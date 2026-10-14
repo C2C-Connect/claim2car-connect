@@ -23,7 +23,7 @@ finalize() {
   for rc in "$capture_rc" "$compare_rc" "$state_rc" "$logs_rc" "$image_rc"; do
     if [ "$final_rc" -eq 0 ] && [ "$rc" -ne 0 ]; then final_rc=$rc; fi
   done
-  printf 'classification=placeholder-scaffold-smoke-only\nacceptance_gates_verified=0/14\nprimary_exit_code=%s\nafter_capture_exit_code=%s\nmanifest_compare_exit_code=%s\ncontainer_state_exit_code=%s\ncontainer_logs_exit_code=%s\nimage_inspect_exit_code=%s\nfinal_exit_code=%s\n' "$primary_rc" "$capture_rc" "$compare_rc" "$state_rc" "$logs_rc" "$image_rc" "$final_rc" > "$root/database-evidence/status.txt"
+  printf 'classification=placeholder-scaffold-smoke-only\nacceptance_gates_verified=0/14\nprimary_exit_code=%s\ngate_verification_exit_code=%s\nafter_capture_exit_code=%s\nmanifest_compare_exit_code=%s\ncontainer_state_exit_code=%s\ncontainer_logs_exit_code=%s\nimage_inspect_exit_code=%s\nfinal_exit_code=%s\n' "$primary_rc" "$gate_verification_rc" "$capture_rc" "$compare_rc" "$state_rc" "$logs_rc" "$image_rc" "$final_rc" > "$root/database-evidence/status.txt"
   (cd "$root" && find database-guard database-evidence -type f -print0 | sort -z | xargs -0 sha256sum) > "$root/checksums.sha256"
   checksum_rc=$?
   if [ "$final_rc" -eq 0 ] && [ "$checksum_rc" -ne 0 ]; then final_rc=$checksum_rc; fi
@@ -33,6 +33,16 @@ finalize() {
 }
 trap finalize EXIT
 python scripts/candidate_manifest.py capture "$root/database-guard/before.json" > "$root/database-guard/before-capture.log" 2>&1
+gate_verification_rc=0
+if python tests/database/verify_gates.py > "$root/database-evidence/gate-verification.log" 2>&1; then
+  gate_verification_rc=0
+else
+  gate_verification_rc=$?
+fi
+cat "$root/database-evidence/gate-verification.log" || true
+if [ "$gate_verification_rc" -ne 0 ]; then
+  exit "$gate_verification_rc"
+fi
 if bash scripts/run_database_acceptance.sh > "$root/database-evidence/harness.log" 2>&1; then
   harness_rc=0
 else
