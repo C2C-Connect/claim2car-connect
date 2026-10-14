@@ -4,7 +4,7 @@ from psycopg.rows import dict_row
 
 DATABASE_URL = os.getenv(
     "APP_DATABASE_URL",
-    "postgresql://faos_app@127.0.0.1:55432/claim2car_test",
+    "postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test",
 )
 TENANT_TABLES = [
     "organizations", "users", "memberships", "dealer_groups",

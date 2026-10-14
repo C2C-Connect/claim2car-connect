@@ -34,6 +34,7 @@ jobs:
           docker cp database/bootstrap.sql faos-active-run-database-1:/tmp/bootstrap.sql
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only';"
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
       - name: Run placeholder guarded acceptance harness
         run: bash scripts/run_guarded_database_acceptance.sh
       - name: Upload smoke-run evidence
