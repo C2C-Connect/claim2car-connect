@@ -20,23 +20,20 @@ jobs:
           pip install 'psycopg[binary,pool]>=3.1.18'
       - name: Start ephemeral PostGIS container
         run: docker compose -p faos-active-run -f compose.database-tests.yml up -d --wait
-      - name: Wait for PostgreSQL
-        run: |
-          for i in {1..30}; do
-            if docker exec faos-active-run-database-1 pg_isready -U postgres -d claim2car_test; then
-              exit 0
-            fi
-            sleep 2
-          done
-          exit 1
-      - name: Apply bootstrap and configure smoke-run migration role
+      - name: Apply bootstrap and configure synthetic roles
         run: |
           docker cp database/bootstrap.sql faos-active-run-database-1:/tmp/bootstrap.sql
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only';"
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
-      - name: Run placeholder guarded acceptance harness
-        run: bash scripts/run_guarded_database_acceptance.sh
+      - name: Run migrations and guarded verification
+        env:
+          FAOS_MIGRATIONS_ALREADY_APPLIED: '1'
+        run: |
+          mkdir -p output/database-runs/migration-preflight
+          set -o pipefail
+          python -m database.migrate 2>&1 | tee output/database-runs/migration-preflight/migrations.log
+          bash scripts/run_guarded_database_acceptance.sh
       - name: Upload smoke-run evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -44,3 +41,6 @@ jobs:
           name: database-smoke-run-evidence
           path: output/database-runs/
           if-no-files-found: warn
+      - name: Remove ephemeral test container
+        if: always()
+        run: docker compose -p faos-active-run -f compose.database-tests.yml down -v

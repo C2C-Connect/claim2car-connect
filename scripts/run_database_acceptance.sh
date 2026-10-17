@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-python -m database.migrate
+if [ "${FAOS_MIGRATIONS_ALREADY_APPLIED:-0}" != "1" ]; then
+  python -m database.migrate
+fi
 python scripts/run_counted_tests.py database --record "$FAOS_EVIDENCE_ROOT/database-evidence/counted-tests.json"
