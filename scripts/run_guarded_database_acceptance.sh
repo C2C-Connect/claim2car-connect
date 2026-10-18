@@ -4,6 +4,7 @@ root="$(python -c 'import uuid; print("output/database-runs/"+uuid.uuid4().hex)'
 mkdir -p "$root/database-guard" "$root/database-evidence"
 root="$(cd "$root" && pwd)"
 export FAOS_EVIDENCE_ROOT="$root"
+gate_verification_rc=not_run
 finalize() {
   primary_rc=$?
   trap - EXIT
@@ -33,7 +34,6 @@ finalize() {
 }
 trap finalize EXIT
 python scripts/candidate_manifest.py capture "$root/database-guard/before.json" > "$root/database-guard/before-capture.log" 2>&1
-gate_verification_rc=0
 if python tests/database/verify_gates.py > "$root/database-evidence/gate-verification.log" 2>&1; then
   gate_verification_rc=0
 else
