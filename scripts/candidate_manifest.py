@@ -11,7 +11,10 @@ REQUIRED = [
  'scripts/candidate_manifest.py','scripts/run_database_acceptance.sh',
  'scripts/run_guarded_database_acceptance.sh','scripts/run_counted_tests.py',
  'compose.database-tests.yml','app/domain_events.py','app/synthetic_evidence.py',
- 'app/evidence_manifest.py','contracts/shot-list.json','test_lifecycle.py']
+ 'app/evidence_manifest.py','contracts/shot-list.json','test_lifecycle.py',
+ 'database/readback.py','tests/database/test_event_contract_regression.py',
+ 'tests/database/test_process_recovery.py','tests/database/test_tenant_context_regression.py',
+ 'tests/database/verify_gates.py','.github/workflows/database-smoke-run.yml']
 def snapshot():
     root=Path(subprocess.check_output(['git','rev-parse','--show-toplevel']).decode().strip()).resolve()
     for name in REQUIRED:
