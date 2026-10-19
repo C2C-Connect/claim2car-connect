@@ -39,6 +39,14 @@ def run_gate_verification():
                 require(tables[table]['relrowsecurity'], 'RLS not enabled: ' + table)
                 require(tables[table]['relforcerowsecurity'], 'FORCE RLS not enabled: ' + table)
             print('[PASS] RLS and FORCE RLS verified for all expected tenant tables')
+            for table in ('manifest_roots', 'completion_receipts'):
+                for privilege in ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'):
+                    cur.execute('SELECT has_table_privilege(current_user,%s,%s) AS allowed',
+                                ('faos.' + table, privilege))
+                    expected = privilege == 'SELECT'
+                    require(cur.fetchone()['allowed'] is expected,
+                            'UNEXPECTED_APP_TABLE_PRIVILEGE:' + table + ':' + privilege)
+            print('[PASS] protected completion tables allow application SELECT but deny direct writes and TRUNCATE')
             cur.execute("SELECT 1 FROM information_schema.routines WHERE routine_schema='faos' AND routine_name='append_event'")
             require(cur.fetchone() is not None, 'faos.append_event missing')
 
