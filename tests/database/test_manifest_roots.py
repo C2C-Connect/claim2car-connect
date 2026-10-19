@@ -55,6 +55,24 @@ class ManifestRootTests(unittest.TestCase):
                 self.assertEqual(caught.exception.sqlstate, '42501')
         self.assertEqual(self.roots(self.tenant), [])
 
+    def test_application_cannot_update_delete_or_truncate_registered_root(self):
+        self.assertEqual(self.register(), 'REGISTERED')
+        expected = [(self.seal, self.digest, self.version)]
+        keys = (self.tenant, self.session, self.seal)
+        statements = (
+            ('UPDATE faos.manifest_roots SET manifest_digest=manifest_digest WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s', keys),
+            ('DELETE FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s', keys),
+            ('TRUNCATE faos.manifest_roots', ()),
+        )
+        for statement, values in statements:
+            with self.subTest(statement=statement):
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
+                    with tenant_transaction(self.conn, self.tenant):
+                        self.conn.execute(statement, values)
+                        raise AssertionError('UNEXPECTED_ROOT_MUTATION_ALLOWED')
+                self.assertEqual(caught.exception.sqlstate, '42501')
+                self.assertEqual(self.roots(self.tenant), expected)
+
     def assert_registration_rejected(self, values, message, context=True):
         with self.assertRaises(psycopg.errors.RaiseException) as caught:
             self.register(values, context=context)
