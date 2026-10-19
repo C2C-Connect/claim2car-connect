@@ -1,17 +1,28 @@
 import argparse, hashlib, json, subprocess
 from pathlib import Path
-REQUIRED = ['requirements.txt', 'requirements-database.txt', 'database/__init__.py', 'database/bootstrap.sql', 'database/migrate.py', 'database/journal.py', 'migrations/0001_tenant_registry.sql', 'migrations/0002_event_journal.sql', 'tests/database/seed.sql', 'tests/database/test_journal_integration.py', 'tests/database/test_adapter_validation.py', 'tests/database/test_remaining_integration.py', 'tests/database/test_access_hardening.py', 'tests/database/test_completion_coverage.py', 'tests/database/test_migration_preflight.py', 'tests/database/test_migration_controls_integration.py', 'scripts/candidate_manifest.py', 'scripts/run_database_acceptance.sh', 'scripts/run_guarded_database_acceptance.sh', 'scripts/run_counted_tests.py', 'compose.database-tests.yml', 'app/domain_events.py', 'app/synthetic_evidence.py', 'app/evidence_manifest.py', 'contracts/shot-list.json', 'test_lifecycle.py', 'database/readback.py', 'tests/database/test_event_contract_regression.py', 'tests/database/test_process_recovery.py', 'tests/database/test_tenant_context_regression.py', 'tests/database/verify_gates.py', '.github/workflows/database-smoke-run.yml', 'database/migration_plan.py', 'tests/database/test_migration_plan.py']
+REQUIRED = ['requirements.txt', 'requirements-database.txt', 'database/__init__.py', 'database/bootstrap.sql', 'database/migrate.py', 'database/journal.py', 'migrations/0001_tenant_registry.sql', 'migrations/0002_event_journal.sql', 'tests/database/seed.sql', 'tests/database/test_journal_integration.py', 'tests/database/test_adapter_validation.py', 'tests/database/test_remaining_integration.py', 'tests/database/test_access_hardening.py', 'tests/database/test_completion_coverage.py', 'tests/database/test_migration_preflight.py', 'tests/database/test_migration_controls_integration.py', 'scripts/candidate_manifest.py', 'scripts/run_database_acceptance.sh', 'scripts/run_guarded_database_acceptance.sh', 'scripts/run_counted_tests.py', 'compose.database-tests.yml', 'app/domain_events.py', 'app/synthetic_evidence.py', 'app/evidence_manifest.py', 'contracts/shot-list.json', 'test_lifecycle.py', 'database/readback.py', 'tests/database/test_event_contract_regression.py', 'tests/database/test_process_recovery.py', 'tests/database/test_tenant_context_regression.py', 'tests/database/verify_gates.py', '.github/workflows/database-smoke-run.yml', 'database/migration_plan.py', 'tests/database/test_migration_plan.py', 'tests/database/test_candidate_manifest.py']
 
 def snapshot():
     root = Path(subprocess.check_output(['git','rev-parse','--show-toplevel']).decode().strip()).resolve()
+    migration_dir = root / 'migrations'
+    if migration_dir.is_symlink():
+        raise ValueError('INVALID_CANDIDATE_PATH:migrations')
+    names = set(REQUIRED)
+    names.update(path.relative_to(root).as_posix() for path in migration_dir.glob('*.sql'))
     rows = []
-    for name in sorted(REQUIRED):
+    for name in sorted(names):
         path = root / name
+        if path.is_symlink() or not path.resolve().is_relative_to(root):
+            raise ValueError('INVALID_CANDIDATE_PATH:' + name)
         if not path.is_file():
             raise ValueError('REQUIRED_FILE_MISSING:' + name)
         data = path.read_bytes()
         rows.append({'path':name,'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)})
     return {'head':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root).decode().strip(),'files':rows}
+
+def compare(first, second):
+    if first != second:
+        raise SystemExit('CANDIDATE_CHANGED_DURING_RUN')
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
@@ -24,5 +35,4 @@ if __name__ == '__main__':
     else:
         if args.second is None:
             parser.error('compare requires two manifests')
-        if json.loads(Path(args.first).read_text())!=json.loads(Path(args.second).read_text()):
-            raise SystemExit('CANDIDATE_CHANGED_DURING_RUN')
+        compare(json.loads(Path(args.first).read_text()), json.loads(Path(args.second).read_text()))
