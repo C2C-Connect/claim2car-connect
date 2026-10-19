@@ -88,6 +88,50 @@ class TestAccessHardening(unittest.TestCase):
             (self.tenant, self.session, 'event-1'),
         )
 
+    def assert_privilege_denied(self, sql, params=None):
+        before = self.history()
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
+            with self.conn.transaction():
+                self.conn.execute(sql, params)
+        self.assertEqual(caught.exception.sqlstate, '42501')
+        self.assertEqual(self.conn.execute('SELECT current_user').fetchone()[0], 'faos_app')
+        self.assertEqual(self.history(), before)
+
+    def test_application_cannot_assume_privileged_roles(self):
+        from psycopg import sql
+        for role in ('faos_writer', 'faos_migrator', 'postgres'):
+            with self.subTest(role=role):
+                self.assertFalse(self.conn.execute("SELECT pg_has_role(current_user,%s,'MEMBER')", (role,)).fetchone()[0])
+                self.assert_privilege_denied(sql.SQL('SET LOCAL ROLE {}').format(sql.Identifier(role)))
+        self.assertEqual(self.append_event('event-2', 2), 'ACCEPTED')
+
+    def test_application_cannot_create_schema_objects(self):
+        from psycopg import sql
+        for schema in ('faos', 'public'):
+            with self.subTest(schema=schema):
+                self.assertFalse(self.conn.execute("SELECT has_schema_privilege(current_user,%s,'CREATE')", (schema,)).fetchone()[0])
+                name = 'forbidden_' + uuid.uuid4().hex
+                statement = sql.SQL('CREATE TABLE {}.{} (value integer)').format(sql.Identifier(schema), sql.Identifier(name))
+                self.assert_privilege_denied(statement)
+        self.assertEqual(self.append_event('event-2', 2), 'ACCEPTED')
+
+    def test_application_cannot_read_or_modify_migration_ledger(self):
+        for privilege in ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'):
+            with self.subTest(privilege=privilege):
+                self.assertFalse(self.conn.execute('SELECT has_table_privilege(current_user,%s,%s)',
+                                 ('public.faos_migration_history', privilege)).fetchone()[0])
+        statements = [
+            ('SELECT name FROM public.faos_migration_history', None),
+            ('INSERT INTO public.faos_migration_history(name,sha256) VALUES (%s,%s)', ('forbidden-' + uuid.uuid4().hex, '0' * 64)),
+            ('UPDATE public.faos_migration_history SET sha256=sha256 WHERE false', None),
+            ('DELETE FROM public.faos_migration_history WHERE false', None),
+            ('TRUNCATE TABLE public.faos_migration_history', None),
+        ]
+        for statement, params in statements:
+            with self.subTest(statement=statement):
+                self.assert_privilege_denied(statement, params)
+        self.assertEqual(self.append_event('event-2', 2), 'ACCEPTED')
+
 
 if __name__ == '__main__':
     unittest.main()
