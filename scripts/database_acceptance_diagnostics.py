@@ -63,9 +63,14 @@ def run():
             except RollbackProbe:
                 pass
             except psycopg.Error as error:
-                report['checks'].append({'id':'G06-DIRECT-SQL-'+name,'status':'UNVERIFIED',
+                constraint = error.diag.constraint_name
+                attributed = (name == 'timestamp' and error.sqlstate == '23514'
+                              and constraint == 'event_timestamp_input_valid')
+                report['checks'].append({'id':'G06-DIRECT-SQL-'+name,'status':'PASS' if attributed else 'UNVERIFIED',
                                         'python_rejection':python_error,'sqlstate':error.sqlstate,
-                                        'reason':'SQL rejection must be attributed to intended validation; this diagnostic captures it for follow-up'})
+                                        'constraint_name':constraint,
+                                        'reason':'Expected malformed-timestamp constraint rejection' if attributed else 'SQL rejection requires attribution to the intended validation rule',
+                                        'scope':'diagnostic assertion only; not full timestamp parity or a gate result'})
             with tenant_transaction(conn,tenants[0]):
                 remaining = conn.execute('SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s',(tenants[0],session)).fetchone()[0]
             if remaining != 0:
