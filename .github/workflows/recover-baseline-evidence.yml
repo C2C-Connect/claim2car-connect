@@ -22,8 +22,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p /tmp/c2c-original-artifact /tmp/c2c-recovered
-          gh api repos/C2C-Connect/claim2car-connect/actions/jobs/118276398032 > /tmp/c2c-recovered/job.json
-          if gh run download 39315674997 --repo C2C-Connect/claim2car-connect --name acceptance-baseline-diagnostics --dir /tmp/c2c-original-artifact; then
+          gh api repos/C2C-Connect/claim2car-connect/actions/jobs/118321821561 > /tmp/c2c-recovered/job.json
+          if gh run download 39328921664 --repo C2C-Connect/claim2car-connect --name acceptance-baseline-diagnostics --dir /tmp/c2c-original-artifact; then
             echo downloaded > /tmp/c2c-recovered/artifact-state.txt
           else
             echo unavailable > /tmp/c2c-recovered/artifact-state.txt
@@ -41,7 +41,9 @@ jobs:
           candidates = list(Path('/tmp/c2c-original-artifact').rglob('report.json'))
           candidates = [p for p in candidates if p.parent.name == 'acceptance-diagnostics']
           metadata['diagnostic_report_count'] = len(candidates)
-          out = Path('acceptance-evidence/39315674997')
+          counted = list(Path('/tmp/c2c-original-artifact').rglob('counted-tests.json'))
+          metadata['counted_test_report_count'] = len(counted)
+          out = Path('acceptance-evidence/39328921664')
           out.mkdir(parents=True,exist_ok=True)
           (out/'job-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
           if len(candidates) == 1:
@@ -49,12 +51,17 @@ jobs:
               allowed = ('classification','commit','contract','gate_passes_awarded','checks','database','extensions','complete_gate_results','overall_acceptance','diagnostics_successful','execution_error_type')
               sanitized = {key: report[key] for key in allowed if key in report}
               (out/'diagnostic-report.json').write_text(json.dumps(sanitized,indent=2)+'\n')
+          if len(counted) == 1:
+              record = json.loads(counted[0].read_text())
+              allowed = ('suite','discovered','executed','failures','errors','skipped','expected_failures','unexpected_successes','successful','tests')
+              sanitized = {key: record[key] for key in allowed if key in record}
+              (out/'counted-tests.json').write_text(json.dumps(sanitized,indent=2)+'\n')
       - name: Publish evidence on dedicated branch
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git checkout -b acceptance-evidence/39315674997
-          git add acceptance-evidence/39315674997/
-          git commit -m 'Preserve original baseline diagnostic report and job metadata'
-          git push origin HEAD:refs/heads/acceptance-evidence/39315674997
+          git checkout -b acceptance-evidence/39328921664
+          git add acceptance-evidence/39328921664/
+          git commit -m 'Preserve timestamp remediation diagnostic and component results'
+          git push origin HEAD:refs/heads/acceptance-evidence/39328921664
