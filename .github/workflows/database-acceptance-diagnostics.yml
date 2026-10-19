@@ -5,7 +5,7 @@ on:
       - 'database-acceptance-run/**'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   baseline-diagnostics:
     runs-on: ubuntu-latest
@@ -58,6 +58,44 @@ jobs:
           name: acceptance-baseline-diagnostics
           path: output/
           if-no-files-found: error
+      - name: Prepare connector-readable structured evidence
+        if: always()
+        shell: python
+        run: |
+          import json, os, subprocess
+          from pathlib import Path
+          source = subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          run = os.environ['GITHUB_RUN_ID']
+          attempt = os.environ['GITHUB_RUN_ATTEMPT']
+          out = Path('acceptance-evidence') / (run+'-'+attempt)
+          out.mkdir(parents=True,exist_ok=True)
+          metadata = {'candidate_commit':source,'run_id':run,'run_attempt':attempt,
+                      'classification':'component-and-diagnostic-evidence-not-gate-certification',
+                      'gate_passes_awarded':0}
+          report = Path('output/acceptance-diagnostics/report.json')
+          metadata['diagnostic_report_present'] = report.is_file()
+          if report.is_file():
+              value = json.loads(report.read_text())
+              allowed = ('classification','commit','contract','gate_passes_awarded','checks','database','extensions','complete_gate_results','overall_acceptance','diagnostics_successful','execution_error_type')
+              (out/'diagnostic-report.json').write_text(json.dumps({k:value[k] for k in allowed if k in value},indent=2)+'\n')
+          counted = list(Path('output/database-runs').rglob('counted-tests.json'))
+          metadata['counted_test_report_count'] = len(counted)
+          if len(counted) == 1:
+              value = json.loads(counted[0].read_text())
+              allowed = ('suite','discovered','executed','failures','errors','skipped','expected_failures','unexpected_successes','successful','tests')
+              (out/'counted-tests.json').write_text(json.dumps({k:value[k] for k in allowed if k in value},indent=2)+'\n')
+          (out/'evidence-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
+      - name: Publish evidence without changing candidate branch
+        if: always()
+        run: |
+          evidence_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test -f "acceptance-evidence/$evidence_id/evidence-metadata.json"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "acceptance-evidence/$evidence_id"
+          git add "acceptance-evidence/$evidence_id/"
+          git commit -m "Preserve structured diagnostic evidence for $evidence_id"
+          git push origin "HEAD:refs/heads/acceptance-evidence/$evidence_id"
       - name: Remove isolated database
         if: always()
         run: docker compose -p faos-active-run -f compose.database-tests.yml down -v
