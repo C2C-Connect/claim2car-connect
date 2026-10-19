@@ -1,0 +1,63 @@
+name: Isolated database acceptance baseline diagnostics
+on:
+  push:
+    branches:
+      - 'database-acceptance-run/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  baseline-diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_DATABASE_URL: postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test
+      MIGRATION_DATABASE_URL: postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55432/claim2car_test
+      MIGRATION_TEST_ADMIN_URL: postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install synthetic test dependencies
+        run: pip install 'psycopg[binary,pool]>=3.1.18'
+      - name: Start isolated database
+        run: docker compose -p faos-active-run -f compose.database-tests.yml up -d --wait
+      - name: Bootstrap synthetic roles and apply actual migrations
+        run: |
+          mkdir -p output/acceptance-diagnostics
+          docker cp database/bootstrap.sql faos-active-run-database-1:/tmp/bootstrap.sql
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only'; ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
+          set -o pipefail
+          python -m database.migrate 2>&1 | tee output/acceptance-diagnostics/migrations.log
+          git rev-parse HEAD > output/acceptance-diagnostics/commit.txt
+          pip freeze > output/acceptance-diagnostics/python-dependencies.txt
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c 'TABLE public.faos_migration_history;' > output/acceptance-diagnostics/migration-ledger.txt
+      - name: Existing guarded component suite
+        env:
+          FAOS_MIGRATIONS_ALREADY_APPLIED: '1'
+        run: bash scripts/run_guarded_database_acceptance.sh
+      - name: Direct SQL baseline diagnostics
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p output/acceptance-diagnostics
+          set -o pipefail
+          python -m scripts.database_acceptance_diagnostics 2>&1 | tee output/acceptance-diagnostics/diagnostics.log
+      - name: Preserve environment evidence
+        if: always()
+        run: |
+          mkdir -p output/acceptance-diagnostics
+          docker compose -p faos-active-run -f compose.database-tests.yml ps -a > output/acceptance-diagnostics/container-state.txt
+          docker compose -p faos-active-run -f compose.database-tests.yml logs --no-color > output/acceptance-diagnostics/container.log
+          docker image inspect postgis/postgis:16-3.4 > output/acceptance-diagnostics/image.json
+      - name: Upload baseline evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-baseline-diagnostics
+          path: output/
+          if-no-files-found: error
+      - name: Remove isolated database
+        if: always()
+        run: docker compose -p faos-active-run -f compose.database-tests.yml down -v
