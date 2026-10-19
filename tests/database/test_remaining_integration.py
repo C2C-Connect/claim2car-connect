@@ -82,6 +82,68 @@ class TestRemainingIntegration(unittest.TestCase):
                 self.set_context(tenant)
                 self.assert_own_rows_only(tenant)
 
+    def seed_users(self):
+        user = str(uuid.uuid4())
+        for tenant in self.tenants:
+            self.set_context(tenant)
+            self.conn.execute('INSERT INTO faos.users(tenant_id,user_id,external_subject) VALUES (%s,%s,%s)',
+                              (tenant, user, 'synthetic-' + tenant))
+        return user
+
+    def test_cross_tenant_user_insert_denied(self):
+        own, other = self.tenants
+        user = str(uuid.uuid4())
+        self.set_context(own)
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
+            with self.conn.transaction():
+                self.conn.execute('INSERT INTO faos.users(tenant_id,user_id,external_subject) VALUES (%s,%s,%s)',
+                                  (other, user, 'attempt-' + user))
+        self.assertEqual(caught.exception.sqlstate, '42501')
+        self.set_context(other)
+        self.assertEqual(self.conn.execute('SELECT count(*) FROM faos.users WHERE user_id=%s', (user,)).fetchone()[0], 0)
+        self.set_context(own)
+        result = self.conn.execute('INSERT INTO faos.users(tenant_id,user_id,external_subject) VALUES (%s,%s,%s)',
+                                   (own, user, 'own-' + user))
+        self.assertEqual(result.rowcount, 1)
+
+    def test_cross_tenant_user_update_affects_no_rows(self):
+        user = self.seed_users()
+        own, other = self.tenants
+        self.set_context(own)
+        denied = self.conn.execute('UPDATE faos.users SET external_subject=%s WHERE tenant_id=%s AND user_id=%s',
+                                   ('tampered', other, user))
+        self.assertEqual(denied.rowcount, 0)
+        allowed = self.conn.execute('UPDATE faos.users SET external_subject=%s WHERE tenant_id=%s AND user_id=%s',
+                                    ('own-updated', own, user))
+        self.assertEqual(allowed.rowcount, 1)
+        self.assertEqual(self.conn.execute('SELECT external_subject FROM faos.users WHERE user_id=%s', (user,)).fetchall(), [('own-updated',)])
+        self.set_context(other)
+        self.assertEqual(self.conn.execute('SELECT external_subject FROM faos.users WHERE user_id=%s', (user,)).fetchall(), [('synthetic-' + other,)])
+
+    def test_cross_tenant_user_delete_affects_no_rows(self):
+        user = self.seed_users()
+        own, other = self.tenants
+        self.set_context(own)
+        denied = self.conn.execute('DELETE FROM faos.users WHERE tenant_id=%s AND user_id=%s', (other, user))
+        self.assertEqual(denied.rowcount, 0)
+        allowed = self.conn.execute('DELETE FROM faos.users WHERE tenant_id=%s AND user_id=%s', (own, user))
+        self.assertEqual(allowed.rowcount, 1)
+        self.assertEqual(self.conn.execute('SELECT count(*) FROM faos.users WHERE user_id=%s', (user,)).fetchone()[0], 0)
+        self.set_context(other)
+        self.assertEqual(self.conn.execute('SELECT external_subject FROM faos.users WHERE user_id=%s', (user,)).fetchall(), [('synthetic-' + other,)])
+
+    def test_missing_context_user_insert_denied(self):
+        own = self.tenants[0]
+        user = str(uuid.uuid4())
+        self.set_context('')
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
+            with self.conn.transaction():
+                self.conn.execute('INSERT INTO faos.users(tenant_id,user_id,external_subject) VALUES (%s,%s,%s)',
+                                  (own, user, 'missing-context-' + user))
+        self.assertEqual(caught.exception.sqlstate, '42501')
+        self.set_context(own)
+        self.assertEqual(self.conn.execute('SELECT count(*) FROM faos.users WHERE user_id=%s', (user,)).fetchone()[0], 0)
+
 
 if __name__ == '__main__':
     unittest.main()
