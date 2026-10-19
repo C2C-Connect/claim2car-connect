@@ -1,0 +1,125 @@
+{
+  "id": 118276398032,
+  "run_id": 39315674997,
+  "head_sha": "560b5873ce58acd0571e7ff58b1cda6c93449b09",
+  "status": "completed",
+  "conclusion": "failure",
+  "started_at": "2026-10-19T20:00:32Z",
+  "completed_at": "2026-10-19T20:01:04Z",
+  "steps": [
+    {
+      "name": "Set up job",
+      "number": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:00:33Z",
+      "completed_at": "2026-10-19T20:00:34Z"
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "number": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:00:34Z",
+      "completed_at": "2026-10-19T20:00:34Z"
+    },
+    {
+      "name": "Run actions/setup-python@v5",
+      "number": 3,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:00:34Z",
+      "completed_at": "2026-10-19T20:00:34Z"
+    },
+    {
+      "name": "Install synthetic test dependencies",
+      "number": 4,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:00:34Z",
+      "completed_at": "2026-10-19T20:00:39Z"
+    },
+    {
+      "name": "Start isolated database",
+      "number": 5,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:00:39Z",
+      "completed_at": "2026-10-19T20:00:52Z"
+    },
+    {
+      "name": "Bootstrap synthetic roles and apply actual migrations",
+      "number": 6,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:00:52Z",
+      "completed_at": "2026-10-19T20:00:53Z"
+    },
+    {
+      "name": "Existing guarded component suite",
+      "number": 7,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:00:53Z",
+      "completed_at": "2026-10-19T20:01:00Z"
+    },
+    {
+      "name": "Direct SQL baseline diagnostics",
+      "number": 8,
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-10-19T20:01:00Z",
+      "completed_at": "2026-10-19T20:01:00Z"
+    },
+    {
+      "name": "Preserve environment evidence",
+      "number": 9,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:01:00Z",
+      "completed_at": "2026-10-19T20:01:00Z"
+    },
+    {
+      "name": "Upload baseline evidence even on failure",
+      "number": 10,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:01:00Z",
+      "completed_at": "2026-10-19T20:01:01Z"
+    },
+    {
+      "name": "Remove isolated database",
+      "number": 11,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:01:01Z",
+      "completed_at": "2026-10-19T20:01:02Z"
+    },
+    {
+      "name": "Post Run actions/setup-python@v5",
+      "number": 21,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-19T20:01:02Z",
+      "completed_at": "2026-10-19T20:01:02Z"
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "number": 22,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:01:02Z",
+      "completed_at": "2026-10-19T20:01:02Z"
+    },
+    {
+      "name": "Complete job",
+      "number": 23,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-19T20:01:02Z",
+      "completed_at": "2026-10-19T20:01:02Z"
+    }
+  ],
+  "artifact_state": "downloaded",
+  "diagnostic_report_count": 1
+}
