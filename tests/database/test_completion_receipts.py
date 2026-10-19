@@ -59,6 +59,25 @@ class CompletionReceiptTests(unittest.TestCase):
                 self.assertEqual(caught.exception.sqlstate, '42501')
         self.assertEqual(self.receipts(), [])
 
+    def test_application_cannot_update_delete_or_truncate_recorded_receipt(self):
+        f = self.fixture
+        self.assertEqual(self.record(), 'RECORDED')
+        expected = [(self.request, f.seal, len(f.events), 'faos_writer')]
+        keys = (f.tenant, f.session, self.request)
+        statements = (
+            ('UPDATE faos.completion_receipts SET seal_event_id=seal_event_id WHERE tenant_id=%s AND session_id=%s AND request_id=%s', keys),
+            ('DELETE FROM faos.completion_receipts WHERE tenant_id=%s AND session_id=%s AND request_id=%s', keys),
+            ('TRUNCATE faos.completion_receipts', ()),
+        )
+        for statement, values in statements:
+            with self.subTest(statement=statement):
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
+                    with tenant_transaction(f.conn, f.tenant):
+                        f.conn.execute(statement, values)
+                        raise AssertionError('UNEXPECTED_RECEIPT_MUTATION_ALLOWED')
+                self.assertEqual(caught.exception.sqlstate, '42501')
+                self.assertEqual(self.receipts(), expected)
+
     def test_wrong_sequence_rejected_without_receipt(self):
         values = self.values()
         self.assert_rejected(values[:-1] + (values[-1]+1,), 'COMPLETION_SEQUENCE_CHANGED')
