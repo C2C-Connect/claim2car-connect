@@ -70,5 +70,44 @@ class EventContractRegression(unittest.TestCase):
         payload['injected'] = True
         self.assertEqual(self.event.payload, {})
 
+
+class DurableTimestampRegression(unittest.TestCase):
+    """SQL input-validity boundary; not complete timestamp-contract parity."""
+    def setUp(self):
+        import test_journal_integration as fixtures
+        self.fixture = fixtures.TestJournalIntegration()
+        self.addCleanup(self.fixture.doCleanups)
+        self.fixture.setUp()
+        self.conn = self.fixture.conn
+
+    def append_at(self, timestamp):
+        f = self.fixture
+        return self.conn.execute(
+            'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+            (f.tenant,f.session,'timestamp-event',2,'SESSION_CREATED','synthetic-test',timestamp,'timestamp SQL regression','{}','0.1'),
+        ).fetchone()[0]
+
+    def test_malformed_timestamp_rejected_without_history_mutation(self):
+        import psycopg
+        before = self.fixture.history()
+        for timestamp in ('not-a-timestamp','2026-02-30T00:00:00Z',''):
+            with self.subTest(timestamp=timestamp):
+                with self.assertRaises(psycopg.errors.CheckViolation) as caught:
+                    with self.conn.transaction():
+                        self.append_at(timestamp)
+                        raise AssertionError('INVALID_TIMESTAMP_ACCEPTED')
+                self.assertEqual(caught.exception.sqlstate,'23514')
+                self.assertEqual(caught.exception.diag.constraint_name,'event_timestamp_input_valid')
+                self.assertEqual(self.fixture.history(),before)
+        self.assertEqual(self.append_at('2026-01-01T00:00:00Z'),'ACCEPTED')
+        self.assertEqual(self.append_at('2026-01-01T00:00:00Z'),'DUPLICATE')
+        self.assertEqual(len(self.fixture.history()),len(before)+1)
+
+    def test_offset_timestamp_round_trips_exact_text(self):
+        timestamp = '2026-01-01T00:00:00+05:30'
+        self.assertEqual(self.append_at(timestamp),'ACCEPTED')
+        self.assertEqual(self.fixture.history()[-1][4],timestamp)
+
+
 if __name__ == '__main__':
     unittest.main()
