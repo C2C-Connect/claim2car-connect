@@ -1,0 +1,9 @@
+{
+  "candidate_commit": "46b543f40a83d1284c743fb27e733de037e3548c",
+  "run_id": "39331747602",
+  "run_attempt": "1",
+  "classification": "component-and-diagnostic-evidence-not-gate-certification",
+  "gate_passes_awarded": 0,
+  "diagnostic_report_present": true,
+  "counted_test_report_count": 1
+}
