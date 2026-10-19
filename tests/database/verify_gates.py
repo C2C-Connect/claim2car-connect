@@ -11,6 +11,7 @@ DATABASE_URL = os.getenv(
 TENANT_TABLES = [
     'organizations', 'users', 'memberships', 'dealer_groups',
     'dealer_locations', 'location_brands', 'sessions', 'events',
+    'manifest_roots', 'completion_receipts',
 ]
 
 
