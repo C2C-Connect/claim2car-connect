@@ -30,6 +30,14 @@ def discover(directory):
         raise ValueError('DUPLICATE_MIGRATION_VERSION')
     return tuple(result)
 
+def discover_authority(root=None):
+    root = Path(root) if root is not None else Path(__file__).resolve().parents[1]
+    plan = tuple(sorted(discover(root/'migrations') + discover(root/'authority_migrations'),key=lambda item:item.name))
+    versions = [item.name.split('_',1)[0] for item in plan]
+    if len(versions) != len(set(versions)):
+        raise ValueError('DUPLICATE_MIGRATION_VERSION')
+    return plan
+
 def pending(candidate, history):
     history = tuple(history)
     if len(history) > len(candidate):

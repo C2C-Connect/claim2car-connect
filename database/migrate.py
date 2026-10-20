@@ -1,13 +1,14 @@
-"""Synthetic acceptance runner; not a production migration tool.
+"""Transactional foundation migrator; full authority plan is the default.
 
-Only reviewed, transaction-compatible SQL is supported. SQL must not contain
-transaction control or modify the migration ledger/lock. Existing nonempty
-schemas without a ledger are rejected: this runner does not adopt a baseline.
+Not production-certified. Provisioning and recovery rehearsal remain prerequisites.
+SQL must not contain transaction control or modify the migration ledger/lock.
+Nonempty schemas without a ledger cannot be adopted by this runner.
 """
+import argparse
 import os
 from pathlib import Path
 import psycopg
-from database.migration_plan import discover, pending
+from database.migration_plan import discover, discover_authority, pending
 
 LOCK_KEY = 734190281632
 LEDGER_DDL = """
@@ -38,12 +39,21 @@ def apply(conn, candidate):
                          (migration.name, migration.sha256))
     return tuple(item.name for item in plan)
 
-def run_migrations():
-    candidate = discover(Path(__file__).resolve().parents[1] / 'migrations')
-    url = os.getenv('MIGRATION_DATABASE_URL', 'postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55432/claim2car_test')
-    with psycopg.connect(url, autocommit=True) as conn:
+def run_migrations(legacy_baseline=False):
+    root = Path(__file__).resolve().parents[1]
+    if legacy_baseline:
+        if os.environ.get('FAOS_LEGACY_BASELINE_ALLOWED') != '1':
+            raise ValueError('EXPLICIT_LEGACY_TEST_BASELINE_REQUIRED')
+        candidate = discover(root/'migrations')
+    else:
+        candidate = discover_authority(root)
+    url = os.environ['MIGRATION_DATABASE_URL']
+    with psycopg.connect(url, autocommit=True, connect_timeout=5) as conn:
         return apply(conn, candidate)
 
 if __name__ == '__main__':
-    for name in run_migrations():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--legacy-baseline',action='store_true',help='Disposable pre-cutover comparison tests only; requires FAOS_LEGACY_BASELINE_ALLOWED=1')
+    args = parser.parse_args()
+    for name in run_migrations(legacy_baseline=args.legacy_baseline):
         print('Applied migration: ' + name)

@@ -1,11 +1,14 @@
 name: Database authority cutover verification
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   push:
-    branches:
-      - 'database-acceptance-run/**'
+    branches: [main, acceptance, 'acceptance/**', 'database-acceptance-run/**', 'release/**', 'release-candidate/**', 'rc/**']
+    tags: ['rc-*', 'v*-rc*']
+  merge_group:
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   authority-cutover:
     runs-on: ubuntu-latest
@@ -16,6 +19,8 @@ jobs:
       MIGRATION_TEST_ADMIN_URL: postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -23,25 +28,27 @@ jobs:
         run: pip install 'psycopg[binary,pool]>=3.1.18'
       - name: Start isolated database
         run: docker compose -p faos-active-run -f compose.database-tests.yml up -d --wait
-      - name: Bootstrap and initialize legacy schema through 0007
+      - name: Bootstrap and initialize explicit legacy test baseline through 0007
+        env:
+          FAOS_LEGACY_BASELINE_ALLOWED: '1'
         run: |
           mkdir -p output/acceptance-diagnostics
           docker cp database/bootstrap.sql faos-active-run-database-1:/tmp/bootstrap.sql
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only'; ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
           set -o pipefail
-          python -m database.migrate 2>&1 | tee output/acceptance-diagnostics/legacy-migrations.log
+          python -m database.migrate --legacy-baseline 2>&1 | tee output/acceptance-diagnostics/legacy-migrations.log
           git rev-parse HEAD > output/acceptance-diagnostics/commit.txt
           pip freeze > output/acceptance-diagnostics/python-dependencies.txt
-      - name: Pre-cutover components and isolated authority integration tests
+      - name: Pre-cutover components and isolated full-plan migration/integration tests
         env:
           FAOS_MIGRATIONS_ALREADY_APPLIED: '1'
         run: bash scripts/run_guarded_database_acceptance.sh
-      - name: Upgrade primary disposable database to authority track
+      - name: Upgrade primary database using the normal full-authority entry point and rerun
         run: |
           set -o pipefail
-          python -m database.authority_migrate 2>&1 | tee output/acceptance-diagnostics/authority-migrations.log
-          python -m database.authority_migrate 2>&1 | tee output/acceptance-diagnostics/authority-rerun.log
+          python -m database.migrate 2>&1 | tee output/acceptance-diagnostics/authority-migrations.log
+          python -m database.migrate 2>&1 | tee output/acceptance-diagnostics/authority-rerun.log
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c 'TABLE public.faos_migration_history;' > output/acceptance-diagnostics/migration-ledger.txt
       - name: Post-cutover authority and validation diagnostics
         run: |
@@ -54,28 +61,20 @@ jobs:
           docker compose -p faos-active-run -f compose.database-tests.yml ps -a > output/acceptance-diagnostics/container-state.txt
           docker compose -p faos-active-run -f compose.database-tests.yml logs --no-color > output/acceptance-diagnostics/container.log
           docker image inspect postgis/postgis:16-3.4 > output/acceptance-diagnostics/image.json
-      - name: Upload evidence even on failure
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: acceptance-baseline-diagnostics
-          path: output/
-          if-no-files-found: error
-      - name: Prepare connector-readable structured evidence
+      - name: Prepare structured evidence without repository writes
         if: always()
         shell: python
         run: |
           import json, os, subprocess
           from pathlib import Path
           source = subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-          run = os.environ['GITHUB_RUN_ID']
-          attempt = os.environ['GITHUB_RUN_ATTEMPT']
-          out = Path('acceptance-evidence') / (run+'-'+attempt)
+          out = Path('output/structured-evidence')
           out.mkdir(parents=True,exist_ok=True)
-          metadata = {'candidate_commit':source,'run_id':run,'run_attempt':attempt,
+          metadata = {'candidate_commit':source,'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
+                      'event':os.environ['GITHUB_EVENT_NAME'],'ref':os.environ['GITHUB_REF'],
                       'classification':'phased-authority-cutover-not-gate-certification','gate_passes_awarded':0,
-                      'component_phase':'legacy primary schema through0007; isolated authority integration databases through0008',
-                      'diagnostic_phase':'primary database after authority migration0008'}
+                      'component_phase':'legacy primary through0007; isolated full-authority migration and integration databases',
+                      'diagnostic_phase':'primary after full default migration plan through0008'}
           report = Path('output/acceptance-diagnostics/report.json')
           metadata['diagnostic_report_present'] = report.is_file()
           if report.is_file():
@@ -88,20 +87,55 @@ jobs:
               value = json.loads(counted[0].read_text())
               allowed = ('suite','discovered','executed','failures','errors','skipped','expected_failures','unexpected_successes','successful','tests')
               record = {k:value[k] for k in allowed if k in value}
-              record['primary_schema_phase'] = 'pre-cutover-through0007; not a complete post-cutover regression suite'
+              record['primary_schema_phase'] = 'pre-cutover-through0007; not a complete primary-post-cutover regression suite'
               (out/'counted-tests.json').write_text(json.dumps(record,indent=2)+'\n')
           (out/'evidence-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
-      - name: Publish evidence without changing candidate branch
+      - name: Upload evidence even on failure
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-baseline-diagnostics
+          path: output/
+          if-no-files-found: error
+      - name: Remove isolated database
+        if: always()
+        run: docker compose -p faos-active-run -f compose.database-tests.yml down -v
+  publish-evidence:
+    needs: authority-cutover
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_type == 'branch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: acceptance-baseline-diagnostics
+          path: downloaded-evidence
+      - name: Copy allowlisted JSON only; never execute downloaded candidate code
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          source = Path('downloaded-evidence/structured-evidence')
+          metadata = json.loads((source/'evidence-metadata.json').read_text())
+          expected = {'candidate_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT']}
+          if any(metadata.get(k)!=v for k,v in expected.items()):
+              raise ValueError('EVIDENCE_SOURCE_MISMATCH')
+          out = Path('acceptance-evidence')/(os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT'])
+          out.mkdir(parents=True,exist_ok=True)
+          for name in ('evidence-metadata.json','diagnostic-report.json','counted-tests.json'):
+              path = source/name
+              if path.is_file():
+                  (out/name).write_text(json.dumps(json.loads(path.read_text()),indent=2)+'\n')
+      - name: Publish structured evidence on a dedicated branch
         run: |
           evidence_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          test -f "acceptance-evidence/$evidence_id/evidence-metadata.json"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -b "acceptance-evidence/$evidence_id"
           git add "acceptance-evidence/$evidence_id/"
           git commit -m "Preserve structured authority cutover evidence for $evidence_id"
           git push origin "HEAD:refs/heads/acceptance-evidence/$evidence_id"
-      - name: Remove isolated database
-        if: always()
-        run: docker compose -p faos-active-run -f compose.database-tests.yml down -v

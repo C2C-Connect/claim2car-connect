@@ -1,17 +1,16 @@
-"""Real PostgreSQL tests in a unique disposable database per method.
-Requires the synthetic CI bootstrap roles and a database-creating admin.
-Does not connect to production; defaults match the ephemeral compose stack.
-"""
+"""Real PostgreSQL migration controls in unique disposable databases."""
 from dataclasses import replace
 import hashlib
 import os
+from pathlib import Path
 import unittest
+from unittest.mock import patch
 import uuid
 import psycopg
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
-from database.migrate import apply, LOCK_KEY
-from database.migration_plan import Migration
+from database.migrate import apply, LOCK_KEY, run_migrations
+from database.migration_plan import Migration, discover, discover_authority
 
 class MigrationControlsIntegration(unittest.TestCase):
     def setUp(self):
@@ -67,3 +66,36 @@ class MigrationControlsIntegration(unittest.TestCase):
                 self.assertIsNone(self.conn.execute("SELECT to_regclass('public.faos_migration_history')").fetchone()[0])
             self.conn.execute("SET lock_timeout = '0'")
             self.assertEqual(apply(self.conn,(self.first,)),(self.first.name,))
+
+    def authority_plan(self):
+        return discover_authority(Path(__file__).resolve().parents[2])
+
+    def test_default_entry_point_clean_full_initialization_and_rerun(self):
+        plan = self.authority_plan()
+        self.assertEqual(plan[-1].name,'0008_tenant_login_authority.sql')
+        with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
+            self.assertEqual(run_migrations(),tuple(item.name for item in plan))
+            before = self.history()
+            self.assertEqual(run_migrations(),())
+        self.assertEqual(self.history(),[(item.name,item.sha256) for item in plan])
+        self.assertEqual(self.history(),before)
+        self.assertIsNotNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
+
+    def test_default_entry_point_upgrades_legacy_seven_migration_schema(self):
+        legacy = discover(Path(__file__).resolve().parents[2]/'migrations')
+        self.assertEqual(len(legacy),7)
+        apply(self.conn,legacy)
+        self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
+        with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql',))
+            self.assertEqual(run_migrations(),())
+        self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
+
+    def test_applied_authority_migration_checksum_change_is_rejected(self):
+        plan = self.authority_plan()
+        apply(self.conn,plan)
+        before = self.history()
+        changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0008_tenant_login_authority'):
+            apply(self.conn,changed)
+        self.assertEqual(self.history(),before)
