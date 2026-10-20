@@ -1,4 +1,4 @@
-"""Real faos integration in disposable DBs; not cutover of shared-login fixtures."""
+"""Real faos authority-track integration in disposable databases."""
 import os
 from pathlib import Path
 import unittest
@@ -10,7 +10,7 @@ from app.domain_events import DomainEvent
 from database.journal import append, tenant_transaction
 from database.readback import load_journal
 from database.migrate import apply
-from database.migration_plan import discover
+from database.authority_migrate import migration_plan
 
 class TenantAuthorityIntegration(unittest.TestCase):
     def setUp(self):
@@ -31,9 +31,7 @@ class TenantAuthorityIntegration(unittest.TestCase):
         self.addCleanup(self.drop_database)
         root = Path(__file__).resolve().parents[2]
         with psycopg.connect(make_conninfo(url,dbname=self.db,user='faos_migrator',password='synthetic-migrator-only'),autocommit=True,connect_timeout=5) as migrator:
-            apply(migrator,discover(root/'migrations'))
-            with migrator.transaction():
-                migrator.execute((root/'database/tenant_authority_candidate.sql').read_text())
+            apply(migrator,migration_plan(root))
         self.seed = psycopg.connect(make_conninfo(url,dbname=self.db),autocommit=True,connect_timeout=5)
         self.addCleanup(self.seed.close)
         self.tenants = [str(uuid.uuid4()),str(uuid.uuid4())]
