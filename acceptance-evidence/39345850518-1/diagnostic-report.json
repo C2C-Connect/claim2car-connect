@@ -1,0 +1,89 @@
+{
+  "classification": "baseline-diagnostics-not-gate-certification",
+  "commit": "420749e97fe2274e0997a375bfc4fc816d6228fc",
+  "contract": "C2C-DB-AC-001 v1.0 proposed",
+  "gate_passes_awarded": 0,
+  "checks": [
+    {
+      "id": "G04-DIRECT-SQL-TENANT-SWITCH",
+      "status": "FAIL",
+      "threat_model": "actor can execute arbitrary SQL as shared faos_app role",
+      "other_tenant_visible": true,
+      "scope": "diagnostic assertion only; not a complete gate result"
+    },
+    {
+      "id": "G06-DIRECT-SQL-timestamp",
+      "status": "PASS",
+      "python_rejection": "INVALID_TIMESTAMP",
+      "sqlstate": "23514",
+      "constraint_name": "event_timestamp_input_valid",
+      "reason": "Expected named constraint rejection",
+      "scope": "diagnostic assertion only; not full canonicalization/timestamp parity or a gate result"
+    },
+    {
+      "id": "G06-DIRECT-SQL-canonical_payload",
+      "status": "PASS",
+      "python_rejection": "NONCANONICAL_PAYLOAD",
+      "sqlstate": "23514",
+      "constraint_name": "event_payload_compact",
+      "reason": "Expected named constraint rejection",
+      "scope": "diagnostic assertion only; not full canonicalization/timestamp parity or a gate result"
+    },
+    {
+      "id": "G06-DIRECT-SQL-payload_leading",
+      "status": "PASS",
+      "python_rejection": "NONCANONICAL_PAYLOAD",
+      "sqlstate": "23514",
+      "constraint_name": "event_payload_compact",
+      "reason": "Expected named constraint rejection",
+      "scope": "diagnostic assertion only; not full canonicalization/timestamp parity or a gate result"
+    },
+    {
+      "id": "G06-DIRECT-SQL-payload_nested",
+      "status": "PASS",
+      "python_rejection": "NONCANONICAL_PAYLOAD",
+      "sqlstate": "23514",
+      "constraint_name": "event_payload_compact",
+      "reason": "Expected named constraint rejection",
+      "scope": "diagnostic assertion only; not full canonicalization/timestamp parity or a gate result"
+    },
+    {
+      "id": "G06-COMPACT-JSON-POSITIVE-CONTROL",
+      "status": "PASS",
+      "first_append": "ACCEPTED",
+      "identical_retry": "DUPLICATE",
+      "exact_payload_readback": true,
+      "rollback_verified": true,
+      "scope": "spaces and escaped quotes inside strings preserved; no full canonicalization claim"
+    }
+  ],
+  "database": [
+    "claim2car_test",
+    "PostgreSQL 16.4 (Debian 16.4-1.pgdg110+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit"
+  ],
+  "extensions": [
+    [
+      "fuzzystrmatch",
+      "1.2"
+    ],
+    [
+      "plpgsql",
+      "1.0"
+    ],
+    [
+      "postgis",
+      "3.4.3"
+    ],
+    [
+      "postgis_tiger_geocoder",
+      "3.4.3"
+    ],
+    [
+      "postgis_topology",
+      "3.4.3"
+    ]
+  ],
+  "complete_gate_results": "NOT RUN",
+  "overall_acceptance": "NOT ACCEPTED",
+  "diagnostics_successful": false
+}
