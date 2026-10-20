@@ -1,0 +1,11 @@
+{
+  "candidate_commit": "3d7ada31e21a69901c7692d212cd6ec8201f3808",
+  "run_id": "39383556525",
+  "run_attempt": "1",
+  "classification": "phased-authority-cutover-not-gate-certification",
+  "gate_passes_awarded": 0,
+  "component_phase": "legacy primary schema through0007; isolated authority integration databases through0008",
+  "diagnostic_phase": "primary database after authority migration0008",
+  "diagnostic_report_present": true,
+  "counted_test_report_count": 1
+}
