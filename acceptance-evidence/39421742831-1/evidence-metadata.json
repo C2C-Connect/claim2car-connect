@@ -1,0 +1,13 @@
+{
+  "candidate_commit": "cc96f46cb0fc146162e07cbb8e419b1c18c05401",
+  "run_id": "39421742831",
+  "run_attempt": "1",
+  "event": "push",
+  "ref": "refs/heads/database-acceptance-run/20261014-104900",
+  "classification": "phased-authority-cutover-not-gate-certification",
+  "gate_passes_awarded": 0,
+  "component_phase": "legacy primary through0007; isolated full-authority migration and integration databases",
+  "diagnostic_phase": "primary after full default migration plan through0008",
+  "diagnostic_report_present": true,
+  "counted_test_report_count": 1
+}
