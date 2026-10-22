@@ -1,0 +1,13 @@
+{
+  "candidate_commit": "f574d47cd6e6f59c10666f8e4b0c7770d8a30df8",
+  "run_id": "39849995392",
+  "run_attempt": "1",
+  "event": "push",
+  "ref": "refs/heads/acceptance/capture-core",
+  "classification": "phased-authority-cutover-not-gate-certification",
+  "gate_passes_awarded": 0,
+  "component_phase": "legacy primary through0007; isolated full-authority migration and integration databases",
+  "diagnostic_phase": "primary after full default migration plan through0008",
+  "diagnostic_report_present": true,
+  "counted_test_report_count": 1
+}
