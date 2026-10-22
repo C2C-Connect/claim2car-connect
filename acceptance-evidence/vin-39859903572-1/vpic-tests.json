@@ -1,0 +1,74 @@
+{
+  "classification": "offline-synthetic-vpic-response-adapter-not-live-service-validation",
+  "commit": "a5045b7e2f4c5154bb90e7a18ca2a50adcfb5076",
+  "runtime": "v22.23.3",
+  "executed": 16,
+  "failures": 0,
+  "successful": true,
+  "tests": [
+    {
+      "id": "clean_profile_and_explicit_lb_to_kg_conversion",
+      "outcome": "passed"
+    },
+    {
+      "id": "missing_mass_is_not_zero_or_gvwr",
+      "outcome": "passed"
+    },
+    {
+      "id": "invalid_mass_is_never_clamped_or_defaulted",
+      "outcome": "passed"
+    },
+    {
+      "id": "mass_outside_unspecified_bounds_is_preserved_not_approved",
+      "outcome": "passed"
+    },
+    {
+      "id": "decode_errors_and_mixed_codes_block",
+      "outcome": "passed"
+    },
+    {
+      "id": "missing_decode_status_blocks",
+      "outcome": "passed"
+    },
+    {
+      "id": "suggested_vin_is_never_substituted",
+      "outcome": "passed"
+    },
+    {
+      "id": "response_for_another_vin_cannot_become_active_profile",
+      "outcome": "passed"
+    },
+    {
+      "id": "invalid_request_vin_blocks_before_touching_payload",
+      "outcome": "passed"
+    },
+    {
+      "id": "malformed_and_ambiguous_response_shapes_block",
+      "outcome": "passed"
+    },
+    {
+      "id": "required_profile_fields_remain_missing_not_generic_defaults",
+      "outcome": "passed"
+    },
+    {
+      "id": "malformed_year_does_not_become_a_default",
+      "outcome": "passed"
+    },
+    {
+      "id": "request_normalization_uses_the_same_vin_guard",
+      "outcome": "passed"
+    },
+    {
+      "id": "raw_fields_are_retained_without_aliasing_input",
+      "outcome": "passed"
+    },
+    {
+      "id": "oversized_response_blocks",
+      "outcome": "passed"
+    },
+    {
+      "id": "unknown_profile_sentinel_is_not_treated_as_identity",
+      "outcome": "passed"
+    }
+  ]
+}
