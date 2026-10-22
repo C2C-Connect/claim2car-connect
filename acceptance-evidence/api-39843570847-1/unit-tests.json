@@ -1,0 +1,69 @@
+{
+  "suite": "api-unit",
+  "discovered": 11,
+  "executed": 11,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "expected_failures": 0,
+  "unexpected_successes": 0,
+  "successful": true,
+  "tests": [
+    {
+      "id": "test_health.HealthTests.test_app_factory_does_not_connect_at_startup",
+      "outcome": "passed",
+      "duration_seconds": 0.012237
+    },
+    {
+      "id": "test_health.HealthTests.test_false_or_truthy_non_boolean_probe_is_not_accepted",
+      "outcome": "passed",
+      "duration_seconds": 0.024155
+    },
+    {
+      "id": "test_health.HealthTests.test_liveness_never_connects_to_database",
+      "outcome": "passed",
+      "duration_seconds": 0.004403
+    },
+    {
+      "id": "test_health.HealthTests.test_missing_configuration_fails_readiness_without_fallback",
+      "outcome": "passed",
+      "duration_seconds": 0.005061
+    },
+    {
+      "id": "test_health.HealthTests.test_only_read_only_health_routes_are_exposed",
+      "outcome": "passed",
+      "duration_seconds": 0.013349
+    },
+    {
+      "id": "test_health.HealthTests.test_probe_checks_all_prerequisites_with_read_only_timeouts",
+      "outcome": "passed",
+      "duration_seconds": 0.001724
+    },
+    {
+      "id": "test_health.HealthTests.test_request_cannot_supply_database_or_tenant_authority",
+      "outcome": "passed",
+      "duration_seconds": 0.004725
+    },
+    {
+      "id": "test_health.HealthTests.test_settings_repr_redacts_database_url",
+      "outcome": "passed",
+      "duration_seconds": 5.4e-05
+    },
+    {
+      "id": "test_health.HealthTests.test_unavailable_database_fails_closed_without_leaking_details",
+      "outcome": "passed",
+      "duration_seconds": 0.006347
+    },
+    {
+      "id": "test_health.HealthTests.test_unexpected_probe_exception_also_fails_closed",
+      "outcome": "passed",
+      "duration_seconds": 0.00504
+    },
+    {
+      "id": "test_health.HealthTests.test_valid_probe_reports_infrastructure_only",
+      "outcome": "passed",
+      "duration_seconds": 0.005077
+    }
+  ],
+  "commit": "4a15f73a88d00388144d2e34c8461f8815457f33"
+}
