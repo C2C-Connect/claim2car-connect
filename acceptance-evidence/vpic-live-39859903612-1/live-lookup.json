@@ -1,0 +1,32 @@
+{
+  "classification": "single-live-vpic-test-vin-not-browser-or-vehicle-authenticity-proof",
+  "commit": "a5045b7e2f4c5154bb90e7a18ca2a50adcfb5076",
+  "vin": "1HGCM82633A004352",
+  "runtime": "v22.23.3",
+  "successful": true,
+  "transport": {
+    "status": "response_received",
+    "reason": null,
+    "httpStatus": 200
+  },
+  "decode": {
+    "status": "parsed",
+    "reason": null,
+    "decodeErrorCode": "0",
+    "suggestedVin": null,
+    "physicsReady": false,
+    "massBoundsConfigured": false
+  },
+  "profile": {
+    "vin": "1HGCM82633A004352",
+    "make": "HONDA",
+    "model": "Accord",
+    "modelYear": 2003,
+    "bodyClass": "Coupe",
+    "curbWeightStatus": "unavailable",
+    "curbWeightLb": null,
+    "curbWeightKg": null
+  },
+  "elapsed_ms": 303,
+  "completed_at_runner": "2026-10-22T21:46:23.346Z"
+}
