@@ -7,6 +7,8 @@ REQUIRED += ['app/identity.py','tests/database/test_identity_boundary.py']
 
 REQUIRED += ['database/capture_sessions.py','tests/database/test_capture_sessions_integration.py']
 
+REQUIRED += ['app/capture_api.py','tests/api/test_capture_api.py']
+
 def snapshot():
     root = Path(subprocess.check_output(['git','rev-parse','--show-toplevel']).decode().strip()).resolve()
     migration_dir = root / 'migrations'
