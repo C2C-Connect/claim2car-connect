@@ -1,0 +1,67 @@
+name: Recover baseline diagnostic evidence
+on:
+  push:
+    branches:
+      - 'database-acceptance-run/**'
+    paths:
+      - '.github/workflows/recover-baseline-evidence.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  recover-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: C2C-Connect/claim2car-connect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve original job metadata and artifact
+        shell: bash
+        run: |
+          mkdir -p /tmp/c2c-original-artifact /tmp/c2c-recovered
+          gh api repos/C2C-Connect/claim2car-connect/actions/jobs/118321821561 > /tmp/c2c-recovered/job.json
+          if gh run download 39328921664 --repo C2C-Connect/claim2car-connect --name acceptance-baseline-diagnostics --dir /tmp/c2c-original-artifact; then
+            echo downloaded > /tmp/c2c-recovered/artifact-state.txt
+          else
+            echo unavailable > /tmp/c2c-recovered/artifact-state.txt
+          fi
+      - name: Extract only structured diagnostic evidence
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          root = Path('/tmp/c2c-recovered')
+          job = json.loads((root/'job.json').read_text())
+          metadata = {key: job.get(key) for key in ('id','run_id','head_sha','status','conclusion','started_at','completed_at')}
+          metadata['steps'] = [{key: step.get(key) for key in ('name','number','status','conclusion','started_at','completed_at')} for step in job.get('steps',[])]
+          metadata['artifact_state'] = (root/'artifact-state.txt').read_text().strip()
+          candidates = list(Path('/tmp/c2c-original-artifact').rglob('report.json'))
+          candidates = [p for p in candidates if p.parent.name == 'acceptance-diagnostics']
+          metadata['diagnostic_report_count'] = len(candidates)
+          counted = list(Path('/tmp/c2c-original-artifact').rglob('counted-tests.json'))
+          metadata['counted_test_report_count'] = len(counted)
+          out = Path('acceptance-evidence/39328921664')
+          out.mkdir(parents=True,exist_ok=True)
+          (out/'job-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
+          if len(candidates) == 1:
+              report = json.loads(candidates[0].read_text())
+              allowed = ('classification','commit','contract','gate_passes_awarded','checks','database','extensions','complete_gate_results','overall_acceptance','diagnostics_successful','execution_error_type')
+              sanitized = {key: report[key] for key in allowed if key in report}
+              (out/'diagnostic-report.json').write_text(json.dumps(sanitized,indent=2)+'\n')
+          if len(counted) == 1:
+              record = json.loads(counted[0].read_text())
+              allowed = ('suite','discovered','executed','failures','errors','skipped','expected_failures','unexpected_successes','successful','tests')
+              sanitized = {key: record[key] for key in allowed if key in record}
+              (out/'counted-tests.json').write_text(json.dumps(sanitized,indent=2)+'\n')
+      - name: Publish evidence on dedicated branch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b acceptance-evidence/39328921664
+          git add acceptance-evidence/39328921664/
+          git commit -m 'Preserve timestamp remediation diagnostic and component results'
+          git push origin HEAD:refs/heads/acceptance-evidence/39328921664

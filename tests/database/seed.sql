@@ -1,0 +1,1 @@
+INSERT INTO faos.organizations (tenant_id, name) VALUES ('00000000-0000-0000-0000-000000000001', 'Test Tenant') ON CONFLICT DO NOTHING;

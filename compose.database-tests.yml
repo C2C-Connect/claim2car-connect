@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  database:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: claim2car_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: synthetic-container-only
+    ports:
+      - target: 5432
+        published: 55432
+        host_ip: 127.0.0.1
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d claim2car_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20

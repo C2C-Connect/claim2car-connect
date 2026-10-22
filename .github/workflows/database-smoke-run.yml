@@ -1,0 +1,51 @@
+name: Legacy database component verification
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
+  push:
+    branches: [main, acceptance, 'acceptance/**', 'database-acceptance-run/**', 'release/**', 'release-candidate/**', 'rc/**']
+    tags: ['rc-*', 'v*-rc*']
+  merge_group:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install 'psycopg[binary,pool]>=3.1.18'
+      - name: Start ephemeral PostGIS container
+        run: docker compose -p faos-active-run -f compose.database-tests.yml up -d --wait
+      - name: Apply bootstrap and configure synthetic roles
+        run: |
+          docker cp database/bootstrap.sql faos-active-run-database-1:/tmp/bootstrap.sql
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only'; ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
+      - name: Run explicit pre-cutover baseline and guarded components
+        env:
+          FAOS_MIGRATIONS_ALREADY_APPLIED: '1'
+          FAOS_LEGACY_BASELINE_ALLOWED: '1'
+          MIGRATION_DATABASE_URL: postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55432/claim2car_test
+        run: |
+          mkdir -p output/database-runs/migration-preflight
+          set -o pipefail
+          python -m database.migrate --legacy-baseline 2>&1 | tee output/database-runs/migration-preflight/migrations.log
+          bash scripts/run_guarded_database_acceptance.sh
+      - name: Upload component evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-smoke-run-evidence
+          path: output/database-runs/
+          if-no-files-found: error
+      - name: Remove ephemeral test container
+        if: always()
+        run: docker compose -p faos-active-run -f compose.database-tests.yml down -v

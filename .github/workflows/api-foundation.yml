@@ -1,0 +1,126 @@
+name: FastAPI foundation verification
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
+  push:
+    branches: [main, acceptance, 'acceptance/**', 'database-acceptance-run/**', 'release/**', 'release-candidate/**', 'rc/**']
+    tags: ['rc-*', 'v*-rc*']
+  merge_group:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  api-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_DATABASE_URL: postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test
+      MIGRATION_DATABASE_URL: postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55432/claim2car_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install API and test dependencies
+        run: |
+          mkdir -p output/api-foundation
+          pip install -r requirements-api.txt 'httpx>=0.27,<1'
+          pip freeze > output/api-foundation/dependencies.txt
+      - name: Capture candidate before verification
+        run: python scripts/candidate_manifest.py capture output/api-foundation/before.json
+      - name: Counted ASGI unit tests with mocked database I/O
+        shell: python
+        run: |
+          import json, subprocess, sys, unittest
+          from pathlib import Path
+          sys.path.insert(0,str(Path.cwd()))
+          from scripts.run_counted_tests import run_suite
+          record=run_suite(unittest.defaultTestLoader.discover('tests/api',pattern='test_*.py'))
+          record['suite']='api-unit'
+          record['commit']=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          Path('output/api-foundation/unit-tests.json').write_text(json.dumps(record,indent=2)+'\n')
+          raise SystemExit(0 if record['successful'] else 1)
+      - name: Start disposable database and bootstrap restricted synthetic roles
+        run: |
+          docker compose -p faos-active-run -f compose.database-tests.yml up -d --wait
+          docker cp database/bootstrap.sql faos-active-run-database-1:/tmp/bootstrap.sql
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only'; ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
+      - name: Live Uvicorn must reject an unmigrated database
+        run: python -m scripts.api_health_acceptance --stage unmigrated
+      - name: Live Uvicorn must reject the legacy-only schema
+        env:
+          FAOS_LEGACY_BASELINE_ALLOWED: '1'
+        run: |
+          python -m database.migrate --legacy-baseline
+          python -m scripts.api_health_acceptance --stage legacy
+      - name: Live Uvicorn must accept the full authority-schema prerequisites
+        run: |
+          python -m database.migrate
+          python -m database.migrate
+          python -m scripts.api_health_acceptance --stage authority
+      - name: Database outage must fail readiness while liveness stays available
+        run: |
+          docker compose -p faos-active-run -f compose.database-tests.yml stop database
+          python -m scripts.api_health_acceptance --stage unavailable
+      - name: Verify candidate did not change during execution
+        if: always()
+        run: |
+          mkdir -p output/api-foundation
+          python scripts/candidate_manifest.py capture output/api-foundation/after.json
+          python scripts/candidate_manifest.py compare output/api-foundation/before.json output/api-foundation/after.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-foundation-evidence
+          path: output/api-foundation/
+          if-no-files-found: error
+      - name: Remove disposable database
+        if: always()
+        run: docker compose -p faos-active-run -f compose.database-tests.yml down -v
+  publish-api-evidence:
+    needs: api-health
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_type == 'branch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      VERIFICATION_RESULT: ${{ needs.api-health.result }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-foundation-evidence
+          path: downloaded-api-evidence
+      - name: Preserve allowlisted JSON evidence only
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          out=Path('acceptance-evidence')/('api-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT'])
+          out.mkdir(parents=True,exist_ok=True)
+          metadata={'candidate_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
+                    'classification':'health-only-api-foundation-not-business-acceptance','event':os.environ['GITHUB_EVENT_NAME'],
+                    'verification_job_result':os.environ['VERIFICATION_RESULT'],'reports_present':[]}
+          for name in ('unit-tests.json','unmigrated.json','legacy.json','authority.json','unavailable.json'):
+              path=Path('downloaded-api-evidence')/name
+              if path.is_file():
+                  value=json.loads(path.read_text())
+                  if value.get('commit')!=os.environ['GITHUB_SHA']:
+                      raise ValueError('API_EVIDENCE_SOURCE_MISMATCH')
+                  (out/name).write_text(json.dumps(value,indent=2)+'\n')
+                  metadata['reports_present'].append(name)
+          (out/'evidence-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
+      - name: Publish without changing candidate branch
+        run: |
+          evidence_id="api-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "acceptance-evidence/$evidence_id"
+          git add "acceptance-evidence/$evidence_id/"
+          git commit -m "Preserve API foundation evidence for $evidence_id"
+          git push origin "HEAD:refs/heads/acceptance-evidence/$evidence_id"
