@@ -1,0 +1,10 @@
+{
+  "candidate_commit": "56f8b970090c35818201cfadb6acada89b1f0ffd",
+  "run_id": "39855104004",
+  "run_attempt": "1",
+  "classification": "offline-vin-and-vpic-parser-not-live-service-or-camera-validation",
+  "event": "push",
+  "verification_job_result": "success",
+  "report_present": true,
+  "vpic_report_present": true
+}
