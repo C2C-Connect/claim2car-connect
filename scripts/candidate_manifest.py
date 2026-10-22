@@ -5,6 +5,8 @@ REQUIRED += ['database/authority_migrate.py', 'authority_migrations/0008_tenant_
 REQUIRED += ['app/main.py','requirements-api.txt','tests/api/test_health.py','scripts/api_health_acceptance.py','.github/workflows/api-foundation.yml','docs/api-foundation.md']
 REQUIRED += ['app/identity.py','tests/database/test_identity_boundary.py']
 
+REQUIRED += ['database/capture_sessions.py','tests/database/test_capture_sessions_integration.py']
+
 def snapshot():
     root = Path(subprocess.check_output(['git','rev-parse','--show-toplevel']).decode().strip()).resolve()
     migration_dir = root / 'migrations'
