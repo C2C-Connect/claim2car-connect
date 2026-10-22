@@ -1,0 +1,21 @@
+{
+  "classification": "live-http-and-database-prerequisite-checks-not-business-acceptance",
+  "commit": "08e1de1652bb2898d81b95e250413d11e821ef82",
+  "stage": "unmigrated",
+  "checks": [
+    {
+      "id": "LIVENESS",
+      "status": "PASS"
+    },
+    {
+      "id": "READINESS-unmigrated",
+      "status": "PASS",
+      "expected_http_status": 503
+    },
+    {
+      "id": "NO-BUSINESS-WRITE-ROUTE",
+      "status": "PASS"
+    }
+  ],
+  "successful": true
+}
