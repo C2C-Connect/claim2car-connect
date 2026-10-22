@@ -1,0 +1,85 @@
+name: Frontend VIN core verification
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
+  push:
+    branches: [main, acceptance, 'acceptance/**', 'database-acceptance-run/**', 'release/**', 'release-candidate/**', 'rc/**']
+    tags: ['rc-*', 'v*-rc*']
+  merge_group:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  vin-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Guard candidate and execute offline VIN assertions
+        run: |
+          mkdir -p output/frontend-vin
+          python scripts/candidate_manifest.py capture output/frontend-vin/before.json
+          node frontend/tests/vin.test.mjs > output/frontend-vin/vin-tests.json
+      - name: Verify unchanged candidate even on failure
+        if: always()
+        run: |
+          mkdir -p output/frontend-vin
+          python scripts/candidate_manifest.py capture output/frontend-vin/after.json
+          python scripts/candidate_manifest.py compare output/frontend-vin/before.json output/frontend-vin/after.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-vin-evidence
+          path: output/frontend-vin/
+          if-no-files-found: error
+  publish-vin-evidence:
+    needs: vin-validation
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_type == 'branch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      VERIFICATION_RESULT: ${{ needs.vin-validation.result }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-vin-evidence
+          path: downloaded-vin-evidence
+      - name: Preserve report JSON without executing downloaded code
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          out=Path('acceptance-evidence')/('vin-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT'])
+          out.mkdir(parents=True,exist_ok=True)
+          metadata={'candidate_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
+                    'classification':'offline-vin-format-checkdigit-not-identity-or-camera-validation','event':os.environ['GITHUB_EVENT_NAME'],
+                    'verification_job_result':os.environ['VERIFICATION_RESULT'],'report_present':False}
+          report=Path('downloaded-vin-evidence/vin-tests.json')
+          if report.is_file():
+              value=json.loads(report.read_text())
+              if value.get('commit')!=os.environ['GITHUB_SHA']:
+                  raise ValueError('VIN_EVIDENCE_SOURCE_MISMATCH')
+              (out/'vin-tests.json').write_text(json.dumps(value,indent=2)+'\n')
+              metadata['report_present']=True
+          (out/'evidence-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
+      - name: Publish evidence without changing candidate branch
+        run: |
+          evidence_id="vin-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "acceptance-evidence/$evidence_id"
+          git add "acceptance-evidence/$evidence_id/"
+          git commit -m "Preserve frontend VIN evidence for $evidence_id"
+          git push origin "HEAD:refs/heads/acceptance-evidence/$evidence_id"
