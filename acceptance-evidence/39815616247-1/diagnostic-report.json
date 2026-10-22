@@ -1,0 +1,1396 @@
+{
+  "classification": "post-cutover-authority-diagnostics-not-gate-certification",
+  "commit": "08e1de1652bb2898d81b95e250413d11e821ef82",
+  "contract": "C2C-DB-AC-001 v1.0 proposed",
+  "gate_passes_awarded": 0,
+  "checks": [
+    {
+      "id": "BOUND-APPEND-RETRY-READBACK",
+      "status": "PASS"
+    },
+    {
+      "id": "G04-DIRECT-SQL-TENANT-SWITCH",
+      "status": "PASS",
+      "other_tenant_visible": false
+    },
+    {
+      "id": "UNBOUND-SHARED-LOGIN-DENIED",
+      "status": "PASS"
+    },
+    {
+      "id": "PRIVATE-AUTHORITY-REGISTRY",
+      "status": "PASS"
+    },
+    {
+      "id": "G06-timestamp",
+      "status": "PASS",
+      "constraint_name": "event_timestamp_input_valid"
+    },
+    {
+      "id": "G06-compact_payload",
+      "status": "PASS",
+      "constraint_name": "event_payload_compact"
+    },
+    {
+      "id": "COMPACT-JSON-POSITIVE-CONTROL",
+      "status": "PASS"
+    },
+    {
+      "id": "POSTCUTOVER-PER-TABLE-ISOLATION",
+      "status": "PASS",
+      "table_count": 10,
+      "tenant_directions": 2,
+      "fixture_classification": "admin-provisioned storage-isolation fixtures; not evidence evaluation or accepted completion",
+      "results": [
+        {
+          "tenant_index": 0,
+          "table": "organizations",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "users",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "memberships",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "dealer_groups",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "dealer_locations",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "location_brands",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "sessions",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "writer_tenant",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "events",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "writer_tenant",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 3
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "manifest_roots",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_root_read",
+                  "SELECT",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_roots",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "completion_receipts",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_receipt_read",
+                  "SELECT",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_receipts",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "organizations",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "users",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "memberships",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "dealer_groups",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "dealer_locations",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "location_brands",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "sessions",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "writer_tenant",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "events",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "writer_tenant",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 2
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "manifest_roots",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_root_read",
+                  "SELECT",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_roots",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "completion_receipts",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_receipt_read",
+                  "SELECT",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_receipts",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        }
+      ],
+      "assertion_count": 200
+    },
+    {
+      "id": "BINDING-REVOCATION-NEXT-TRANSACTION",
+      "status": "PASS"
+    }
+  ],
+  "database": [
+    "claim2car_test",
+    "PostgreSQL 16.4 (Debian 16.4-1.pgdg110+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit"
+  ],
+  "extensions": [
+    [
+      "fuzzystrmatch",
+      "1.2"
+    ],
+    [
+      "plpgsql",
+      "1.0"
+    ],
+    [
+      "postgis",
+      "3.4.3"
+    ],
+    [
+      "postgis_tiger_geocoder",
+      "3.4.3"
+    ],
+    [
+      "postgis_topology",
+      "3.4.3"
+    ]
+  ],
+  "migration_inventory": [
+    [
+      "0001_tenant_registry.sql",
+      "0cbf695b51f57124a071fd125af91e3fc889a727e80d8935559957e2c8627d65"
+    ],
+    [
+      "0002_event_journal.sql",
+      "11e02549f8bb03f0f17301303573605eb635d0425ca95ba9f0eb761237e2fdcb"
+    ],
+    [
+      "0003_completion_lock.sql",
+      "5905aa2971cb38d6fb0b8f3838fbc6ce120fe2a0f2cfa2b91795e3b908f87678"
+    ],
+    [
+      "0004_manifest_roots.sql",
+      "de933f3a7261c1cbacd1793a802e4e1b8940370a9c316cf272ce6ab76946c7b7"
+    ],
+    [
+      "0005_completion_receipts.sql",
+      "1d106bcdc57599f1c763f2b60d4ddb84048090c61dd2a16489d7c7503de67332"
+    ],
+    [
+      "0006_event_timestamp_validity.sql",
+      "b333fbbcd134cdf5c9a3261640924ab08c7294b36c40335ab98665d744006e39"
+    ],
+    [
+      "0007_event_payload_compactness.sql",
+      "47fba2b4be66ba9a27ed0d36eb0dd68df726036edc52d242ee47a672b363b456"
+    ],
+    [
+      "0008_tenant_login_authority.sql",
+      "b50e1010f635984a467a2f23d9184165f372b82f857ca88405dfef3c7d099983"
+    ]
+  ],
+  "complete_gate_results": "NOT RUN",
+  "overall_acceptance": "NOT ACCEPTED",
+  "diagnostics_successful": true
+}
