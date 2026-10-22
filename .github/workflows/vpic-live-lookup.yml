@@ -1,0 +1,96 @@
+name: Live vPIC single-VIN verification
+on:
+  push:
+    branches: ['acceptance/capture-core']
+    paths: ['.github/workflows/vpic-live-lookup.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-lookup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: One real lookup through committed transport and parser; no fixture fallback
+        run: |
+          mkdir -p output/vpic-live
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          import {fetchVpicPayload} from './frontend/src/modules/capture/vpic_transport.mjs';
+          import {parseVpicResponse} from './frontend/src/modules/capture/vpic.mjs';
+          const vin='1HGCM82633A004352';
+          const start=Date.now();
+          const report={classification:'single-live-vpic-test-vin-not-browser-or-vehicle-authenticity-proof',commit:process.env.GITHUB_SHA,vin,runtime:process.version,successful:false};
+          try {
+            const received=await fetchVpicPayload(vin,{timeoutMs:10000,maxBytes:262144});
+            report.transport={status:received.status,reason:received.reason,httpStatus:received.httpStatus};
+            if(received.status==='response_received'){
+              const parsed=parseVpicResponse(received.vin,received.payload);
+              report.decode={status:parsed.status,reason:parsed.reason,decodeErrorCode:parsed.decodeErrorCode,suggestedVin:parsed.suggestedVin,physicsReady:parsed.physicsReady,massBoundsConfigured:parsed.massBoundsConfigured};
+              report.profile=parsed.profile;
+              report.successful=parsed.status==='parsed'&&parsed.profile.vin===vin;
+            }
+          } catch(error) {
+            report.execution_error_type=error.name;
+          }
+          report.elapsed_ms=Date.now()-start;
+          report.completed_at_runner=new Date().toISOString();
+          writeFileSync('output/vpic-live/live-lookup.json',JSON.stringify(report,null,2)+'\n');
+          console.log(JSON.stringify({successful:report.successful,transport:report.transport,decode:report.decode},null,2));
+          process.exitCode=report.successful?0:1;
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vpic-live-evidence
+          path: output/vpic-live/
+          if-no-files-found: warn
+  publish-live-evidence:
+    needs: live-lookup
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_type == 'branch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    env:
+      VERIFICATION_RESULT: ${{ needs.live-lookup.result }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: vpic-live-evidence
+          path: downloaded-vpic-live
+      - name: Preserve live result with exact provenance
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          out=Path('acceptance-evidence')/('vpic-live-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT'])
+          out.mkdir(parents=True,exist_ok=True)
+          metadata={'candidate_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
+                    'classification':'single-live-vpic-test-vin-not-deployment-or-camera-validation',
+                    'verification_job_result':os.environ['VERIFICATION_RESULT'],'report_present':False}
+          source=Path('downloaded-vpic-live/live-lookup.json')
+          if source.is_file():
+              report=json.loads(source.read_text())
+              if report.get('commit')!=os.environ['GITHUB_SHA']:
+                  raise ValueError('LIVE_VPIC_EVIDENCE_SOURCE_MISMATCH')
+              (out/'live-lookup.json').write_text(json.dumps(report,indent=2)+'\n')
+              metadata['report_present']=True
+          (out/'evidence-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
+      - name: Publish report only; do not modify candidate branch
+        run: |
+          evidence_id="vpic-live-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "acceptance-evidence/$evidence_id"
+          git add "acceptance-evidence/$evidence_id/"
+          git commit -m "Preserve live vPIC evidence for $evidence_id"
+          git push origin "HEAD:refs/heads/acceptance-evidence/$evidence_id"
