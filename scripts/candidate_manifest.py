@@ -11,6 +11,8 @@ REQUIRED += ['app/capture_api.py','tests/api/test_capture_api.py']
 
 REQUIRED += ['frontend/src/modules/capture/vin.mjs','frontend/src/modules/capture/vin.d.mts','frontend/tests/vin.test.mjs','.github/workflows/frontend-vin-core.yml']
 
+REQUIRED += ['frontend/src/modules/capture/vpic.mjs','frontend/src/modules/capture/vpic.d.mts','frontend/tests/vpic.test.mjs']
+
 def snapshot():
     root = Path(subprocess.check_output(['git','rev-parse','--show-toplevel']).decode().strip()).resolve()
     migration_dir = root / 'migrations'
