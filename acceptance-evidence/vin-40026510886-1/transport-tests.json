@@ -1,0 +1,86 @@
+{
+  "classification": "local-mocked-fetch-and-stream-transport-tests-not-live-service-or-browser-proof",
+  "commit": "2edc6e508ceefc7215b2870e836a1a34f3b2e3d8",
+  "runtime": "v22.23.3",
+  "executed": 19,
+  "failures": 0,
+  "successful": true,
+  "tests": [
+    {
+      "id": "valid_json_received_without_decoded_profile_claim",
+      "outcome": "passed"
+    },
+    {
+      "id": "invalid_vin_never_calls_fetch",
+      "outcome": "passed"
+    },
+    {
+      "id": "only_fixed_endpoint_and_normalized_vin_used",
+      "outcome": "passed"
+    },
+    {
+      "id": "custom_endpoint_option_is_not_accepted",
+      "outcome": "passed"
+    },
+    {
+      "id": "http_errors_do_not_create_payload_defaults",
+      "outcome": "passed"
+    },
+    {
+      "id": "rate_limit_is_explicit_without_automatic_retry",
+      "outcome": "passed"
+    },
+    {
+      "id": "unexpected_response_origin_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "html_instead_of_json_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "malformed_json_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "declared_oversize_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "actual_stream_size_enforced",
+      "outcome": "passed"
+    },
+    {
+      "id": "missing_body_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "pre_cancelled_request_never_fetches",
+      "outcome": "passed"
+    },
+    {
+      "id": "inflight_cancellation_works_even_if_fixture_ignores_abort",
+      "outcome": "passed"
+    },
+    {
+      "id": "fetch_timeout_does_not_wait_for_ignored_abort",
+      "outcome": "passed"
+    },
+    {
+      "id": "body_read_timeout_is_also_bounded",
+      "outcome": "passed"
+    },
+    {
+      "id": "network_exception_details_not_returned",
+      "outcome": "passed"
+    },
+    {
+      "id": "invalid_timeout_cannot_disable_deadline",
+      "outcome": "passed"
+    },
+    {
+      "id": "late_response_cannot_replace_timeout_result",
+      "outcome": "passed"
+    }
+  ]
+}
