@@ -1,0 +1,66 @@
+{
+  "classification": "offline-vin-format-checkdigit-unit-tests-not-vehicle-authenticity",
+  "commit": "68b1217dcddf1af540e9db6722ca532596fc3349",
+  "runtime": "v22.23.3",
+  "executed": 14,
+  "failures": 0,
+  "successful": true,
+  "tests": [
+    {
+      "id": "numeric_check_digit",
+      "outcome": "passed"
+    },
+    {
+      "id": "remainder_ten_requires_x",
+      "outcome": "passed"
+    },
+    {
+      "id": "lowercase_normalizes_without_changing_identity",
+      "outcome": "passed"
+    },
+    {
+      "id": "ascii_separators_are_removed_and_original_retained",
+      "outcome": "passed"
+    },
+    {
+      "id": "wrong_check_digit_is_not_repaired",
+      "outcome": "passed"
+    },
+    {
+      "id": "illegal_i_o_q_are_never_substituted",
+      "outcome": "passed"
+    },
+    {
+      "id": "short_and_long_vins_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "non_string_inputs_rejected",
+      "outcome": "passed"
+    },
+    {
+      "id": "unicode_confusables_not_silently_rewritten",
+      "outcome": "passed"
+    },
+    {
+      "id": "oversized_input_has_bounded_report",
+      "outcome": "passed"
+    },
+    {
+      "id": "standard_weights_are_immutable",
+      "outcome": "passed"
+    },
+    {
+      "id": "report_is_immutable",
+      "outcome": "passed"
+    },
+    {
+      "id": "failure_has_exact_recapture_message",
+      "outcome": "passed"
+    },
+    {
+      "id": "checksum_pass_is_not_decoded_identity",
+      "outcome": "passed"
+    }
+  ]
+}
