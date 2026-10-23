@@ -1,4 +1,4 @@
-name: Frontend VIN and vPIC response verification
+name: Frontend VIN, decoder and transport verification
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
@@ -29,6 +29,7 @@ jobs:
           python scripts/candidate_manifest.py capture output/frontend-vin/before.json
           node frontend/tests/vin.test.mjs > output/frontend-vin/vin-tests.json
           node frontend/tests/vpic.test.mjs > output/frontend-vin/vpic-tests.json
+          node frontend/tests/vpic_transport.test.mjs > output/frontend-vin/transport-tests.json
       - name: Verify unchanged candidate even on failure
         if: always()
         run: |
@@ -65,16 +66,16 @@ jobs:
           out=Path('acceptance-evidence')/('vin-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT'])
           out.mkdir(parents=True,exist_ok=True)
           metadata={'candidate_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
-                    'classification':'offline-vin-and-vpic-parser-not-live-service-or-camera-validation','event':os.environ['GITHUB_EVENT_NAME'],
-                    'verification_job_result':os.environ['VERIFICATION_RESULT'],'report_present':False,'vpic_report_present':False}
-          for name in ('vin-tests.json','vpic-tests.json'):
+                    'classification':'offline-vin-decoder-and-mocked-transport-not-browser-or-live-service-validation','event':os.environ['GITHUB_EVENT_NAME'],
+                    'verification_job_result':os.environ['VERIFICATION_RESULT'],'report_present':False,'vpic_report_present':False,'transport_report_present':False}
+          for name in ('vin-tests.json','vpic-tests.json','transport-tests.json'):
               report=Path('downloaded-vin-evidence')/name
               if report.is_file():
                   value=json.loads(report.read_text())
                   if value.get('commit')!=os.environ['GITHUB_SHA']:
                       raise ValueError('VIN_EVIDENCE_SOURCE_MISMATCH')
                   (out/name).write_text(json.dumps(value,indent=2)+'\n')
-                  metadata['report_present' if name=='vin-tests.json' else 'vpic_report_present']=True
+                  metadata[{'vin-tests.json':'report_present','vpic-tests.json':'vpic_report_present','transport-tests.json':'transport_report_present'}[name]]=True
           (out/'evidence-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
       - name: Publish evidence without changing candidate branch
         run: |
