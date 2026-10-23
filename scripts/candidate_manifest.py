@@ -15,6 +15,8 @@ REQUIRED += ['frontend/src/modules/capture/vpic.mjs','frontend/src/modules/captu
 
 REQUIRED += ['frontend/src/modules/capture/vpic_transport.mjs','frontend/tests/vpic_transport.test.mjs','.github/workflows/vpic-live-lookup.yml']
 
+REQUIRED += ['frontend/tests/vpic_transport.test.mjs']
+
 def snapshot():
     root = Path(subprocess.check_output(['git','rev-parse','--show-toplevel']).decode().strip()).resolve()
     migration_dir = root / 'migrations'
