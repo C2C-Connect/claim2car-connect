@@ -1,0 +1,184 @@
+{
+  "suite": "api-unit",
+  "discovered": 34,
+  "executed": 34,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "expected_failures": 0,
+  "unexpected_successes": 0,
+  "successful": true,
+  "tests": [
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_body_cannot_choose_tenant_actor_or_database_login",
+      "outcome": "passed",
+      "duration_seconds": 0.039327
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_capture_factory_requires_explicit_server_configuration",
+      "outcome": "passed",
+      "duration_seconds": 0.000809
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_config_database_target_and_login_must_match",
+      "outcome": "passed",
+      "duration_seconds": 0.001255
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_create_returns_201_and_preserves_server_metadata",
+      "outcome": "passed",
+      "duration_seconds": 0.003844
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_get_ignores_attempted_query_and_header_tenant_override",
+      "outcome": "passed",
+      "duration_seconds": 0.003628
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_idempotent_retry_returns_200",
+      "outcome": "passed",
+      "duration_seconds": 0.003587
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_invalid_and_duplicate_config_keys_fail_without_secrets",
+      "outcome": "passed",
+      "duration_seconds": 0.00079
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_known_errors_have_attributed_status_without_internal_detail",
+      "outcome": "passed",
+      "duration_seconds": 0.017387
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_malformed_session_identifier_is_rejected",
+      "outcome": "passed",
+      "duration_seconds": 0.003353
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_missing_unknown_expired_and_disabled_credentials_do_not_call_store",
+      "outcome": "passed",
+      "duration_seconds": 0.012465
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_valid_config_builds_runtime_without_connecting",
+      "outcome": "passed",
+      "duration_seconds": 0.004318
+    },
+    {
+      "id": "test_health.HealthTests.test_app_factory_does_not_connect_at_startup",
+      "outcome": "passed",
+      "duration_seconds": 0.001084
+    },
+    {
+      "id": "test_health.HealthTests.test_false_or_truthy_non_boolean_probe_is_not_accepted",
+      "outcome": "passed",
+      "duration_seconds": 0.010198
+    },
+    {
+      "id": "test_health.HealthTests.test_liveness_never_connects_to_database",
+      "outcome": "passed",
+      "duration_seconds": 0.002302
+    },
+    {
+      "id": "test_health.HealthTests.test_missing_configuration_fails_readiness_without_fallback",
+      "outcome": "passed",
+      "duration_seconds": 0.002721
+    },
+    {
+      "id": "test_health.HealthTests.test_only_read_only_health_routes_are_exposed",
+      "outcome": "passed",
+      "duration_seconds": 0.006664
+    },
+    {
+      "id": "test_health.HealthTests.test_probe_checks_all_prerequisites_with_read_only_timeouts",
+      "outcome": "passed",
+      "duration_seconds": 0.000985
+    },
+    {
+      "id": "test_health.HealthTests.test_request_cannot_supply_database_or_tenant_authority",
+      "outcome": "passed",
+      "duration_seconds": 0.002361
+    },
+    {
+      "id": "test_health.HealthTests.test_settings_repr_redacts_database_url",
+      "outcome": "passed",
+      "duration_seconds": 2.7e-05
+    },
+    {
+      "id": "test_health.HealthTests.test_unavailable_database_fails_closed_without_leaking_details",
+      "outcome": "passed",
+      "duration_seconds": 0.002408
+    },
+    {
+      "id": "test_health.HealthTests.test_unexpected_probe_exception_also_fails_closed",
+      "outcome": "passed",
+      "duration_seconds": 0.002378
+    },
+    {
+      "id": "test_health.HealthTests.test_valid_probe_reports_infrastructure_only",
+      "outcome": "passed",
+      "duration_seconds": 0.002371
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_environment_configuration_required",
+      "outcome": "passed",
+      "duration_seconds": 0.00245
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_extra_identity_fields_rejected_without_echo",
+      "outcome": "passed",
+      "duration_seconds": 0.009316
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_get_empty_draft",
+      "outcome": "passed",
+      "duration_seconds": 0.003478
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_get_requires_auth",
+      "outcome": "passed",
+      "duration_seconds": 0.003189
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_idempotent_receipt_flag_preserved",
+      "outcome": "passed",
+      "duration_seconds": 0.00342
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_known_failures_are_sanitized",
+      "outcome": "passed",
+      "duration_seconds": 0.017183
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_malformed_identifiers",
+      "outcome": "passed",
+      "duration_seconds": 0.005568
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_malformed_json_not_echoed",
+      "outcome": "passed",
+      "duration_seconds": 0.003132
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_missing_and_unknown_credentials",
+      "outcome": "passed",
+      "duration_seconds": 0.005553
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_query_or_header_cannot_override_actor",
+      "outcome": "passed",
+      "duration_seconds": 0.00337
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_revision_is_strict_positive_integer",
+      "outcome": "passed",
+      "duration_seconds": 0.00954
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_save_forwards_only_declared_fields",
+      "outcome": "passed",
+      "duration_seconds": 0.003622
+    }
+  ],
+  "commit": "2edc6e508ceefc7215b2870e836a1a34f3b2e3d8"
+}
