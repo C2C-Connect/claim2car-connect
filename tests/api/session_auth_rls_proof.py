@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + list + owner GET + events GET."""
+"""Minimal single-tenant session create + list + owner GET + events GET + tenant health."""
 import hashlib
 import os
 import sys
@@ -35,6 +35,17 @@ def main():
         app = create_app()
         app.dependency_overrides[get_resolver] = lambda: resolver
         client = TestClient(app)
+
+        health = client.get("/health/tenant", headers={"Authorization": f"Bearer {token_a}"})
+        print("tenant health status", health.status_code)
+        print("tenant health body", health.text)
+        if health.status_code != 200:
+            sys.exit(1)
+        hbody = health.json()
+        assert hbody["status"] == "ok"
+        assert hbody["tenant_id"] == "11111111-1111-1111-1111-111111111111"
+        assert hbody["actor_id"] == "operator-1"
+        print("TENANT_HEALTH_OK")
 
         resp = client.post("/sessions", headers={"Authorization": f"Bearer {token_a}"})
         print("create status", resp.status_code)
