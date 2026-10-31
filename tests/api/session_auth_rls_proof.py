@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + owner GET + events GET."""
+"""Minimal single-tenant session create + list + owner GET + events GET."""
 import hashlib
 import os
 import sys
@@ -44,6 +44,15 @@ def main():
         body = resp.json()
         session_id = body["session_id"]
         assert body["tenant_id"] == "11111111-1111-1111-1111-111111111111"
+
+        lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
+        print("list status", lst.status_code)
+        print("list body", lst.text)
+        if lst.status_code != 200:
+            sys.exit(1)
+        sessions = lst.json()["sessions"]
+        assert any(s["session_id"] == session_id for s in sessions)
+        print("LIST_OK")
 
         get_a = client.get(f"/sessions/{session_id}", headers={"Authorization": f"Bearer {token_a}"})
         print("get owner status", get_a.status_code)
