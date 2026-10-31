@@ -1,4 +1,4 @@
-"""Tenant-scoped session start and retrieve under RLS.
+"""Tenant-scoped session start, retrieve, and event list under RLS.
 Does not touch sealing or evidence.
 """
 from uuid import uuid4
@@ -15,6 +15,15 @@ router = APIRouter()
 class SessionStartResponse(BaseModel):
     session_id: str
     tenant_id: str
+
+class EventItem(BaseModel):
+    event_id: str
+    kind: str
+    actor_id: str
+
+class EventListResponse(BaseModel):
+    session_id: str
+    events: list[EventItem]
 
 def get_resolver() -> CredentialResolver:
     return CredentialResolver()
@@ -98,3 +107,32 @@ async def get_session(
         raise
     except Exception:
         raise HTTPException(status_code=500, detail='SESSION_READ_FAILED')
+
+@router.get('/sessions/{session_id}/events', response_model=EventListResponse)
+async def get_session_events(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return EventListResponse(session_id=session_id, events=[])
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute(
+                    "SELECT event_id, kind, actor_id FROM faos.events WHERE session_id = %s ORDER BY sequence_no",
+                    (session_id,),
+                )
+                rows = cur.fetchall()
+                events = [EventItem(event_id=r[0], kind=r[1], actor_id=r[2]) for r in rows]
+                return EventListResponse(session_id=session_id, events=events)
+    except Exception:
+        raise HTTPException(status_code=500, detail='EVENTS_READ_FAILED')
