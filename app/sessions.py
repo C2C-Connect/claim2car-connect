@@ -1,4 +1,4 @@
-"""Tenant-scoped session start that persists under RLS and records SESSION_CREATED.
+"""Tenant-scoped session start and retrieve under RLS.
 Does not touch sealing or evidence.
 """
 from uuid import uuid4
@@ -66,3 +66,35 @@ async def start_session(
     except Exception:
         raise HTTPException(status_code=500, detail='SESSION_PERSIST_FAILED')
     return SessionStartResponse(session_id=session_id, tenant_id=str(binding.tenant_id))
+
+@router.get('/sessions/{session_id}', response_model=SessionStartResponse)
+async def get_session(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return SessionStartResponse(session_id=session_id, tenant_id=str(binding.tenant_id))
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute(
+                    "SELECT tenant_id, session_id FROM faos.sessions WHERE session_id = %s",
+                    (session_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail='SESSION_NOT_FOUND')
+                return SessionStartResponse(session_id=row[1], tenant_id=str(row[0]))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail='SESSION_READ_FAILED')
