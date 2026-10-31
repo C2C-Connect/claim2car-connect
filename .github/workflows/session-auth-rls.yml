@@ -7,6 +7,7 @@ on:
       - phase1-foundation-bootstrap
     paths:
       - 'app/sessions.py'
+      - 'tests/api/session_auth_rls_proof.py'
       - '.github/workflows/session-auth-rls.yml'
 
 jobs:
@@ -61,28 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== AUTHENTICATED INSERT ==="
-          python -c "
-import hashlib, time
-from uuid import UUID
-from fastapi.testclient import TestClient
-from app.main import create_app
-from app.sessions import get_resolver
-from app.identity import CredentialResolver, Credential, ActorBinding
-token = 'test-token-for-session-start-aaaaaaaaaaaaaaaaaaaaaaaa'
-digest = hashlib.sha256(token.encode()).hexdigest()
-binding = ActorBinding(actor_id='operator-1', tenant_id=UUID('11111111-1111-1111-1111-111111111111'), database_role='tenant_a_role')
-cred = Credential(token_sha256=digest, binding=binding, expires_at=int(time.time())+3600)
-resolver = CredentialResolver([cred])
-app = create_app()
-app.dependency_overrides[get_resolver] = lambda: resolver
-client = TestClient(app)
-resp = client.post('/sessions', headers={'Authorization': 'Bearer ' + token})
-print('status', resp.status_code)
-print('body', resp.json())
-assert resp.status_code == 200
-assert resp.json()['tenant_id'] == '11111111-1111-1111-1111-111111111111'
-print('API_INSERT_OK')
-"
+          python tests/api/session_auth_rls_proof.py
           echo "=== VISIBLE TO TENANT A ==="
           psql -c "SET ROLE faos_app; SET faos.tenant_id = '11111111-1111-1111-1111-111111111111'; SELECT count(*) FROM faos.sessions;"
           echo "=== INVISIBLE TO TENANT B ==="
