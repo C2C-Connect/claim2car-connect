@@ -1,5 +1,8 @@
-"""Tenant-scoped session start that persists under RLS. Does not touch sealing or evidence."""
+"""Tenant-scoped session start that persists under RLS and records SESSION_CREATED.
+Does not touch sealing or evidence.
+"""
 from uuid import uuid4
+import json
 import os
 import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -14,7 +17,6 @@ class SessionStartResponse(BaseModel):
     tenant_id: str
 
 def get_resolver() -> CredentialResolver:
-    # Production loads credentials out of band. Tests override this dependency.
     return CredentialResolver()
 
 def get_db_url() -> str | None:
@@ -42,6 +44,23 @@ async def start_session(
                 cur.execute(
                     "INSERT INTO faos.sessions (tenant_id, session_id) VALUES (%s, %s)",
                     (binding.tenant_id, session_id),
+                )
+                event_id = str(uuid4())
+                payload = json.dumps({"actor_id": binding.actor_id})
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        binding.tenant_id,
+                        session_id,
+                        event_id,
+                        1,
+                        "SESSION_CREATED",
+                        binding.actor_id,
+                        "2026-10-31T00:00:00Z",
+                        "session_start",
+                        payload,
+                        "0.1",
+                    ),
                 )
             conn.commit()
     except Exception:
