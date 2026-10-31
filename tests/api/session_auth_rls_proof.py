@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + owner GET under non-superuser."""
+"""Minimal single-tenant session create + owner GET + events GET."""
 import hashlib
 import os
 import sys
@@ -50,7 +50,16 @@ def main():
         print("get owner body", get_a.text)
         if get_a.status_code != 200:
             sys.exit(1)
-        print("OWNER_GET_OK")
+
+        events = client.get(f"/sessions/{session_id}/events", headers={"Authorization": f"Bearer {token_a}"})
+        print("events status", events.status_code)
+        print("events body", events.text)
+        if events.status_code != 200:
+            sys.exit(1)
+        elist = events.json()["events"]
+        assert len(elist) >= 1
+        assert elist[0]["kind"] == "SESSION_CREATED"
+        print("EVENTS_OK")
     except Exception:
         traceback.print_exc()
         sys.exit(1)
