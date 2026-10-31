@@ -1,4 +1,4 @@
-"""Tenant-scoped session start, retrieve, and event list under RLS.
+"""Tenant-scoped session start, list, retrieve, and event list under RLS.
 Does not touch sealing or evidence.
 """
 from uuid import uuid4
@@ -15,6 +15,9 @@ router = APIRouter()
 class SessionStartResponse(BaseModel):
     session_id: str
     tenant_id: str
+
+class SessionListResponse(BaseModel):
+    sessions: list[SessionStartResponse]
 
 class EventItem(BaseModel):
     event_id: str
@@ -75,6 +78,31 @@ async def start_session(
     except Exception:
         raise HTTPException(status_code=500, detail='SESSION_PERSIST_FAILED')
     return SessionStartResponse(session_id=session_id, tenant_id=str(binding.tenant_id))
+
+@router.get('/sessions', response_model=SessionListResponse)
+async def list_sessions(
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return SessionListResponse(sessions=[])
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT tenant_id, session_id FROM faos.sessions ORDER BY session_id")
+                rows = cur.fetchall()
+                sessions = [SessionStartResponse(session_id=r[1], tenant_id=str(r[0])) for r in rows]
+                return SessionListResponse(sessions=sessions)
+    except Exception:
+        raise HTTPException(status_code=500, detail='SESSIONS_LIST_FAILED')
 
 @router.get('/sessions/{session_id}', response_model=SessionStartResponse)
 async def get_session(
