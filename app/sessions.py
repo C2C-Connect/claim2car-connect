@@ -28,11 +28,33 @@ class EventListResponse(BaseModel):
     session_id: str
     events: list[EventItem]
 
+class TenantHealthResponse(BaseModel):
+    status: str
+    tenant_id: str
+    actor_id: str
+
 def get_resolver() -> CredentialResolver:
     return CredentialResolver()
 
 def get_db_url() -> str | None:
     return os.environ.get('APP_DATABASE_URL')
+
+@router.get('/health/tenant', response_model=TenantHealthResponse)
+async def tenant_health(
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    return TenantHealthResponse(
+        status='ok',
+        tenant_id=str(binding.tenant_id),
+        actor_id=binding.actor_id,
+    )
 
 @router.post('/sessions', response_model=SessionStartResponse)
 async def start_session(
