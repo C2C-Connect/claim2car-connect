@@ -1,0 +1,63 @@
+name: Migration proof 0009-0010
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - phase1-foundation-bootstrap
+    paths:
+      - 'migrations/0009*.sql'
+      - 'migrations/0010*.sql'
+      - '.github/workflows/migration-proof-0009-0010.yml'
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: proof
+          POSTGRES_USER: proof
+          POSTGRES_DB: faos_proof
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-foundation-bootstrap
+      - name: Install client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply baseline through 0008 then 0009/0010
+        env:
+          PGPASSWORD: proof
+          PGHOST: localhost
+          PGUSER: proof
+          PGDATABASE: faos_proof
+        run: |
+          set -euo pipefail
+          echo "=== SHA ==="
+          git rev-parse HEAD
+          echo "=== CREATE ROLES ==="
+          psql -c "CREATE ROLE faos_app; CREATE ROLE faos_writer; CREATE ROLE faos_fixture;"
+          echo "=== APPLY MIGRATIONS ==="
+          for f in migrations/000[1-8]_*.sql migrations/0009_*.sql migrations/0010_*.sql; do
+            [ -f "$f" ] || continue
+            echo "--- applying $f ---"
+            psql -f "$f"
+          done
+          echo "=== DOWN 0010 ==="
+          psql -f migrations/0010_routing_results_down.sql
+          echo "=== DOWN 0009 ==="
+          psql -f migrations/0009_capacity_reservations_down.sql
+          echo "=== RE-UP 0009 ==="
+          psql -f migrations/0009_capacity_reservations.sql
+          echo "=== RE-UP 0010 ==="
+          psql -f migrations/0010_routing_results.sql
+          echo "=== SCHEMA OK ==="
+          psql -c "\dt faos.*"
