@@ -1,4 +1,4 @@
-"""Authenticated session persist + RLS proof. Run under APP_DATABASE_URL."""
+"""Authenticated session persist + SESSION_CREATED + RLS proof."""
 import hashlib
 import os
 import sys
