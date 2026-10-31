@@ -59,6 +59,7 @@ jobs:
           PGHOST: localhost
           PGUSER: proof
           PGDATABASE: faos_proof
+          PYTHONPATH: .
         run: |
           set -euo pipefail
           echo "=== AUTHENTICATED INSERT ==="
