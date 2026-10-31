@@ -14,6 +14,7 @@ class SessionStartResponse(BaseModel):
     tenant_id: str
 
 def get_resolver() -> CredentialResolver:
+    # Production loads credentials out of band. Tests override this dependency.
     return CredentialResolver()
 
 def get_db_url() -> str | None:
@@ -33,7 +34,6 @@ async def start_session(
         raise HTTPException(status_code=401, detail='UNAUTHORIZED')
     session_id = str(uuid4())
     if not db_url:
-        # Contract-only mode when no database is configured (unit tests).
         return SessionStartResponse(session_id=session_id, tenant_id=str(binding.tenant_id))
     try:
         with psycopg.connect(db_url, autocommit=False) as conn:
