@@ -128,7 +128,7 @@ async def get_session_events(
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
                 cur.execute(
-                    "SELECT event_id, kind, actor_id FROM faos.events WHERE session_id = %s ORDER BY sequence_no",
+                    "SELECT event_id, kind, actor FROM faos.events WHERE session_id = %s ORDER BY sequence_no",
                     (session_id,),
                 )
                 rows = cur.fetchall()
