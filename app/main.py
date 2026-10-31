@@ -1,9 +1,13 @@
-"""Health-only FastAPI foundation; no authenticated business API is exposed."""
+"""Foundation FastAPI with health probes and minimal tenant-scoped session start.
+Sealing and evidence routes remain absent.
+"""
 from dataclasses import dataclass, field
 import os
 import psycopg
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+
+from app.sessions import router as sessions_router
 
 @dataclass(frozen=True)
 class Settings:
@@ -37,6 +41,7 @@ def probe_database(url):
 def create_app(settings=None):
     settings = settings if settings is not None else Settings.from_environment()
     api = FastAPI(title='Claim2Car Connect foundation',docs_url=None,redoc_url=None,openapi_url=None)
+    api.include_router(sessions_router)
 
     @api.get('/health/live')
     def live():
