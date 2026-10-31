@@ -1,0 +1,35 @@
+name: Session contract proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - phase1-foundation-bootstrap
+    paths:
+      - 'app/sessions.py'
+      - 'app/main.py'
+      - 'tests/api/test_sessions.py'
+      - '.github/workflows/session-contract.yml'
+
+jobs:
+  session-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-foundation-bootstrap
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install fastapi uvicorn psycopg[binary] httpx pytest
+      - name: Run session contract tests
+        run: |
+          set -euo pipefail
+          echo "=== SHA ==="
+          git rev-parse HEAD
+          echo "=== SESSION CONTRACT TESTS ==="
+          python -m pytest tests/api/test_sessions.py -v
