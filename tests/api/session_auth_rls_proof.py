@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle + artifact + quality."""
+"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle + artifact + quality + routing."""
 import hashlib
 import os
 import sys
@@ -96,6 +96,16 @@ def main():
         assert qbody["shot_slot"] == "front-left-damage"
         print("QUALITY_OK")
 
+        routing = client.post(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
+        print("routing status", routing.status_code)
+        print("routing body", routing.text)
+        if routing.status_code != 200:
+            sys.exit(1)
+        rbody = routing.json()
+        assert rbody["kind"] == "ROUTING_REQUESTED"
+        assert len(rbody["shortlist"]) == 3
+        print("ROUTING_OK")
+
         lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
         print("list status", lst.status_code)
         print("list body", lst.text)
@@ -117,13 +127,14 @@ def main():
         if events.status_code != 200:
             sys.exit(1)
         elist = events.json()["events"]
-        assert len(elist) >= 5
+        assert len(elist) >= 6
         kinds = [e["kind"] for e in elist]
         assert "SESSION_CREATED" in kinds
         assert "CONSENT_RECORDED" in kinds
         assert "VEHICLE_RECORDED" in kinds
         assert "ARTIFACT_REGISTERED" in kinds
         assert "QUALITY_RECORDED" in kinds
+        assert "ROUTING_REQUESTED" in kinds
         print("EVENTS_OK")
     except Exception:
         traceback.print_exc()
