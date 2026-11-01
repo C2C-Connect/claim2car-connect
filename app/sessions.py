@@ -1,4 +1,4 @@
-"""Tenant-scoped session start, list, retrieve, event list, consent, vehicle, artifact, quality, and routing under RLS.
+"""Tenant-scoped session start, list, retrieve, event list, consent, vehicle, artifact, quality, and review under RLS.
 Does not touch sealing or evidence.
 """
 from uuid import uuid4
@@ -58,11 +58,11 @@ class QualityRecordResponse(BaseModel):
     score: float
     shot_slot: str
 
-class RoutingRequestResponse(BaseModel):
+class ReviewRecordResponse(BaseModel):
     session_id: str
     event_id: str
     kind: str
-    shortlist: list[str]
+    note: str
 
 def get_resolver() -> CredentialResolver:
     return CredentialResolver()
@@ -341,8 +341,8 @@ async def record_quality(
         shot_slot=synthetic_slot,
     )
 
-@router.post('/sessions/{session_id}/routing', response_model=RoutingRequestResponse)
-async def request_routing(
+@router.post('/sessions/{session_id}/review', response_model=ReviewRecordResponse)
+async def record_review(
     session_id: str,
     authorization: str = Header(None),
     resolver: CredentialResolver = Depends(get_resolver),
@@ -356,7 +356,7 @@ async def request_routing(
         raise HTTPException(status_code=401, detail='UNAUTHORIZED')
     if not db_url:
         raise HTTPException(status_code=500, detail='NO_DATABASE')
-    synthetic_shortlist = ["dealer-sa-01", "dealer-sa-02", "dealer-sa-03"]
+    synthetic_note = "human-review-required"
     try:
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
@@ -369,7 +369,7 @@ async def request_routing(
                 event_id = str(uuid4())
                 payload = json.dumps({
                     "actor_id": binding.actor_id,
-                    "shortlist": synthetic_shortlist,
+                    "note": synthetic_note,
                 })
                 cur.execute(
                     "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
@@ -378,22 +378,22 @@ async def request_routing(
                         session_id,
                         event_id,
                         next_seq,
-                        "ROUTING_REQUESTED",
+                        "REVIEW_RECORDED",
                         binding.actor_id,
                         "2026-10-31T00:00:00Z",
-                        "routing_requested",
+                        "review_recorded",
                         payload,
                         "0.1",
                     ),
                 )
             conn.commit()
     except Exception:
-        raise HTTPException(status_code=500, detail='ROUTING_REQUEST_FAILED')
-    return RoutingRequestResponse(
+        raise HTTPException(status_code=500, detail='REVIEW_RECORD_FAILED')
+    return ReviewRecordResponse(
         session_id=session_id,
         event_id=event_id,
-        kind="ROUTING_REQUESTED",
-        shortlist=synthetic_shortlist,
+        kind="REVIEW_RECORDED",
+        note=synthetic_note,
     )
 
 @router.get('/sessions', response_model=SessionListResponse)
