@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent."""
+"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle."""
 import hashlib
 import os
 import sys
@@ -65,6 +65,16 @@ def main():
         assert cbody["kind"] == "CONSENT_RECORDED"
         print("CONSENT_OK")
 
+        vehicle = client.post(f"/sessions/{session_id}/vehicle", headers={"Authorization": f"Bearer {token_a}"})
+        print("vehicle status", vehicle.status_code)
+        print("vehicle body", vehicle.text)
+        if vehicle.status_code != 200:
+            sys.exit(1)
+        vbody = vehicle.json()
+        assert vbody["kind"] == "VEHICLE_RECORDED"
+        assert vbody["vin"] == "1HGCM82633A004352"
+        print("VEHICLE_OK")
+
         lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
         print("list status", lst.status_code)
         print("list body", lst.text)
@@ -86,10 +96,11 @@ def main():
         if events.status_code != 200:
             sys.exit(1)
         elist = events.json()["events"]
-        assert len(elist) >= 2
+        assert len(elist) >= 3
         kinds = [e["kind"] for e in elist]
         assert "SESSION_CREATED" in kinds
         assert "CONSENT_RECORDED" in kinds
+        assert "VEHICLE_RECORDED" in kinds
         print("EVENTS_OK")
     except Exception:
         traceback.print_exc()
