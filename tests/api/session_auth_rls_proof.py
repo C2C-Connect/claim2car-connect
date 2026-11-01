@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + list + owner GET + events GET + tenant health."""
+"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent."""
 import hashlib
 import os
 import sys
@@ -56,6 +56,15 @@ def main():
         session_id = body["session_id"]
         assert body["tenant_id"] == "11111111-1111-1111-1111-111111111111"
 
+        consent = client.post(f"/sessions/{session_id}/consent", headers={"Authorization": f"Bearer {token_a}"})
+        print("consent status", consent.status_code)
+        print("consent body", consent.text)
+        if consent.status_code != 200:
+            sys.exit(1)
+        cbody = consent.json()
+        assert cbody["kind"] == "CONSENT_RECORDED"
+        print("CONSENT_OK")
+
         lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
         print("list status", lst.status_code)
         print("list body", lst.text)
@@ -77,8 +86,10 @@ def main():
         if events.status_code != 200:
             sys.exit(1)
         elist = events.json()["events"]
-        assert len(elist) >= 1
-        assert elist[0]["kind"] == "SESSION_CREATED"
+        assert len(elist) >= 2
+        kinds = [e["kind"] for e in elist]
+        assert "SESSION_CREATED" in kinds
+        assert "CONSENT_RECORDED" in kinds
         print("EVENTS_OK")
     except Exception:
         traceback.print_exc()
