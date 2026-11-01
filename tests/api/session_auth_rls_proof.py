@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle + artifact."""
+"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle + artifact + quality."""
 import hashlib
 import os
 import sys
@@ -85,6 +85,17 @@ def main():
         assert abody["content_hash"].startswith("sha256:")
         print("ARTIFACT_OK")
 
+        quality = client.post(f"/sessions/{session_id}/quality", headers={"Authorization": f"Bearer {token_a}"})
+        print("quality status", quality.status_code)
+        print("quality body", quality.text)
+        if quality.status_code != 200:
+            sys.exit(1)
+        qbody = quality.json()
+        assert qbody["kind"] == "QUALITY_RECORDED"
+        assert qbody["score"] == 0.87
+        assert qbody["shot_slot"] == "front-left-damage"
+        print("QUALITY_OK")
+
         lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
         print("list status", lst.status_code)
         print("list body", lst.text)
@@ -106,12 +117,13 @@ def main():
         if events.status_code != 200:
             sys.exit(1)
         elist = events.json()["events"]
-        assert len(elist) >= 4
+        assert len(elist) >= 5
         kinds = [e["kind"] for e in elist]
         assert "SESSION_CREATED" in kinds
         assert "CONSENT_RECORDED" in kinds
         assert "VEHICLE_RECORDED" in kinds
         assert "ARTIFACT_REGISTERED" in kinds
+        assert "QUALITY_RECORDED" in kinds
         print("EVENTS_OK")
     except Exception:
         traceback.print_exc()
