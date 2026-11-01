@@ -1,4 +1,4 @@
-"""Tenant-scoped session start, list, retrieve, event list, consent, vehicle, and artifact record under RLS.
+"""Tenant-scoped session start, list, retrieve, event list, consent, vehicle, artifact, and quality record under RLS.
 Does not touch sealing or evidence.
 """
 from uuid import uuid4
@@ -50,6 +50,13 @@ class ArtifactRecordResponse(BaseModel):
     kind: str
     artifact_id: str
     content_hash: str
+
+class QualityRecordResponse(BaseModel):
+    session_id: str
+    event_id: str
+    kind: str
+    score: float
+    shot_slot: str
 
 def get_resolver() -> CredentialResolver:
     return CredentialResolver()
@@ -268,6 +275,64 @@ async def record_artifact(
         kind="ARTIFACT_REGISTERED",
         artifact_id=synthetic_artifact_id,
         content_hash=synthetic_hash,
+    )
+
+@router.post('/sessions/{session_id}/quality', response_model=QualityRecordResponse)
+async def record_quality(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        raise HTTPException(status_code=500, detail='NO_DATABASE')
+    synthetic_score = 0.87
+    synthetic_slot = "front-left-damage"
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute(
+                    "SELECT COALESCE(MAX(sequence), 0) FROM faos.events WHERE session_id = %s",
+                    (session_id,),
+                )
+                next_seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps({
+                    "actor_id": binding.actor_id,
+                    "score": synthetic_score,
+                    "shot_slot": synthetic_slot,
+                })
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        binding.tenant_id,
+                        session_id,
+                        event_id,
+                        next_seq,
+                        "QUALITY_RECORDED",
+                        binding.actor_id,
+                        "2026-10-31T00:00:00Z",
+                        "quality_recorded",
+                        payload,
+                        "0.1",
+                    ),
+                )
+            conn.commit()
+    except Exception:
+        raise HTTPException(status_code=500, detail='QUALITY_RECORD_FAILED')
+    return QualityRecordResponse(
+        session_id=session_id,
+        event_id=event_id,
+        kind="QUALITY_RECORDED",
+        score=synthetic_score,
+        shot_slot=synthetic_slot,
     )
 
 @router.get('/sessions', response_model=SessionListResponse)
