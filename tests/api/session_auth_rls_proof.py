@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle."""
+"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle + artifact."""
 import hashlib
 import os
 import sys
@@ -75,6 +75,16 @@ def main():
         assert vbody["vin"] == "1HGCM82633A004352"
         print("VEHICLE_OK")
 
+        artifact = client.post(f"/sessions/{session_id}/artifact", headers={"Authorization": f"Bearer {token_a}"})
+        print("artifact status", artifact.status_code)
+        print("artifact body", artifact.text)
+        if artifact.status_code != 200:
+            sys.exit(1)
+        abody = artifact.json()
+        assert abody["kind"] == "ARTIFACT_REGISTERED"
+        assert abody["content_hash"].startswith("sha256:")
+        print("ARTIFACT_OK")
+
         lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
         print("list status", lst.status_code)
         print("list body", lst.text)
@@ -96,11 +106,12 @@ def main():
         if events.status_code != 200:
             sys.exit(1)
         elist = events.json()["events"]
-        assert len(elist) >= 3
+        assert len(elist) >= 4
         kinds = [e["kind"] for e in elist]
         assert "SESSION_CREATED" in kinds
         assert "CONSENT_RECORDED" in kinds
         assert "VEHICLE_RECORDED" in kinds
+        assert "ARTIFACT_REGISTERED" in kinds
         print("EVENTS_OK")
     except Exception:
         traceback.print_exc()
