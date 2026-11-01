@@ -1,4 +1,4 @@
-"""Tenant-scoped session start, list, retrieve, and event list under RLS.
+"""Tenant-scoped session start, list, retrieve, event list, and consent record under RLS.
 Does not touch sealing or evidence.
 """
 from uuid import uuid4
@@ -32,6 +32,11 @@ class TenantHealthResponse(BaseModel):
     status: str
     tenant_id: str
     actor_id: str
+
+class ConsentRecordResponse(BaseModel):
+    session_id: str
+    event_id: str
+    kind: str
 
 def get_resolver() -> CredentialResolver:
     return CredentialResolver()
@@ -100,6 +105,52 @@ async def start_session(
     except Exception:
         raise HTTPException(status_code=500, detail='SESSION_PERSIST_FAILED')
     return SessionStartResponse(session_id=session_id, tenant_id=str(binding.tenant_id))
+
+@router.post('/sessions/{session_id}/consent', response_model=ConsentRecordResponse)
+async def record_consent(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        raise HTTPException(status_code=500, detail='NO_DATABASE')
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute(
+                    "SELECT COALESCE(MAX(sequence), 0) FROM faos.events WHERE session_id = %s",
+                    (session_id,),
+                )
+                next_seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps({"actor_id": binding.actor_id, "consent": "recorded"})
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        binding.tenant_id,
+                        session_id,
+                        event_id,
+                        next_seq,
+                        "CONSENT_RECORDED",
+                        binding.actor_id,
+                        "2026-10-31T00:00:00Z",
+                        "consent_recorded",
+                        payload,
+                        "0.1",
+                    ),
+                )
+            conn.commit()
+    except Exception:
+        raise HTTPException(status_code=500, detail='CONSENT_RECORD_FAILED')
+    return ConsentRecordResponse(session_id=session_id, event_id=event_id, kind="CONSENT_RECORDED")
 
 @router.get('/sessions', response_model=SessionListResponse)
 async def list_sessions(
