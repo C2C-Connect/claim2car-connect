@@ -1,0 +1,25 @@
+// Real validator, transport and parser; mocked HTTP only. No live NHTSA request.
+import assert from 'node:assert/strict';
+import {lookupVin} from '../src/modules/capture/vin_lookup.mjs';
+const vin='1HGCM82633A004352',records=[];
+const row={VIN:vin,ErrorCode:'0',SuggestedVIN:'',Make:'Honda',Model:'Accord',ModelYear:'2003',BodyClass:'Sedan',CurbWeightLB:''};
+function response(url,changes={},status=200){const r=new Response(JSON.stringify({Count:1,Results:[{...row,...changes}]}),{status,headers:{'content-type':'application/json'}});Object.defineProperty(r,'url',{value:url});return r;}
+async function test(id,fn){try{await fn();records.push({id,outcome:'passed'});}catch(e){records.push({id,outcome:'failed',error_type:e.name});}}
+await test('valid_vin_composes_real_modules',async()=>{const r=await lookupVin(vin,{fetchImpl:async url=>response(url)});assert.equal(r.status,'parsed');assert.equal(r.profile.vin,vin);assert.equal(r.profile.make,'Honda');assert.equal(r.profile.curbWeightStatus,'unavailable');assert.equal(r.physicsReady,false);assert.equal(r.massBoundsConfigured,false);assert.equal(Object.isFrozen(r.profile),true);});
+await test('normalization_shared_across_request_and_parser',async()=>{let target;const r=await lookupVin(' 1hg-cm82633a004352 ',{fetchImpl:async url=>{target=url;return response(url);}});assert.equal(r.status,'parsed');assert.equal(r.profile.vin,vin);assert.equal(target,'https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/'+vin+'?format=json');});
+await test('invalid_vin_never_fetches',async()=>{let calls=0;const r=await lookupVin('bad',{fetchImpl:()=>{calls++;}});assert.equal(r.status,'blocked');assert.equal(r.reason,'INVALID_LENGTH');assert.equal(calls,0);});
+await test('checksum_mismatch_never_fetches',async()=>{let calls=0;const r=await lookupVin('1HGCM82643A004352',{fetchImpl:()=>{calls++;}});assert.equal(r.reason,'CHECKSUM_MISMATCH');assert.equal(calls,0);});
+await test('wrong_returned_vin_cannot_supply_profile',async()=>{const r=await lookupVin(vin,{fetchImpl:async url=>response(url,{VIN:'1M8GDM9AXKP042788'})});assert.equal(r.reason,'VIN_MISMATCH');assert.equal(r.profile,null);});
+await test('unresolved_decode_status_blocked',async()=>{const r=await lookupVin(vin,{fetchImpl:async url=>response(url,{ErrorCode:'1'})});assert.equal(r.reason,'DECODE_STATUS_UNRESOLVED');assert.equal(r.profile,null);});
+await test('suggested_vin_requires_review',async()=>{const r=await lookupVin(vin,{fetchImpl:async url=>response(url,{SuggestedVIN:vin})});assert.equal(r.reason,'SUGGESTED_VIN_REQUIRES_REVIEW');});
+await test('incomplete_profile_blocked',async()=>{const r=await lookupVin(vin,{fetchImpl:async url=>response(url,{Model:''})});assert.equal(r.reason,'INCOMPLETE_PROFILE');});
+await test('rate_limit_does_not_parse_error_body',async()=>{const r=await lookupVin(vin,{fetchImpl:async url=>response(url,{},429)});assert.equal(r.status,'transport_error');assert.equal(r.reason,'HTTP_RATE_LIMITED');assert.equal(r.profile,null);});
+await test('pre_cancelled_signal_never_fetches',async()=>{const c=new AbortController();c.abort();let calls=0;const r=await lookupVin(vin,{signal:c.signal,fetchImpl:()=>{calls++;}});assert.equal(r.reason,'CANCELLED');assert.equal(calls,0);});
+await test('inflight_cancel_reaches_real_transport',async()=>{const c=new AbortController();let aborted=false;const p=lookupVin(vin,{signal:c.signal,fetchImpl:(_,opts)=>{opts.signal.addEventListener('abort',()=>{aborted=true;});return new Promise(()=>{});}});c.abort();assert.equal((await p).reason,'CANCELLED');assert.equal(aborted,true);});
+await test('timeout_stays_failure_without_fallback_profile',async()=>{const r=await lookupVin(vin,{timeoutMs:5,fetchImpl:()=>new Promise(()=>{})});assert.equal(r.reason,'TIMEOUT');assert.equal(r.profile,null);});
+await test('raw_rows_and_extra_fields_not_exposed',async()=>{const r=await lookupVin(vin,{fetchImpl:async url=>response(url,{PrivateDiagnostic:'not-for-ui'})});assert.equal(r.status,'parsed');assert.equal(Object.hasOwn(r,'rawResult'),false);assert.equal(JSON.stringify(r).includes('not-for-ui'),false);assert.equal(Object.isFrozen(r),true);});
+await test('reported_mass_does_not_enable_physics',async()=>{const r=await lookupVin(vin,{fetchImpl:async url=>response(url,{CurbWeightLB:'3200'})});assert.equal(r.profile.curbWeightStatus,'reported');assert.equal(r.profile.curbWeightLb,3200);assert.equal(r.physicsReady,false);});
+await test('invalid_options_preserve_transport_failure',async()=>{const r=await lookupVin(vin,{timeoutMs:0});assert.equal(r.reason,'INVALID_OPTIONS');assert.equal(r.profile,null);});
+const failures=records.filter(r=>r.outcome!=='passed').length;
+const successful=records.length>0&&failures===0&&new Set(records.map(r=>r.id)).size===records.length;
+console.log(JSON.stringify({classification:'real-vin-transport-parser-composition-mocked-http-not-browser-or-live-service',commit:process.env.GITHUB_SHA??null,runtime:process.version,executed:records.length,failures,successful,tests:records},null,2));process.exitCode=successful?0:1;

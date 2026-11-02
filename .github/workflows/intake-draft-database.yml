@@ -1,0 +1,75 @@
+name: Controlled-test intake draft PostgreSQL verification
+on:
+  pull_request:
+  push:
+    branches: [main, acceptance, 'acceptance/**', 'release/**', 'rc/**']
+  merge_group:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  intake-draft-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies and capture source checksums
+        run: |
+          mkdir -p output/intake-draft
+          pip install -r requirements-api.txt 'httpx>=0.27,<1'
+          python scripts/candidate_manifest.py capture output/intake-draft/before.json
+          sha256sum database/intake_drafts.py app/intake_api.py tests/api/test_intake_api.py tests/database/test_intake_drafts_integration.py tests/integration/test_intake_http_postgres.py .github/workflows/intake-draft-database.yml > output/intake-draft/sources.sha256
+      - name: Start disposable PostgreSQL and bootstrap synthetic roles
+        run: |
+          docker compose -p faos-active-run -f compose.database-tests.yml up -d --wait
+          docker cp database/bootstrap.sql faos-active-run-database-1:/tmp/bootstrap.sql
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
+          docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only'; ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
+      - name: Count real PostgreSQL draft tests using the full migration fixture
+        shell: python
+        run: |
+          import json, os, sys, unittest
+          from pathlib import Path
+          sys.path.insert(0,str(Path.cwd()))
+          sys.path.insert(0,str(Path('tests/database').resolve()))
+          from scripts.run_counted_tests import run_suite
+          from test_intake_drafts_integration import IntakeDraftIntegration
+          record=run_suite(unittest.defaultTestLoader.loadTestsFromTestCase(IntakeDraftIntegration))
+          record.update(commit=os.environ['GITHUB_SHA'],classification='controlled-test-postgresql-vin-draft-not-http-or-browser-proof')
+          Path('output/intake-draft/database-tests.json').write_text(json.dumps(record,indent=2)+'\n')
+          raise SystemExit(0 if record['successful'] and record['executed']==9 else 1)
+      - name: Count real loopback HTTP and PostgreSQL tests
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import json, os, sys, unittest
+          from pathlib import Path
+          sys.path.insert(0,str(Path.cwd()))
+          sys.path.insert(0,str(Path('tests/database').resolve()))
+          sys.path.insert(0,str(Path('tests/integration').resolve()))
+          from scripts.run_counted_tests import run_suite
+          from test_intake_http_postgres import IntakeHttpPostgresIntegration
+          record=run_suite(unittest.defaultTestLoader.loadTestsFromTestCase(IntakeHttpPostgresIntegration))
+          record.update(commit=os.environ['GITHUB_SHA'],classification='real-loopback-http-postgresql-controlled-test-not-browser-proof')
+          Path('output/intake-draft/http-database-tests.json').write_text(json.dumps(record,indent=2)+'\n')
+          raise SystemExit(0 if record['successful'] and record['executed']==7 else 1)
+      - name: Verify source integrity
+        if: always()
+        run: |
+          python scripts/candidate_manifest.py capture output/intake-draft/after.json
+          python scripts/candidate_manifest.py compare output/intake-draft/before.json output/intake-draft/after.json
+          sha256sum --check output/intake-draft/sources.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: intake-draft-${{ github.run_id }}-${{ github.run_attempt }}
+          path: output/intake-draft/
+          if-no-files-found: error
+      - name: Remove disposable database
+        if: always()
+        run: docker compose -p faos-active-run -f compose.database-tests.yml down -v

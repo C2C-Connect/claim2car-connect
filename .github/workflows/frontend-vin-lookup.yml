@@ -1,0 +1,45 @@
+name: Offline VIN lookup controller integration
+on:
+  pull_request:
+  push:
+    branches: [main, acceptance, 'acceptance/**', 'release/**', 'rc/**']
+  merge_group:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lookup-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Capture candidate and lookup source checksums
+        run: |
+          mkdir -p output/vin-lookup
+          python scripts/candidate_manifest.py capture output/vin-lookup/before.json
+          sha256sum frontend/src/modules/capture/{vin,vpic,vpic_transport,vin_lookup,vin_lookup_controller}.mjs frontend/tests/{vin_lookup,vin_lookup_controller}.test.mjs .github/workflows/frontend-vin-lookup.yml > output/vin-lookup/sources.sha256
+      - name: Adapter composition assertions
+        run: node frontend/tests/vin_lookup.test.mjs > output/vin-lookup/adapter-tests.json
+      - name: Controller integration assertions
+        if: ${{ !cancelled() }}
+        run: node frontend/tests/vin_lookup_controller.test.mjs > output/vin-lookup/controller-tests.json
+      - name: Verify candidate and lookup sources unchanged
+        if: always()
+        run: |
+          python scripts/candidate_manifest.py capture output/vin-lookup/after.json
+          python scripts/candidate_manifest.py compare output/vin-lookup/before.json output/vin-lookup/after.json
+          sha256sum --check output/vin-lookup/sources.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vin-lookup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: output/vin-lookup/
+          if-no-files-found: error
