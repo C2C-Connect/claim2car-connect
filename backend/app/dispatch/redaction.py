@@ -100,4 +100,24 @@ def redact_payload(role: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         out.pop("vin", None)
         out.pop("fraud_flags", None)
 
+    # Always surface a public-safe verification block (needed for dossier page 6/7
+    # and independent public verify). No PII is included.
+    anchor = data.get("anchor") or {}
+    out["public_verify"] = {
+        "session_id": data.get("session_id"),
+        "merkle_root": anchor.get("merkle_root") or data.get("merkle_root"),
+        "master_hash": anchor.get("master_hash") or data.get("master_hash"),
+        "entry_hash": anchor.get("entry_hash"),
+        "anchored_at": anchor.get("anchored_at"),
+        "endpoint": "/api/v1/verify/",
+    }
+    # Also keep a compact anchor reference for dossier builders
+    if out["public_verify"].get("merkle_root"):
+        out["anchor"] = {
+            "merkle_root": out["public_verify"]["merkle_root"],
+            "master_hash": out["public_verify"]["master_hash"],
+            "entry_hash": out["public_verify"].get("entry_hash"),
+            "anchored_at": out["public_verify"].get("anchored_at"),
+        }
+
     return out

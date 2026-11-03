@@ -1,5 +1,5 @@
 """
-Claim2Car Connect — FastAPI entrypoint (Milestone 5 Reports & Dispatch).
+Claim2Car Connect — FastAPI entrypoint (Milestone 5 surface).
 """
 
 from __future__ import annotations
