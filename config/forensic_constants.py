@@ -1,63 +1,99 @@
 """
 Claim2Car Connect — versioned forensic constants.
 Single source of truth for weights, thresholds, and commercial parameters.
-Do not hard-code these values elsewhere.
 """
 
-VERSION = "2026.11.02.1"
+VERSION = "2026.11.03.5"
 
-# --- Commercial (owner directive 2026-11-02) ---
+# --- Commercial ---
 OPERATOR_PAYOUT_USD = 110.0
 # OWNER payout intentionally absent — permanently excluded per legal counsel.
 
 DEALER_ACQUISITION_FEE_MIN_USD = 375.0
 DEALER_ACQUISITION_FEE_MAX_USD = 425.0
 SHOP_AUCTION_FLOOR_USD = 250.0
-FEE_FACTOR_CAP_USD = 500.0  # fee_factor = min(fee / FEE_FACTOR_CAP_USD, 1.0)
+FEE_FACTOR_CAP_USD = 500.0
 
-# --- Integrity ---
+# --- Integrity (S_i weighted geometric) ---
 S_I_PASS = 0.65
-S_I_REVIEW = 0.65  # < this → review
-S_I_REJECT = 0.30  # < this → reject/fraud
-S_I_WEIGHTS = {"gps": 0.30, "hash": 0.45, "meta": 0.25}  # geometric form required
+S_I_REVIEW = 0.65
+S_I_REJECT = 0.30
+S_I_WEIGHTS = {"gps": 0.30, "hash": 0.45, "meta": 0.25}
 
-# --- Capture protocol ---
+GPS_TIERS = (
+    (20.0, 1.0),
+    (50.0, 0.9),
+    (100.0, 0.8),
+    (200.0, 0.6),
+    (500.0, 0.4),
+)
+GPS_TIER_FLOOR = 0.2
+
 DEFAULT_SHOT_LIST = "16-v1"
 SELECTABLE_SHOT_LISTS = ("16-v1", "12-v1")
-
-# Quality gates (16-v1 / walkaround)
 LAPLACIAN_SHARPNESS_MIN = 160.0
 LUMINANCE_MIN = 40.0
 LUMINANCE_MAX = 220.0
 GYRO_STABILITY_MAX_MS2 = 0.6
 ACOUSTIC_QUIET_DBFS = -40.0
 
-# --- VIN ---
 CURB_MASS_KG_MIN = 500
 CURB_MASS_KG_MAX = 5000
 
-# --- Physics / triage (targets; formulas locked in Layer 2/3) ---
 LOW_IMPACT_EK_KJ = 20.0
-RTV_REVIEW_LOW = 0.70   # inclusive
+RTV_REVIEW_LOW = 0.70
 RTV_TOTAL_LOSS = 1.0
 ENSEMBLE_PHYSICS_WEIGHT = 0.55
 ENSEMBLE_AI_WEIGHT = 0.45
 ENSEMBLE_TOTAL_LOSS_THRESHOLD = 0.55
+SEVERE_EK_KJ = 400.0
+SEVERE_DEPTH_CM = 40.0
+SEVERE_P_PHYSICS_FLOOR = 0.75
+LOW_IMPACT_RY = 0.5
+LOW_IMPACT_V_KPH = 25.0
+LOW_IMPACT_P_PHYSICS_CEIL = 0.15
+ENTROPY_AI_OVERRIDE_BITS = 2.0
 
-# --- Zones (m²) for stress ---
-A_ZONE = {
-    "front": 0.55,
-    "rear": 0.50,
-    "side": 0.35,
-    "roof": 0.85,
-    "underbody": 0.65,
+A_ZONE_M2 = {
+    "front": 0.55, "rear": 0.50, "side": 0.35, "roof": 0.85, "underbody": 0.65,
 }
-
-# Yield strengths (MPa) — representative
 SIGMA_YIELD_MPA = {
-    "boron": 1500,
-    "ahss": 780,
-    "composite": 400,
-    "aluminum": 275,
-    "mild_steel": 250,
+    "boron": 1500.0, "ahss": 780.0, "composite": 400.0,
+    "aluminum": 275.0, "mild_steel": 250.0,
 }
+R_STRUCT_W_RY = 0.48
+R_STRUCT_W_BRITTLE = 0.28
+R_STRUCT_W_ENTROPY = 0.14
+R_STRUCT_W_ZONE = 0.10
+R_STRUCT_RY_DIVISOR = 2.2
+P_STRUCT_RY_THRESHOLD = 0.6
+P_STRUCT_RY_SCALE = 0.45
+P_STRUCT_BRITTLE_SCALE = 0.4
+P_STRUCT_CAP = 0.99
+P_BRITTLE_BETA = 0.85
+P_BRITTLE_CAP = 0.99
+KE_FACTOR_DIVISOR_KJ = 500.0
+KE_FACTOR_CAP = 0.55
+YOLO_CONF_MIN = 0.55
+MODEL_VOTE_THRESHOLD = 2 / 3
+INFERENCE_TIMEOUT_S = 6.0
+
+P_S_CAP = 0.45
+P_S_R_STRUCT_SCALE = 0.6
+ACV_BLEND_WEIGHTS = (0.40, 0.40, 0.20)
+CLAIM2CAR_PRICE_MULTIPLIER = 1.08
+ACV_FALLBACK_FLOOR = 4000.0
+ACV_FALLBACK_BASE = 32000.0
+ACV_FALLBACK_DECAY = 0.86
+
+PDR_MAX_AREA_CM2 = 150.0
+PDR_MAX_DEPTH_CM = 3.0
+REPAIR_MAX_AREA_CM2 = 1200.0
+REPAIR_MAX_DEPTH_CM = 15.0
+SECTION_MAX_DEPTH_CM = 35.0
+HIDDEN_DAMAGE_STRUCTURAL_ALLOWANCE = 0.12
+
+DEFAULT_LABOR_RATE_USD = 65.0
+DEFAULT_PAINT_RATE_USD = 55.0
+DEFAULT_TAX_RATE = 0.0825
+RTV_BORDERLINE_MARGIN = 0.05
