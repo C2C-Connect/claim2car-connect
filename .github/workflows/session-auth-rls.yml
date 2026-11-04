@@ -9,6 +9,7 @@ on:
       - 'app/sessions.py'
       - 'tests/api/session_auth_rls_proof.py'
       - '.github/workflows/session-auth-rls.yml'
+      - 'migrations/0011_*.sql'
 
 jobs:
   auth-rls:
@@ -47,7 +48,7 @@ jobs:
           echo "=== SHA ==="
           git rev-parse HEAD
           psql -c "CREATE ROLE faos_app; CREATE ROLE faos_writer; CREATE ROLE faos_fixture;"
-          for f in migrations/000[1-2]_*.sql; do
+          for f in migrations/000[1-2]_*.sql migrations/0011_add_routing_requested_kind.sql; do
             [ -f "$f" ] || continue
             psql -f "$f"
           done
