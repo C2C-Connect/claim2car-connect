@@ -215,8 +215,8 @@ async def record_consent(
                     ),
                 )
             conn.commit()
-    except Exception:
-        raise HTTPException(status_code=500, detail='CONSENT_RECORD_FAILED')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'CONSENT_RECORD_FAILED: {e}')
     return ConsentRecordResponse(session_id=session_id, event_id=event_id, kind="CONSENT_RECORDED")
 
 @router.post('/sessions/{session_id}/vehicle', response_model=VehicleRecordResponse)
