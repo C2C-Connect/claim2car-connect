@@ -146,6 +146,28 @@ class DashboardResponse(BaseModel):
     operator_payout_cents: int
     dealer_invoice_cents: int
 
+
+class CaptureProgressResponse(BaseModel):
+    session_id: str
+    points_captured: int
+    points_expected: int = 16
+    latest_point: str | None = None
+    latest_sharpness: float | None = None
+    latest_silhouette_match: float | None = None
+
+class DamageSummaryResponse(BaseModel):
+    session_id: str
+    major: int = 0
+    minor: int = 0
+    findings: list[dict] = []
+
+class ActivityItem(BaseModel):
+    session_id: str
+    status: str
+
+class ActivityResponse(BaseModel):
+    events: list[ActivityItem]
+
 class TimelineItem(BaseModel):
     sequence: int
     kind: str
@@ -1760,6 +1782,7 @@ async def record_capture_frame(
     session_id: str,
     body: CaptureFrameRequest,
     authorization: str = Header(None),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     resolver: CredentialResolver = Depends(get_resolver),
     db_url: str | None = Depends(get_db_url),
 ):
@@ -1775,6 +1798,11 @@ async def record_capture_frame(
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                if idempotency_key:
+                    cur.execute("SELECT event_id FROM faos.idempotency_keys WHERE key = %s AND tenant_id = faos.tenant_id()", (idempotency_key,))
+                    existing = cur.fetchone()
+                    if existing:
+                        return {"session_id": session_id, "event_id": str(existing[0]), "kind": "CAPTURE_FRAME", "status": "idempotent"}
                 cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
                 seq = cur.fetchone()[0] + 1
                 event_id = str(uuid4())
@@ -1783,6 +1811,8 @@ async def record_capture_frame(
                     "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     (binding.tenant_id, session_id, event_id, seq, "CAPTURE_FRAME", binding.actor_id, "2026-11-04T00:00:00Z", "capture", payload, "0.1"),
                 )
+                if idempotency_key:
+                    cur.execute("INSERT INTO faos.idempotency_keys (tenant_id, key, event_id) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (binding.tenant_id, idempotency_key, event_id))
             conn.commit()
         return {"session_id": session_id, "kind": "CAPTURE_FRAME"}
     except Exception:
@@ -1874,3 +1904,114 @@ async def admin_dashboard(
                 )
     except Exception:
         raise HTTPException(status_code=500, detail='DASHBOARD_FAILED')
+
+
+@router.get('/sessions/{session_id}/capture-progress', response_model=CaptureProgressResponse)
+async def capture_progress(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return CaptureProgressResponse(session_id=session_id, points_captured=0)
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'CAPTURE_FRAME' ORDER BY sequence", (session_id,))
+                rows = cur.fetchall()
+                points = set()
+                latest = {}
+                for row in rows:
+                    payload = row[0] if isinstance(row[0], dict) else (json.loads(row[0]) if row[0] else {})
+                    if payload.get("point"):
+                        points.add(payload["point"])
+                    latest = payload
+                return CaptureProgressResponse(
+                    session_id=session_id,
+                    points_captured=len(points),
+                    latest_point=latest.get("point"),
+                    latest_sharpness=latest.get("sharpness"),
+                    latest_silhouette_match=latest.get("silhouette_match"),
+                )
+    except Exception:
+        raise HTTPException(status_code=500, detail='CAPTURE_PROGRESS_FAILED')
+
+@router.get('/sessions/{session_id}/damage-summary', response_model=DamageSummaryResponse)
+async def damage_summary(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return DamageSummaryResponse(session_id=session_id)
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'DAMAGE_DETECTED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                row = cur.fetchone()
+                findings = []
+                if row and row[0]:
+                    payload = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                    findings = payload.get("findings", [])
+                major = sum(1 for f in findings if f.get("severity") == "MAJOR")
+                minor = sum(1 for f in findings if f.get("severity") == "MINOR")
+                return DamageSummaryResponse(session_id=session_id, major=major, minor=minor, findings=findings)
+    except Exception:
+        raise HTTPException(status_code=500, detail='DAMAGE_SUMMARY_FAILED')
+
+@router.get('/admin/activity', response_model=ActivityResponse)
+async def admin_activity(
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return ActivityResponse(events=[])
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT session_id FROM faos.sessions ORDER BY session_id LIMIT 20")
+                sessions = [r[0] for r in cur.fetchall()]
+                items = []
+                for sid in sessions:
+                    cur.execute("SELECT 1 FROM faos.events WHERE session_id = %s AND kind = 'SETTLEMENT_RECORDED' LIMIT 1", (sid,))
+                    if cur.fetchone():
+                        items.append(ActivityItem(session_id=str(sid), status="SETTLED"))
+                        continue
+                    cur.execute("SELECT kind FROM faos.events WHERE session_id = %s AND kind IN ('DEALER_ACCEPTED','DEALER_PASSED') ORDER BY sequence DESC LIMIT 1", (sid,))
+                    d = cur.fetchone()
+                    if d:
+                        items.append(ActivityItem(session_id=str(sid), status=d[0].replace("DEALER_", "")))
+                        continue
+                    cur.execute("SELECT outcome FROM faos.routing_results WHERE request_digest = %s ORDER BY created_at DESC LIMIT 1", (f"routing-{sid}",))
+                    r = cur.fetchone()
+                    if r:
+                        items.append(ActivityItem(session_id=str(sid), status=r[0]))
+                        continue
+                    items.append(ActivityItem(session_id=str(sid), status="OPEN"))
+                return ActivityResponse(events=items)
+    except Exception:
+        raise HTTPException(status_code=500, detail='ACTIVITY_FAILED')
