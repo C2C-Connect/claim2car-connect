@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dealer Dossier</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #fff; color: #1a1a1a; }
+    h1 { font-size: 1.6rem; border-bottom: 2px solid #1e3a8a; padding-bottom: 0.5rem; }
+    .meta { color: #666; margin-bottom: 1.5rem; }
+    .section { margin-bottom: 1.5rem; }
+    .section h2 { font-size: 1rem; color: #1e3a8a; margin-bottom: 0.5rem; }
+    .row { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px solid #eee; }
+    .label { color: #666; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.4rem; border-bottom: 1px solid #eee; }
+    th { background: #f8fafc; }
+  </style>
+</head>
+<body>
+  <h1>Dealer Dossier</h1>
+  <div class="meta" id="meta"></div>
+  <div class="section">
+    <h2>Vehicle</h2>
+    <div id="vehicle"></div>
+  </div>
+  <div class="section">
+    <h2>Damage</h2>
+    <div id="damage"></div>
+  </div>
+  <div class="section">
+    <h2>Physics</h2>
+    <div id="physics"></div>
+  </div>
+  <div class="section">
+    <h2>Cost</h2>
+    <div id="cost"></div>
+  </div>
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    const sid = location.pathname.split("/").pop();
+    async function load() {
+      if (!token) return;
+      const res = await fetch(`/sessions/${sid}/exhibit`, { headers: { Authorization: "Bearer " + token } });
+      const e = await res.json();
+      document.getElementById("meta").textContent = `${e.year || ""} ${e.make || ""} ${e.model || ""} · ${e.vin || ""}`;
+      document.getElementById("vehicle").innerHTML = `
+        <div class="row"><span class="label">VIN</span><span>${e.vin || "—"}</span></div>
+        <div class="row"><span class="label">Body</span><span>${e.body_class || "—"}</span></div>`;
+      document.getElementById("damage").innerHTML = (e.damage_findings || []).map(f => `<div class="row"><span>${f.panel}</span><span>${f.severity}</span></div>`).join("") || "<div class=\"row\">—</div>";
+      document.getElementById("physics").innerHTML = `
+        <div class="row"><span class="label">ΔV</span><span>${e.delta_v_mph ?? "—"} mph</span></div>
+        <div class="row"><span class="label">Impact</span><span>${e.impact_angle_deg ?? "—"}°</span></div>`;
+      const lines = e.cost_lines || [];
+      document.getElementById("cost").innerHTML = lines.length
+        ? `<table><tr><th>Part</th><th>Hours</th><th>Cost</th></tr>${lines.map(l => `<tr><td>${l.description}</td><td>${l.labor_hours ?? "—"}</td><td>$${((l.cost_cents||0)/100).toFixed(2)}</td></tr>`).join("")}</table>`
+        : "<div class=\"row\">—</div>";
+    }
+    if (token) load();
+  </script>
+</body>
+</html>
