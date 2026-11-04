@@ -59,6 +59,7 @@ def main():
         consent = client.post(f"/sessions/{session_id}/consent", headers={"Authorization": f"Bearer {token_a}"})
         print("consent status", consent.status_code)
         if consent.status_code != 200:
+            print("consent body", consent.text)
             sys.exit(1)
         print("CONSENT_OK")
 
