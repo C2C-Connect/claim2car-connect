@@ -390,6 +390,7 @@ def main():
         print("TIMELINE_OK")
         # Status must be SETTLED after accept
         st = client.get(f"/sessions/{session_id}/status", headers={"Authorization": f"Bearer {token_a}"})
+        print("status", st.status_code, st.text)
         if st.status_code != 200:
             sys.exit(1)
         assert st.json()["status"] == "SETTLED"
