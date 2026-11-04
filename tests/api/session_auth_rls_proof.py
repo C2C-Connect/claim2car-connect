@@ -311,6 +311,24 @@ def main():
         assert match[0]["operator_payout_cents"] == 11000
         assert match[0]["dealer_invoice_cents"] == 37500
         print("LIST_SETTLEMENTS_OK")
+        # Routing Idempotency-Key: repeated key returns same event_id
+        rkey = "routing-key-1"
+        r1 = client.post(
+            f"/sessions/{session_id}/routing",
+            headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": rkey},
+        )
+        if r1.status_code != 200:
+            print("r1", r1.text)
+            sys.exit(1)
+        eid1 = r1.json()["event_id"]
+        r2 = client.post(
+            f"/sessions/{session_id}/routing",
+            headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": rkey},
+        )
+        if r2.status_code != 200:
+            sys.exit(1)
+        assert r2.json()["event_id"] == eid1
+        print("ROUTING_IDEMPOTENCY_KEY_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
