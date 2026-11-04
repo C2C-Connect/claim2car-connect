@@ -379,6 +379,15 @@ def main():
             sys.exit(1)
         assert any(s["session_id"] == session_id for s in ds.json()["settlements"])
         print("DEALER_SETTLEMENTS_OK")
+        # Timeline must include routing, accept, and settlement
+        tl = client.get(f"/sessions/{session_id}/timeline", headers={"Authorization": f"Bearer {token_a}"})
+        if tl.status_code != 200:
+            sys.exit(1)
+        kinds = [e["kind"] for e in tl.json()["events"]]
+        assert "ROUTING_REQUESTED" in kinds
+        assert "DEALER_ACCEPTED" in kinds
+        assert "SETTLEMENT_RECORDED" in kinds
+        print("TIMELINE_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
