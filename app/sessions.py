@@ -1527,8 +1527,8 @@ async def record_vin(
                 )
             conn.commit()
         return {"session_id": session_id, "kind": "VIN_DECODED", "vin": body.vin}
-    except Exception:
-        raise HTTPException(status_code=500, detail='VIN_RECORD_FAILED')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'VIN_RECORD_FAILED: {e}')
 
 @router.post('/sessions/{session_id}/damage')
 async def record_damage(
