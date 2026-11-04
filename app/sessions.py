@@ -24,6 +24,13 @@ class EventItem(BaseModel):
     kind: str
     actor_id: str
 
+
+class SettlementResponse(BaseModel):
+    session_id: str
+    operator_payout_cents: int | None = None
+    dealer_invoice_cents: int | None = None
+    settled: bool = False
+
 class EventListResponse(BaseModel):
     session_id: str
     events: list[EventItem]
@@ -805,3 +812,42 @@ async def get_session_events(
                 return EventListResponse(session_id=session_id, events=events)
     except Exception:
         raise HTTPException(status_code=500, detail='EVENTS_READ_FAILED')
+
+
+@router.get('/sessions/{session_id}/settlement', response_model=SettlementResponse)
+async def get_settlement(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return SettlementResponse(session_id=session_id)
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute(
+                    """SELECT payload_json FROM faos.events
+                       WHERE session_id = %s AND kind = 'SETTLEMENT_RECORDED'
+                       ORDER BY sequence DESC LIMIT 1""",
+                    (session_id,),
+                )
+                row = cur.fetchone()
+                if not row or not row[0]:
+                    return SettlementResponse(session_id=session_id, settled=False)
+                payload = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                return SettlementResponse(
+                    session_id=session_id,
+                    operator_payout_cents=payload.get("operator_payout_cents"),
+                    dealer_invoice_cents=payload.get("dealer_invoice_cents"),
+                    settled=True,
+                )
+    except Exception:
+        raise HTTPException(status_code=500, detail='SETTLEMENT_READ_FAILED')
