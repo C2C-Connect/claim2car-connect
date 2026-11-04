@@ -1375,7 +1375,7 @@ async def list_expired_reservations(
     except Exception:
         raise HTTPException(status_code=500, detail='EXPIRED_RESERVATIONS_FAILED')
 
-@router.get('/sessions/human-review', response_model=HumanReviewListResponse)
+@router.get('/routing/human-review', response_model=HumanReviewListResponse)
 async def list_human_review(
     authorization: str = Header(None),
     resolver: CredentialResolver = Depends(get_resolver),
