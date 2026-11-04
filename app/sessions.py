@@ -48,6 +48,32 @@ class ShopPacketResponse(BaseModel):
     selected_location_id: str | None = None
 
 
+
+class ExpiredReservationItem(BaseModel):
+    reservation_id: str
+    location_id: str
+    request_digest: str
+    expires_at: str
+
+class ExpiredReservationListResponse(BaseModel):
+    reservations: list[ExpiredReservationItem]
+
+class HumanReviewItem(BaseModel):
+    session_id: str
+    outcome: str
+
+class HumanReviewListResponse(BaseModel):
+    sessions: list[HumanReviewItem]
+
+class SettlementTotalResponse(BaseModel):
+    operator_payout_cents: int
+    dealer_invoice_cents: int
+    count: int
+
+class SessionStatusResponse(BaseModel):
+    session_id: str
+    status: str
+
 class TimelineItem(BaseModel):
     sequence: int
     kind: str
@@ -1314,3 +1340,132 @@ async def get_timeline(
                 return TimelineResponse(session_id=session_id, events=items)
     except Exception:
         raise HTTPException(status_code=500, detail='TIMELINE_FAILED')
+
+
+@router.get('/reservations/expired', response_model=ExpiredReservationListResponse)
+async def list_expired_reservations(
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return ExpiredReservationListResponse(reservations=[])
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("""
+                    SELECT reservation_id, location_id, request_digest, expires_at
+                    FROM faos.capacity_reservations
+                    WHERE status = 'ACTIVE' AND expires_at < now()
+                    ORDER BY expires_at
+                """)
+                rows = cur.fetchall()
+                items = [ExpiredReservationItem(
+                    reservation_id=str(r[0]), location_id=str(r[1]),
+                    request_digest=r[2], expires_at=r[3].isoformat()
+                ) for r in rows]
+                return ExpiredReservationListResponse(reservations=items)
+    except Exception:
+        raise HTTPException(status_code=500, detail='EXPIRED_RESERVATIONS_FAILED')
+
+@router.get('/sessions/human-review', response_model=HumanReviewListResponse)
+async def list_human_review(
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return HumanReviewListResponse(sessions=[])
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("""
+                    SELECT request_digest, outcome FROM faos.routing_results
+                    WHERE outcome = 'HUMAN_REVIEW'
+                    ORDER BY created_at DESC
+                """)
+                rows = cur.fetchall()
+                items = [HumanReviewItem(
+                    session_id=r[0].replace("routing-", "") if r[0].startswith("routing-") else r[0],
+                    outcome=r[1]
+                ) for r in rows]
+                return HumanReviewListResponse(sessions=items)
+    except Exception:
+        raise HTTPException(status_code=500, detail='HUMAN_REVIEW_LIST_FAILED')
+
+@router.get('/settlements/total', response_model=SettlementTotalResponse)
+async def settlement_total(
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return SettlementTotalResponse(operator_payout_cents=0, dealer_invoice_cents=0, count=0)
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT payload_json FROM faos.events WHERE kind = 'SETTLEMENT_RECORDED'")
+                rows = cur.fetchall()
+                payout = invoice = 0
+                for row in rows:
+                    payload = row[0] if isinstance(row[0], dict) else (json.loads(row[0]) if row[0] else {})
+                    payout += payload.get("operator_payout_cents") or 0
+                    invoice += payload.get("dealer_invoice_cents") or 0
+                return SettlementTotalResponse(operator_payout_cents=payout, dealer_invoice_cents=invoice, count=len(rows))
+    except Exception:
+        raise HTTPException(status_code=500, detail='SETTLEMENT_TOTAL_FAILED')
+
+@router.get('/sessions/{session_id}/status', response_model=SessionStatusResponse)
+async def get_session_status(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return SessionStatusResponse(session_id=session_id, status="UNKNOWN")
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT 1 FROM faos.events WHERE session_id = %s AND kind = 'SETTLEMENT_RECORDED' LIMIT 1", (session_id,))
+                if cur.fetchone():
+                    return SessionStatusResponse(session_id=session_id, status="SETTLED")
+                cur.execute("SELECT kind FROM faos.events WHERE session_id = %s AND kind IN ('DEALER_ACCEPTED','DEALER_PASSED') ORDER BY sequence DESC LIMIT 1", (session_id,))
+                d = cur.fetchone()
+                if d:
+                    return SessionStatusResponse(session_id=session_id, status=d[0].replace("DEALER_", ""))
+                cur.execute("SELECT outcome FROM faos.routing_results WHERE request_digest = %s ORDER BY created_at DESC LIMIT 1", (f"routing-{session_id}",))
+                r = cur.fetchone()
+                if r:
+                    return SessionStatusResponse(session_id=session_id, status=r[0])
+                return SessionStatusResponse(session_id=session_id, status="OPEN")
+    except Exception:
+        raise HTTPException(status_code=500, detail='STATUS_FAILED')
