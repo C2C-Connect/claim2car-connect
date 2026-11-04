@@ -114,6 +114,13 @@ def main():
         assert dbody["kind"] == "DEALER_ACCEPTED"
         assert dbody["decision"] == "ACCEPTED"
         print("DECISION_ACCEPTED_OK")
+        # Settlement must follow acceptance
+        events_after = client.get(f"/sessions/{session_id}/events", headers={"Authorization": f"Bearer {token_a}"})
+        if events_after.status_code != 200:
+            sys.exit(1)
+        kinds_after = [e["kind"] for e in events_after.json()["events"]]
+        assert "SETTLEMENT_RECORDED" in kinds_after
+        print("SETTLEMENT_RECORDED_OK")
 
         get_routing = client.get(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
         print("get routing status", get_routing.status_code)
