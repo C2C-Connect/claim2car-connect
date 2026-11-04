@@ -47,6 +47,16 @@ class ShopPacketResponse(BaseModel):
     routing_outcome: str | None = None
     selected_location_id: str | None = None
 
+
+class TimelineItem(BaseModel):
+    sequence: int
+    kind: str
+    actor_id: str | None = None
+
+class TimelineResponse(BaseModel):
+    session_id: str
+    events: list[TimelineItem]
+
 class CarrierPacketResponse(BaseModel):
     session_id: str
     routing_outcome: str | None = None
@@ -1271,3 +1281,36 @@ async def list_dealer_settlements(
                 return SettlementListResponse(settlements=items)
     except Exception:
         raise HTTPException(status_code=500, detail='DEALER_SETTLEMENTS_FAILED')
+
+
+@router.get('/sessions/{session_id}/timeline', response_model=TimelineResponse)
+async def get_timeline(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return TimelineResponse(session_id=session_id, events=[])
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute(
+                    """SELECT sequence, kind, actor FROM faos.events
+                       WHERE session_id = %s
+                         AND kind IN ('ROUTING_REQUESTED','DEALER_ACCEPTED','DEALER_PASSED','SETTLEMENT_RECORDED')
+                       ORDER BY sequence""",
+                    (session_id,),
+                )
+                rows = cur.fetchall()
+                items = [TimelineItem(sequence=r[0], kind=r[1], actor_id=r[2]) for r in rows]
+                return TimelineResponse(session_id=session_id, events=items)
+    except Exception:
+        raise HTTPException(status_code=500, detail='TIMELINE_FAILED')
