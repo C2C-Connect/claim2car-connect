@@ -132,8 +132,7 @@ def main():
         print("GET_SETTLEMENT_OK")
         # Second accept must not create a second settlement
         decision2 = client.post(
-            f"/sessions/{session_id}/decision",
-            json={"decision": "ACCEPTED"},
+            f"/sessions/{session_id}/decision?decision=ACCEPTED",
             headers={"Authorization": f"Bearer {token_a}"},
         )
         if decision2.status_code != 200:
