@@ -19,6 +19,7 @@ on:
       - 'migrations/0016_*.sql'
       - 'migrations/0017_*.sql'
       - 'migrations/0018_*.sql'
+      - 'migrations/0019_*.sql'
 
 jobs:
   auth-rls:
@@ -57,7 +58,7 @@ jobs:
           echo "=== SHA ==="
           git rev-parse HEAD
           psql -c "CREATE ROLE faos_app; CREATE ROLE faos_writer; CREATE ROLE faos_fixture;"
-          for f in migrations/000[1-2]_*.sql migrations/0009_capacity_reservations.sql migrations/0010_routing_results.sql migrations/0011_add_routing_requested_kind.sql migrations/0012_location_geometry.sql migrations/0013_location_brand.sql migrations/0014_add_dealer_decision_kinds.sql migrations/0015_add_settlement_kind.sql migrations/0016_idempotency_keys.sql migrations/0017_add_capture_vision_kinds.sql migrations/0018_add_cost_kind.sql; do
+          for f in migrations/000[1-2]_*.sql migrations/0009_capacity_reservations.sql migrations/0010_routing_results.sql migrations/0011_add_routing_requested_kind.sql migrations/0012_location_geometry.sql migrations/0013_location_brand.sql migrations/0014_add_dealer_decision_kinds.sql migrations/0015_add_settlement_kind.sql migrations/0016_idempotency_keys.sql migrations/0017_add_capture_vision_kinds.sql migrations/0018_add_cost_kind.sql migrations/0019_add_capture_frame_kind.sql; do
             [ -f "$f" ] || continue
             psql -f "$f"
           done
