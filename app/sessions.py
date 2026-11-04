@@ -1596,6 +1596,8 @@ async def get_session_status(
         with psycopg.connect(db_url, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT count(DISTINCT payload_json::jsonb->>'point') FROM faos.events WHERE session_id = %s AND kind = 'CAPTURE_FRAME' AND payload_json::jsonb->>'point' IS NOT NULL", (session_id,))
+                cap_pct = min(100, (cur.fetchone()[0] or 0) * 100 // 16)
                 cur.execute("SELECT 1 FROM faos.events WHERE session_id = %s AND kind = 'SETTLEMENT_RECORDED' LIMIT 1", (session_id,))
                 if cur.fetchone():
                     return SessionStatusResponse(session_id=session_id, status="SETTLED", capture_pct=cap_pct)
