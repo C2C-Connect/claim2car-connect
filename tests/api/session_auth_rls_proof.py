@@ -300,6 +300,17 @@ def main():
         settle_passed = client.get(f"/sessions/{session_pass}/settlement", headers={"Authorization": f"Bearer {token_a}"})
         assert settle_passed.json()["settled"] is False
         print("DEALER_PASSED_NO_SETTLEMENT_OK")
+        # List settlements must contain the accepted session and its amounts
+        settlements = client.get("/settlements", headers={"Authorization": f"Bearer {token_a}"})
+        if settlements.status_code != 200:
+            print("settlements body", settlements.text)
+            sys.exit(1)
+        slist = settlements.json()["settlements"]
+        match = [s for s in slist if s["session_id"] == session_id]
+        assert len(match) == 1
+        assert match[0]["operator_payout_cents"] == 11000
+        assert match[0]["dealer_invoice_cents"] == 37500
+        print("LIST_SETTLEMENTS_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
