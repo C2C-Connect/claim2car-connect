@@ -105,6 +105,16 @@ def main():
         assert "cccccccc-cccc-cccc-cccc-cccccccccccc" not in shortlist
         print("ROUTING_BRAND_MATCH_OK")
 
+        decision = client.post(f"/sessions/{session_id}/decision?decision=ACCEPTED", headers={"Authorization": f"Bearer {token_a}"})
+        print("decision status", decision.status_code)
+        print("decision body", decision.text)
+        if decision.status_code != 200:
+            sys.exit(1)
+        dbody = decision.json()
+        assert dbody["kind"] == "DEALER_ACCEPTED"
+        assert dbody["decision"] == "ACCEPTED"
+        print("DECISION_ACCEPTED_OK")
+
         get_routing = client.get(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
         print("get routing status", get_routing.status_code)
         print("get routing body", get_routing.text)
