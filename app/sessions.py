@@ -525,7 +525,7 @@ async def record_routing(
                             ST_SetSRID(ST_MakePoint(-98.55, 29.45), 4326)::geography,
                             rp.service_radius_meters
                           )
-                      AND (%s IS NULL OR dl.brand = %s)
+                      AND (%s::text IS NULL OR dl.brand = %s::text)
                     ORDER BY dl.geom <-> ST_SetSRID(ST_MakePoint(-98.55, 29.45), 4326)
                     LIMIT 2
                 """, (binding.tenant_id, binding.tenant_id, vehicle_brand, vehicle_brand))
@@ -583,10 +583,8 @@ async def record_routing(
                     ),
                 )
             conn.commit()
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f'ROUTING_RECORD_FAILED: {e}')
+    except Exception:
+        raise HTTPException(status_code=500, detail='ROUTING_RECORD_FAILED')
     return RoutingRecordResponse(
         session_id=session_id,
         event_id=event_id,
