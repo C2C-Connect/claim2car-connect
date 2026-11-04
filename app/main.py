@@ -4,6 +4,7 @@ Sealing and evidence routes remain absent.
 from dataclasses import dataclass, field
 import os
 import psycopg
+from fastapi.responses import FileResponse
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
@@ -42,6 +43,10 @@ def create_app(settings=None):
     settings = settings if settings is not None else Settings.from_environment()
     api = FastAPI(title='Claim2Car Connect foundation',docs_url=None,redoc_url=None,openapi_url=None)
     api.include_router(sessions_router)
+
+    @api.get('/settlements/history')
+    def settlement_history():
+        return FileResponse("app/settlement_history.html")
 
     @api.get('/health/live')
     def live():
