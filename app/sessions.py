@@ -99,9 +99,36 @@ class ExhibitResponse(BaseModel):
     model: str | None = None
     body_class: str | None = None
     damage_findings: list[dict] = []
+    delta_v_mph: float | None = None
+    impact_angle_deg: float | None = None
+    crush_front_in: float | None = None
+    crush_side_in: float | None = None
+    crush_rear_in: float | None = None
+    cost_lines: list[dict] = []
+    total_parts_cents: int | None = None
+    total_labor_cents: int | None = None
     routing_outcome: str | None = None
     decision: str | None = None
     settled: bool = False
+
+
+class PhysicsRequest(BaseModel):
+    delta_v_mph: float | None = None
+    impact_angle_deg: float | None = None
+    crush_front_in: float | None = None
+    crush_side_in: float | None = None
+    crush_rear_in: float | None = None
+
+class CostLine(BaseModel):
+    description: str
+    part_id: str | None = None
+    labor_hours: float | None = None
+    cost_cents: int
+
+class CostRequest(BaseModel):
+    lines: list[CostLine]
+    total_parts_cents: int | None = None
+    total_labor_cents: int | None = None
 
 class TimelineItem(BaseModel):
     sequence: int
@@ -1598,6 +1625,18 @@ async def get_exhibit(
                 if d and d[0]:
                     dp = d[0] if isinstance(d[0], dict) else json.loads(d[0])
                     findings = dp.get("findings", [])
+                # Physics
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'PHYSICS_COMPUTED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                ph = cur.fetchone()
+                phys = {}
+                if ph and ph[0]:
+                    phys = ph[0] if isinstance(ph[0], dict) else json.loads(ph[0])
+                # Cost
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'COST_ESTIMATED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                co = cur.fetchone()
+                cost = {}
+                if co and co[0]:
+                    cost = co[0] if isinstance(co[0], dict) else json.loads(co[0])
                 # Routing
                 cur.execute("SELECT outcome FROM faos.routing_results WHERE request_digest = %s ORDER BY created_at DESC LIMIT 1", (f"routing-{session_id}",))
                 r = cur.fetchone()
@@ -1617,9 +1656,84 @@ async def get_exhibit(
                     model=vin_payload.get("model"),
                     body_class=vin_payload.get("body_class"),
                     damage_findings=findings,
+                    delta_v_mph=phys.get("delta_v_mph"),
+                    impact_angle_deg=phys.get("impact_angle_deg"),
+                    crush_front_in=phys.get("crush_front_in"),
+                    crush_side_in=phys.get("crush_side_in"),
+                    crush_rear_in=phys.get("crush_rear_in"),
+                    cost_lines=cost.get("lines", []),
+                    total_parts_cents=cost.get("total_parts_cents"),
+                    total_labor_cents=cost.get("total_labor_cents"),
                     routing_outcome=outcome,
                     decision=decision,
                     settled=settled,
                 )
     except Exception:
         raise HTTPException(status_code=500, detail='EXHIBIT_READ_FAILED')
+
+
+@router.post('/sessions/{session_id}/physics')
+async def record_physics(
+    session_id: str,
+    body: PhysicsRequest,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return {"session_id": session_id, "kind": "PHYSICS_COMPUTED"}
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
+                seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps(body.model_dump())
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (binding.tenant_id, session_id, event_id, seq, "PHYSICS_COMPUTED", binding.actor_id, "2026-11-04T00:00:00Z", "physics", payload, "0.1"),
+                )
+            conn.commit()
+        return {"session_id": session_id, "kind": "PHYSICS_COMPUTED"}
+    except Exception:
+        raise HTTPException(status_code=500, detail='PHYSICS_RECORD_FAILED')
+
+@router.post('/sessions/{session_id}/cost')
+async def record_cost(
+    session_id: str,
+    body: CostRequest,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return {"session_id": session_id, "kind": "COST_ESTIMATED"}
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
+                seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps(body.model_dump())
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (binding.tenant_id, session_id, event_id, seq, "COST_ESTIMATED", binding.actor_id, "2026-11-04T00:00:00Z", "cost", payload, "0.1"),
+                )
+            conn.commit()
+        return {"session_id": session_id, "kind": "COST_ESTIMATED"}
+    except Exception:
+        raise HTTPException(status_code=500, detail='COST_RECORD_FAILED')
