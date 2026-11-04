@@ -522,7 +522,7 @@ async def record_routing(
                         ON CONFLICT (tenant_id, location_id, request_digest) DO NOTHING
                     """, (binding.tenant_id, str(uuid4()), loc_id, request_digest))
                 # Persist the routing result
-                outcome = "ROUTED" if available else "UNRESOLVED"
+                outcome = "ROUTED" if available else "HUMAN_REVIEW"
                 selected = available[0] if available else None
                 cur.execute("""
                     INSERT INTO faos.routing_results
