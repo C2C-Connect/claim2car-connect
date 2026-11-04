@@ -161,6 +161,33 @@ def main():
         events_idem = client.get(f"/sessions/{session_id}/events", headers={"Authorization": f"Bearer {token_a}"})
         assert [e["kind"] for e in events_idem.json()["events"]].count("SETTLEMENT_RECORDED") == 1
         print("IDEMPOTENCY_KEY_OK")
+        # PASSED must not create a settlement
+        create2 = client.post("/sessions", headers={"Authorization": f"Bearer {token_a}"})
+        if create2.status_code != 200:
+            sys.exit(1)
+        session_id2 = create2.json()["session_id"]
+        # minimal path to routing
+        client.post(f"/sessions/{session_id2}/consent", headers={"Authorization": f"Bearer {token_a}"})
+        client.post(f"/sessions/{session_id2}/vehicle", json={"brand": "Toyota"}, headers={"Authorization": f"Bearer {token_a}"})
+        client.post(f"/sessions/{session_id2}/artifact", headers={"Authorization": f"Bearer {token_a}"})
+        client.post(f"/sessions/{session_id2}/quality", headers={"Authorization": f"Bearer {token_a}"})
+        client.post(f"/sessions/{session_id2}/review", headers={"Authorization": f"Bearer {token_a}"})
+        client.post(f"/sessions/{session_id2}/seal", headers={"Authorization": f"Bearer {token_a}"})
+        client.post(f"/sessions/{session_id2}/routing", headers={"Authorization": f"Bearer {token_a}"})
+        passed = client.post(
+            f"/sessions/{session_id2}/decision?decision=PASSED",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        if passed.status_code != 200:
+            print("passed body", passed.text)
+            sys.exit(1)
+        events_passed = client.get(f"/sessions/{session_id2}/events", headers={"Authorization": f"Bearer {token_a}"})
+        kinds_passed = [e["kind"] for e in events_passed.json()["events"]]
+        assert "DEALER_PASSED" in kinds_passed
+        assert "SETTLEMENT_RECORDED" not in kinds_passed
+        settle_passed = client.get(f"/sessions/{session_id2}/settlement", headers={"Authorization": f"Bearer {token_a}"})
+        assert settle_passed.json()["settled"] is False
+        print("DEALER_PASSED_NO_SETTLEMENT_OK")
 
         get_routing = client.get(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
         print("get routing status", get_routing.status_code)
