@@ -52,7 +52,7 @@
         const tbody = document.getElementById("rows");
         items.forEach(s => {
           const tr = document.createElement("tr");
-          tr.innerHTML = `<td>${s.session_id}</td><td>$${(s.operator_payout_cents/100).toFixed(2)}</td><td>$${(s.dealer_invoice_cents/100).toFixed(2)}</td>`;
+          tr.innerHTML = `<td><a href="/settlements/${s.session_id}">${s.session_id}</a></td><td>$${(s.operator_payout_cents/100).toFixed(2)}</td><td>$${(s.dealer_invoice_cents/100).toFixed(2)}</td>`;
           tbody.appendChild(tr);
         });
         document.getElementById("table").hidden = false;
