@@ -41,6 +41,12 @@
         <div class="stat"><div class="label">Operator Payout</div><div class="value">$${(d.operator_payout_cents/100).toFixed(2)}</div></div>
         <div class="stat"><div class="label">Dealer Invoice</div><div class="value">$${(d.dealer_invoice_cents/100).toFixed(2)}</div></div>`;
     }
+    const a = await fetch("/admin/activity", { headers: { Authorization: "Bearer " + token } });
+      const feed = await a.json();
+      const el = document.createElement("div");
+      el.style.marginTop = "2rem";
+      el.innerHTML = "<h3>Live Activity</h3>" + (feed.events || []).map(e => `<div style="padding:.3rem 0;border-bottom:1px solid #eee">${e.session_id.slice(0,8)} · ${e.status}</div>`).join("");
+      document.querySelector("main").appendChild(el);
     if (token) load();
   </script>
 </body>
