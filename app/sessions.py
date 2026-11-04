@@ -1125,14 +1125,14 @@ async def list_settlements(
                 items = []
                 for row in rows:
                     payload = row[1] if isinstance(row[1], dict) else (json.loads(row[1]) if row[1] else {})
-                    items.append(SettlementItem(
+                    items.append(SettlementListItem(
                         session_id=str(row[0]),
                         operator_payout_cents=payload.get("operator_payout_cents"),
                         dealer_invoice_cents=payload.get("dealer_invoice_cents"),
                     ))
                 return SettlementListResponse(settlements=items)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'SETTLEMENTS_READ_FAILED: {e}')
+    except Exception:
+        raise HTTPException(status_code=500, detail='SETTLEMENTS_READ_FAILED')
 
 
 @router.get('/sessions/{session_id}/summary', response_model=SessionSummaryResponse)
@@ -1440,7 +1440,7 @@ async def list_dealer_settlements(
                 items = []
                 for row in rows:
                     payload = row[1] if isinstance(row[1], dict) else (json.loads(row[1]) if row[1] else {})
-                    items.append(SettlementItem(
+                    items.append(SettlementListItem(
                         session_id=str(row[0]),
                         operator_payout_cents=payload.get("operator_payout_cents"),
                         dealer_invoice_cents=payload.get("dealer_invoice_cents"),
