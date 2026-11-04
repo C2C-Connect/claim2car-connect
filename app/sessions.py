@@ -686,6 +686,30 @@ async def record_decision(
                         "0.1",
                     ),
                 )
+                # On acceptance, record the fixed pilot settlement
+                if decision == "ACCEPTED":
+                    settle_seq = next_seq + 1
+                    settle_id = str(uuid4())
+                    settle_payload = json.dumps({
+                        "actor_id": binding.actor_id,
+                        "operator_payout_cents": 11000,
+                        "dealer_invoice_cents": 17500,
+                    })
+                    cur.execute(
+                        "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            binding.tenant_id,
+                            session_id,
+                            settle_id,
+                            settle_seq,
+                            "SETTLEMENT_RECORDED",
+                            binding.actor_id,
+                            "2026-10-31T00:00:00Z",
+                            "settlement_recorded",
+                            settle_payload,
+                            "0.1",
+                        ),
+                    )
             conn.commit()
     except Exception:
         raise HTTPException(status_code=500, detail='DECISION_RECORD_FAILED')
