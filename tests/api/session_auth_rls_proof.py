@@ -563,6 +563,25 @@ def main():
             print("dmg3", dmg3.text)
             sys.exit(1)
         print("DAMAGE_IDEMPOTENCY_OK")
+        # Consumer packet includes VIN and damage
+        cp2 = client.get(f"/sessions/{session_id}/packet", headers={"Authorization": f"Bearer {token_a}"})
+        if cp2.status_code != 200:
+            sys.exit(1)
+        assert cp2.json()["major_damage"] >= 1
+        print("CONSUMER_PACKET_ENRICHED_OK")
+        # Status includes capture pct
+        st2 = client.get(f"/sessions/{session_id}/status", headers={"Authorization": f"Bearer {token_a}"})
+        if st2.status_code != 200:
+            sys.exit(1)
+        assert st2.json()["capture_pct"] >= 0
+        print("STATUS_CAPTURE_PCT_OK")
+        # Settlements list
+        sl = client.get("/settlements", headers={"Authorization": f"Bearer {token_a}"})
+        if sl.status_code != 200:
+            print("settlements", sl.text)
+            sys.exit(1)
+        assert any(s["session_id"] == session_id for s in sl.json()["settlements"])
+        print("SETTLEMENT_LIST_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
