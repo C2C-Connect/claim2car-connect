@@ -491,7 +491,7 @@ async def record_routing(
                 # Select locations with remaining capacity, inside policy radius, ordered by distance
                 # Resolve vehicle brand from latest VEHICLE_RECORDED for this session
                 cur.execute("""
-                    SELECT payload->>'brand'
+                    SELECT payload_json::jsonb->>'brand'
                     FROM faos.events
                     WHERE session_id = %s AND kind = 'VEHICLE_RECORDED'
                     ORDER BY sequence DESC
