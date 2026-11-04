@@ -577,8 +577,8 @@ def main():
         print("STATUS_CAPTURE_PCT_OK")
         # Settlements list
         sl = client.get("/settlements", headers={"Authorization": f"Bearer {token_a}"})
+        print("settlements", sl.status_code, sl.text)
         if sl.status_code != 200:
-            print("settlements", sl.text)
             sys.exit(1)
         assert any(s["session_id"] == session_id for s in sl.json()["settlements"])
         print("SETTLEMENT_LIST_OK")
