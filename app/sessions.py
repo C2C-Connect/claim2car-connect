@@ -1815,8 +1815,8 @@ async def record_capture_frame(
                     cur.execute("INSERT INTO faos.idempotency_keys (tenant_id, key, event_id) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (binding.tenant_id, idempotency_key, event_id))
             conn.commit()
         return {"session_id": session_id, "kind": "CAPTURE_FRAME"}
-    except Exception:
-        raise HTTPException(status_code=500, detail='CAPTURE_RECORD_FAILED')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'CAPTURE_RECORD_FAILED: {e}')
 
 @router.post('/sessions/{session_id}/vin/decode')
 async def decode_vin_nhtsa(
