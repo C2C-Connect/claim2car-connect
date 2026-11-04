@@ -413,6 +413,41 @@ def main():
             print("expired", er.text)
             sys.exit(1)
         print("EXPIRED_RESERVATIONS_OK")
+        # VIN decode
+        vin = client.post(f"/sessions/{session_id}/vin", json={
+            "vin": "1HGCM82633A004352",
+            "year": 2003,
+            "make": "HONDA",
+            "model": "Accord",
+            "body_class": "Coupe"
+        }, headers={"Authorization": f"Bearer {token_a}"})
+        if vin.status_code != 200:
+            print("vin", vin.text)
+            sys.exit(1)
+        print("VIN_DECODED_OK")
+        # Damage findings
+        dmg = client.post(f"/sessions/{session_id}/damage", json={
+            "findings": [
+                {"panel": "Front Bumper", "severity": "MAJOR", "confidence": 0.92, "types": ["crush"]},
+                {"panel": "Hood", "severity": "MINOR", "confidence": 0.81, "types": ["dent"]}
+            ]
+        }, headers={"Authorization": f"Bearer {token_a}"})
+        if dmg.status_code != 200:
+            print("damage", dmg.text)
+            sys.exit(1)
+        print("DAMAGE_DETECTED_OK")
+        # Exhibit must aggregate VIN + damage + routing
+        ex = client.get(f"/sessions/{session_id}/exhibit", headers={"Authorization": f"Bearer {token_a}"})
+        if ex.status_code != 200:
+            print("exhibit", ex.text)
+            sys.exit(1)
+        ebody = ex.json()
+        assert ebody["vin"] == "1HGCM82633A004352"
+        assert ebody["make"] == "HONDA"
+        assert len(ebody["damage_findings"]) == 2
+        assert ebody["routing_outcome"] == "ROUTED"
+        assert ebody["settled"] is True
+        print("EXHIBIT_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
