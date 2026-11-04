@@ -182,16 +182,6 @@ async def record_consent(
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
-                # Idempotency key check
-                if idempotency_key:
-                    cur.execute(
-                        "SELECT response_json FROM faos.idempotency_keys WHERE tenant_id = %s AND key = %s",
-                        (binding.tenant_id, idempotency_key),
-                    )
-                    existing = cur.fetchone()
-                    if existing:
-                        resp = existing[0] if isinstance(existing[0], dict) else json.loads(existing[0])
-                        return DecisionRecordResponse(**resp)
                 cur.execute(
                     "SELECT COALESCE(MAX(sequence), 0) FROM faos.events WHERE session_id = %s",
                     (session_id,),
