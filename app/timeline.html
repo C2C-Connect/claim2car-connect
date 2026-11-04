@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Timeline</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f4ef; }
+    .item { background: #fff; border-left: 3px solid #1e3a8a; padding: 0.6rem 1rem; margin: 0.5rem 0; }
+    .kind { font-weight: 600; }
+    .time { color: #888; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <h1>Timeline</h1>
+  <div id="timeline"></div>
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    const sid = location.pathname.split("/").pop();
+    async function load() {
+      if (!token) return;
+      const t = await (await fetch(`/sessions/${sid}/timeline`, { headers: { Authorization: "Bearer " + token } })).json();
+      document.getElementById("timeline").innerHTML = (t.events || []).map(e => `
+        <div class="item"><div class="kind">${e.kind}</div><div class="time">${e.occurred_at || ""}</div></div>
+      `).join("") || "// awaiting first event";
+    }
+    if (token) load();
+  </script>
+</body>
+</html>
