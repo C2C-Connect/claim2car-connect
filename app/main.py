@@ -48,6 +48,10 @@ def create_app(settings=None):
     def printable_packet():
         return FileResponse("app/printable_packet.html")
 
+    @api.get('/sessions/{session_id}/exhibit')
+    def exhibit_page(session_id: str):
+        return FileResponse("app/exhibit.html")
+
     @api.get('/packets')
     def packets():
         return FileResponse("app/packets.html")
