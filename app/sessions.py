@@ -1520,15 +1520,18 @@ async def record_vin(
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
-                payload = body.model_dump()
+                cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
+                seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps(body.model_dump())
                 cur.execute(
-                    "SELECT faos.append_event(%s, %s, %s, %s::jsonb)",
-                    (str(binding.tenant_id), session_id, "VIN_DECODED", json.dumps(payload)),
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (binding.tenant_id, session_id, event_id, seq, "VIN_DECODED", binding.actor_id, "2026-11-04T00:00:00Z", "vin_decode", payload, "0.1"),
                 )
             conn.commit()
         return {"session_id": session_id, "kind": "VIN_DECODED", "vin": body.vin}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'VIN_RECORD_FAILED: {e}')
+    except Exception:
+        raise HTTPException(status_code=500, detail='VIN_RECORD_FAILED')
 
 @router.post('/sessions/{session_id}/damage')
 async def record_damage(
@@ -1550,10 +1553,13 @@ async def record_damage(
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
-                payload = {"findings": [f.model_dump() for f in body.findings]}
+                cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
+                seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps({"findings": [f.model_dump() for f in body.findings]})
                 cur.execute(
-                    "SELECT faos.append_event(%s, %s, %s, %s::jsonb)",
-                    (str(binding.tenant_id), session_id, "DAMAGE_DETECTED", json.dumps(payload)),
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (binding.tenant_id, session_id, event_id, seq, "DAMAGE_DETECTED", binding.actor_id, "2026-11-04T00:00:00Z", "damage_detect", payload, "0.1"),
                 )
             conn.commit()
         return {"session_id": session_id, "kind": "DAMAGE_DETECTED", "count": len(body.findings)}
