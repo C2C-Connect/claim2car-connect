@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Capture Progress</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #0f1115; color: #e8e8e8; }
+    .bar { background: #2a2a2a; border-radius: 999px; height: 12px; margin: 1rem 0; overflow: hidden; }
+    .fill { background: #10b981; height: 100%; }
+    .meta { color: #aaa; }
+  </style>
+</head>
+<body>
+  <h1>Capture Progress</h1>
+  <div id="status"></div>
+  <div class="bar"><div class="fill" id="fill" style="width:0%"></div></div>
+  <div class="meta" id="meta"></div>
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    const sid = location.pathname.split("/").pop();
+    async function load() {
+      if (!token) return;
+      const res = await fetch(`/sessions/${sid}/capture-progress`, { headers: { Authorization: "Bearer " + token } });
+      const p = await res.json();
+      const pct = Math.round((p.points_captured / p.points_expected) * 100);
+      document.getElementById("status").textContent = `${p.points_captured} / ${p.points_expected} points`;
+      document.getElementById("fill").style.width = pct + "%";
+      document.getElementById("meta").textContent = p.latest_point ? `Latest: ${p.latest_point} · sharpness ${p.latest_sharpness ?? "—"} · silhouette ${p.latest_silhouette_match ?? "—"}` : "// awaiting capture";
+    }
+    if (token) load();
+  </script>
+</body>
+</html>
