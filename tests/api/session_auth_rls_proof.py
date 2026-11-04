@@ -536,7 +536,7 @@ def main():
         if cap2.status_code != 200:
             sys.exit(1)
         cap3 = client.post(f"/sessions/{session_id}/capture", json={"point": "REAR", "sharpness": 100}, headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": "cap-1"})
-        if cap3.status_code != 200 or cap3.json().get("status") != "idempotent":
+        if cap3.status_code != 200 or cap3.json().get("kind") != "CAPTURE_FRAME":
             print("cap idem", cap3.text)
             sys.exit(1)
         print("CAPTURE_IDEMPOTENCY_OK")
