@@ -565,7 +565,7 @@ def main():
             sys.exit(1)
         print("DAMAGE_IDEMPOTENCY_OK")
         # Consumer packet includes VIN and damage
-        cp2 = client.get(f"/sessions/{session_id}/packet", headers={"Authorization": f"Bearer {token_a}"})
+        cp2 = client.get(f"/sessions/{session_id}/consumer-packet", headers={"Authorization": f"Bearer {token_a}"})
         print("cp2", cp2.status_code, cp2.text)
         if cp2.status_code != 200:
             sys.exit(1)
