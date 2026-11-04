@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Exhibit</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f4ef; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; letter-spacing: 0.02em; }
+    .meta { color: #666; margin-bottom: 1.5rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 900px; }
+    .card { background: #fff; border: 1px solid #e0dcd4; border-radius: 6px; padding: 1rem 1.25rem; }
+    .card h3 { margin: 0 0 0.5rem; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: #888; }
+    .row { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px solid #f0ece6; font-size: 0.95rem; }
+    .label { color: #888; }
+    .findings { font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>EXHIBIT</h1>
+  <div class="meta" id="meta"></div>
+  <div class="grid">
+    <div class="card">
+      <h3>VIN Consensus</h3>
+      <div id="vin"></div>
+    </div>
+    <div class="card">
+      <h3>Damage Findings</h3>
+      <div id="damage" class="findings"></div>
+    </div>
+    <div class="card">
+      <h3>Routing</h3>
+      <div id="routing"></div>
+    </div>
+    <div class="card">
+      <h3>Commercial</h3>
+      <div id="commercial"></div>
+    </div>
+  </div>
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    const sid = location.pathname.split("/").pop();
+    async function load() {
+      if (!token) return;
+      const res = await fetch(`/sessions/${sid}/exhibit`, { headers: { Authorization: "Bearer " + token } });
+      const e = await res.json();
+      document.getElementById("meta").textContent = e.session_id;
+      document.getElementById("vin").innerHTML = `
+        <div class="row"><span class="label">VIN</span><span>${e.vin || "—"}</span></div>
+        <div class="row"><span class="label">Year</span><span>${e.year || "—"}</span></div>
+        <div class="row"><span class="label">Make</span><span>${e.make || "—"}</span></div>
+        <div class="row"><span class="label">Model</span><span>${e.model || "—"}</span></div>
+        <div class="row"><span class="label">Body</span><span>${e.body_class || "—"}</span></div>`;
+      document.getElementById("damage").innerHTML = e.damage_findings.length
+        ? e.damage_findings.map(f => `<div class="row"><span>${f.panel}</span><span>${f.severity} (${f.confidence})</span></div>`).join("")
+        : "<div class=\"row\">// awaiting capture</div>";
+      document.getElementById("routing").innerHTML = `<div class="row"><span class="label">Outcome</span><span>${e.routing_outcome || "—"}</span></div>`;
+      document.getElementById("commercial").innerHTML = `
+        <div class="row"><span class="label">Decision</span><span>${e.decision || "—"}</span></div>
+        <div class="row"><span class="label">Settled</span><span>${e.settled ? "Yes" : "No"}</span></div>`;
+    }
+    if (token) load();
+  </script>
+</body>
+</html>
