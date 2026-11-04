@@ -3,6 +3,7 @@ Does not touch sealing or evidence.
 """
 from uuid import uuid4
 import json
+import urllib.request
 import os
 import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -129,6 +130,21 @@ class CostRequest(BaseModel):
     lines: list[CostLine]
     total_parts_cents: int | None = None
     total_labor_cents: int | None = None
+
+
+class CaptureFrameRequest(BaseModel):
+    angle_deg: float | None = None
+    sharpness: float | None = None
+    silhouette_match: float | None = None
+    point: str | None = None
+
+class DashboardResponse(BaseModel):
+    claims_today: int
+    routed: int
+    human_review: int
+    settled: int
+    operator_payout_cents: int
+    dealer_invoice_cents: int
 
 class TimelineItem(BaseModel):
     sequence: int
@@ -1737,3 +1753,124 @@ async def record_cost(
         return {"session_id": session_id, "kind": "COST_ESTIMATED"}
     except Exception:
         raise HTTPException(status_code=500, detail='COST_RECORD_FAILED')
+
+
+@router.post('/sessions/{session_id}/capture')
+async def record_capture_frame(
+    session_id: str,
+    body: CaptureFrameRequest,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return {"session_id": session_id, "kind": "CAPTURE_FRAME"}
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
+                seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps(body.model_dump())
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (binding.tenant_id, session_id, event_id, seq, "CAPTURE_FRAME", binding.actor_id, "2026-11-04T00:00:00Z", "capture", payload, "0.1"),
+                )
+            conn.commit()
+        return {"session_id": session_id, "kind": "CAPTURE_FRAME"}
+    except Exception:
+        raise HTTPException(status_code=500, detail='CAPTURE_RECORD_FAILED')
+
+@router.post('/sessions/{session_id}/vin/decode')
+async def decode_vin_nhtsa(
+    session_id: str,
+    body: VinDecodeRequest,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    decoded = {"vin": body.vin, "year": body.year, "make": body.make, "model": body.model, "body_class": body.body_class}
+    try:
+        url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{body.vin}?format=json"
+        with urllib.request.urlopen(url, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+            results = {r.get("Variable"): r.get("Value") for r in data.get("Results", []) if r.get("Value")}
+            decoded["year"] = decoded["year"] or (int(results["Model Year"]) if results.get("Model Year") and results["Model Year"].isdigit() else None)
+            decoded["make"] = decoded["make"] or results.get("Make")
+            decoded["model"] = decoded["model"] or results.get("Model")
+            decoded["body_class"] = decoded["body_class"] or results.get("Body Class")
+            decoded["plant"] = results.get("Plant City")
+            decoded["fuel"] = results.get("Fuel Type - Primary")
+    except Exception:
+        pass
+    if not db_url:
+        return {"session_id": session_id, "kind": "VIN_DECODED", **decoded}
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
+                seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps(decoded)
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (binding.tenant_id, session_id, event_id, seq, "VIN_DECODED", binding.actor_id, "2026-11-04T00:00:00Z", "nhtsa_decode", payload, "0.1"),
+                )
+            conn.commit()
+        return {"session_id": session_id, "kind": "VIN_DECODED", **decoded}
+    except Exception:
+        raise HTTPException(status_code=500, detail='NHTSA_DECODE_FAILED')
+
+@router.get('/admin/dashboard', response_model=DashboardResponse)
+async def admin_dashboard(
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return DashboardResponse(claims_today=0, routed=0, human_review=0, settled=0, operator_payout_cents=0, dealer_invoice_cents=0)
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT count(*) FROM faos.sessions")
+                claims = cur.fetchone()[0]
+                cur.execute("SELECT count(*) FROM faos.routing_results WHERE outcome = 'ROUTED'")
+                routed = cur.fetchone()[0]
+                cur.execute("SELECT count(*) FROM faos.routing_results WHERE outcome = 'HUMAN_REVIEW'")
+                hr = cur.fetchone()[0]
+                cur.execute("SELECT count(*) FROM faos.events WHERE kind = 'SETTLEMENT_RECORDED'")
+                settled = cur.fetchone()[0]
+                cur.execute("SELECT payload_json FROM faos.events WHERE kind = 'SETTLEMENT_RECORDED'")
+                rows = cur.fetchall()
+                payout = invoice = 0
+                for row in rows:
+                    payload = row[0] if isinstance(row[0], dict) else (json.loads(row[0]) if row[0] else {})
+                    payout += payload.get("operator_payout_cents") or 0
+                    invoice += payload.get("dealer_invoice_cents") or 0
+                return DashboardResponse(
+                    claims_today=claims, routed=routed, human_review=hr,
+                    settled=settled, operator_payout_cents=payout, dealer_invoice_cents=invoice,
+                )
+    except Exception:
+        raise HTTPException(status_code=500, detail='DASHBOARD_FAILED')
