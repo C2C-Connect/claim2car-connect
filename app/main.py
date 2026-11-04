@@ -52,6 +52,10 @@ def create_app(settings=None):
     def exhibit_page(session_id: str):
         return FileResponse("app/exhibit.html")
 
+    @api.get('/sessions/{session_id}/reconstruction')
+    def reconstruction_page(session_id: str):
+        return FileResponse("app/reconstruction.html")
+
     @api.get('/packets')
     def packets():
         return FileResponse("app/packets.html")
