@@ -74,6 +74,35 @@ class SessionStatusResponse(BaseModel):
     session_id: str
     status: str
 
+
+class VinDecodeRequest(BaseModel):
+    vin: str
+    year: int | None = None
+    make: str | None = None
+    model: str | None = None
+    body_class: str | None = None
+
+class DamageFinding(BaseModel):
+    panel: str
+    severity: str
+    confidence: float
+    types: list[str] = []
+
+class DamageRequest(BaseModel):
+    findings: list[DamageFinding]
+
+class ExhibitResponse(BaseModel):
+    session_id: str
+    vin: str | None = None
+    year: int | None = None
+    make: str | None = None
+    model: str | None = None
+    body_class: str | None = None
+    damage_findings: list[dict] = []
+    routing_outcome: str | None = None
+    decision: str | None = None
+    settled: bool = False
+
 class TimelineItem(BaseModel):
     sequence: int
     kind: str
@@ -1469,3 +1498,122 @@ async def get_session_status(
                 return SessionStatusResponse(session_id=session_id, status="OPEN")
     except Exception:
         raise HTTPException(status_code=500, detail='STATUS_FAILED')
+
+
+@router.post('/sessions/{session_id}/vin')
+async def record_vin(
+    session_id: str,
+    body: VinDecodeRequest,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return {"session_id": session_id, "kind": "VIN_DECODED"}
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                payload = body.model_dump()
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s::jsonb)",
+                    (str(binding.tenant_id), session_id, "VIN_DECODED", json.dumps(payload)),
+                )
+            conn.commit()
+        return {"session_id": session_id, "kind": "VIN_DECODED", "vin": body.vin}
+    except Exception:
+        raise HTTPException(status_code=500, detail='VIN_RECORD_FAILED')
+
+@router.post('/sessions/{session_id}/damage')
+async def record_damage(
+    session_id: str,
+    body: DamageRequest,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return {"session_id": session_id, "kind": "DAMAGE_DETECTED"}
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                payload = {"findings": [f.model_dump() for f in body.findings]}
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s::jsonb)",
+                    (str(binding.tenant_id), session_id, "DAMAGE_DETECTED", json.dumps(payload)),
+                )
+            conn.commit()
+        return {"session_id": session_id, "kind": "DAMAGE_DETECTED", "count": len(body.findings)}
+    except Exception:
+        raise HTTPException(status_code=500, detail='DAMAGE_RECORD_FAILED')
+
+@router.get('/sessions/{session_id}/exhibit', response_model=ExhibitResponse)
+async def get_exhibit(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return ExhibitResponse(session_id=session_id)
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                # VIN
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'VIN_DECODED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                v = cur.fetchone()
+                vin_payload = {}
+                if v and v[0]:
+                    vin_payload = v[0] if isinstance(v[0], dict) else json.loads(v[0])
+                # Damage
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'DAMAGE_DETECTED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                d = cur.fetchone()
+                findings = []
+                if d and d[0]:
+                    dp = d[0] if isinstance(d[0], dict) else json.loads(d[0])
+                    findings = dp.get("findings", [])
+                # Routing
+                cur.execute("SELECT outcome FROM faos.routing_results WHERE request_digest = %s ORDER BY created_at DESC LIMIT 1", (f"routing-{session_id}",))
+                r = cur.fetchone()
+                outcome = r[0] if r else None
+                # Decision
+                cur.execute("SELECT kind FROM faos.events WHERE session_id = %s AND kind IN ('DEALER_ACCEPTED','DEALER_PASSED') ORDER BY sequence DESC LIMIT 1", (session_id,))
+                dec = cur.fetchone()
+                decision = "ACCEPTED" if dec and dec[0] == "DEALER_ACCEPTED" else ("PASSED" if dec else None)
+                # Settled
+                cur.execute("SELECT 1 FROM faos.events WHERE session_id = %s AND kind = 'SETTLEMENT_RECORDED' LIMIT 1", (session_id,))
+                settled = bool(cur.fetchone())
+                return ExhibitResponse(
+                    session_id=session_id,
+                    vin=vin_payload.get("vin"),
+                    year=vin_payload.get("year"),
+                    make=vin_payload.get("make"),
+                    model=vin_payload.get("model"),
+                    body_class=vin_payload.get("body_class"),
+                    damage_findings=findings,
+                    routing_outcome=outcome,
+                    decision=decision,
+                    settled=settled,
+                )
+    except Exception:
+        raise HTTPException(status_code=500, detail='EXHIBIT_READ_FAILED')
