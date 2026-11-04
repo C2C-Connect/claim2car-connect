@@ -329,6 +329,18 @@ def main():
             sys.exit(1)
         assert r2.json()["event_id"] == eid1
         print("ROUTING_IDEMPOTENCY_KEY_OK")
+        # Summary must include routing, decision, and settlement
+        summary = client.get(f"/sessions/{session_id}/summary", headers={"Authorization": f"Bearer {token_a}"})
+        if summary.status_code != 200:
+            print("summary", summary.text)
+            sys.exit(1)
+        sbody = summary.json()
+        assert sbody["routing_outcome"] == "ROUTED"
+        assert sbody["decision"] == "ACCEPTED"
+        assert sbody["settled"] is True
+        assert sbody["operator_payout_cents"] == 11000
+        assert sbody["dealer_invoice_cents"] == 37500
+        print("SESSION_SUMMARY_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
