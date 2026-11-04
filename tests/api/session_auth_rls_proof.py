@@ -511,6 +511,34 @@ def main():
         assert dash.json()["claims_today"] >= 1
         assert dash.json()["settled"] >= 1
         print("DASHBOARD_OK")
+        # Capture progress
+        prog = client.get(f"/sessions/{session_id}/capture-progress", headers={"Authorization": f"Bearer {token_a}"})
+        if prog.status_code != 200:
+            sys.exit(1)
+        assert prog.json()["points_captured"] >= 1
+        print("CAPTURE_PROGRESS_OK")
+        # Damage summary
+        ds = client.get(f"/sessions/{session_id}/damage-summary", headers={"Authorization": f"Bearer {token_a}"})
+        if ds.status_code != 200:
+            sys.exit(1)
+        assert ds.json()["major"] >= 1
+        print("DAMAGE_SUMMARY_OK")
+        # Activity feed
+        act = client.get("/admin/activity", headers={"Authorization": f"Bearer {token_a}"})
+        if act.status_code != 200:
+            print("activity", act.text)
+            sys.exit(1)
+        assert any(a["session_id"] == session_id for a in act.json()["events"])
+        print("ACTIVITY_OK")
+        # Capture idempotency
+        cap2 = client.post(f"/sessions/{session_id}/capture", json={"point": "REAR", "sharpness": 100}, headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": "cap-1"})
+        if cap2.status_code != 200:
+            sys.exit(1)
+        cap3 = client.post(f"/sessions/{session_id}/capture", json={"point": "REAR", "sharpness": 100}, headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": "cap-1"})
+        if cap3.status_code != 200 or cap3.json().get("status") != "idempotent":
+            print("cap idem", cap3.text)
+            sys.exit(1)
+        print("CAPTURE_IDEMPOTENCY_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
