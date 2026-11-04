@@ -1799,10 +1799,11 @@ async def record_capture_frame(
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
                 if idempotency_key:
-                    cur.execute("SELECT event_id FROM faos.idempotency_keys WHERE key = %s AND tenant_id = faos.tenant_id()", (idempotency_key,))
+                    cur.execute("SELECT response_json FROM faos.idempotency_keys WHERE tenant_id = %s AND key = %s", (binding.tenant_id, idempotency_key))
                     existing = cur.fetchone()
                     if existing:
-                        return {"session_id": session_id, "event_id": str(existing[0]), "kind": "CAPTURE_FRAME", "status": "idempotent"}
+                        resp = existing[0] if isinstance(existing[0], dict) else json.loads(existing[0])
+                        return resp
                 cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
                 seq = cur.fetchone()[0] + 1
                 event_id = str(uuid4())
@@ -1812,11 +1813,12 @@ async def record_capture_frame(
                     (binding.tenant_id, session_id, event_id, seq, "CAPTURE_FRAME", binding.actor_id, "2026-11-04T00:00:00Z", "capture", payload, "0.1"),
                 )
                 if idempotency_key:
-                    cur.execute("INSERT INTO faos.idempotency_keys (tenant_id, key, event_id) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (binding.tenant_id, idempotency_key, event_id))
+                    cur.execute("INSERT INTO faos.idempotency_keys (tenant_id, key, session_id, response_json) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                                (binding.tenant_id, idempotency_key, session_id, json.dumps({"session_id": session_id, "kind": "CAPTURE_FRAME", "status": "recorded"})))
             conn.commit()
         return {"session_id": session_id, "kind": "CAPTURE_FRAME"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'CAPTURE_RECORD_FAILED: {e}')
+    except Exception:
+        raise HTTPException(status_code=500, detail='CAPTURE_RECORD_FAILED')
 
 @router.post('/sessions/{session_id}/vin/decode')
 async def decode_vin_nhtsa(
