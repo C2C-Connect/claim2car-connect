@@ -182,6 +182,16 @@ async def record_consent(
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                # Idempotency key check
+                if idempotency_key:
+                    cur.execute(
+                        "SELECT response_json FROM faos.idempotency_keys WHERE tenant_id = %s AND key = %s",
+                        (binding.tenant_id, idempotency_key),
+                    )
+                    existing = cur.fetchone()
+                    if existing:
+                        resp = existing[0] if isinstance(existing[0], dict) else json.loads(existing[0])
+                        return DecisionRecordResponse(**resp)
                 cur.execute(
                     "SELECT COALESCE(MAX(sequence), 0) FROM faos.events WHERE session_id = %s",
                     (session_id,),
@@ -650,6 +660,7 @@ async def record_decision(
     session_id: str,
     decision: str,
     authorization: str = Header(None),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     resolver: CredentialResolver = Depends(get_resolver),
     db_url: str | None = Depends(get_db_url),
 ):
@@ -725,6 +736,19 @@ async def record_decision(
                                 "0.1",
                             ),
                         )
+                response_obj = {
+                    "session_id": session_id,
+                    "event_id": event_id,
+                    "kind": kind,
+                    "decision": decision,
+                }
+                if idempotency_key:
+                    cur.execute(
+                        """INSERT INTO faos.idempotency_keys (tenant_id, key, session_id, response_json)
+                           VALUES (%s, %s, %s, %s)
+                           ON CONFLICT (tenant_id, key) DO NOTHING""",
+                        (binding.tenant_id, idempotency_key, session_id, json.dumps(response_obj)),
+                    )
             conn.commit()
     except Exception:
         raise HTTPException(status_code=500, detail='DECISION_RECORD_FAILED')
