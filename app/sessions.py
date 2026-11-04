@@ -607,12 +607,24 @@ async def record_routing(
             conn.commit()
     except Exception:
         raise HTTPException(status_code=500, detail='ROUTING_RECORD_FAILED')
-    return RoutingRecordResponse(
-        session_id=session_id,
-        event_id=event_id,
-        kind="ROUTING_REQUESTED",
-        dealer_shortlist=available,
-    )
+    response_obj = {
+        "session_id": session_id,
+        "event_id": event_id,
+        "kind": "ROUTING_REQUESTED",
+        "dealer_shortlist": available,
+    }
+    if idempotency_key:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute(
+                    """INSERT INTO faos.idempotency_keys (tenant_id, key, session_id, response_json)
+                       VALUES (%s, %s, %s, %s)
+                       ON CONFLICT (tenant_id, key) DO NOTHING""",
+                    (binding.tenant_id, idempotency_key, session_id, json.dumps(response_obj)),
+                )
+            conn.commit()
+    return RoutingRecordResponse(**response_obj)
 
 @router.get('/sessions/{session_id}/routing', response_model=RoutingResultResponse)
 async def get_routing(
