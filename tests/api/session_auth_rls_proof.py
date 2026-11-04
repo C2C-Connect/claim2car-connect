@@ -483,6 +483,34 @@ def main():
         assert len(e2["cost_lines"]) == 2
         assert e2["total_parts_cents"] == 194000
         print("EXHIBIT_PHYSICS_COST_OK")
+        # Capture frame (AR silhouette metadata)
+        cap = client.post(f"/sessions/{session_id}/capture", json={
+            "angle_deg": 0,
+            "sharpness": 142.5,
+            "silhouette_match": 0.91,
+            "point": "FRONT"
+        }, headers={"Authorization": f"Bearer {token_a}"})
+        if cap.status_code != 200:
+            print("capture", cap.text)
+            sys.exit(1)
+        print("CAPTURE_FRAME_OK")
+        # NHTSA decode (falls back if offline)
+        nh = client.post(f"/sessions/{session_id}/vin/decode", json={
+            "vin": "1HGCM82633A004352"
+        }, headers={"Authorization": f"Bearer {token_a}"})
+        if nh.status_code != 200:
+            print("nhtsa", nh.text)
+            sys.exit(1)
+        assert nh.json()["vin"] == "1HGCM82633A004352"
+        print("NHTSA_DECODE_OK")
+        # Dashboard
+        dash = client.get("/admin/dashboard", headers={"Authorization": f"Bearer {token_a}"})
+        if dash.status_code != 200:
+            print("dashboard", dash.text)
+            sys.exit(1)
+        assert dash.json()["claims_today"] >= 1
+        assert dash.json()["settled"] >= 1
+        print("DASHBOARD_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
