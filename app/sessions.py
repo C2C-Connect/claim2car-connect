@@ -507,7 +507,7 @@ async def record_routing(
                     LEFT JOIN (
                         SELECT location_id, COUNT(*) AS active_count
                         FROM faos.capacity_reservations
-                        WHERE status = 'ACTIVE'
+                        WHERE status = 'ACTIVE' AND expires_at > now()
                         GROUP BY location_id
                     ) cr ON cr.location_id = lc.location_id
                     CROSS JOIN (
