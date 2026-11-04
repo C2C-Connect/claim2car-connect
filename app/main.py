@@ -48,6 +48,22 @@ def create_app(settings=None):
     def packets():
         return FileResponse("app/packets.html")
 
+    @api.get('/sessions/{session_id}/consumer-packet')
+    def consumer_packet_page(session_id: str):
+        return FileResponse("app/consumer_packet.html")
+
+    @api.get('/sessions/{session_id}/shop-packet')
+    def shop_packet_page(session_id: str):
+        return FileResponse("app/shop_packet.html")
+
+    @api.get('/sessions/{session_id}/carrier-packet')
+    def carrier_packet_page(session_id: str):
+        return FileResponse("app/carrier_packet.html")
+
+    @api.get('/sessions/{session_id}/dealer-packet')
+    def dealer_packet_page(session_id: str):
+        return FileResponse("app/dealer_packet.html")
+
     @api.get('/settlements/history')
     def settlement_history():
         return FileResponse("app/settlement_history.html")
