@@ -63,7 +63,7 @@ def main():
             sys.exit(1)
         print("CONSENT_OK")
 
-        vehicle = client.post(f"/sessions/{session_id}/vehicle", headers={"Authorization": f"Bearer {token_a}"})
+        vehicle = client.post(f"/sessions/{session_id}/vehicle", json={"brand": "Toyota"}, headers={"Authorization": f"Bearer {token_a}"})
         print("vehicle status", vehicle.status_code)
         if vehicle.status_code != 200:
             sys.exit(1)
