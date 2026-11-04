@@ -482,7 +482,7 @@ async def record_routing(
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
-                # Select locations with remaining capacity, ordered by distance from synthetic incident
+                # Select locations with remaining capacity, inside policy radius, ordered by distance
                 cur.execute("""
                     SELECT lc.location_id
                     FROM faos.location_capacity lc
@@ -493,12 +493,24 @@ async def record_routing(
                         WHERE status = 'ACTIVE'
                         GROUP BY location_id
                     ) cr ON cr.location_id = lc.location_id
+                    CROSS JOIN (
+                        SELECT service_radius_meters
+                        FROM faos.routing_policies
+                        WHERE tenant_id = %s
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    ) rp
                     WHERE lc.tenant_id = %s
                       AND (lc.capacity - COALESCE(cr.active_count, 0)) > 0
                       AND dl.geom IS NOT NULL
+                      AND ST_DWithin(
+                            dl.geom::geography,
+                            ST_SetSRID(ST_MakePoint(-98.55, 29.45), 4326)::geography,
+                            rp.service_radius_meters
+                          )
                     ORDER BY dl.geom <-> ST_SetSRID(ST_MakePoint(-98.55, 29.45), 4326)
                     LIMIT 2
-                """, (binding.tenant_id,))
+                """, (binding.tenant_id, binding.tenant_id))
                 available = [str(row[0]) for row in cur.fetchall()]
                 # Create reservations for the selected locations
                 request_digest = f"routing-{session_id}"
