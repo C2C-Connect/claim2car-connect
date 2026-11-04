@@ -41,6 +41,10 @@ class ConsumerPacketResponse(BaseModel):
     routing_outcome: str | None = None
     decision: str | None = None
     settled: bool = False
+    year: int | None = None
+    make: str | None = None
+    model: str | None = None
+    major_damage: int = 0
 
 class ShopPacketResponse(BaseModel):
     session_id: str
@@ -78,6 +82,7 @@ class SettlementTotalResponse(BaseModel):
 class SessionStatusResponse(BaseModel):
     session_id: str
     status: str
+    capture_pct: int = 0
 
 
 class VinDecodeRequest(BaseModel):
@@ -1298,7 +1303,21 @@ async def get_consumer_packet(
                 decision = "ACCEPTED" if d and d[0] == "DEALER_ACCEPTED" else ("PASSED" if d else None)
                 cur.execute("SELECT 1 FROM faos.events WHERE session_id = %s AND kind = 'SETTLEMENT_RECORDED' LIMIT 1", (session_id,))
                 settled = bool(cur.fetchone())
-                return ConsumerPacketResponse(session_id=session_id, vehicle_brand=brand, routing_outcome=outcome, decision=decision, settled=settled)
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'VIN_DECODED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                vrow = cur.fetchone()
+                year = make = model = None
+                if vrow and vrow[0]:
+                    vp = vrow[0] if isinstance(vrow[0], dict) else json.loads(vrow[0])
+                    year = vp.get("year")
+                    make = vp.get("make")
+                    model = vp.get("model")
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'DAMAGE_DETECTED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                drow = cur.fetchone()
+                major = 0
+                if drow and drow[0]:
+                    dp = drow[0] if isinstance(drow[0], dict) else json.loads(drow[0])
+                    major = sum(1 for f in dp.get("findings", []) if f.get("severity") == "MAJOR")
+                return ConsumerPacketResponse(session_id=session_id, vehicle_brand=brand, routing_outcome=outcome, decision=decision, settled=settled, year=year, make=make, model=model, major_damage=major)
     except Exception:
         raise HTTPException(status_code=500, detail='CONSUMER_PACKET_FAILED')
 
@@ -1579,16 +1598,16 @@ async def get_session_status(
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
                 cur.execute("SELECT 1 FROM faos.events WHERE session_id = %s AND kind = 'SETTLEMENT_RECORDED' LIMIT 1", (session_id,))
                 if cur.fetchone():
-                    return SessionStatusResponse(session_id=session_id, status="SETTLED")
+                    return SessionStatusResponse(session_id=session_id, status="SETTLED", capture_pct=cap_pct)
                 cur.execute("SELECT kind FROM faos.events WHERE session_id = %s AND kind IN ('DEALER_ACCEPTED','DEALER_PASSED') ORDER BY sequence DESC LIMIT 1", (session_id,))
                 d = cur.fetchone()
                 if d:
-                    return SessionStatusResponse(session_id=session_id, status=d[0].replace("DEALER_", ""))
+                    return SessionStatusResponse(session_id=session_id, status=d[0].replace("DEALER_", ""), capture_pct=cap_pct)
                 cur.execute("SELECT outcome FROM faos.routing_results WHERE request_digest = %s ORDER BY created_at DESC LIMIT 1", (f"routing-{session_id}",))
                 r = cur.fetchone()
                 if r:
-                    return SessionStatusResponse(session_id=session_id, status=r[0])
-                return SessionStatusResponse(session_id=session_id, status="OPEN")
+                    return SessionStatusResponse(session_id=session_id, status=r[0], capture_pct=cap_pct)
+                return SessionStatusResponse(session_id=session_id, status="OPEN", capture_pct=cap_pct)
     except Exception:
         raise HTTPException(status_code=500, detail='STATUS_FAILED')
 
@@ -2055,3 +2074,43 @@ async def admin_activity(
                 return ActivityResponse(events=items)
     except Exception:
         raise HTTPException(status_code=500, detail='ACTIVITY_FAILED')
+
+class SettlementListItem(BaseModel):
+    session_id: str
+    operator_payout_cents: int | None = None
+    dealer_invoice_cents: int | None = None
+
+class SettlementListResponse(BaseModel):
+    settlements: list[SettlementListItem]
+
+@router.get('/settlements', response_model=SettlementListResponse)
+async def list_settlements(
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return SettlementListResponse(settlements=[])
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute("SELECT session_id, payload_json FROM faos.events WHERE kind = 'SETTLEMENT_RECORDED' ORDER BY sequence DESC LIMIT 50")
+                rows = cur.fetchall()
+                items = []
+                for row in rows:
+                    payload = row[1] if isinstance(row[1], dict) else (json.loads(row[1]) if row[1] else {})
+                    items.append(SettlementListItem(
+                        session_id=str(row[0]),
+                        operator_payout_cents=payload.get("operator_payout_cents"),
+                        dealer_invoice_cents=payload.get("dealer_invoice_cents"),
+                    ))
+                return SettlementListResponse(settlements=items)
+    except Exception:
+        raise HTTPException(status_code=500, detail='SETTLEMENT_LIST_FAILED')
