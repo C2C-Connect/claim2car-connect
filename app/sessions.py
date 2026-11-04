@@ -583,8 +583,10 @@ async def record_routing(
                     ),
                 )
             conn.commit()
-    except Exception:
-        raise HTTPException(status_code=500, detail='ROUTING_RECORD_FAILED')
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f'ROUTING_RECORD_FAILED: {e}')
     return RoutingRecordResponse(
         session_id=session_id,
         event_id=event_id,
