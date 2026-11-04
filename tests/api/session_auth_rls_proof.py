@@ -100,9 +100,10 @@ def main():
         rtbody = routing.json()
         assert rtbody["kind"] == "ROUTING_REQUESTED"
         shortlist = rtbody["dealer_shortlist"]
+        # Brand-matched: only Honda location
         assert "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in shortlist
-        assert "cccccccc-cccc-cccc-cccc-cccccccccccc" in shortlist
-        print("ROUTING_OK")
+        assert "cccccccc-cccc-cccc-cccc-cccccccccccc" not in shortlist
+        print("ROUTING_BRAND_MATCH_OK")
 
         get_routing = client.get(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
         print("get routing status", get_routing.status_code)
@@ -112,7 +113,7 @@ def main():
         grbody = get_routing.json()
         assert grbody["outcome"] == "ROUTED"
         assert "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in grbody["candidates"]
-        assert "cccccccc-cccc-cccc-cccc-cccccccccccc" in grbody["candidates"]
+        assert "cccccccc-cccc-cccc-cccc-cccccccccccc" not in grbody["candidates"]
         print("GET_ROUTING_OK")
 
         # --- Force empty shortlist for HUMAN_REVIEW ---
