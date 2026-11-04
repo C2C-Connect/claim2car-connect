@@ -76,6 +76,12 @@ class RoutingRecordResponse(BaseModel):
     kind: str
     dealer_shortlist: list[str]
 
+class RoutingResultResponse(BaseModel):
+    session_id: str
+    outcome: str
+    selected_location_id: str | None
+    candidates: list[str]
+
 def get_resolver() -> CredentialResolver:
     return CredentialResolver()
 
@@ -573,6 +579,46 @@ async def record_routing(
         kind="ROUTING_REQUESTED",
         dealer_shortlist=available,
     )
+
+@router.get('/sessions/{session_id}/routing', response_model=RoutingResultResponse)
+async def get_routing(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        raise HTTPException(status_code=500, detail='NO_DATABASE')
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                request_digest = f"routing-{session_id}"
+                cur.execute("""
+                    SELECT outcome, selected_location_id, candidates_json
+                    FROM faos.routing_results
+                    WHERE tenant_id = %s AND request_digest = %s
+                """, (binding.tenant_id, request_digest))
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail='ROUTING_NOT_FOUND')
+                candidates = json.loads(row[2]) if row[2] else []
+                return RoutingResultResponse(
+                    session_id=session_id,
+                    outcome=row[0],
+                    selected_location_id=str(row[1]) if row[1] else None,
+                    candidates=candidates,
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail='ROUTING_READ_FAILED')
 
 @router.get('/sessions', response_model=SessionListResponse)
 async def list_sessions(
