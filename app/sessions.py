@@ -984,8 +984,8 @@ async def get_session_summary(
                 # Routing
                 cur.execute(
                     """SELECT outcome, selected_location_id FROM faos.routing_results
-                       WHERE session_id = %s ORDER BY created_at DESC LIMIT 1""",
-                    (session_id,),
+                       WHERE request_digest = %s ORDER BY created_at DESC LIMIT 1""",
+                    (f"routing-{session_id}",),
                 )
                 r = cur.fetchone()
                 outcome = r[0] if r else None
@@ -1022,5 +1022,5 @@ async def get_session_summary(
                     operator_payout_cents=payout,
                     dealer_invoice_cents=invoice,
                 )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'SUMMARY_READ_FAILED: {e}')
+    except Exception:
+        raise HTTPException(status_code=500, detail='SUMMARY_READ_FAILED')
