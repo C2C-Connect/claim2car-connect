@@ -403,6 +403,7 @@ def main():
         print("SETTLEMENT_TOTAL_OK")
         # Human review list (may be empty or contain the forced session)
         hr = client.get("/sessions/human-review", headers={"Authorization": f"Bearer {token_a}"})
+        print("hr", hr.status_code, hr.text)
         if hr.status_code != 200:
             sys.exit(1)
         print("HUMAN_REVIEW_LIST_OK")
