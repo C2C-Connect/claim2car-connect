@@ -128,6 +128,17 @@ def main():
         assert "cccccccc-cccc-cccc-cccc-cccccccccccc" in shortlist
         print("ROUTING_OK")
 
+        get_routing = client.get(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
+        print("get routing status", get_routing.status_code)
+        print("get routing body", get_routing.text)
+        if get_routing.status_code != 200:
+            sys.exit(1)
+        grbody = get_routing.json()
+        assert grbody["outcome"] == "ROUTED"
+        assert "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in grbody["candidates"]
+        assert "cccccccc-cccc-cccc-cccc-cccccccccccc" in grbody["candidates"]
+        print("GET_ROUTING_OK")
+
         lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
         print("list status", lst.status_code)
         print("list body", lst.text)
