@@ -47,6 +47,10 @@ class ShopPacketResponse(BaseModel):
     vehicle_brand: str | None = None
     routing_outcome: str | None = None
     selected_location_id: str | None = None
+    major_damage: int = 0
+    minor_damage: int = 0
+    total_parts_cents: int | None = None
+    total_labor_cents: int | None = None
 
 
 
@@ -183,6 +187,8 @@ class CarrierPacketResponse(BaseModel):
     decision: str | None = None
     settled: bool = False
     operator_payout_cents: int | None = None
+    delta_v_mph: float | None = None
+    impact_angle_deg: float | None = None
 
 class DealerPacketResponse(BaseModel):
     session_id: str
@@ -1322,7 +1328,22 @@ async def get_shop_packet(
                 r = cur.fetchone()
                 outcome = r[0] if r else None
                 selected = str(r[1]) if r and r[1] else None
-                return ShopPacketResponse(session_id=session_id, vehicle_brand=brand, routing_outcome=outcome, selected_location_id=selected)
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'DAMAGE_DETECTED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                drow = cur.fetchone()
+                findings = []
+                if drow and drow[0]:
+                    dp = drow[0] if isinstance(drow[0], dict) else json.loads(drow[0])
+                    findings = dp.get("findings", [])
+                major = sum(1 for f in findings if f.get("severity") == "MAJOR")
+                minor = sum(1 for f in findings if f.get("severity") == "MINOR")
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'COST_ESTIMATED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                crow = cur.fetchone()
+                parts = labor = None
+                if crow and crow[0]:
+                    cp = crow[0] if isinstance(crow[0], dict) else json.loads(crow[0])
+                    parts = cp.get("total_parts_cents")
+                    labor = cp.get("total_labor_cents")
+                return ShopPacketResponse(session_id=session_id, vehicle_brand=brand, routing_outcome=outcome, selected_location_id=selected, major_damage=major, minor_damage=minor, total_parts_cents=parts, total_labor_cents=labor)
     except Exception:
         raise HTTPException(status_code=500, detail='SHOP_PACKET_FAILED')
 
@@ -1358,7 +1379,14 @@ async def get_carrier_packet(
                 if s and s[0]:
                     payload = s[0] if isinstance(s[0], dict) else json.loads(s[0])
                     payout = payload.get("operator_payout_cents")
-                return CarrierPacketResponse(session_id=session_id, routing_outcome=outcome, decision=decision, settled=settled, operator_payout_cents=payout)
+                cur.execute("SELECT payload_json FROM faos.events WHERE session_id = %s AND kind = 'PHYSICS_COMPUTED' ORDER BY sequence DESC LIMIT 1", (session_id,))
+                prow = cur.fetchone()
+                dv = angle = None
+                if prow and prow[0]:
+                    pp = prow[0] if isinstance(prow[0], dict) else json.loads(prow[0])
+                    dv = pp.get("delta_v_mph")
+                    angle = pp.get("impact_angle_deg")
+                return CarrierPacketResponse(session_id=session_id, routing_outcome=outcome, decision=decision, settled=settled, operator_payout_cents=payout, delta_v_mph=dv, impact_angle_deg=angle)
     except Exception:
         raise HTTPException(status_code=500, detail='CARRIER_PACKET_FAILED')
 
@@ -1603,6 +1631,7 @@ async def record_damage(
     session_id: str,
     body: DamageRequest,
     authorization: str = Header(None),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     resolver: CredentialResolver = Depends(get_resolver),
     db_url: str | None = Depends(get_db_url),
 ):
@@ -1618,6 +1647,12 @@ async def record_damage(
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                if idempotency_key:
+                    cur.execute("SELECT response_json FROM faos.idempotency_keys WHERE tenant_id = %s AND key = %s", (binding.tenant_id, idempotency_key))
+                    existing = cur.fetchone()
+                    if existing:
+                        resp = existing[0] if isinstance(existing[0], dict) else json.loads(existing[0])
+                        return resp
                 cur.execute("SELECT COALESCE(MAX(sequence),0) FROM faos.events WHERE session_id = %s", (session_id,))
                 seq = cur.fetchone()[0] + 1
                 event_id = str(uuid4())
@@ -1626,6 +1661,9 @@ async def record_damage(
                     "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     (binding.tenant_id, session_id, event_id, seq, "DAMAGE_DETECTED", binding.actor_id, "2026-11-04T00:00:00Z", "damage_detect", payload, "0.1"),
                 )
+                if idempotency_key:
+                    cur.execute("INSERT INTO faos.idempotency_keys (tenant_id, key, session_id, response_json) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                                (binding.tenant_id, idempotency_key, session_id, json.dumps({"session_id": session_id, "kind": "DAMAGE_DETECTED", "status": "recorded"})))
             conn.commit()
         return {"session_id": session_id, "kind": "DAMAGE_DETECTED", "count": len(body.findings)}
     except Exception:
