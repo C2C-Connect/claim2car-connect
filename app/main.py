@@ -48,6 +48,10 @@ def create_app(settings=None):
     def settlement_history():
         return FileResponse("app/settlement_history.html")
 
+    @api.get('/settlements/{session_id}')
+    def settlement_detail(session_id: str):
+        return FileResponse("app/settlement_detail.html")
+
     @api.get('/health/live')
     def live():
         return JSONResponse({'status':'alive'},headers={'Cache-Control':'no-store'})
