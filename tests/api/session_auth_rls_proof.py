@@ -343,8 +343,8 @@ def main():
         print("SESSION_SUMMARY_OK")
         # Dealer packet must include brand + commercial fields
         packet = client.get(f"/sessions/{session_id}/dealer-packet", headers={"Authorization": f"Bearer {token_a}"})
+        print("packet", packet.text)
         if packet.status_code != 200:
-            print("packet", packet.text)
             sys.exit(1)
         pbody = packet.json()
         assert pbody["vehicle_brand"] == "Toyota"
