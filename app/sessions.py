@@ -32,6 +32,17 @@ class SettlementItem(BaseModel):
     dealer_invoice_cents: int | None = None
 
 
+
+class DealerPacketResponse(BaseModel):
+    session_id: str
+    vehicle_brand: str | None = None
+    routing_outcome: str | None = None
+    selected_location_id: str | None = None
+    decision: str | None = None
+    settled: bool = False
+    operator_payout_cents: int | None = None
+    dealer_invoice_cents: int | None = None
+
 class SessionSummaryResponse(BaseModel):
     session_id: str
     routing_outcome: str | None = None
@@ -1024,3 +1035,77 @@ async def get_session_summary(
                 )
     except Exception:
         raise HTTPException(status_code=500, detail='SUMMARY_READ_FAILED')
+
+
+@router.get('/sessions/{session_id}/dealer-packet', response_model=DealerPacketResponse)
+async def get_dealer_packet(
+    session_id: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if not db_url:
+        return DealerPacketResponse(session_id=session_id)
+    try:
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                # Brand
+                cur.execute(
+                    """SELECT payload_json::jsonb->>'brand' FROM faos.events
+                       WHERE session_id = %s AND kind = 'VEHICLE_RECORDED'
+                       ORDER BY sequence DESC LIMIT 1""",
+                    (session_id,),
+                )
+                br = cur.fetchone()
+                brand = br[0] if br else None
+                # Routing
+                cur.execute(
+                    """SELECT outcome, selected_location_id FROM faos.routing_results
+                       WHERE request_digest = %s ORDER BY created_at DESC LIMIT 1""",
+                    (f"routing-{session_id}",),
+                )
+                r = cur.fetchone()
+                outcome = r[0] if r else None
+                selected = str(r[1]) if r and r[1] else None
+                # Decision
+                cur.execute(
+                    """SELECT kind FROM faos.events
+                       WHERE session_id = %s AND kind IN ('DEALER_ACCEPTED','DEALER_PASSED')
+                       ORDER BY sequence DESC LIMIT 1""",
+                    (session_id,),
+                )
+                d = cur.fetchone()
+                decision = "ACCEPTED" if d and d[0] == "DEALER_ACCEPTED" else ("PASSED" if d else None)
+                # Settlement
+                cur.execute(
+                    """SELECT payload_json FROM faos.events
+                       WHERE session_id = %s AND kind = 'SETTLEMENT_RECORDED'
+                       ORDER BY sequence DESC LIMIT 1""",
+                    (session_id,),
+                )
+                s = cur.fetchone()
+                settled = bool(s)
+                payout = invoice = None
+                if s and s[0]:
+                    payload = s[0] if isinstance(s[0], dict) else json.loads(s[0])
+                    payout = payload.get("operator_payout_cents")
+                    invoice = payload.get("dealer_invoice_cents")
+                return DealerPacketResponse(
+                    session_id=session_id,
+                    vehicle_brand=brand,
+                    routing_outcome=outcome,
+                    selected_location_id=selected,
+                    decision=decision,
+                    settled=settled,
+                    operator_payout_cents=payout,
+                    dealer_invoice_cents=invoice,
+                )
+    except Exception:
+        raise HTTPException(status_code=500, detail='DEALER_PACKET_FAILED')
