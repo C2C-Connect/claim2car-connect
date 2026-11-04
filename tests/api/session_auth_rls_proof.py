@@ -341,6 +341,18 @@ def main():
         assert sbody["operator_payout_cents"] == 11000
         assert sbody["dealer_invoice_cents"] == 37500
         print("SESSION_SUMMARY_OK")
+        # Dealer packet must include brand + commercial fields
+        packet = client.get(f"/sessions/{session_id}/dealer-packet", headers={"Authorization": f"Bearer {token_a}"})
+        if packet.status_code != 200:
+            print("packet", packet.text)
+            sys.exit(1)
+        pbody = packet.json()
+        assert pbody["vehicle_brand"] == "Toyota"
+        assert pbody["routing_outcome"] == "ROUTED"
+        assert pbody["decision"] == "ACCEPTED"
+        assert pbody["settled"] is True
+        assert pbody["dealer_invoice_cents"] == 37500
+        print("DEALER_PACKET_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
