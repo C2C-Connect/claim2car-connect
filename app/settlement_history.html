@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Settlement History</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #0f1115; color: #e8e8e8; }
+    h1 { margin-bottom: 0.5rem; }
+    .meta { color: #888; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid #2a2a2a; }
+    th { color: #aaa; font-weight: 500; }
+    .empty { color: #666; padding: 2rem 0; }
+    .error { color: #f66; }
+  </style>
+</head>
+<body>
+  <h1>Settlement History</h1>
+  <div class="meta" id="meta">Loading…</div>
+  <table id="table" hidden>
+    <thead>
+      <tr>
+        <th>Session</th>
+        <th>Operator payout</th>
+        <th>Dealer invoice</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" hidden>No settlements yet.</div>
+  <div class="error" id="error" hidden></div>
+
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    if (token) localStorage.setItem("faos_token", token);
+
+    async function load() {
+      if (!token) {
+        document.getElementById("meta").textContent = "Provide ?token=… or set faos_token";
+        return;
+      }
+      try {
+        const res = await fetch("/settlements", { headers: { Authorization: "Bearer " + token } });
+        if (!res.ok) throw new Error(res.status + " " + await res.text());
+        const data = await res.json();
+        const items = data.settlements || [];
+        document.getElementById("meta").textContent = items.length + " settlement" + (items.length === 1 ? "" : "s");
+        if (items.length === 0) {
+          document.getElementById("empty").hidden = false;
+          return;
+        }
+        const tbody = document.getElementById("rows");
+        items.forEach(s => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${s.session_id}</td><td>$${(s.operator_payout_cents/100).toFixed(2)}</td><td>$${(s.dealer_invoice_cents/100).toFixed(2)}</td>`;
+          tbody.appendChild(tr);
+        });
+        document.getElementById("table").hidden = false;
+      } catch (e) {
+        document.getElementById("error").textContent = e.message;
+        document.getElementById("error").hidden = false;
+        document.getElementById("meta").textContent = "Failed to load";
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
