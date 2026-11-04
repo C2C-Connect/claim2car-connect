@@ -388,6 +388,30 @@ def main():
         assert "DEALER_ACCEPTED" in kinds
         assert "SETTLEMENT_RECORDED" in kinds
         print("TIMELINE_OK")
+        # Status must be SETTLED after accept
+        st = client.get(f"/sessions/{session_id}/status", headers={"Authorization": f"Bearer {token_a}"})
+        if st.status_code != 200:
+            sys.exit(1)
+        assert st.json()["status"] == "SETTLED"
+        print("SESSION_STATUS_OK")
+        # Settlement total
+        tot = client.get("/settlements/total", headers={"Authorization": f"Bearer {token_a}"})
+        if tot.status_code != 200:
+            sys.exit(1)
+        assert tot.json()["count"] >= 1
+        assert tot.json()["operator_payout_cents"] >= 11000
+        print("SETTLEMENT_TOTAL_OK")
+        # Human review list (may be empty or contain the forced session)
+        hr = client.get("/sessions/human-review", headers={"Authorization": f"Bearer {token_a}"})
+        if hr.status_code != 200:
+            sys.exit(1)
+        print("HUMAN_REVIEW_LIST_OK")
+        # Expired reservations list
+        er = client.get("/reservations/expired", headers={"Authorization": f"Bearer {token_a}"})
+        if er.status_code != 200:
+            print("expired", er.text)
+            sys.exit(1)
+        print("EXPIRED_RESERVATIONS_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
