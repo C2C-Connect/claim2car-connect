@@ -402,7 +402,7 @@ def main():
         assert tot.json()["operator_payout_cents"] >= 11000
         print("SETTLEMENT_TOTAL_OK")
         # Human review list (may be empty or contain the forced session)
-        hr = client.get("/sessions/human-review", headers={"Authorization": f"Bearer {token_a}"})
+        hr = client.get("/routing/human-review", headers={"Authorization": f"Bearer {token_a}"})
         print("hr", hr.status_code, hr.text)
         if hr.status_code != 200:
             sys.exit(1)
