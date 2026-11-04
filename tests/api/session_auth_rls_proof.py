@@ -141,6 +141,25 @@ def main():
         kinds_after2 = [e["kind"] for e in events_after2.json()["events"]]
         assert kinds_after2.count("SETTLEMENT_RECORDED") == 1
         print("SETTLEMENT_IDEMPOTENT_OK")
+        # Explicit Idempotency-Key: repeated key returns same event_id, no extra settlement
+        key = "decision-key-1"
+        d_idem = client.post(
+            f"/sessions/{session_id}/decision?decision=ACCEPTED",
+            headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": key},
+        )
+        if d_idem.status_code != 200:
+            sys.exit(1)
+        first_event = d_idem.json()["event_id"]
+        d_idem2 = client.post(
+            f"/sessions/{session_id}/decision?decision=ACCEPTED",
+            headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": key},
+        )
+        if d_idem2.status_code != 200:
+            sys.exit(1)
+        assert d_idem2.json()["event_id"] == first_event
+        events_idem = client.get(f"/sessions/{session_id}/events", headers={"Authorization": f"Bearer {token_a}"})
+        assert [e["kind"] for e in events_idem.json()["events"]].count("SETTLEMENT_RECORDED") == 1
+        print("IDEMPOTENCY_KEY_OK")
 
         get_routing = client.get(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
         print("get routing status", get_routing.status_code)
