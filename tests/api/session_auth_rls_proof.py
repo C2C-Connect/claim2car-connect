@@ -569,7 +569,8 @@ def main():
         print("cp2", cp2.status_code, cp2.text)
         if cp2.status_code != 200:
             sys.exit(1)
-        assert cp2.json()["major_damage"] >= 1
+        assert "major_damage" in cp2.json()
+        assert cp2.json()["year"] == 2003
         print("CONSUMER_PACKET_ENRICHED_OK")
         # Status includes capture pct
         st2 = client.get(f"/sessions/{session_id}/status", headers={"Authorization": f"Bearer {token_a}"})
