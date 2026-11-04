@@ -44,6 +44,10 @@ def create_app(settings=None):
     api = FastAPI(title='Claim2Car Connect foundation',docs_url=None,redoc_url=None,openapi_url=None)
     api.include_router(sessions_router)
 
+    @api.get('/packets/print')
+    def printable_packet():
+        return FileResponse("app/printable_packet.html")
+
     @api.get('/packets')
     def packets():
         return FileResponse("app/packets.html")
