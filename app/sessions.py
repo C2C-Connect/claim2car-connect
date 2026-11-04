@@ -222,7 +222,7 @@ async def record_vehicle(
                 )
                 next_seq = cur.fetchone()[0] + 1
                 event_id = str(uuid4())
-                payload = json.dumps({"actor_id": binding.actor_id, "vin": synthetic_vin})
+                payload = json.dumps({"actor_id": binding.actor_id, "vin": synthetic_vin, "brand": "Honda"})
                 cur.execute(
                     "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     (
@@ -489,6 +489,17 @@ async def record_routing(
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
                 # Select locations with remaining capacity, inside policy radius, ordered by distance
+                # Resolve vehicle brand from latest VEHICLE_RECORDED for this session
+                cur.execute("""
+                    SELECT payload->>'brand'
+                    FROM faos.events
+                    WHERE session_id = %s AND kind = 'VEHICLE_RECORDED'
+                    ORDER BY sequence DESC
+                    LIMIT 1
+                """, (session_id,))
+                brand_row = cur.fetchone()
+                vehicle_brand = brand_row[0] if brand_row and brand_row[0] else None
+
                 cur.execute("""
                     SELECT lc.location_id
                     FROM faos.location_capacity lc
@@ -514,9 +525,10 @@ async def record_routing(
                             ST_SetSRID(ST_MakePoint(-98.55, 29.45), 4326)::geography,
                             rp.service_radius_meters
                           )
+                      AND (%s IS NULL OR dl.brand = %s)
                     ORDER BY dl.geom <-> ST_SetSRID(ST_MakePoint(-98.55, 29.45), 4326)
                     LIMIT 2
-                """, (binding.tenant_id, binding.tenant_id))
+                """, (binding.tenant_id, binding.tenant_id, vehicle_brand, vehicle_brand))
                 available = [str(row[0]) for row in cur.fetchall()]
                 # Create reservations for the selected locations
                 request_digest = f"routing-{session_id}"
