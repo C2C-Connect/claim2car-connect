@@ -4,7 +4,7 @@ import os
 import sys
 import time
 import traceback
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
@@ -179,6 +179,43 @@ def main():
         kinds = [e["kind"] for e in elist]
         assert "ROUTING_REQUESTED" in kinds
         print("EVENTS_OK")
+
+        # Expired reservation must not consume capacity
+        print("=== EXPIRED RESERVATION DOES NOT BLOCK CAPACITY ===")
+        import psycopg
+        with psycopg.connect(os.environ["APP_DATABASE_URL"], autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO faos.capacity_reservations
+                        (tenant_id, reservation_id, location_id, request_digest, status, expires_at)
+                    VALUES (%s, %s, %s, %s, 'ACTIVE', now() - interval '1 hour')
+                """, (
+                    "11111111-1111-1111-1111-111111111111",
+                    str(uuid4()),
+                    "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    "expired-test-" + str(uuid4()),
+                ))
+        # Restore capacity for the test
+        with psycopg.connect(os.environ["APP_DATABASE_URL"], autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE faos.location_capacity
+                    SET capacity = 2
+                    WHERE location_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+                """)
+        resp3 = client.post("/sessions", headers={"Authorization": f"Bearer {token_a}"})
+        if resp3.status_code != 200:
+            sys.exit(1)
+        session_id3 = resp3.json()["session_id"]
+        client.post(f"/sessions/{session_id3}/vehicle", headers={"Authorization": f"Bearer {token_a}"})
+        routing3 = client.post(f"/sessions/{session_id3}/routing", headers={"Authorization": f"Bearer {token_a}"})
+        print("routing3 status", routing3.status_code)
+        print("routing3 body", routing3.text)
+        if routing3.status_code != 200:
+            sys.exit(1)
+        rtbody3 = routing3.json()
+        assert "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in rtbody3["dealer_shortlist"]
+        print("EXPIRED_RESERVATION_IGNORED_OK")
 
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
