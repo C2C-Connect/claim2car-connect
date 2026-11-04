@@ -2112,5 +2112,5 @@ async def list_settlements(
                         dealer_invoice_cents=payload.get("dealer_invoice_cents"),
                     ))
                 return SettlementListResponse(settlements=items)
-    except Exception:
-        raise HTTPException(status_code=500, detail='SETTLEMENT_LIST_FAILED')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'SETTLEMENT_LIST_FAILED: {e}')
