@@ -60,6 +60,10 @@ def create_app(settings=None):
     def dossier_page(session_id: str):
         return FileResponse("app/dossier.html")
 
+    @api.get('/sessions/{session_id}/capture-progress')
+    def capture_progress_page(session_id: str):
+        return FileResponse("app/capture_progress.html")
+
     @api.get('/command')
     def command():
         return FileResponse("app/command.html")
