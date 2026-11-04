@@ -448,6 +448,41 @@ def main():
         assert ebody["routing_outcome"] == "ROUTED"
         assert ebody["settled"] is True
         print("EXHIBIT_OK")
+        # Physics
+        ph = client.post(f"/sessions/{session_id}/physics", json={
+            "delta_v_mph": 18.2,
+            "impact_angle_deg": 70,
+            "crush_front_in": 18,
+            "crush_side_in": 24,
+            "crush_rear_in": 16
+        }, headers={"Authorization": f"Bearer {token_a}"})
+        if ph.status_code != 200:
+            print("physics", ph.text)
+            sys.exit(1)
+        print("PHYSICS_COMPUTED_OK")
+        # Cost
+        co = client.post(f"/sessions/{session_id}/cost", json={
+            "lines": [
+                {"description": "Front Bumper Assembly", "part_id": "F-102", "labor_hours": 3.5, "cost_cents": 68000},
+                {"description": "Left Door Panel", "part_id": "S-207", "labor_hours": 4.0, "cost_cents": 72000}
+            ],
+            "total_parts_cents": 194000,
+            "total_labor_cents": 108000
+        }, headers={"Authorization": f"Bearer {token_a}"})
+        if co.status_code != 200:
+            print("cost", co.text)
+            sys.exit(1)
+        print("COST_ESTIMATED_OK")
+        # Exhibit must include physics and cost
+        ex2 = client.get(f"/sessions/{session_id}/exhibit", headers={"Authorization": f"Bearer {token_a}"})
+        if ex2.status_code != 200:
+            sys.exit(1)
+        e2 = ex2.json()
+        assert e2["delta_v_mph"] == 18.2
+        assert e2["crush_side_in"] == 24
+        assert len(e2["cost_lines"]) == 2
+        assert e2["total_parts_cents"] == 194000
+        print("EXHIBIT_PHYSICS_COST_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
