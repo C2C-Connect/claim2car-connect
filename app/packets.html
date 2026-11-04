@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Packets</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #0f1115; color: #e8e8e8; }
+    a { color: #6af; }
+    .card { background: #1a1d24; border-radius: 8px; padding: 1rem 1.5rem; margin: 1rem 0; max-width: 420px; }
+  </style>
+</head>
+<body>
+  <h1>Packets</h1>
+  <p>Role-gated views of a session (Layer 5).</p>
+  <div class="card">
+    <h3>Consumer Packet</h3>
+    <p>Brand, routing outcome, decision, settled.</p>
+    <a href="#" id="consumer">Open</a>
+  </div>
+  <div class="card">
+    <h3>Dealer Packet</h3>
+    <p>Brand, routing, decision, settlement amounts.</p>
+    <a href="#" id="dealer">Open</a>
+  </div>
+  <div class="card">
+    <h3>Shop Packet</h3>
+    <p>Brand, routing outcome, selected location (PII redacted).</p>
+    <a href="#" id="shop">Open</a>
+  </div>
+  <div class="card">
+    <h3>Carrier Packet</h3>
+    <p>Routing, decision, operator payout.</p>
+    <a href="#" id="carrier">Open</a>
+  </div>
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token") || "";
+    const sid = new URLSearchParams(location.search).get("session") || "";
+    if (token) localStorage.setItem("faos_token", token);
+    function link(id, path) {
+      document.getElementById(id).href = sid ? `${path}?token=${token}` : "#";
+      document.getElementById(id).textContent = sid ? "Open" : "Provide ?session=";
+    }
+    link("consumer", `/sessions/${sid}/consumer-packet`);
+    link("dealer", `/sessions/${sid}/dealer-packet`);
+    link("shop", `/sessions/${sid}/shop-packet`);
+    link("carrier", `/sessions/${sid}/carrier-packet`);
+  </script>
+</body>
+</html>
