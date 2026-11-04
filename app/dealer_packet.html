@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><title>Dealer Packet</title>
+<style>body{font-family:system-ui;margin:2rem;background:#0f1115;color:#e8e8e8}a{color:#6af}.card{background:#1a1d24;border-radius:8px;padding:1.5rem;max-width:480px}.row{display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid #2a2a2a}.label{color:#aaa}</style>
+</head>
+<body>
+<p><a href="/packets">← Packets</a></p>
+<h1>Dealer Packet</h1>
+<div class="card" id="card"></div>
+<script>
+const token=new URLSearchParams(location.search).get("token")||localStorage.getItem("faos_token");
+const sid=location.pathname.split("/").pop();
+async function load(){
+  const res=await fetch(`/sessions/${sid}/dealer-packet`,{headers:{Authorization:"Bearer "+token}});
+  const s=await res.json();
+  document.getElementById("card").innerHTML=`
+    <div class="row"><span class="label">Session</span><span>${s.session_id}</span></div>
+    <div class="row"><span class="label">Brand</span><span>${s.vehicle_brand||"—"}</span></div>
+    <div class="row"><span class="label">Routing</span><span>${s.routing_outcome||"—"}</span></div>
+    <div class="row"><span class="label">Decision</span><span>${s.decision||"—"}</span></div>
+    <div class="row"><span class="label">Settled</span><span>${s.settled?"Yes":"No"}</span></div>
+    <div class="row"><span class="label">Operator payout</span><span>${s.operator_payout_cents!=null?"$"+(s.operator_payout_cents/100).toFixed(2):"—"}</span></div>
+    <div class="row"><span class="label">Dealer invoice</span><span>${s.dealer_invoice_cents!=null?"$"+(s.dealer_invoice_cents/100).toFixed(2):"—"}</span></div>`;
+}
+if(token)load();
+</script>
+</body></html>
