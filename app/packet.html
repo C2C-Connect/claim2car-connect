@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Full Packet</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #fff; }
+    h1 { border-bottom: 2px solid #1e3a8a; }
+    .section { margin: 1.5rem 0; }
+    .row { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px solid #eee; }
+    @media print { .no-print { display: none; } }
+  </style>
+</head>
+<body>
+  <h1>Claim2Car Packet</h1>
+  <div id="content"></div>
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    const sid = location.pathname.split("/").pop();
+    async function load() {
+      if (!token) return;
+      const e = await (await fetch(`/sessions/${sid}/exhibit`, { headers: { Authorization: "Bearer " + token } })).json();
+      document.getElementById("content").innerHTML = `
+        <div class="section"><h2>Vehicle</h2>
+          <div class="row"><span>VIN</span><span>${e.vin || "—"}</span></div>
+          <div class="row"><span>Year / Make / Model</span><span>${e.year || ""} ${e.make || ""} ${e.model || ""}</span></div>
+        </div>
+        <div class="section"><h2>Damage</h2>
+          ${(e.damage_findings||[]).map(f=>`<div class="row"><span>${f.panel}</span><span>${f.severity}</span></div>`).join("") || "—"}
+        </div>
+        <div class="section"><h2>Physics</h2>
+          <div class="row"><span>ΔV</span><span>${e.delta_v_mph ?? "—"} mph</span></div>
+          <div class="row"><span>Impact</span><span>${e.impact_angle_deg ?? "—"}°</span></div>
+        </div>
+        <div class="section"><h2>Cost</h2>
+          ${(e.cost_lines||[]).map(l=>`<div class="row"><span>${l.description}</span><span>$${((l.cost_cents||0)/100).toFixed(2)}</span></div>`).join("") || "—"}
+          <div class="row"><span>Parts</span><span>${e.total_parts_cents != null ? "$"+(e.total_parts_cents/100).toFixed(2) : "—"}</span></div>
+          <div class="row"><span>Labor</span><span>${e.total_labor_cents != null ? "$"+(e.total_labor_cents/100).toFixed(2) : "—"}</span></div>
+        </div>
+        <div class="section"><h2>Commercial</h2>
+          <div class="row"><span>Routing</span><span>${e.routing_outcome || "—"}</span></div>
+          <div class="row"><span>Decision</span><span>${e.decision || "—"}</span></div>
+          <div class="row"><span>Settled</span><span>${e.settled ? "Yes" : "No"}</span></div>
+        </div>`;
+    }
+    if (token) load();
+  </script>
+</body>
+</html>
