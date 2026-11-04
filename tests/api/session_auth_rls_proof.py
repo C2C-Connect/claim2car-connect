@@ -353,6 +353,32 @@ def main():
         assert pbody["settled"] is True
         assert pbody["dealer_invoice_cents"] == 37500
         print("DEALER_PACKET_OK")
+        # Consumer packet
+        cp = client.get(f"/sessions/{session_id}/consumer-packet", headers={"Authorization": f"Bearer {token_a}"})
+        if cp.status_code != 200:
+            sys.exit(1)
+        assert cp.json()["settled"] is True
+        assert cp.json()["decision"] == "ACCEPTED"
+        print("CONSUMER_PACKET_OK")
+        # Shop packet
+        sp = client.get(f"/sessions/{session_id}/shop-packet", headers={"Authorization": f"Bearer {token_a}"})
+        if sp.status_code != 200:
+            sys.exit(1)
+        assert sp.json()["routing_outcome"] == "ROUTED"
+        print("SHOP_PACKET_OK")
+        # Carrier packet
+        cr = client.get(f"/sessions/{session_id}/carrier-packet", headers={"Authorization": f"Bearer {token_a}"})
+        if cr.status_code != 200:
+            sys.exit(1)
+        assert cr.json()["operator_payout_cents"] == 11000
+        print("CARRIER_PACKET_OK")
+        # Dealer-scoped settlements
+        ds = client.get("/dealer/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/settlements", headers={"Authorization": f"Bearer {token_a}"})
+        if ds.status_code != 200:
+            print("dealer settlements", ds.text)
+            sys.exit(1)
+        assert any(s["session_id"] == session_id for s in ds.json()["settlements"])
+        print("DEALER_SETTLEMENTS_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
