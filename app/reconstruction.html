@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reconstruction</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #f7f4ef; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 900px; }
+    .card { background: #fff; border: 1px solid #e0dcd4; border-radius: 6px; padding: 1rem 1.25rem; }
+    .card h3 { margin: 0 0 0.5rem; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: #888; }
+    .row { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px solid #f0ece6; }
+    .label { color: #888; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <h1>Reconstruction</h1>
+  <div class="grid">
+    <div class="card">
+      <h3>Physics</h3>
+      <div id="physics"></div>
+    </div>
+    <div class="card">
+      <h3>Cost</h3>
+      <div id="cost"></div>
+    </div>
+  </div>
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    const sid = location.pathname.split("/").pop();
+    async function load() {
+      if (!token) return;
+      const res = await fetch(`/sessions/${sid}/exhibit`, { headers: { Authorization: "Bearer " + token } });
+      const e = await res.json();
+      document.getElementById("physics").innerHTML = `
+        <div class="row"><span class="label">ΔV</span><span>${e.delta_v_mph ?? "—"} mph</span></div>
+        <div class="row"><span class="label">Impact angle</span><span>${e.impact_angle_deg ?? "—"}°</span></div>
+        <div class="row"><span class="label">Crush front</span><span>${e.crush_front_in ?? "—"} in</span></div>
+        <div class="row"><span class="label">Crush side</span><span>${e.crush_side_in ?? "—"} in</span></div>
+        <div class="row"><span class="label">Crush rear</span><span>${e.crush_rear_in ?? "—"} in</span></div>`;
+      const lines = e.cost_lines || [];
+      const table = lines.length
+        ? `<table><tr><th>Part</th><th>Hours</th><th>Cost</th></tr>${lines.map(l => `<tr><td>${l.description}</td><td>${l.labor_hours ?? "—"}</td><td>$${((l.cost_cents||0)/100).toFixed(2)}</td></tr>`).join("")}</table>`
+        : "<div class=\"row\">// awaiting cost</div>";
+      document.getElementById("cost").innerHTML = table + `
+        <div class="row"><span class="label">Parts</span><span>${e.total_parts_cents != null ? "$"+(e.total_parts_cents/100).toFixed(2) : "—"}</span></div>
+        <div class="row"><span class="label">Labor</span><span>${e.total_labor_cents != null ? "$"+(e.total_labor_cents/100).toFixed(2) : "—"}</span></div>`;
+    }
+    if (token) load();
+  </script>
+</body>
+</html>
