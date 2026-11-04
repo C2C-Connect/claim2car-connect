@@ -82,6 +82,12 @@ class RoutingResultResponse(BaseModel):
     selected_location_id: str | None
     candidates: list[str]
 
+class DecisionRecordResponse(BaseModel):
+    session_id: str
+    event_id: str
+    kind: str
+    decision: str
+
 def get_resolver() -> CredentialResolver:
     return CredentialResolver()
 
@@ -631,6 +637,64 @@ async def get_routing(
         raise
     except Exception:
         raise HTTPException(status_code=500, detail='ROUTING_READ_FAILED')
+
+@router.post('/sessions/{session_id}/decision', response_model=DecisionRecordResponse)
+async def record_decision(
+    session_id: str,
+    decision: str,
+    authorization: str = Header(None),
+    resolver: CredentialResolver = Depends(get_resolver),
+    db_url: str | None = Depends(get_db_url),
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    try:
+        binding = resolver.resolve(authorization)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
+    if decision not in ("ACCEPTED", "PASSED"):
+        raise HTTPException(status_code=400, detail='INVALID_DECISION')
+    if not db_url:
+        raise HTTPException(status_code=500, detail='NO_DATABASE')
+    kind = "DEALER_ACCEPTED" if decision == "ACCEPTED" else "DEALER_PASSED"
+    try:
+        with psycopg.connect(db_url, autocommit=False) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                cur.execute(
+                    "SELECT COALESCE(MAX(sequence), 0) FROM faos.events WHERE session_id = %s",
+                    (session_id,),
+                )
+                next_seq = cur.fetchone()[0] + 1
+                event_id = str(uuid4())
+                payload = json.dumps({
+                    "actor_id": binding.actor_id,
+                    "decision": decision,
+                })
+                cur.execute(
+                    "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        binding.tenant_id,
+                        session_id,
+                        event_id,
+                        next_seq,
+                        kind,
+                        binding.actor_id,
+                        "2026-10-31T00:00:00Z",
+                        "dealer_decision",
+                        payload,
+                        "0.1",
+                    ),
+                )
+            conn.commit()
+    except Exception:
+        raise HTTPException(status_code=500, detail='DECISION_RECORD_FAILED')
+    return DecisionRecordResponse(
+        session_id=session_id,
+        event_id=event_id,
+        kind=kind,
+        decision=decision,
+    )
 
 @router.get('/sessions', response_model=SessionListResponse)
 async def list_sessions(
