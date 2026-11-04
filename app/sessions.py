@@ -1131,8 +1131,8 @@ async def list_settlements(
                         dealer_invoice_cents=payload.get("dealer_invoice_cents"),
                     ))
                 return SettlementListResponse(settlements=items)
-    except Exception:
-        raise HTTPException(status_code=500, detail='SETTLEMENTS_READ_FAILED')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'SETTLEMENTS_READ_FAILED: {e}')
 
 
 @router.get('/sessions/{session_id}/summary', response_model=SessionSummaryResponse)
@@ -2083,34 +2083,3 @@ class SettlementListItem(BaseModel):
 class SettlementListResponse(BaseModel):
     settlements: list[SettlementListItem]
 
-@router.get('/settlements', response_model=SettlementListResponse)
-async def list_settlements(
-    authorization: str = Header(None),
-    resolver: CredentialResolver = Depends(get_resolver),
-    db_url: str | None = Depends(get_db_url),
-):
-    if not authorization:
-        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
-    try:
-        binding = resolver.resolve(authorization)
-    except AuthenticationError:
-        raise HTTPException(status_code=401, detail='UNAUTHORIZED')
-    if not db_url:
-        return SettlementListResponse(settlements=[])
-    try:
-        with psycopg.connect(db_url, autocommit=True) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
-                cur.execute("SELECT session_id, payload_json FROM faos.events WHERE kind = 'SETTLEMENT_RECORDED' ORDER BY sequence DESC LIMIT 50")
-                rows = cur.fetchall()
-                items = []
-                for row in rows:
-                    payload = row[1] if isinstance(row[1], dict) else (json.loads(row[1]) if row[1] else {})
-                    items.append(SettlementListItem(
-                        session_id=str(row[0]),
-                        operator_payout_cents=payload.get("operator_payout_cents"),
-                        dealer_invoice_cents=payload.get("dealer_invoice_cents"),
-                    ))
-                return SettlementListResponse(settlements=items)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'SETTLEMENT_LIST_FAILED: {e}')
