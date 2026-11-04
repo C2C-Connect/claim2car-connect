@@ -56,6 +56,10 @@ def create_app(settings=None):
     def reconstruction_page(session_id: str):
         return FileResponse("app/reconstruction.html")
 
+    @api.get('/command')
+    def command():
+        return FileResponse("app/command.html")
+
     @api.get('/packets')
     def packets():
         return FileResponse("app/packets.html")
