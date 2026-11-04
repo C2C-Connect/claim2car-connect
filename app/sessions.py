@@ -509,6 +509,23 @@ async def record_routing(
                         VALUES (%s, %s, %s, %s, 'ACTIVE', now() + interval '4 hours')
                         ON CONFLICT (tenant_id, location_id, request_digest) DO NOTHING
                     """, (binding.tenant_id, str(uuid4()), loc_id, request_digest))
+                # Persist the routing result
+                outcome = "ROUTED" if available else "UNRESOLVED"
+                selected = available[0] if available else None
+                cur.execute("""
+                    INSERT INTO faos.routing_results
+                        (tenant_id, result_id, request_digest, policy_version, outcome, selected_location_id, candidates_json, exclusion_reasons_json)
+                    VALUES (%s, %s, %s, 'v1-synthetic', %s, %s, %s, %s)
+                    ON CONFLICT (tenant_id, request_digest) DO NOTHING
+                """, (
+                    binding.tenant_id,
+                    str(uuid4()),
+                    request_digest,
+                    outcome,
+                    selected,
+                    json.dumps(available),
+                    json.dumps([]),
+                ))
                 # Append the event
                 cur.execute(
                     "SELECT COALESCE(MAX(sequence), 0) FROM faos.events WHERE session_id = %s",
