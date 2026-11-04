@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Settlement Detail</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #0f1115; color: #e8e8e8; }
+    a { color: #6af; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .meta { color: #888; margin-bottom: 1.5rem; }
+    .card { background: #1a1d24; border-radius: 8px; padding: 1.5rem; max-width: 480px; }
+    .row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #2a2a2a; }
+    .row:last-child { border-bottom: none; }
+    .label { color: #aaa; }
+    .error { color: #f66; }
+  </style>
+</head>
+<body>
+  <p><a href="/settlements/history">← Settlement History</a></p>
+  <h1>Settlement Detail</h1>
+  <div class="meta" id="meta">Loading…</div>
+  <div class="card" id="card" hidden>
+    <div class="row"><span class="label">Session</span><span id="session"></span></div>
+    <div class="row"><span class="label">Settled</span><span id="settled"></span></div>
+    <div class="row"><span class="label">Operator payout</span><span id="payout"></span></div>
+    <div class="row"><span class="label">Dealer invoice</span><span id="invoice"></span></div>
+  </div>
+  <div class="error" id="error" hidden></div>
+
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    if (token) localStorage.setItem("faos_token", token);
+    const sessionId = location.pathname.split("/").pop();
+
+    async function load() {
+      if (!token) {
+        document.getElementById("meta").textContent = "Provide ?token=… or set faos_token";
+        return;
+      }
+      try {
+        const res = await fetch(`/sessions/${sessionId}/settlement`, { headers: { Authorization: "Bearer " + token } });
+        if (!res.ok) throw new Error(res.status + " " + await res.text());
+        const s = await res.json();
+        document.getElementById("meta").textContent = s.settled ? "Settled" : "Not settled";
+        document.getElementById("session").textContent = s.session_id;
+        document.getElementById("settled").textContent = s.settled ? "Yes" : "No";
+        document.getElementById("payout").textContent = s.operator_payout_cents != null ? "$" + (s.operator_payout_cents / 100).toFixed(2) : "—";
+        document.getElementById("invoice").textContent = s.dealer_invoice_cents != null ? "$" + (s.dealer_invoice_cents / 100).toFixed(2) : "—";
+        document.getElementById("card").hidden = false;
+      } catch (e) {
+        document.getElementById("error").textContent = e.message;
+        document.getElementById("error").hidden = false;
+        document.getElementById("meta").textContent = "Failed to load";
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
