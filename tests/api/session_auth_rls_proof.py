@@ -540,6 +540,29 @@ def main():
             print("cap idem", cap3.text)
             sys.exit(1)
         print("CAPTURE_IDEMPOTENCY_OK")
+        # Shop packet includes damage and cost
+        sp2 = client.get(f"/sessions/{session_id}/shop-packet", headers={"Authorization": f"Bearer {token_a}"})
+        if sp2.status_code != 200:
+            sys.exit(1)
+        assert sp2.json()["major_damage"] >= 1
+        assert sp2.json()["total_parts_cents"] == 194000
+        print("SHOP_PACKET_ENRICHED_OK")
+        # Carrier packet includes physics
+        cr2 = client.get(f"/sessions/{session_id}/carrier-packet", headers={"Authorization": f"Bearer {token_a}"})
+        if cr2.status_code != 200:
+            sys.exit(1)
+        assert cr2.json()["delta_v_mph"] == 18.2
+        print("CARRIER_PACKET_ENRICHED_OK")
+        # Damage idempotency
+        dmg2 = client.post(f"/sessions/{session_id}/damage", json={"findings": [{"panel": "Hood", "severity": "MINOR", "confidence": 0.8}]}, headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": "dmg-1"})
+        if dmg2.status_code != 200:
+            print("dmg2", dmg2.text)
+            sys.exit(1)
+        dmg3 = client.post(f"/sessions/{session_id}/damage", json={"findings": [{"panel": "Hood", "severity": "MINOR", "confidence": 0.8}]}, headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": "dmg-1"})
+        if dmg3.status_code != 200 or dmg3.json().get("kind") != "DAMAGE_DETECTED":
+            print("dmg3", dmg3.text)
+            sys.exit(1)
+        print("DAMAGE_IDEMPOTENCY_OK")
         print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
     except Exception:
         traceback.print_exc()
