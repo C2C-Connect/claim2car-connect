@@ -64,11 +64,11 @@ def create_app(settings=None):
     def capture_progress_page(session_id: str):
         return FileResponse("app/capture_progress.html")
 
-    @api.get('/sessions/{session_id}/packet')
+    @api.get('/sessions/{session_id}/packet-view')
     def packet_page(session_id: str):
         return FileResponse("app/packet.html")
 
-    @api.get('/sessions/{session_id}/timeline')
+    @api.get('/sessions/{session_id}/timeline-view')
     def timeline_page(session_id: str):
         return FileResponse("app/timeline.html")
 
