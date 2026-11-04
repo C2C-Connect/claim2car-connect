@@ -123,7 +123,9 @@ def main():
             sys.exit(1)
         rtbody = routing.json()
         assert rtbody["kind"] == "ROUTING_REQUESTED"
-        assert "dealer-a-synthetic" in rtbody["dealer_shortlist"]
+        shortlist = rtbody["dealer_shortlist"]
+        assert "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in shortlist
+        assert "cccccccc-cccc-cccc-cccc-cccccccccccc" in shortlist
         print("ROUTING_OK")
 
         lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
