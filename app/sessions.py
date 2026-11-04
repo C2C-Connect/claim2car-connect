@@ -1022,5 +1022,5 @@ async def get_session_summary(
                     operator_payout_cents=payout,
                     dealer_invoice_cents=invoice,
                 )
-    except Exception:
-        raise HTTPException(status_code=500, detail='SUMMARY_READ_FAILED')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'SUMMARY_READ_FAILED: {e}')
