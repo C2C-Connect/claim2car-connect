@@ -532,6 +532,7 @@ def main():
         print("ACTIVITY_OK")
         # Capture idempotency
         cap2 = client.post(f"/sessions/{session_id}/capture", json={"point": "REAR", "sharpness": 100}, headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": "cap-1"})
+        print("cap2", cap2.status_code, cap2.text)
         if cap2.status_code != 200:
             sys.exit(1)
         cap3 = client.post(f"/sessions/{session_id}/capture", json={"point": "REAR", "sharpness": 100}, headers={"Authorization": f"Bearer {token_a}", "Idempotency-Key": "cap-1"})
