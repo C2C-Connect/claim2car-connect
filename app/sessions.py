@@ -495,6 +495,7 @@ async def record_seal(
 async def record_routing(
     session_id: str,
     authorization: str = Header(None),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     resolver: CredentialResolver = Depends(get_resolver),
     db_url: str | None = Depends(get_db_url),
 ):
@@ -510,6 +511,15 @@ async def record_routing(
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                if idempotency_key:
+                    cur.execute(
+                        "SELECT response_json FROM faos.idempotency_keys WHERE tenant_id = %s AND key = %s",
+                        (binding.tenant_id, idempotency_key),
+                    )
+                    existing = cur.fetchone()
+                    if existing:
+                        resp = existing[0] if isinstance(existing[0], dict) else json.loads(existing[0])
+                        return RoutingRecordResponse(**resp)
                 # Select locations with remaining capacity, inside policy radius, ordered by distance
                 # Resolve vehicle brand from latest VEHICLE_RECORDED for this session
                 cur.execute("""
