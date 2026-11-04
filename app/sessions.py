@@ -693,7 +693,7 @@ async def record_decision(
                     settle_payload = json.dumps({
                         "actor_id": binding.actor_id,
                         "operator_payout_cents": 11000,
-                        "dealer_invoice_cents": 17500,
+                        "dealer_invoice_cents": 37500,
                     })
                     cur.execute(
                         "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
