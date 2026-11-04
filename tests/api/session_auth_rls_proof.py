@@ -121,6 +121,15 @@ def main():
         kinds_after = [e["kind"] for e in events_after.json()["events"]]
         assert "SETTLEMENT_RECORDED" in kinds_after
         print("SETTLEMENT_RECORDED_OK")
+        # GET settlement must return the fixed amounts
+        settle_get = client.get(f"/sessions/{session_id}/settlement", headers={"Authorization": f"Bearer {token_a}"})
+        if settle_get.status_code != 200:
+            sys.exit(1)
+        sbody = settle_get.json()
+        assert sbody["settled"] is True
+        assert sbody["operator_payout_cents"] == 11000
+        assert sbody["dealer_invoice_cents"] == 37500
+        print("GET_SETTLEMENT_OK")
 
         get_routing = client.get(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
         print("get routing status", get_routing.status_code)
