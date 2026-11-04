@@ -584,7 +584,7 @@ def main():
             sys.exit(1)
         assert any(s["session_id"] == session_id for s in sl.json()["settlements"])
         print("SETTLEMENT_LIST_OK")
-        print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW ===")
+        print("=== ALL PROOFS PASSED INCLUDING HUMAN_REVIEW AND PAGES ===")
     except Exception:
         traceback.print_exc()
         sys.exit(1)
