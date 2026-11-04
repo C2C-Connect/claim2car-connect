@@ -1,4 +1,4 @@
-"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle + artifact + quality + review."""
+"""Minimal single-tenant session create + list + owner GET + events GET + tenant health + consent + vehicle + artifact + quality + review + seal."""
 import hashlib
 import os
 import sys
@@ -106,6 +106,16 @@ def main():
         assert rbody["note"] == "human-review-required"
         print("REVIEW_OK")
 
+        seal = client.post(f"/sessions/{session_id}/seal", headers={"Authorization": f"Bearer {token_a}"})
+        print("seal status", seal.status_code)
+        print("seal body", seal.text)
+        if seal.status_code != 200:
+            sys.exit(1)
+        sbody = seal.json()
+        assert sbody["kind"] == "MANIFEST_SEALED"
+        assert sbody["seal_hash"].startswith("sha256:seal-synthetic-")
+        print("SEAL_OK")
+
         lst = client.get("/sessions", headers={"Authorization": f"Bearer {token_a}"})
         print("list status", lst.status_code)
         print("list body", lst.text)
@@ -127,7 +137,7 @@ def main():
         if events.status_code != 200:
             sys.exit(1)
         elist = events.json()["events"]
-        assert len(elist) >= 6
+        assert len(elist) >= 7
         kinds = [e["kind"] for e in elist]
         assert "SESSION_CREATED" in kinds
         assert "CONSENT_RECORDED" in kinds
@@ -135,6 +145,7 @@ def main():
         assert "ARTIFACT_REGISTERED" in kinds
         assert "QUALITY_RECORDED" in kinds
         assert "REVIEW_RECORDED" in kinds
+        assert "MANIFEST_SEALED" in kinds
         print("EVENTS_OK")
     except Exception:
         traceback.print_exc()
