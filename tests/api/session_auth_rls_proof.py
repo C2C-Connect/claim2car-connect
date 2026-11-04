@@ -130,6 +130,18 @@ def main():
         assert sbody["operator_payout_cents"] == 11000
         assert sbody["dealer_invoice_cents"] == 37500
         print("GET_SETTLEMENT_OK")
+        # Second accept must not create a second settlement
+        decision2 = client.post(
+            f"/sessions/{session_id}/decision",
+            json={"decision": "ACCEPTED"},
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        if decision2.status_code != 200:
+            sys.exit(1)
+        events_after2 = client.get(f"/sessions/{session_id}/events", headers={"Authorization": f"Bearer {token_a}"})
+        kinds_after2 = [e["kind"] for e in events_after2.json()["events"]]
+        assert kinds_after2.count("SETTLEMENT_RECORDED") == 1
+        print("SETTLEMENT_IDEMPOTENT_OK")
 
         get_routing = client.get(f"/sessions/{session_id}/routing", headers={"Authorization": f"Bearer {token_a}"})
         print("get routing status", get_routing.status_code)
