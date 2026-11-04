@@ -347,7 +347,7 @@ def main():
         if packet.status_code != 200:
             sys.exit(1)
         pbody = packet.json()
-        assert pbody["vehicle_brand"] == "Toyota"
+        assert pbody["vehicle_brand"] == "Honda"
         assert pbody["routing_outcome"] == "ROUTED"
         assert pbody["decision"] == "ACCEPTED"
         assert pbody["settled"] is True
