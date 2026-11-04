@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Printable Packet</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    @media print { body { margin: 0.5in; } .no-print { display: none; } }
+    h1 { margin-bottom: 0.25rem; }
+    .meta { color: #555; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <p class="no-print"><a href="/packets">← Packets</a></p>
+  <h1 id="title">Packet</h1>
+  <div class="meta" id="meta"></div>
+  <table id="table"></table>
+  <script>
+    const token = new URLSearchParams(location.search).get("token") || localStorage.getItem("faos_token");
+    const sid = new URLSearchParams(location.search).get("session");
+    const kind = new URLSearchParams(location.search).get("kind") || "dealer";
+    document.getElementById("title").textContent = kind.charAt(0).toUpperCase() + kind.slice(1) + " Packet";
+    async function load() {
+      if (!token || !sid) return;
+      const res = await fetch(`/sessions/${sid}/${kind}-packet`, { headers: { Authorization: "Bearer " + token } });
+      const s = await res.json();
+      document.getElementById("meta").textContent = "Session " + s.session_id;
+      const rows = Object.entries(s).filter(([k]) => k !== "session_id");
+      document.getElementById("table").innerHTML = rows.map(([k,v]) => `<tr><th>${k}</th><td>${v ?? "—"}</td></tr>`).join("");
+    }
+    if (token) load();
+  </script>
+</body>
+</html>
