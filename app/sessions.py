@@ -478,11 +478,36 @@ async def record_routing(
         raise HTTPException(status_code=401, detail='UNAUTHORIZED')
     if not db_url:
         raise HTTPException(status_code=500, detail='NO_DATABASE')
-    synthetic_shortlist = ["dealer-a-synthetic", "dealer-b-synthetic"]
     try:
         with psycopg.connect(db_url, autocommit=False) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(binding.tenant_id),))
+                # Select locations with remaining capacity
+                cur.execute("""
+                    SELECT lc.location_id
+                    FROM faos.location_capacity lc
+                    LEFT JOIN (
+                        SELECT location_id, COUNT(*) AS active_count
+                        FROM faos.capacity_reservations
+                        WHERE status = 'ACTIVE'
+                        GROUP BY location_id
+                    ) cr ON cr.location_id = lc.location_id
+                    WHERE lc.tenant_id = %s
+                      AND (lc.capacity - COALESCE(cr.active_count, 0)) > 0
+                    ORDER BY lc.location_id
+                    LIMIT 2
+                """, (binding.tenant_id,))
+                available = [str(row[0]) for row in cur.fetchall()]
+                # Create reservations for the selected locations
+                request_digest = f"routing-{session_id}"
+                for loc_id in available:
+                    cur.execute("""
+                        INSERT INTO faos.capacity_reservations
+                            (tenant_id, reservation_id, location_id, request_digest, status, expires_at)
+                        VALUES (%s, %s, %s, %s, 'ACTIVE', now() + interval '4 hours')
+                        ON CONFLICT (tenant_id, location_id, request_digest) DO NOTHING
+                    """, (binding.tenant_id, str(uuid4()), loc_id, request_digest))
+                # Append the event
                 cur.execute(
                     "SELECT COALESCE(MAX(sequence), 0) FROM faos.events WHERE session_id = %s",
                     (session_id,),
@@ -491,7 +516,7 @@ async def record_routing(
                 event_id = str(uuid4())
                 payload = json.dumps({
                     "actor_id": binding.actor_id,
-                    "dealer_shortlist": synthetic_shortlist,
+                    "dealer_shortlist": available,
                 })
                 cur.execute(
                     "SELECT faos.append_event(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
@@ -515,7 +540,7 @@ async def record_routing(
         session_id=session_id,
         event_id=event_id,
         kind="ROUTING_REQUESTED",
-        dealer_shortlist=synthetic_shortlist,
+        dealer_shortlist=available,
     )
 
 @router.get('/sessions', response_model=SessionListResponse)
