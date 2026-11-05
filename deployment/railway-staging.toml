@@ -1,3 +1,4 @@
+# Select /deployment/railway-staging.toml only on the dedicated staging service.
 # Reference: https://docs.railway.com/reference/config-as-code
 [build]
 builder = "DOCKERFILE"

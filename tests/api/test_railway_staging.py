@@ -1,5 +1,7 @@
 """HTTP unit tests for the deliberately restricted Railway staging surface."""
 import os
+from pathlib import Path
+import tomllib
 import unittest
 from unittest.mock import patch
 
@@ -98,6 +100,18 @@ class RailwayStagingTests(unittest.TestCase):
             with self.subTest(value=value), patch.dict(os.environ, {"PORT": value}):
                 with self.assertRaisesRegex(RuntimeError, "PORT_INVALID"):
                     railway_staging.listen_port()
+
+    def test_railway_build_configuration_is_service_specific(self):
+        root = Path(__file__).resolve().parents[2]
+        self.assertFalse((root / "railway.toml").exists())
+        config = tomllib.loads(
+            (root / "deployment" / "railway-staging.toml").read_text(encoding="utf-8")
+        )
+        self.assertEqual(config["build"]["builder"], "DOCKERFILE")
+        self.assertEqual(config["build"]["dockerfilePath"], "Dockerfile.railway")
+        self.assertEqual(config["deploy"]["healthcheckPath"], "/health/ready")
+        self.assertEqual(config["deploy"]["restartPolicyType"], "ON_FAILURE")
+        self.assertEqual(config["deploy"]["restartPolicyMaxRetries"], 3)
 
 
 if __name__ == "__main__":

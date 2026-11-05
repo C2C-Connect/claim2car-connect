@@ -74,11 +74,14 @@ The workflow stamps `app/_build_revision.txt` with the exact checked-out commit.
 Do not commit a generated stamp or edit source files after stamping and then
 claim the resulting image represents the unchanged commit.
 
-`railway.toml` selects `Dockerfile.railway`, `/health/ready`, a 120-second health
-check timeout, and bounded on-failure restarts. Review service settings for
-overrides or a custom config-file path before deployment. ([Railway config reference](https://docs.railway.com/reference/config-as-code))
-Use a dedicated staging service so this config does not replace an existing
-database-backed intake or production service.
+Create or choose a dedicated staging application service, then set its custom
+Railway Config File path to `/deployment/railway-staging.toml` in that service's
+settings. Railway requires the absolute repository path when selecting a custom
+config file. ([Railway config reference](https://docs.railway.com/reference/config-as-code))
+The file selects `Dockerfile.railway`, `/health/ready`, a 120-second health check
+timeout, and bounded on-failure restarts; review service settings for overrides
+before enabling deployment. There is deliberately no root `railway.toml`, so
+other services are not opted in by this repository change.
 
 If native GitHub autodeploy is configured on that service, do not also let it
 deploy every push alongside this workflow. Railway's native GitHub triggers and
@@ -90,6 +93,8 @@ Use an environment-scoped project token in `RAILWAY_TOKEN`. Explicit `--project`
 and `--environment` avoid a local link; `--environment` is required when using
 `--project`. ([Railway deployment guide](https://docs.railway.com/cli/deploying))
 Use the intended existing application service, never a database service.
+That service must first select `/deployment/railway-staging.toml` as described
+above; the CLI upload alone does not configure that service setting.
 
 ```bash
 # Run from a clean checkout of the reviewed commit, before generating the stamp.
