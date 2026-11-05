@@ -79,31 +79,16 @@ jobs:
           npm install --global "@railway/cli@${RAILWAY_CLI_VERSION}"
           railway --version
       - name: Validate settings and deploy exact revision
+        id: upload
         env:
+          GH_TOKEN: ${{ github.token }}
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
           RAILWAY_STAGING_URL: ${{ vars.RAILWAY_STAGING_URL }}
-        run: |
-          set -euo pipefail
-          unset RAILWAY_API_TOKEN
-          for name in RAILWAY_TOKEN RAILWAY_ENVIRONMENT_ID RAILWAY_SERVICE_ID RAILWAY_STAGING_URL; do
-            if [[ -z "${!name}" || "${!name}" =~ [[:space:]] ]]; then
-              printf '::error::Missing or malformed repository setting: %s\n' "$name"
-              exit 1
-            fi
-          done
-          if [[ "$RAILWAY_STAGING_URL" != https://* ]]; then
-            printf '::error::RAILWAY_STAGING_URL must be an HTTPS origin.\n'
-            exit 1
-          fi
-          printf '%s\n' "$GITHUB_SHA" > app/_build_revision.txt
-          railway up \
-            --project "$RAILWAY_PROJECT_ID" \
-            --environment "$RAILWAY_ENVIRONMENT_ID" \
-            --service "$RAILWAY_SERVICE_ID" \
-            --ci --message "Verified restricted staging commit ${GITHUB_SHA}"
+        run: bash scripts/railway_deploy.sh
       - name: Verify public deployment
+        if: steps.upload.outputs.deployed == 'true'
         env:
           STAGING_URL: ${{ vars.RAILWAY_STAGING_URL }}
         run: |

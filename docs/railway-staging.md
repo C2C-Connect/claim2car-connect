@@ -69,6 +69,22 @@ Deployment is allowed only on `main`, after that verification succeeds and the
 repository deployment flag is enabled. Until enabled, a green verification run
 does not mean anything has been deployed.
 
+Inside the serialized deployment job, `scripts/railway_deploy.sh` reads the
+current `main` ref using the read-only GitHub Actions token immediately before
+stamping and uploading. An outdated verified commit is skipped without touching
+Railway, and its public smoke step is also skipped. GitHub lookup failures or
+invalid ref responses fail closed instead of uploading an unchecked revision.
+This prevents an older verification run that finishes late from overwriting a
+newer deployed commit; it does not cancel an upload already in progress if
+`main` advances after the check.
+
+The smoke script polls both `/health/live` and `/health/ready` using one shared
+readiness deadline. Transient HTTP failures, network errors, malformed JSON, and
+old revisions are retried within that budget, with each health request bounded
+by the time remaining. Incorrect scope, cache policy, or enabled business
+capabilities in a successful health response fail immediately; dispatch and
+route-containment checks also remain fail-fast.
+
 The workflow stamps `app/_build_revision.txt` with the exact checked-out commit.
 `UNSTAMPED` is deliberately invalid and makes the staging process fail startup.
 Do not commit a generated stamp or edit source files after stamping and then
