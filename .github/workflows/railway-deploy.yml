@@ -47,6 +47,10 @@ jobs:
       - name: Remove disposable container
         if: always()
         run: docker rm -f c2c-railway-smoke || true
+      - name: Report deployment remains disabled
+        if: github.event_name != 'pull_request' && vars.RAILWAY_DEPLOY_ENABLED != 'true'
+        run: |
+          printf '%s\n' 'Verification only: Railway deployment is disabled until the staging target, secrets, and HTTPS URL are configured.' >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: Deploy verified restricted staging
@@ -79,15 +83,20 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_STAGING_URL: ${{ vars.RAILWAY_STAGING_URL }}
         run: |
           set -euo pipefail
           unset RAILWAY_API_TOKEN
-          for name in RAILWAY_TOKEN RAILWAY_ENVIRONMENT_ID RAILWAY_SERVICE_ID; do
+          for name in RAILWAY_TOKEN RAILWAY_ENVIRONMENT_ID RAILWAY_SERVICE_ID RAILWAY_STAGING_URL; do
             if [[ -z "${!name}" || "${!name}" =~ [[:space:]] ]]; then
-              printf '::error::Missing or malformed repository secret: %s\n' "$name"
+              printf '::error::Missing or malformed repository setting: %s\n' "$name"
               exit 1
             fi
           done
+          if [[ "$RAILWAY_STAGING_URL" != https://* ]]; then
+            printf '::error::RAILWAY_STAGING_URL must be an HTTPS origin.\n'
+            exit 1
+          fi
           printf '%s\n' "$GITHUB_SHA" > app/_build_revision.txt
           railway up \
             --project "$RAILWAY_PROJECT_ID" \
@@ -95,7 +104,6 @@ jobs:
             --service "$RAILWAY_SERVICE_ID" \
             --ci --message "Verified restricted staging commit ${GITHUB_SHA}"
       - name: Verify public deployment
-        if: vars.RAILWAY_STAGING_URL != ''
         env:
           STAGING_URL: ${{ vars.RAILWAY_STAGING_URL }}
         run: |

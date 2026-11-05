@@ -38,7 +38,7 @@ for the value. ([GitHub secrets guide](https://docs.github.com/en/actions/how-to
 | `RAILWAY_ENVIRONMENT_ID` | Secret | Exact intended staging environment ID. |
 | `RAILWAY_SERVICE_ID` | Secret | Dedicated restricted-staging application service ID. |
 | `RAILWAY_DEPLOY_ENABLED` | Variable | Set to literal `true` only after the target and secrets are checked. |
-| `RAILWAY_STAGING_URL` | Variable | HTTPS origin for the restricted staging service; enables post-deploy HTTP checks. |
+| `RAILWAY_STAGING_URL` | Variable | Required HTTPS origin for the restricted staging service and post-deploy HTTP checks. |
 
 Use Railway project **Settings → Tokens** to create an environment-scoped project
 token, and store it as `RAILWAY_TOKEN`, not `RAILWAY_API_TOKEN`. ([Railway GitHub Actions guide](https://railway.com/guides/github-actions))
