@@ -78,7 +78,9 @@ def create_staging_app() -> FastAPI:
 
     @api.get("/api/v1/dispatch/health")
     def dispatch_status() -> JSONResponse:
-        return JSONResponse(dispatch_health(), headers={"Cache-Control": "no-store"})
+        body = dispatch_health()
+        body.update({"scope": SCOPE, "redact_enabled": False, "verify_enabled": False})
+        return JSONResponse(body, headers={"Cache-Control": "no-store"})
 
     @api.post("/api/v1/dispatch/build")
     def disabled_dispatch():

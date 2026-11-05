@@ -69,6 +69,9 @@ class RailwayStagingTests(unittest.TestCase):
             body = client.get("/api/v1/dispatch/health").json()
         self.assertEqual(body["status"], "disabled")
         self.assertIs(body["build_enabled"], False)
+        self.assertIs(body["redact_enabled"], False)
+        self.assertIs(body["verify_enabled"], False)
+        self.assertEqual(body["scope"], railway_staging.SCOPE)
 
     def test_build_revision_must_be_a_full_commit(self):
         for value in ("UNSTAMPED", "", "main", "a" * 39, "a" * 41, "../../secret"):

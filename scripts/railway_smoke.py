@@ -66,6 +66,9 @@ def verify(base_url, expected_revision, wait_seconds=120):
     status, _, body = request(base_url, "/api/v1/dispatch/health")
     require(status == 200 and body.get("status") == "disabled"
             and body.get("build_enabled") is False, "DISPATCH_HEALTH_UNSAFE")
+    require(body.get("scope") == "synthetic-staging-containment-only"
+            and body.get("redact_enabled") is False
+            and body.get("verify_enabled") is False, "DISPATCH_SCOPE_UNSAFE")
     for provenance in ({}, {"execution_mode": "synthetic"},
                        {"execution_mode": "model", "provenance_verified": True}):
         status, headers, body = request(
