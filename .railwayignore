@@ -1,0 +1,13 @@
+# Keep local secrets, generated evidence, caches, and development tooling out
+# of the uploaded source archive. Dockerfile.railway has a separate allowlist.
+.env
+.env.*
+**/.env
+**/.env.*
+**/__pycache__/
+**/*.pyc
+.venv/
+node_modules/
+frontend/node_modules/
+output/
+.git/

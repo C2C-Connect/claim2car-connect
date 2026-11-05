@@ -63,12 +63,22 @@ tag verification retains artifact evidence without publishing an evidence branch
 Required-check/ruleset enforcement and event-specific execution still need review;
 workflow trigger configuration alone does not prevent all unverified merges.
 
-## San Antonio staging target - not provisioned
+## Railway restricted staging rehearsal
+
+Railway project `463d410b-09a3-4117-a3b5-05e6646e7807` is the supplied hosting
+target. [The staging deployment guide](docs/railway-staging.md) describes a
+dedicated restricted runtime, exact-revision HTTP checks, and the repository
+settings needed to enable deployment. Deployment is disabled by default until
+the environment, service, and token are verified. The runtime exposes only
+scoped health checks and disabled dispatch construction, not the integrated
+claims application. The existing intake Dockerfile is unchanged.
+
+## San Antonio database staging target - not provisioned
 
 Proposed logical environment: san-antonio-pilot-staging. This is a planning name,
 not a provisioned database, hosting project or verified GitHub Environment.
-Hosting provider, account/project, region, existing/new database target and owner
-must be resolved before deployment. Use persistent storage, managed secrets,
+The database provider, region, existing/new database target and owner must be
+resolved before database deployment. Use persistent storage, managed secrets,
 restricted bound identities and the full default migration route. The tmpfs test
 Compose stack and claim2car_test bootstrap are not a persistent staging recipe.
 The migration engine is not production-certified; environment-specific provisioning,

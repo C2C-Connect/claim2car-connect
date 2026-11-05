@@ -1,9 +1,14 @@
 **
 !Dockerfile
+!Dockerfile.railway
 !requirements-api.txt
 !requirements-database.txt
 !app/
 !app/**
+!backend/
+!backend/**
+!config/
+!config/**
 !database/
 !database/**
 !contracts/
