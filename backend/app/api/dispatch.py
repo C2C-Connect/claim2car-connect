@@ -1,13 +1,10 @@
-"""
-Dispatch + public verify API (Layers 6/7).
-"""
-
+"""Dispatch API: HTTP package construction disabled pending trusted provenance."""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from backend.app.anchor.ledger import LEDGER
 from backend.app.dispatch.dispatcher import build_dispatch
@@ -40,51 +37,29 @@ class VerifyRequest(BaseModel):
 @router.get("/api/v1/dispatch/health")
 def dispatch_health() -> Dict[str, Any]:
     return {
-        "status": "ok",
+        "status": "disabled",
         "layer": "6/7",
         "constants_version": C.VERSION,
         "packages": ["owner", "dealer", "shop", "carrier"],
         "verify": "/api/v1/verify/",
         "anchor": "internal_ledger",
+        "build_enabled": False,
+        "reason": "trusted_provenance_not_integrated",
     }
 
 
 @router.post("/api/v1/dispatch/build")
 def dispatch_build(body: DispatchRequest) -> Dict[str, Any]:
-    try:
-        result = build_dispatch(
-            body.adjudication,
-            photo_hashes=body.photo_hashes,
-            vin=body.vin,
-            vehicle=body.vehicle.model_dump() if body.vehicle else None,
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    packages = []
-    for p in result.packages:
-        packages.append(
-            {
-                "role": p.role,
-                "label": p.label,
-                "payload": p.payload,
-                "dossier_text": p.dossier.plain_text[:4000],
-                "dossier_pages": [
-                    {"number": pg.number, "title": pg.title} for pg in p.dossier.pages
-                ],
-                "has_acord_xml": p.acord_xml is not None,
-                "acord_xml_preview": (p.acord_xml[:1500] if p.acord_xml else None),
-            }
-        )
-    return {
-        "session_id": result.session_id,
-        "anchor": result.anchor,
-        "public_verify_path": result.public_verify_path,
-        "packages": packages,
-        "formula_version": C.VERSION,
-        "owner_payout": None,
-        "operator_payout_usd": C.OPERATOR_PAYOUT_USD,
-    }
+    # Caller-supplied provenance cannot authorize operational report construction.
+    # Do not invoke the builder: it mutates the process-local anchor ledger.
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "code": "dispatch_build_disabled",
+            "message": "HTTP package construction is disabled pending server-owned authorization and trusted provenance integration.",
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/api/v1/dispatch/redact")
@@ -95,7 +70,7 @@ def dispatch_redact(role: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 @router.post("/api/v1/verify/")
 @router.post("/api/verify/")
 def public_verify(body: VerifyRequest) -> Dict[str, Any]:
-    """Public verification endpoint — no auth."""
+    """Public verification endpoint; unchanged by the build containment."""
     result = LEDGER.verify(body.session_id, body.merkle_root, body.master_hash)
     result["kill_switch"] = LEDGER.kill_switch
     result["formula_version"] = C.VERSION
