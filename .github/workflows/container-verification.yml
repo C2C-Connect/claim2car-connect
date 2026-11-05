@@ -1,0 +1,61 @@
+name: Restricted intake container verification
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build restricted runtime image
+        run: docker build --tag claim2car-intake:ci .
+      - name: Verify non-root identity and fail-closed configuration
+        run: |
+          test "$(docker run --rm --entrypoint id claim2car-intake:ci -u)" = 10001
+          if docker run --rm claim2car-intake:ci; then
+            echo 'ERROR: service started without required configuration'
+            exit 1
+          fi
+      - name: Start with synthetic configuration and restricted filesystem
+        run: |
+          mkdir -p "$RUNNER_TEMP/c2c-smoke"
+          printf '%s' '{"health_database_url":"host=127.0.0.1 port=9 dbname=synthetic user=synthetic","dsn_by_role":{},"credentials":[]}' > "$RUNNER_TEMP/c2c-smoke/config.json"
+          chmod 644 "$RUNNER_TEMP/c2c-smoke/config.json"
+          docker run -d --name c2c-intake-smoke --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m -p 127.0.0.1:18000:8000 --mount "type=bind,src=$RUNNER_TEMP/c2c-smoke/config.json,dst=/run/capture.json,readonly" -e C2C_CAPTURE_CONFIG_FILE=/run/capture.json claim2car-intake:ci
+      - name: Verify live HTTP boundaries, not database acceptance
+        shell: python
+        run: |
+          import json, time, urllib.request, urllib.error
+          def request(path):
+              try:
+                  response = urllib.request.urlopen('http://127.0.0.1:18000' + path, timeout=5)
+              except urllib.error.HTTPError as error:
+                  response = error
+              with response:
+                  return response.status, dict(response.headers), json.loads(response.read())
+          for attempt in range(30):
+              try:
+                  if request('/health/live')[0] == 200:
+                      break
+              except (OSError, ValueError):
+                  pass
+              time.sleep(1)
+          else:
+              raise RuntimeError('CONTAINER_STARTUP_FAILED')
+          assert request('/health/live')[2]['status'] == 'alive'
+          assert request('/health/ready')[0] == 503
+          for path in ('/v1/capture-sessions/00000000-0000-0000-0000-000000000001', '/v1/capture-sessions/00000000-0000-0000-0000-000000000001/draft'):
+              status, headers, body = request(path)
+              assert status == 401, (path, status)
+              assert body == {'detail': 'UNAUTHORIZED'}
+              assert next(v for k, v in headers.items() if k.lower() == 'cache-control') == 'no-store'
+      - name: Remove disposable container
+        if: always()
+        run: docker rm -f c2c-intake-smoke || true
