@@ -1,0 +1,8 @@
+{
+  "candidate_commit": "f16be7405ebf88ea7fab95394e6b482f2e506b6d",
+  "run_id": "42100882893",
+  "run_attempt": "1",
+  "classification": "single-live-vpic-test-vin-not-deployment-or-camera-validation",
+  "verification_job_result": "success",
+  "report_present": true
+}
