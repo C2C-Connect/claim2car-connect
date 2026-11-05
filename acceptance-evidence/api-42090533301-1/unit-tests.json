@@ -1,0 +1,304 @@
+{
+  "suite": "api-unit",
+  "discovered": 58,
+  "executed": 58,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "expected_failures": 0,
+  "unexpected_successes": 0,
+  "successful": true,
+  "tests": [
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_concurrent_identical_writers_create_once",
+      "outcome": "passed",
+      "duration_seconds": 0.31325
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_conflicting_retry_does_not_overwrite",
+      "outcome": "passed",
+      "duration_seconds": 0.223593
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_failed_publication_does_not_commit_partial_artifact",
+      "outcome": "passed",
+      "duration_seconds": 0.125378
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_namespace_separation",
+      "outcome": "passed",
+      "duration_seconds": 0.024619
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_new_process_recovers_original",
+      "outcome": "passed",
+      "duration_seconds": 0.100142
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_preserves_original_bytes_and_receipt",
+      "outcome": "passed",
+      "duration_seconds": 0.001827
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_rejects_invalid_keys_and_limits",
+      "outcome": "passed",
+      "duration_seconds": 0.00028
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_retrieval_rejects_tampering",
+      "outcome": "passed",
+      "duration_seconds": 0.002081
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_same_retry_is_stable",
+      "outcome": "passed",
+      "duration_seconds": 0.002193
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_symlink_artifact_is_not_followed",
+      "outcome": "passed",
+      "duration_seconds": 0.001591
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_symlink_directory_is_rejected",
+      "outcome": "passed",
+      "duration_seconds": 0.000489
+    },
+    {
+      "id": "test_artifact_storage.OriginalByteStoreTests.test_wrong_incoming_digest_writes_nothing",
+      "outcome": "passed",
+      "duration_seconds": 0.00014
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_body_cannot_choose_tenant_actor_or_database_login",
+      "outcome": "passed",
+      "duration_seconds": 0.033611
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_capture_factory_requires_explicit_server_configuration",
+      "outcome": "passed",
+      "duration_seconds": 0.000677
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_config_database_target_and_login_must_match",
+      "outcome": "passed",
+      "duration_seconds": 0.000882
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_create_returns_201_and_preserves_server_metadata",
+      "outcome": "passed",
+      "duration_seconds": 0.003323
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_get_ignores_attempted_query_and_header_tenant_override",
+      "outcome": "passed",
+      "duration_seconds": 0.003221
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_idempotent_retry_returns_200",
+      "outcome": "passed",
+      "duration_seconds": 0.003164
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_invalid_and_duplicate_config_keys_fail_without_secrets",
+      "outcome": "passed",
+      "duration_seconds": 0.000594
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_known_errors_have_attributed_status_without_internal_detail",
+      "outcome": "passed",
+      "duration_seconds": 0.015207
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_malformed_session_identifier_is_rejected",
+      "outcome": "passed",
+      "duration_seconds": 0.002912
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_missing_unknown_expired_and_disabled_credentials_do_not_call_store",
+      "outcome": "passed",
+      "duration_seconds": 0.011251
+    },
+    {
+      "id": "test_capture_api.CaptureRouteTests.test_valid_config_builds_runtime_without_connecting",
+      "outcome": "passed",
+      "duration_seconds": 0.00341
+    },
+    {
+      "id": "test_capture_hardening.CaptureHardeningTests.test_invalid_target_types_and_syntax_are_normalized",
+      "outcome": "passed",
+      "duration_seconds": 0.00013
+    },
+    {
+      "id": "test_capture_hardening.CaptureHardeningTests.test_missing_header_is_rejected_even_with_permissive_resolver",
+      "outcome": "passed",
+      "duration_seconds": 0.003307
+    },
+    {
+      "id": "test_capture_hardening.CaptureHardeningTests.test_nonstandard_json_constants_are_rejected",
+      "outcome": "passed",
+      "duration_seconds": 0.00055
+    },
+    {
+      "id": "test_capture_hardening.CaptureHardeningTests.test_serialization_failure_is_controlled",
+      "outcome": "passed",
+      "duration_seconds": 0.003344
+    },
+    {
+      "id": "test_capture_hardening.CaptureHardeningTests.test_single_explicit_target_remains_supported",
+      "outcome": "passed",
+      "duration_seconds": 8.7e-05
+    },
+    {
+      "id": "test_capture_hardening.CaptureHardeningTests.test_target_rejects_all_multitarget_fields",
+      "outcome": "passed",
+      "duration_seconds": 0.000169
+    },
+    {
+      "id": "test_capture_hardening.CaptureHardeningTests.test_uuid_and_datetime_are_encoded",
+      "outcome": "passed",
+      "duration_seconds": 0.003344
+    },
+    {
+      "id": "test_capture_hardening.CaptureHardeningTests.test_validation_response_does_not_echo_private_input",
+      "outcome": "passed",
+      "duration_seconds": 0.003864
+    },
+    {
+      "id": "test_health.HealthTests.test_app_factory_does_not_connect_at_startup",
+      "outcome": "passed",
+      "duration_seconds": 0.001016
+    },
+    {
+      "id": "test_health.HealthTests.test_false_or_truthy_non_boolean_probe_is_not_accepted",
+      "outcome": "passed",
+      "duration_seconds": 0.009225
+    },
+    {
+      "id": "test_health.HealthTests.test_liveness_never_connects_to_database",
+      "outcome": "passed",
+      "duration_seconds": 0.002179
+    },
+    {
+      "id": "test_health.HealthTests.test_missing_configuration_fails_readiness_without_fallback",
+      "outcome": "passed",
+      "duration_seconds": 0.002555
+    },
+    {
+      "id": "test_health.HealthTests.test_only_read_only_health_routes_are_exposed",
+      "outcome": "passed",
+      "duration_seconds": 0.006183
+    },
+    {
+      "id": "test_health.HealthTests.test_probe_checks_all_prerequisites_with_read_only_timeouts",
+      "outcome": "passed",
+      "duration_seconds": 0.000854
+    },
+    {
+      "id": "test_health.HealthTests.test_request_cannot_supply_database_or_tenant_authority",
+      "outcome": "passed",
+      "duration_seconds": 0.002233
+    },
+    {
+      "id": "test_health.HealthTests.test_settings_repr_redacts_database_url",
+      "outcome": "passed",
+      "duration_seconds": 2.1e-05
+    },
+    {
+      "id": "test_health.HealthTests.test_unavailable_database_fails_closed_without_leaking_details",
+      "outcome": "passed",
+      "duration_seconds": 0.002242
+    },
+    {
+      "id": "test_health.HealthTests.test_unexpected_probe_exception_also_fails_closed",
+      "outcome": "passed",
+      "duration_seconds": 0.002624
+    },
+    {
+      "id": "test_health.HealthTests.test_valid_probe_reports_infrastructure_only",
+      "outcome": "passed",
+      "duration_seconds": 0.002325
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_environment_configuration_required",
+      "outcome": "passed",
+      "duration_seconds": 0.001761
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_extra_identity_fields_rejected_without_echo",
+      "outcome": "passed",
+      "duration_seconds": 0.007397
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_get_empty_draft",
+      "outcome": "passed",
+      "duration_seconds": 0.002953
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_get_requires_auth",
+      "outcome": "passed",
+      "duration_seconds": 0.002817
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_idempotent_receipt_flag_preserved",
+      "outcome": "passed",
+      "duration_seconds": 0.003036
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_known_failures_are_sanitized",
+      "outcome": "passed",
+      "duration_seconds": 0.014808
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_malformed_identifiers",
+      "outcome": "passed",
+      "duration_seconds": 0.00451
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_malformed_json_not_echoed",
+      "outcome": "passed",
+      "duration_seconds": 0.003048
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_missing_and_unknown_credentials",
+      "outcome": "passed",
+      "duration_seconds": 0.004226
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_query_or_header_cannot_override_actor",
+      "outcome": "passed",
+      "duration_seconds": 0.003001
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_revision_is_strict_positive_integer",
+      "outcome": "passed",
+      "duration_seconds": 0.008366
+    },
+    {
+      "id": "test_intake_api.IntakeRouteTests.test_save_forwards_only_declared_fields",
+      "outcome": "passed",
+      "duration_seconds": 0.003133
+    },
+    {
+      "id": "test_intake_hardening.IntakeHardeningTests.test_encoding_value_error_is_not_misclassified_as_client_error",
+      "outcome": "passed",
+      "duration_seconds": 0.003231
+    },
+    {
+      "id": "test_intake_hardening.IntakeHardeningTests.test_missing_header_rejected_without_resolver_or_store",
+      "outcome": "passed",
+      "duration_seconds": 0.002853
+    },
+    {
+      "id": "test_intake_hardening.IntakeHardeningTests.test_non_dataclass_result_returns_safe_500",
+      "outcome": "passed",
+      "duration_seconds": 0.00296
+    },
+    {
+      "id": "test_intake_hardening.IntakeHardeningTests.test_uuid_and_datetime_encode",
+      "outcome": "passed",
+      "duration_seconds": 0.003034
+    }
+  ],
+  "commit": "d28a53d017c570de3ac6efa3320bfd1d913d8096"
+}
