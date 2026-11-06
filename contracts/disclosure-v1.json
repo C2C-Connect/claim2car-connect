@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.1",
+  "disclosure_version": "disclosure-v1",
+  "requires_explicit_acceptance": true,
+  "sections": [
+    "This capture session records vehicle condition evidence for a claim file.",
+    "Participation is voluntary; you may pause or stop at any time without penalty.",
+    "The session captures vehicle photographs and a VIN plate image. It does not decode your VIN, authenticate the vehicle, or make ownership claims.",
+    "Captured originals are stored at full resolution and may be shared with your insurance carrier, a repair shop, or a dealership as part of claim handling.",
+    "No payment or compensation is offered or implied for participation in this capture session.",
+    "By proceeding you affirmatively consent to the capture described above."
+  ]
+}

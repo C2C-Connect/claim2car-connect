@@ -22,6 +22,10 @@
 | Low-impact guard | E_k < 20 vs < 25 kJ | **E_k < 20 kJ** (stricter) | 2026-11-02 | |
 | Photo link chain | Content-hash sequential linking | `link_k = SHA-256(content_k ‖ prev)` | 2026-11-03 | Used for notary and sealing. |
 | NHTSA | Only external VIN/recall source | Affirmed | 2026-11-03 | All other third-party services self-hosted or internal behind adapters. |
+| Disclosure gate + consent record (Slice 4) | Unversioned consent vs versioned disclosure contract | **Versioned disclosure (`contracts/disclosure-v1.json`); explicit acceptance only** | 2026-11-06 | Consent refused without presentation of the current version; wrong/stale version and non-boolean acceptance rejected. No compensation language in disclosure (eradication alignment). |
+| VIN uncertainty handling (Slice 4) | Auto-repair vs recapture | **Record uncertainty, require recapture; never repair** | 2026-11-06 | Server-side guard (`app/vin_guard.py`) is an exact port of the frontend guard — same weights, codes, message. Check-digit pass asserts format only; never decoded identity. VIN correction before capture is allowed with traceability (m1-v1). |
+| Retake window (Slice 4) | Unlimited retakes vs closed after quality | **Traceable retakes allowed until QUALITY_RECORDED; closed after** | 2026-11-06 | Superseded artifact ids retained in event history (`supersedes_artifact_id`); post-quality registration rejected by the frozen machine. |
+| Local draft + resumable sync (Slice 4) | Fire-and-forget upload vs persistent draft queue | **Persistent local draft with idempotent, resumable sync** | 2026-11-06 | Client draft survives restart (injectable storage); server sync is idempotent per (slot, artifact_id); same id for a different slot is a conflict. |
 
 ## Pending (to be locked with unit tests in Layer 2/3)
 

@@ -75,8 +75,8 @@ review. Simulated (labeled) dealer decision flow; no live routing, dispatch, or 
 | 2 | Enable required status checks on `main` | AWAITING OWNER APPROVAL | Separate settings-change approval; select checks by job context (database, API, authority-cutover verification), not all workflows indiscriminately |
 | 3 | Review PR #2 full diff at `2edc6e50` against execution evidence; record demonstrated gaps | NOT STARTED | Include hardening gaps: request size limits, rate controls, broader failure paths. Merge/no-merge is a separate deliberate decision |
 | 4 | Slice-specific acceptance for the intake slice (not full 14-gate certification) | NOT STARTED | Bar for PR #2 promotion: slice acceptance + applicable database regressions |
-| 5 | Consent + artifact-storage contracts defined before capture UI | NOT STARTED | Interface and data-handling rules first; then UI/backend built together in small slices |
-| 6 | M1 workflow increments: consent screen, photo checklist, save/resume, review interface | NOT STARTED | Each increment tested; verify on intended physical device (device selection is an unresolved decision) |
+| 5 | Consent + artifact-storage contracts defined before capture UI | IN PROGRESS (Slice 4) | Versioned disclosure contract (`contracts/disclosure-v1.json`) + workflow engine (`app/capture_workflow.py`) landed 2026-11-06; artifact-storage contract (Slice 5) next |
+| 6 | M1 workflow increments: consent screen, photo checklist, save/resume, review interface | IN PROGRESS (Slice 4) | Guided-capture controller (`frontend/src/modules/capture/guided_workflow.mjs`) with local persistence + resumable sync landed 2026-11-06; physical-device verification still pending |
 | 7 | Minimal synthetic staging rehearsal (when first usable slice is ready) | NOT STARTED | Separate approval for any provisioning; synthetic data only |
 | 8 | M1 rehearsal against the gate matrix; demo-readiness review | NOT STARTED | Uses demo-readiness checklist, not live-pilot controls |
 
