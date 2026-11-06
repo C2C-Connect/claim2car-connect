@@ -1,0 +1,56 @@
+name: Full test suite
+
+# Runs the ENTIRE pytest suite (unit + database + integration) so that broken
+# imports or missing constants can never hide behind narrow per-area workflows.
+# Slice 1 of the five-slice execution plan (2026-11-06).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
+  push:
+    branches: [main, acceptance, 'acceptance/**', 'release/**', 'rc/**']
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APP_DATABASE_URL: postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test
+      MIGRATION_DATABASE_URL: postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55432/claim2car_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install all dependencies
+        run: |
+          pip install -r requirements.txt -r requirements-api.txt
+      - name: Start disposable database and bootstrap restricted synthetic roles
+        run: |
+          docker compose -p full-suite-run -f compose.database-tests.yml up -d --wait
+          docker cp database/bootstrap.sql full-suite-run-database-1:/tmp/bootstrap.sql
+          docker exec full-suite-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
+          docker exec full-suite-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only'; ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
+      - name: Apply migrations
+        run: python -m database.migrate
+      - name: Run full pytest suite
+        run: |
+          mkdir -p output/full-suite
+          python -m pytest tests/ -q --junitxml=output/full-suite/junit.xml 2>&1 | tee output/full-suite/pytest.log
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-suite-evidence
+          path: output/full-suite/
+          if-no-files-found: error
+      - name: Remove disposable database
+        if: always()
+        run: docker compose -p full-suite-run -f compose.database-tests.yml down -v
