@@ -4,6 +4,8 @@ Claim2Car Connect — FastAPI entrypoint (Milestone 5 surface).
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,6 +13,14 @@ from backend.app.api.analysis import router as analysis_router
 from backend.app.api.triage import router as triage_router
 from backend.app.api.dispatch import router as dispatch_router
 from config import forensic_constants as C
+
+# Explicit origin allowlist only (no wildcard with credentials).
+# Internal analysis surface: default is no cross-origin browser access.
+ALLOWED_ORIGINS = tuple(
+    origin.strip()
+    for origin in os.environ.get("C2C_ANALYSIS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+)
 
 app = FastAPI(
     title="Claim2Car Connect",
@@ -20,10 +30,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=list(ALLOWED_ORIGINS),
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(analysis_router)
