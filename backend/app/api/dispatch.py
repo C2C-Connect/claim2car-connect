@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from backend.app.anchor.ledger import LEDGER
 from backend.app.dispatch.dispatcher import build_dispatch
 from backend.app.dispatch.redaction import redact_payload
+from backend.app.security import require_service_token
 from config import forensic_constants as C
 
 router = APIRouter(tags=["dispatch"])
@@ -34,6 +35,11 @@ class VerifyRequest(BaseModel):
     master_hash: str
 
 
+class RedactRequest(BaseModel):
+    role: str = Field(..., min_length=1, max_length=32)
+    payload: Dict[str, Any]
+
+
 @router.get("/api/v1/dispatch/health")
 def dispatch_health() -> Dict[str, Any]:
     return {
@@ -44,6 +50,7 @@ def dispatch_health() -> Dict[str, Any]:
         "verify": "/api/v1/verify/",
         "anchor": "internal_ledger",
         "build_enabled": False,
+        "redact_auth": "bearer_required",
         "reason": "trusted_provenance_not_integrated",
     }
 
@@ -63,8 +70,22 @@ def dispatch_build(body: DispatchRequest) -> Dict[str, Any]:
 
 
 @router.post("/api/v1/dispatch/redact")
-def dispatch_redact(role: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    return redact_payload(role, payload)
+def dispatch_redact(
+    body: RedactRequest,
+    _token: str = Depends(require_service_token),
+) -> Dict[str, Any]:
+    """
+    Role-gated redaction. Requires Authorization: Bearer <C2C_SERVICE_TOKEN>.
+    Unauthenticated callers receive 401; missing token config receives 503.
+    """
+    role = (body.role or "").strip().lower()
+    if role not in {"owner", "dealer", "shop", "carrier", "qc", "admin"}:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_role", "message": f"Unsupported role: {body.role}"},
+            headers={"Cache-Control": "no-store"},
+        )
+    return redact_payload(role, body.payload)
 
 
 @router.post("/api/v1/verify/")

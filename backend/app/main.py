@@ -4,12 +4,15 @@ Claim2Car Connect — FastAPI entrypoint (Milestone 5 surface).
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.analysis import router as analysis_router
 from backend.app.api.triage import router as triage_router
 from backend.app.api.dispatch import router as dispatch_router
+from backend.app.security import parse_cors_origins
 from config import forensic_constants as C
 
 app = FastAPI(
@@ -18,12 +21,16 @@ app = FastAPI(
     description="Physics-first forensic claims platform — Milestone 5 Reports & Dispatch",
 )
 
+# CORS: explicit allowlist only. Never allow_origins=["*"] with credentials.
+_CORS_CREDENTIALS = True
+_CORS_ORIGINS = parse_cors_origins(os.environ.get("CORS_ORIGINS"), allow_credentials=_CORS_CREDENTIALS)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_CORS_ORIGINS,
+    allow_credentials=_CORS_CREDENTIALS,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
 )
 
 app.include_router(analysis_router)
@@ -40,11 +47,12 @@ def live():
 def ready():
     return {
         "status": "ready",
-        "environment": "development",
+        "environment": os.environ.get("C2C_ENVIRONMENT", os.environ.get("ENVIRONMENT", "development")),
         "constants_version": C.VERSION,
         "scope": "milestone_5_dispatch",
         "operator_payout_usd": C.OPERATOR_PAYOUT_USD,
         "owner_payout": None,
+        "cors_origins": _CORS_ORIGINS,
     }
 
 
