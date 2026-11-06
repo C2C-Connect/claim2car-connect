@@ -1,14 +1,15 @@
 """
-Layer 3 API — itemized estimate, valuation, adjudication.
+Layer 3 API — itemized estimate, valuation, adjudication (auth required).
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from backend.app.security import require_service_token
 from backend.app.triage.adjudicate import Adjudicator
 from config import forensic_constants as C
 
@@ -65,11 +66,16 @@ def triage_health() -> Dict[str, Any]:
             "fraud_flags",
             "adjudicator",
         ],
+        "auth": "bearer_required_on_compute",
     }
 
 
 @router.post("/adjudicate")
-def adjudicate(body: AdjudicateRequest) -> Dict[str, Any]:
+def adjudicate(
+    body: AdjudicateRequest,
+    _token: str = Depends(require_service_token),
+) -> Dict[str, Any]:
+    """Run Layer 3 adjudication. Requires service bearer token."""
     result = _adj.adjudicate(
         body.session_id,
         detections=[d.model_dump() for d in body.detections],

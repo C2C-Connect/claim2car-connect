@@ -1,16 +1,17 @@
 """
-Analysis API routes — Layer 2.
+Analysis API routes — Layer 2 (auth required for compute endpoints).
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.app.analysis.pipeline import AnalysisPipeline, AnalysisRequest
 from backend.app.physics.darci import DarciInput, ZoneInput, run_darci
+from backend.app.security import require_service_token
 from config import forensic_constants as C
 
 router = APIRouter(prefix="/api/v1/analysis", tags=["analysis"])
@@ -35,7 +36,6 @@ class AnalyzeRequest(BaseModel):
     session_id: str
     mass_kg: float = Field(..., ge=500, le=5000)
     velocity_kph: float = Field(..., ge=0, le=250)
-    # base64 images optional in M3; empty list runs physics + stub vision
     photo_count: int = Field(default=1, ge=0, le=32)
     zone_hints: Optional[List[str]] = None
     materials: Optional[List[str]] = None
@@ -54,12 +54,16 @@ def analysis_health() -> Dict[str, Any]:
         },
         "adapters": ["damage_gate", "yolov11", "sam2", "depth_anything_v2", "cognitive_lmm"],
         "mode": "stub_models_physics_primary",
+        "auth": "bearer_required_on_compute",
     }
 
 
 @router.post("/physics")
-def physics_only(body: PhysicsOnlyRequest) -> Dict[str, Any]:
-    """Run DARCI only (no vision). Useful for unit tests and adjuster tools."""
+def physics_only(
+    body: PhysicsOnlyRequest,
+    _token: str = Depends(require_service_token),
+) -> Dict[str, Any]:
+    """Run DARCI only (no vision). Requires service bearer token."""
     zones = [
         ZoneInput(
             zone=z.zone,
@@ -98,11 +102,11 @@ def physics_only(body: PhysicsOnlyRequest) -> Dict[str, Any]:
 
 
 @router.post("/run")
-def run_analysis(body: AnalyzeRequest) -> Dict[str, Any]:
-    """
-    Full Layer 2 pipeline with stub vision models.
-    Photos are synthetic placeholders when not provided (M3).
-    """
+def run_analysis(
+    body: AnalyzeRequest,
+    _token: str = Depends(require_service_token),
+) -> Dict[str, Any]:
+    """Full Layer 2 pipeline. Requires service bearer token."""
     photos = [f"photo-{i}-{body.session_id}".encode() for i in range(max(1, body.photo_count))]
     try:
         result = _pipeline.run(

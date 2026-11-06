@@ -1,29 +1,35 @@
 """
-Claim2Car Connect — FastAPI entrypoint (Milestone 5 surface).
+Claim2Car Connect — FastAPI entrypoint (Milestone 5 surface + hardened auth).
 """
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import os
+
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.analysis import router as analysis_router
 from backend.app.api.triage import router as triage_router
 from backend.app.api.dispatch import router as dispatch_router
+from backend.app.security import parse_cors_origins, require_service_token
 from config import forensic_constants as C
 
 app = FastAPI(
     title="Claim2Car Connect",
     version=C.VERSION,
-    description="Physics-first forensic claims platform — Milestone 5 Reports & Dispatch",
+    description="Physics-first forensic claims platform — hardened API surface",
 )
+
+_CORS_CREDENTIALS = True
+_CORS_ORIGINS = parse_cors_origins(os.environ.get("CORS_ORIGINS"), allow_credentials=_CORS_CREDENTIALS)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_CORS_ORIGINS,
+    allow_credentials=_CORS_CREDENTIALS,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
 )
 
 app.include_router(analysis_router)
@@ -40,16 +46,18 @@ def live():
 def ready():
     return {
         "status": "ready",
-        "environment": "development",
+        "environment": os.environ.get("C2C_ENVIRONMENT", os.environ.get("ENVIRONMENT", "development")),
         "constants_version": C.VERSION,
-        "scope": "milestone_5_dispatch",
+        "scope": "milestone_5_dispatch_hardened",
         "operator_payout_usd": C.OPERATOR_PAYOUT_USD,
         "owner_payout": None,
+        "cors_origins": _CORS_ORIGINS,
     }
 
 
 @app.get("/api/v1/config/constants")
-def constants():
+def constants(_token: str = Depends(require_service_token)):
+    """Versioned forensic constants — requires service bearer token."""
     return {
         "version": C.VERSION,
         "OPERATOR_PAYOUT_USD": C.OPERATOR_PAYOUT_USD,
@@ -59,4 +67,7 @@ def constants():
         "DEFAULT_SHOT_LIST": C.DEFAULT_SHOT_LIST,
         "LOW_IMPACT_EK_KJ": C.LOW_IMPACT_EK_KJ,
         "RTV_REVIEW_LOW": C.RTV_REVIEW_LOW,
+        "KE_FACTOR_DIVISOR_KJ": C.KE_FACTOR_DIVISOR_KJ,
+        "KE_FACTOR_CAP": C.KE_FACTOR_CAP,
+        "ENTROPY_AI_OVERRIDE_BITS": C.ENTROPY_AI_OVERRIDE_BITS,
     }
