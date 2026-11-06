@@ -77,8 +77,8 @@ review. Simulated (labeled) dealer decision flow; no live routing, dispatch, or 
 | 4 | Slice-specific acceptance for the intake slice (not full 14-gate certification) | NOT STARTED | Bar for PR #2 promotion: slice acceptance + applicable database regressions |
 | 5 | Consent + artifact-storage contracts defined before capture UI | IN PROGRESS (Slice 4) | Versioned disclosure contract (`contracts/disclosure-v1.json`) + workflow engine (`app/capture_workflow.py`) landed 2026-11-06; artifact-storage contract (Slice 5) next |
 | 6 | M1 workflow increments: consent screen, photo checklist, save/resume, review interface | IN PROGRESS (Slice 4) | Guided-capture controller (`frontend/src/modules/capture/guided_workflow.mjs`) with local persistence + resumable sync landed 2026-11-06; physical-device verification still pending |
-| 7 | Minimal synthetic staging rehearsal (when first usable slice is ready) | NOT STARTED | Separate approval for any provisioning; synthetic data only |
-| 8 | M1 rehearsal against the gate matrix; demo-readiness review | NOT STARTED | Uses demo-readiness checklist, not live-pilot controls |
+| 7 | Minimal synthetic staging rehearsal (when first usable slice is ready) | IN PROGRESS (Slice 5) | Controlled demonstration (`python -m app.controlled_demo`) runs fully synthetic capture-to-review end-to-end with retained Gate A evidence record; CI (`controlled-demo.yml`) retains evidence on every run. Railway staging provisioning still needs separate approval |
+| 8 | M1 rehearsal against the gate matrix; demo-readiness review | IN PROGRESS (Slice 5) | Synthetic rehearsal covers disclosure, consent, VIN, capture, durable storage, server hash recomputation (with rejected tamper attempt), seal, and attributed reviewer decision. Physical-device verification and owner demo-readiness review remain open |
 
 ### Backlog (not actively tracked)
 
