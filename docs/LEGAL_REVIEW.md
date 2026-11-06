@@ -6,12 +6,18 @@
 
 ## Commercial & Payout
 
-- [ ] Operator (tow) $110 payout trigger (e-signature verified + S_i ≥ 0.65 + dealer acceptance)
+- [ ] Operator (tow) $110 payout — amount carried forward; trigger, eligibility, reversals, and ledger treatment remain open (plan v1.3, D-04)
 - [ ] Internal payout ledger and manual-settlement adapter
-- [ ] Dealer acquisition fee range $375–$425, pay-on-close
+- [ ] Flat $375 dealer acquisition fee, due on qualified-acquisition close (plan v1.3, D-01)
 - [ ] fee_factor active in dealer assignment scoring
-- [ ] Shop auction floor $250 and two-stage Sovereign Repair Auction mechanics
-- [ ] **Confirmed excluded:** any owner / vehicle-owner cash incentive or $80 consent payout
+- [ ] Flat $275 repair-shop fee, due on recorded shop acceptance of the vehicle (plan v1.3, D-02); payment collection vs settlement and dispatch gating on payment failure (v1.3, D-12)
+- [ ] **Confirmed excluded:** any owner / vehicle-owner cash incentive or consent payout (all amounts, all surfaces)
+
+## Distribution & Navigation (new — owner decision 2026-11-06)
+
+- [ ] Automatic distribution of the dealer packet dossier, shop repair packet, owner PDF, and carrier 7-page document to relevant parties on workflow completion (consent, TCPA/SMS, and privacy review of every recipient channel)
+- [ ] Recipient authorization and verification before any document send
+- [ ] Guided navigation / location sharing with receiving parties (dealer, shop) and tow driver (destination sharing via a Google Maps-class adapter; location-data privacy and retention review)
 
 ## Evidentiary & Integrity Claims
 

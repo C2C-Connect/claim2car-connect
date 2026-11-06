@@ -157,8 +157,10 @@ operational pilot cannot quietly inherit that same incomplete status.
 
 ## 5. Settlement and pilot rules retained from the documented pilot brief
 
-- Dealer invoice: $175, on acceptance only. Operator payout: $110, on acceptance only.
-- Pass: $0, not recycled. Owner cash: none. Expire: no charge or payout unless a separately approved business rule explicitly says otherwise.
+- Dealer acquisition fee: **flat $375**, due upon close of the qualified acquisition (plan v1.3, D-01 — supersedes the prior $375–$425 range and the earlier $175 figure). Not due merely for receiving a packet or expressing interest.
+- Repair-shop fee: **flat $275** (owner decision 2026-11-06; supersedes the $250 auction floor).
+- Operator payout: $110 amount carried forward; **trigger, eligibility, and ledger treatment remain an open decision** (plan v1.3, D-04) — no payout logic until approved. Separately confirmed: the shop's recorded acceptance of the vehicle authorizes tow dispatch to that shop, and the tow driver is then routed to deliver the vehicle there.
+- Pass: $0, not recycled. Owner cash: none (permanently excluded per legal counsel). Expire: no charge or payout unless a separately approved business rule explicitly says otherwise.
 - Payment-provider credentials and live financial integrations remain disabled until separately approved and validated.
 - No live settlement is activated merely because a screen displays "Accepted."
 
@@ -168,3 +170,69 @@ The product is accepted for a given milestone only when every gate that mileston
 VALIDATED with recorded evidence, the run is traceable to an exact source revision, and the
 acceptance decision is recorded with the named reviewer. Demo-readiness and live-pilot readiness
 are separate decisions with separate evidence requirements.
+
+## 7. Post-adjudication distribution and guided routing (owner decision 2026-11-06)
+
+Status: **Specified.** Not implemented. No live sends or navigation handoffs are
+enabled until attorney review (docs/LEGAL_REVIEW.md) and the acceptance gates
+for the owning milestone are passed.
+
+### 7.1 Automatic multi-party distribution
+
+On workflow completion (adjudication recorded and dossier generated), the
+system automatically distributes the generated artifacts to the relevant
+parties of the incident:
+
+- Dealer packet dossier → the routed dealership (total-loss path).
+- Shop repair packet → the accepting repair shop (repairable path).
+- Owner PDF → the person involved in the accident (owner portal / provided channel).
+- Insurance-carrier 7-page document → the carrier of record.
+
+Requirements:
+
+- Distribution is versioned, consent-gated, and auditable (recipient identity,
+  artifact version, timestamp, channel recorded per send).
+- Recipient authorization is verified server-side before any send; a missing or
+  unauthorized recipient blocks that send rather than falling back to another party.
+- Live external sends remain disabled behind an adapter until attorney review
+  of consent, TCPA/SMS, and privacy obligations for every recipient channel.
+
+### 7.2 Acceptance, dispatch, and guided navigation
+
+When the receiving party accepts (plan v1.3 §4):
+
+1. **Authorized acceptance** — explicit accept/reject by an authorized recipient
+   user; actor, organization, timestamp, destination, accepted terms, and
+   packet/evidence version are recorded.
+2. **Commercial trigger** — shop acceptance of the vehicle creates the $275 fee
+   obligation; dealer fee obligation arises on qualified-acquisition close.
+   Payment lifecycle (authorized/collected/settled/failed/refunded/disputed) is
+   recorded separately from dispatch; failed payment must not silently create
+   duplicate dispatches or charges (dispatch gating on payment failure is an
+   open decision, v1.3 D-12).
+3. **Dispatch authorization** — shop acceptance authorizes tow routing to the
+   accepted shop destination only, after validating acceptance and dispatch
+   prerequisites. Dealer-destination dispatch semantics are open (v1.3 D-14).
+4. **Operator assignment and navigation** — an eligible tow operator is
+   assigned and receives step-by-step guided navigation (Google Maps or
+   another approved provider, behind a maps adapter) to the accepted
+   destination; the receiving party likewise receives guided navigation to
+   their destination.
+5. **Arrival and handoff** — en-route, arrival, handoff, recipient
+   confirmation, exceptions, and completion are recorded with actor/time/
+   location provenance per the approved privacy policy.
+
+Requirements:
+
+- The destination comes from the authorized acceptance record; client-side
+  substitution is prevented absent a logged, authorized change.
+- Address/geocoding confidence is validated with a correction/escalation path.
+- Tow-appropriate routing constraints (height, weight, length, width, clearances,
+  access limits) are investigated before provider selection (v1.3 D-13).
+- Navigation handoff is recorded separately from actual arrival and physical
+  handoff; a handoff is not proof of route followed or delivery completed.
+- The maps provider sits behind an adapter; no provider is hard-wired into the
+  core workflow.
+- Location/destination sharing with any party is consent-gated and covered by
+  the privacy review; no continuous location history beyond what is necessary
+  and approved.
