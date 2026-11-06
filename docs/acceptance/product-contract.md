@@ -236,3 +236,38 @@ Requirements:
 - Location/destination sharing with any party is consent-gated and covered by
   the privacy review; no continuous location history beyond what is necessary
   and approved.
+
+## 8. M1 session state machine — frozen contract `m1-v1` (Slice 2, 2026-11-06)
+
+Single source of truth: `contracts/m1_state_machine.py`. Executable contract
+tests: `tests/contracts/test_m1_state_machine.py`. Any change requires a
+contract version bump, product-owner approval, and synchronized tests
+(plan v1.3 workstream C).
+
+States: `initialized → consented → vehicle_identified → evidence_captured →
+quality_verified → sealed → reviewed` (terminal), plus `aborted` (terminal,
+valid from any non-terminal state per the roadside safety SOP).
+
+| Event | Allowed from | Produces |
+|---|---|---|
+| SESSION_CREATED | (none) | initialized |
+| CONSENT_RECORDED | initialized | consented |
+| VEHICLE_RECORDED | consented, vehicle_identified (VIN correction) | vehicle_identified |
+| ARTIFACT_REGISTERED | vehicle_identified, evidence_captured (retake) | evidence_captured |
+| QUALITY_RECORDED | evidence_captured | quality_verified |
+| MANIFEST_SEALED | quality_verified | sealed |
+| REVIEW_RECORDED | sealed | reviewed (terminal) |
+| SESSION_ABORTED | any non-terminal state | aborted (terminal) |
+
+Frozen invariants (negative cases are executable tests):
+
+- Consent gates progression: VEHICLE_RECORDED or ARTIFACT_REGISTERED without
+  CONSENT_RECORDED is rejected (FORBIDDEN_TRANSITION).
+- No skipping ahead: sealing requires quality; review requires sealing.
+- Server-owned ordering: monotonic sequence (SEQUENCE_CONFLICT), no
+  cross-session events (CROSS_SESSION_EVENT), no duplicate creation.
+- Terminal states accept no further work (TERMINAL_STATE_REACHED).
+- Abort before creation is forbidden; abort from any live state is always valid
+  and carries no penalty (plan v1.3 §10).
+- Restart recovery: state is reconstructible from the ordered event history
+  (M1SessionMachine.reconstruct).
