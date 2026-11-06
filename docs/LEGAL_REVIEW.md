@@ -6,11 +6,11 @@
 
 ## Commercial & Payout
 
-- [ ] Operator (tow) $110 payout trigger — paid on the accepting repair shop's acceptance of the vehicle, followed by tow-driver delivery routing (owner decision 2026-11-06)
+- [ ] Operator (tow) $110 payout — amount carried forward; trigger, eligibility, reversals, and ledger treatment remain open (plan v1.3, D-04)
 - [ ] Internal payout ledger and manual-settlement adapter
-- [ ] Flat $375 dealer acquisition fee (owner decision 2026-11-06)
+- [ ] Flat $375 dealer acquisition fee, due on qualified-acquisition close (plan v1.3, D-01)
 - [ ] fee_factor active in dealer assignment scoring
-- [ ] Flat $275 repair-shop fee (owner decision 2026-11-06) and two-stage Sovereign Repair Auction mechanics
+- [ ] Flat $275 repair-shop fee, due on recorded shop acceptance of the vehicle (plan v1.3, D-02); payment collection vs settlement and dispatch gating on payment failure (v1.3, D-12)
 - [ ] **Confirmed excluded:** any owner / vehicle-owner cash incentive or consent payout (all amounts, all surfaces)
 
 ## Distribution & Navigation (new — owner decision 2026-11-06)

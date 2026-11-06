@@ -8,11 +8,12 @@ VERSION = "2026.11.06.1"  # Owner fee decision 2026-11-06: flat dealer $375, sho
 # --- Commercial ---
 OPERATOR_PAYOUT_USD = 110.0
 # OWNER payout intentionally absent — permanently excluded per legal counsel.
-# Operator payout trigger (owner decision 2026-11-06): paid upon the accepting
-# repair shop's acceptance of the vehicle; the tow driver is then routed to
-# deliver the vehicle to that shop. See docs/acceptance/product-contract.md.
+# Operator payout trigger: OPEN (plan v1.3 D-04) — amount carried forward only;
+# eligibility, trigger, split, reversals, and ledger treatment not yet decided.
+# Shop acceptance of the vehicle authorizes tow dispatch to that shop (confirmed
+# in plan v1.3), independent of payout. See docs/acceptance/product-contract.md.
 
-DEALER_ACQUISITION_FEE_USD = 375.0  # flat rate — supersedes $375–$425 range and $175 figure (D-01)
+DEALER_ACQUISITION_FEE_USD = 375.0  # flat, due on qualified-acquisition close (plan v1.3 D-01); supersedes $375–$425 range and $175 figure
 SHOP_FEE_USD = 275.0  # flat repair-shop fee — supersedes $250 auction floor
 FEE_FACTOR_CAP_USD = 500.0
 

@@ -18,10 +18,13 @@ it does not implement dealer matching or prove brand-routing correctness.
 
 ## Product constraints retained from the original pilot brief
 
-- Operator payout: $110, paid upon the accepting shop's acceptance of the vehicle;
-  the tow driver is then routed to deliver the vehicle to that shop.
-- Dealer acquisition fee: flat $375 on acceptance (owner decision 2026-11-06; supersedes
-  the prior $375–$425 range and the earlier $175 figure). Repair-shop fee: flat $275.
+- Operator payout: $110 amount carried forward; eligibility, trigger, and ledger
+  treatment remain an open decision (plan v1.3, D-04). Shop acceptance of the vehicle
+  authorizes tow dispatch/routing to that shop — the tow driver is then routed to
+  take and drop off the vehicle there.
+- Dealer acquisition fee: flat $375, due upon close of the qualified acquisition
+  (plan v1.3, D-01; supersedes the prior $375–$425 range and the earlier $175 figure).
+  Repair-shop fee: flat $275, due upon the shop's recorded acceptance of the vehicle.
 - Pass: $0, not recycled. Owner cash: none (permanently excluded per legal counsel).
   Shop pitch: forbidden by product policy.
 - DARCI: explainable triage; never invent speed or sell the lead.

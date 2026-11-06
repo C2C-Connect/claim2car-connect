@@ -29,10 +29,10 @@ Key consequences:
 
 | Item | Rule |
 |------|------|
-| Operator (tow) payout | $110. Paid upon the accepting repair shop's acceptance of the vehicle (owner decision 2026-11-06; supersedes the prior dealer-acceptance trigger). At acceptance, the tow driver is routed to deliver the vehicle to that shop with guided navigation. Implemented via internal payout ledger. |
+| Operator (tow) payout | $110 amount carried forward (plan v1.3, D-04). Eligibility, trigger, split, reversals, disputes, and ledger treatment remain an open owner decision — no payout logic until approved. Separately confirmed: the shop's recorded acceptance of the vehicle authorizes tow dispatch/routing to that shop, with guided navigation for the delivery run. |
 | Owner / vehicle-owner cash incentive | **Permanently excluded.** No owner payout of any amount exists in product scope, data model, workflows, UI, reports, or documentation. Legal counsel directed removal for liability reasons; the historical dollar figure has been eradicated from all repositories and documents. |
-| Dealer acquisition fee | **Flat $375** (owner decision 2026-11-06; resolves D-01 — supersedes the $375–$425 range and the earlier $175 figure). |
-| Repair-shop fee | **Flat $275** (owner decision 2026-11-06; supersedes the $250 auction floor). |
+| Dealer acquisition fee | **Flat $375, due upon close of the qualified acquisition** (plan v1.3, D-01 — supersedes the $375–$425 range and the earlier $175 figure; not due merely for receiving a packet or expressing interest). |
+| Repair-shop fee | **Flat $275, due upon the shop's recorded acceptance of the vehicle** (plan v1.3, D-02 — supersedes the $250 auction floor). Acceptance precedes tow dispatch to that shop. |
 | Automatic distribution | On workflow completion, the system automatically distributes the dealer packet dossier, shop repair packet, owner PDF, and insurance-carrier 7-page document to the relevant parties. Versioned, consent-gated, auditable. Live sends remain disabled pending attorney review. |
 | Acceptance & guided navigation | On acceptance by the receiving party (dealer or repair shop), the system provides step-by-step guided navigation (Google Maps or equivalent, behind an adapter) to that party's destination; the tow driver receives guided routing to the accepting shop for vehicle delivery. |
 | Marketplace & auctions | Fully in scope. |
