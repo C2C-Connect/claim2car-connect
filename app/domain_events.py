@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 
 VERSION = '0.1'
-KINDS = frozenset({'SESSION_CREATED', 'CONSENT_RECORDED', 'VEHICLE_RECORDED', 'ARTIFACT_REGISTERED', 'QUALITY_RECORDED', 'MANIFEST_SEALED', 'REVIEW_RECORDED'})
+KINDS = frozenset({'SESSION_CREATED', 'CONSENT_RECORDED', 'VEHICLE_RECORDED', 'ARTIFACT_REGISTERED', 'QUALITY_RECORDED', 'MANIFEST_SEALED', 'REVIEW_RECORDED', 'SESSION_ABORTED'})
 
 def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
