@@ -9,7 +9,12 @@
 
 | Topic | Options | Decision | Date | Notes |
 |-------|---------|----------|------|-------|
-| Owner / vehicle-owner cash incentive | $80 consent payout vs none | **Permanently excluded** | 2026-11-02 | Legal counsel: liability exposure. No residual fields in data model, UI, or reports. |
+| Owner / vehicle-owner cash incentive | Owner cash payout vs none | **Permanently excluded** | 2026-11-02 | Legal counsel: liability exposure. No residual fields in data model, UI, or reports. All references to the historical payout amount eradicated from repositories and documents (2026-11-06). |
+| Dealer acquisition fee | $175 vs $375–$425 range vs flat | **Flat $375** | 2026-11-06 | Owner decision; resolves D-01. Single value in `config/forensic_constants.py` (`DEALER_ACQUISITION_FEE_USD`). |
+| Repair-shop fee | $250 auction floor vs flat | **Flat $275** | 2026-11-06 | Owner decision; supersedes floor-commission model. `SHOP_FEE_USD`. |
+| Operator payout trigger | Seal + acceptance vs acceptance-only vs shop vehicle acceptance | **Shop acceptance of the vehicle** | 2026-11-06 | Resolves D-02. $110 paid when the accepting shop takes the vehicle; tow driver is then routed to deliver it to that shop. |
+| Post-adjudication distribution | Manual vs automatic | **Automatic on workflow completion** | 2026-11-06 | Dealer dossier, shop repair packet, owner PDF, carrier 7-page document go to relevant parties. Consent-gated; live sends pending attorney review. |
+| Acceptance & guided navigation | None vs Google Maps-class | **Guided navigation on acceptance** | 2026-11-06 | Receiving party (dealer/shop) gets step-by-step navigation to destination; tow driver routed to accepting shop. Maps provider behind an adapter. |
 | Capture protocol | 12-point vs 16-point | **16-v1 default**; 12-v1 selectable and versioned | 2026-11-02 | Both recorded on every session. |
 | S_i form | Weighted geometric vs cube-root vs arithmetic | **Geometric form required** (All-or-Nothing Trap) | 2026-11-02 | Prefer C_gps^0.30 × C_hash^0.45 × C_meta^0.25 (or equivalent multiplicative form). |
 | RTV review band | 0.70 < RTV < 1.0 vs 0.70 ≤ RTV < 1.0 | **Inclusive lower bound** 0.70 ≤ RTV < 1.0 | 2026-11-02 | Unless a later more detailed version dictates otherwise. |

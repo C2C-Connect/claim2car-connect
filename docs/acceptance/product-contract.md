@@ -157,8 +157,10 @@ operational pilot cannot quietly inherit that same incomplete status.
 
 ## 5. Settlement and pilot rules retained from the documented pilot brief
 
-- Dealer invoice: $175, on acceptance only. Operator payout: $110, on acceptance only.
-- Pass: $0, not recycled. Owner cash: none. Expire: no charge or payout unless a separately approved business rule explicitly says otherwise.
+- Dealer acquisition fee: **flat $375**, on acceptance only (owner decision 2026-11-06; resolves D-01 — supersedes the prior $375–$425 range and the earlier $175 figure).
+- Repair-shop fee: **flat $275** (owner decision 2026-11-06; supersedes the $250 auction floor).
+- Operator payout: $110, **paid upon the accepting shop's acceptance of the vehicle**; at that point the tow driver is routed to deliver the vehicle to that shop (owner decision 2026-11-06; resolves D-02).
+- Pass: $0, not recycled. Owner cash: none (permanently excluded per legal counsel). Expire: no charge or payout unless a separately approved business rule explicitly says otherwise.
 - Payment-provider credentials and live financial integrations remain disabled until separately approved and validated.
 - No live settlement is activated merely because a screen displays "Accepted."
 
@@ -168,3 +170,48 @@ The product is accepted for a given milestone only when every gate that mileston
 VALIDATED with recorded evidence, the run is traceable to an exact source revision, and the
 acceptance decision is recorded with the named reviewer. Demo-readiness and live-pilot readiness
 are separate decisions with separate evidence requirements.
+
+## 7. Post-adjudication distribution and guided routing (owner decision 2026-11-06)
+
+Status: **Specified.** Not implemented. No live sends or navigation handoffs are
+enabled until attorney review (docs/LEGAL_REVIEW.md) and the acceptance gates
+for the owning milestone are passed.
+
+### 7.1 Automatic multi-party distribution
+
+On workflow completion (adjudication recorded and dossier generated), the
+system automatically distributes the generated artifacts to the relevant
+parties of the incident:
+
+- Dealer packet dossier → the routed dealership (total-loss path).
+- Shop repair packet → the accepting repair shop (repairable path).
+- Owner PDF → the person involved in the accident (owner portal / provided channel).
+- Insurance-carrier 7-page document → the carrier of record.
+
+Requirements:
+
+- Distribution is versioned, consent-gated, and auditable (recipient identity,
+  artifact version, timestamp, channel recorded per send).
+- Recipient authorization is verified server-side before any send; a missing or
+  unauthorized recipient blocks that send rather than falling back to another party.
+- Live external sends remain disabled behind an adapter until attorney review
+  of consent, TCPA/SMS, and privacy obligations for every recipient channel.
+
+### 7.2 Acceptance and guided navigation
+
+When the receiving party (dealership or repair shop) accepts:
+
+- The system provides that party with step-by-step guided navigation
+  (Google Maps or equivalent, behind a maps adapter) to their destination.
+- On shop acceptance of the vehicle, the tow driver is routed to take and
+  drop off the vehicle at that shop, with the same guided-navigation treatment.
+- Operator payout ($110) is triggered by shop acceptance of the vehicle per
+  Section 5; delivery completion is recorded as a separate, auditable event.
+
+Requirements:
+
+- The maps provider sits behind an adapter; no provider is hard-wired into the
+  core workflow.
+- Location/destination sharing with any party is consent-gated and covered by
+  the privacy review; sharing is one-time per acceptance event, not a
+  persistent tracking channel.

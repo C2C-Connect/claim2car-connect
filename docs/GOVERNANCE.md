@@ -29,10 +29,12 @@ Key consequences:
 
 | Item | Rule |
 |------|------|
-| Operator (tow) payout | $110. Triggered when e-signature is verified **and** S_i ≥ 0.65 **and** dealer acceptance occurs. Implemented via internal payout ledger. |
-| Owner / vehicle-owner cash incentive | **Permanently excluded.** No $80 (or any other) owner payout exists in product scope, data model, workflows, UI, reports, or documentation. Legal counsel directed removal for liability reasons. |
-| Dealer acquisition fee | $375–$425 range, pay-on-close. fee_factor is active in scoring. |
-| Shop auction floor | $250. Full two-stage Sovereign Repair Auction is in scope. |
+| Operator (tow) payout | $110. Paid upon the accepting repair shop's acceptance of the vehicle (owner decision 2026-11-06; supersedes the prior dealer-acceptance trigger). At acceptance, the tow driver is routed to deliver the vehicle to that shop with guided navigation. Implemented via internal payout ledger. |
+| Owner / vehicle-owner cash incentive | **Permanently excluded.** No owner payout of any amount exists in product scope, data model, workflows, UI, reports, or documentation. Legal counsel directed removal for liability reasons; the historical dollar figure has been eradicated from all repositories and documents. |
+| Dealer acquisition fee | **Flat $375** (owner decision 2026-11-06; resolves D-01 — supersedes the $375–$425 range and the earlier $175 figure). |
+| Repair-shop fee | **Flat $275** (owner decision 2026-11-06; supersedes the $250 auction floor). |
+| Automatic distribution | On workflow completion, the system automatically distributes the dealer packet dossier, shop repair packet, owner PDF, and insurance-carrier 7-page document to the relevant parties. Versioned, consent-gated, auditable. Live sends remain disabled pending attorney review. |
+| Acceptance & guided navigation | On acceptance by the receiving party (dealer or repair shop), the system provides step-by-step guided navigation (Google Maps or equivalent, behind an adapter) to that party's destination; the tow driver receives guided routing to the accepting shop for vehicle delivery. |
 | Marketplace & auctions | Fully in scope. |
 | Anchoring | Internal append-only ledger is the default. Full public verify flow is required. Chain-anchor adapter interface is maintained for possible later external anchoring. |
 

@@ -18,14 +18,25 @@ it does not implement dealer matching or prove brand-routing correctness.
 
 ## Product constraints retained from the original pilot brief
 
-- Operator payout: $110 on dealer acceptance only; dealer invoice: $175 on acceptance.
-- Pass: $0, not recycled. Owner cash: none. Shop pitch: forbidden by product policy.
+- Operator payout: $110, paid upon the accepting shop's acceptance of the vehicle;
+  the tow driver is then routed to deliver the vehicle to that shop.
+- Dealer acquisition fee: flat $375 on acceptance (owner decision 2026-11-06; supersedes
+  the prior $375–$425 range and the earlier $175 figure). Repair-shop fee: flat $275.
+- Pass: $0, not recycled. Owner cash: none (permanently excluded per legal counsel).
+  Shop pitch: forbidden by product policy.
 - DARCI: explainable triage; never invent speed or sell the lead.
 - Integrity direction: SHA-256 chain, not blockchain. This candidate's manifest
   hashing is not proof that every intended integrity feature is implemented.
 - Ancira Auto Group is the historical pilot buyer reference, not a separate codebase.
-- Excluded: salvage auctions, Polygon, $80 owner incentive, pay-on-close,
+- Excluded: salvage auctions, Polygon, owner cash incentive, pay-on-close,
   Grok vision jury, carrier XML.
+- On workflow completion the system distributes the dealer dossier, shop repair
+  packet, owner PDF, and carrier 7-page document to the relevant parties; on
+  acceptance by the receiving party, the system provides step-by-step guided
+  navigation (Google Maps-class) to the destination, and the tow driver is
+  routed to the accepting shop for vehicle delivery. See
+  docs/acceptance/product-contract.md §7. Live sends remain disabled pending
+  attorney review (docs/LEGAL_REVIEW.md).
 
 ## Full authority migration command
 
