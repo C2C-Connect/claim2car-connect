@@ -25,6 +25,7 @@ from uuid import uuid4
 
 from app.domain_events import DomainEvent
 from app.evidence_manifest import CANONICAL_SLOTS, load_shot_contract
+from app.telemetry import workflow_span
 from app.vin_guard import validate_vin
 from contracts.m1_state_machine import M1SessionMachine
 
@@ -85,11 +86,12 @@ class CaptureWorkflow:
     quality gating, and idempotent sync semantics on top.
     """
 
-    def __init__(self, session_id: str, now: Optional[Callable[[], str]] = None):
+    def __init__(self, session_id: str, now: Optional[Callable[[], str]] = None, outbox=None):
         if not isinstance(session_id, str) or not session_id.strip():
             raise WorkflowError("INVALID_SESSION")
         self.session_id = session_id
         self._now = now or (lambda: datetime.now(timezone.utc).isoformat())
+        self.outbox = outbox  # optional app.outbox.OutboxStore; set via attach_outbox
         self.machine = M1SessionMachine(session_id)
         self.disclosure_version, _ = load_disclosure_contract()
         self._presented_disclosure: Optional[str] = None
@@ -113,7 +115,13 @@ class CaptureWorkflow:
             reason=reason,
             payload_json=json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False),
         )
-        self.machine.apply(event)
+        with workflow_span("capture.emit", kind=kind, session_id=self.session_id):
+            self.machine.apply(event)
+        # Transactional outbox pairing: the message is recorded only after the
+        # state machine accepted the event — a rejected transition never
+        # produces an outbound message.
+        if self.outbox is not None:
+            self.outbox.append_for_event(event)
 
     @property
     def state(self):
@@ -347,16 +355,17 @@ def sync_draft_to_server(workflow: CaptureWorkflow, draft: LocalDraftStore, acto
     if not isinstance(workflow, CaptureWorkflow) or not isinstance(draft, LocalDraftStore):
         raise WorkflowError("INVALID_SYNC_TARGET")
     results = []
-    for entry in draft.pending_sync():
-        outcome = workflow.register_artifact(
-            actor,
-            entry["slot"],
-            entry["artifact_id"],
-            entry["sha256_hex"],
-            entry["byte_length"],
-        )
-        draft.mark_synced(entry["artifact_id"])
-        results.append({"slot": entry["slot"], **outcome})
+    with workflow_span("capture.sync", session_id=workflow.session_id):
+        for entry in draft.pending_sync():
+            outcome = workflow.register_artifact(
+                actor,
+                entry["slot"],
+                entry["artifact_id"],
+                entry["sha256_hex"],
+                entry["byte_length"],
+            )
+            draft.mark_synced(entry["artifact_id"])
+            results.append({"slot": entry["slot"], **outcome})
     return {"synced": results, "pending": draft.pending_sync()}
 
 

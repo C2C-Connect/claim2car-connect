@@ -32,6 +32,7 @@ from app.artifact_storage import (
 from app.capture_workflow import ArtifactEntry, CaptureWorkflow, WorkflowError
 from app.domain_events import DomainEvent
 from app.evidence_manifest import Manifest, ManifestEntry, build_manifest
+from app.telemetry import workflow_span
 from contracts.m1_state_machine import M1SessionMachine
 
 REVIEW_DISPOSITIONS = frozenset({"NOTE_ONLY", "HUMAN_QC_REQUIRED"})
@@ -100,7 +101,8 @@ class SealService:
                 allow_nan=False,
             ),
         )
-        workflow.machine.apply(event)
+        with workflow_span("evidence.seal", session_id=workflow.session_id, manifest_digest=manifest.digest()):
+            workflow.machine.apply(event)
         return SealRecord(
             session_id=workflow.session_id,
             manifest_digest=manifest.digest(),
@@ -278,7 +280,8 @@ class ReviewerQueue:
                 allow_nan=False,
             ),
         )
-        workflow.machine.apply(event)
+        with workflow_span("review.decision", session_id=workflow.session_id, disposition=disposition, actor=actor):
+            workflow.machine.apply(event)
         record = ReviewDecisionRecord(
             session_id=workflow.session_id,
             disposition=disposition,
