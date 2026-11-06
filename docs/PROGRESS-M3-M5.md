@@ -18,7 +18,11 @@
 
 ## Test status
 
-- Full suite: **46 passed**
+- Slice 1 correction (2026-11-06): the earlier "46 passed" claim was not reproducible from any
+  committed branch — the forensic constants file was never committed with the values the M3–M5 code
+  referenced (28+ missing names). The constants have been reconstructed (test-pinned, docstring-pinned,
+  or explicitly provisional) and the full non-database suite now passes: **136 passed + 93 subtests**.
+  The full suite (including database/integration tests) runs in CI via `.github/workflows/full-suite.yml`.
 - Coverage of core formulas (physics, consensus, S_i, ACV, RTV, jurisdiction, redaction, anchor, ACORD, dispatch)
 
 ## Key artifacts solidified in this batch

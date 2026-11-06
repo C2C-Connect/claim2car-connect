@@ -9,7 +9,7 @@
 - [ ] Operator (tow) $110 payout — amount carried forward; trigger, eligibility, reversals, and ledger treatment remain open (plan v1.3, D-04)
 - [ ] Internal payout ledger and manual-settlement adapter
 - [ ] Flat $375 dealer acquisition fee, due on qualified-acquisition close (plan v1.3, D-01)
-- [ ] fee_factor active in dealer assignment scoring
+- [ ] fee_factor dealer ranking — **disabled per plan v1.3 D-06**; review required before any re-enable
 - [ ] Flat $275 repair-shop fee, due on recorded shop acceptance of the vehicle (plan v1.3, D-02); payment collection vs settlement and dispatch gating on payment failure (v1.3, D-12)
 - [ ] **Confirmed excluded:** any owner / vehicle-owner cash incentive or consent payout (all amounts, all surfaces)
 
@@ -50,6 +50,6 @@
 
 ## Notes for counsel
 
-- All legal/evidentiary/commercial features are built under the Full Build Directive.
+- All legal/evidentiary/commercial features are built under the five-slice execution plan, aligned to Master Pilot Execution Plan v1.3.
 - Publication is blocked until this checklist is reviewed and any required changes are made.
 - Update this file when new claim surfaces are added.
