@@ -2,8 +2,8 @@
 
 The PgRoutingEngine implements the same RoutingEngine interface as the
 in-memory engine, executing pgr_dijkstra, pgr_ksp, and pgr_drivingDistance
-against the dispatch.network_* tables installed by migration
-0009_dispatch_routing.sql. Parity with the in-memory engine is enforced by
+against the dispatch.network_* tables installed by the routing migration
+stream (routing_migrations/). Parity with the in-memory engine is enforced by
 tests in CI: same network, same queries, same answers.
 
 Credentials and network are synthetic-only in every environment this module

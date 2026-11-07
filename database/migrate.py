@@ -8,7 +8,7 @@ import argparse
 import os
 from pathlib import Path
 import psycopg
-from database.migration_plan import discover, discover_authority, pending
+from database.migration_plan import discover, discover_authority, discover_routing, pending
 
 LOCK_KEY = 734190281632
 LEDGER_DDL = """
@@ -39,21 +39,29 @@ def apply(conn, candidate):
                          (migration.name, migration.sha256))
     return tuple(item.name for item in plan)
 
-def run_migrations(legacy_baseline=False):
+def run_migrations(legacy_baseline=False, routing=False):
     root = Path(__file__).resolve().parents[1]
     if legacy_baseline:
         if os.environ.get('FAOS_LEGACY_BASELINE_ALLOWED') != '1':
             raise ValueError('EXPLICIT_LEGACY_TEST_BASELINE_REQUIRED')
         candidate = discover(root/'migrations')
+    elif routing:
+        # Separate migration stream for the routing database (dispatch schema).
+        # The main authority plan must not gain routing DDL, and the routing
+        # database must not adopt the main schema.
+        candidate = discover_routing(root)
     else:
         candidate = discover_authority(root)
-    url = os.environ['MIGRATION_DATABASE_URL']
+    url = os.environ.get('ROUTING_MIGRATION_DATABASE_URL' if routing else 'MIGRATION_DATABASE_URL')
+    if not url:
+        raise ValueError('MIGRATION_DATABASE_URL_REQUIRED')
     with psycopg.connect(url, autocommit=True, connect_timeout=5) as conn:
         return apply(conn, candidate)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--legacy-baseline',action='store_true',help='Disposable pre-cutover comparison tests only; requires FAOS_LEGACY_BASELINE_ALLOWED=1')
+    parser.add_argument('--routing',action='store_true',help='Apply the routing-migration stream to ROUTING_MIGRATION_DATABASE_URL (dispatch schema only)')
     args = parser.parse_args()
-    for name in run_migrations(legacy_baseline=args.legacy_baseline):
+    for name in run_migrations(legacy_baseline=args.legacy_baseline, routing=args.routing):
         print('Applied migration: ' + name)

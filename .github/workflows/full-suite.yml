@@ -47,9 +47,7 @@ jobs:
       - name: Apply migrations
         run: python -m database.migrate
       - name: Apply routing migrations
-        run: python -m database.migrate
-        env:
-          MIGRATION_DATABASE_URL: postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55433/claim2car_routing_test
+        run: python -m database.migrate --routing
       - name: Run full pytest suite
         run: |
           mkdir -p output/full-suite
