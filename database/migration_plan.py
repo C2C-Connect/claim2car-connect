@@ -38,6 +38,15 @@ def discover_authority(root=None):
         raise ValueError('DUPLICATE_MIGRATION_VERSION')
     return plan
 
+def discover_routing(root=None):
+    """Routing-database migration stream: dispatch schema only, own ledger.
+
+    Separate from the authority plan so the main database never receives
+    routing DDL and the routing database never adopts the main schema.
+    """
+    root = Path(root) if root is not None else Path(__file__).resolve().parents[1]
+    return discover(root/'routing_migrations')
+
 def pending(candidate, history):
     history = tuple(history)
     if len(history) > len(candidate):

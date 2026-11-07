@@ -40,6 +40,12 @@ it does not implement dealer matching or prove brand-routing correctness.
   routed to the accepting shop for vehicle delivery. See
   docs/acceptance/product-contract.md §7. Live sends remain disabled pending
   attorney review (docs/LEGAL_REVIEW.md).
+- Slice 7 lands candidate mechanics for the §7 flow: acceptance-gated tow dispatch
+  routing (in-memory reference engine + pgRouting parity on a synthetic network
+  only), navigation handoff deep links (provider-selectable), and a CIECA-aligned
+  carrier message model (`carrier-message-v1`, docs/carrier-integration.md). The
+  "carrier XML" exclusion refers to the legacy enterprise-XML approach; the new
+  model is CIECA-aligned in category structure, not a compliance claim.
 
 ## Full authority migration command
 

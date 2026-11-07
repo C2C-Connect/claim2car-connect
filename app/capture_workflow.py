@@ -123,6 +123,14 @@ class CaptureWorkflow:
         if self.outbox is not None:
             self.outbox.append_for_event(event)
 
+    def mirror_outbox(self, event) -> None:
+        """Mirror an externally applied event (seal, review) into the outbox.
+
+        Any code path that applies a DomainEvent to this workflow's machine
+        must call this, keeping the transactional pairing complete."""
+        if self.outbox is not None:
+            self.outbox.append_for_event(event)
+
     @property
     def state(self):
         return self.machine.state

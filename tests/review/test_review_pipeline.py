@@ -274,6 +274,9 @@ def test_controlled_demo_end_to_end(tmp_path):
         "seal": "sealed",
         "reviewer_decision": "reviewed",
         "history_replay": "replayed",
+        "tow_dispatch": "planned",
+        "carrier_messages": "formatted",
+        "outbox_relay": "drained",
     }
     # Retained evidence record exists and is self-describing.
     evidence = Path(record["evidence_path"])
@@ -289,6 +292,16 @@ def test_controlled_demo_end_to_end(tmp_path):
     # Originals retained in durable storage for inspection.
     originals_dir = tmp_path / "demo" / "originals"
     assert sum(1 for _ in originals_dir.rglob("*.original")) == len(CANONICAL_SLOTS)
+    # Dispatch plan + carrier messages present, acceptance precedes dispatch.
+    plan = loaded["dispatch_plan"]
+    assert plan["acceptance"]["party_type"] == "shop" and plan["acceptance"]["party_id"] == "synthetic-shop-001"
+    assert plan["leg_to_incident"][0] != plan["leg_to_receiving_party"][-1]
+    assert len(plan["navigation_handoffs"]) == 2
+    assert all(h["uri"].startswith("https://www.google.com/maps/dir/") for h in plan["navigation_handoffs"])
+    message_types = [m["message_type"] for m in loaded["carrier_messages"]]
+    assert "ATTACHMENT" in message_types and "DISPOSITION" in message_types and "ASSIGNMENT" in message_types
+    disposition = next(m for m in loaded["carrier_messages"] if m["message_type"] == "DISPOSITION")
+    assert disposition["payload"]["actor"] == "synthetic-reviewer-01"
 
 
 def test_demo_evidence_contains_no_payment_or_incentive_language(tmp_path):
