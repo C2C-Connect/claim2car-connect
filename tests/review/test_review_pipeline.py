@@ -267,12 +267,14 @@ def test_controlled_demo_end_to_end(tmp_path):
         "consent": "recorded",
         "vin_guard": "recorded",
         "capture_sync": "resumable-sync-complete",
+        "quality_gate": "evaluated",
         "quality": "passed",
         "durable_storage": "originals-stored",
         "server_hash_recomputation": "verified",
         "tamper_rejected": "rejected",
         "seal": "sealed",
         "reviewer_decision": "reviewed",
+        "reviewer_dataset": "labeled",
         "history_replay": "replayed",
         "tow_dispatch": "planned",
         "carrier_messages": "formatted",
@@ -302,6 +304,16 @@ def test_controlled_demo_end_to_end(tmp_path):
     assert "ATTACHMENT" in message_types and "DISPOSITION" in message_types and "ASSIGNMENT" in message_types
     disposition = next(m for m in loaded["carrier_messages"] if m["message_type"] == "DISPOSITION")
     assert disposition["payload"]["actor"] == "synthetic-reviewer-01"
+    # Quality gate ran before record_quality and the dataset row is labeled.
+    gate_steps = [s for s in record["steps"] if s["step"] == "quality_gate"]
+    assert gate_steps and gate_steps[0]["detail"]["gate_version"].startswith("quality-gate-v1")
+    assert "blur" in gate_steps[0]["detail"]["checks"]
+    dataset_path = tmp_path / "demo" / "reviewer-dataset.json"
+    assert dataset_path.is_file()
+    dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+    assert dataset["row_count"] == 1 and dataset["rows"][0]["disposition"] == "NOTE_ONLY"
+    assert len(dataset["rows"][0]["slots"]) == len(CANONICAL_SLOTS)
+    assert dataset["rows"][0]["vehicle_reference"] == "1HGCM82633A004352"
 
 
 def test_demo_evidence_contains_no_payment_or_incentive_language(tmp_path):
