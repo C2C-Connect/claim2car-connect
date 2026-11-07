@@ -22,6 +22,8 @@ jobs:
     env:
       APP_DATABASE_URL: postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test
       MIGRATION_DATABASE_URL: postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55432/claim2car_test
+      ROUTING_DATABASE_URL: postgresql://faos_app:synthetic-app-only@127.0.0.1:55433/claim2car_routing_test
+      ROUTING_MIGRATION_DATABASE_URL: postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55433/claim2car_routing_test
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,8 +40,16 @@ jobs:
           docker cp database/bootstrap.sql full-suite-run-database-1:/tmp/bootstrap.sql
           docker exec full-suite-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -f /tmp/bootstrap.sql
           docker exec full-suite-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only'; ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
+      - name: Bootstrap routing database (pgRouting extension + restricted roles)
+        run: |
+          docker exec full-suite-run-routing-1 psql -U postgres -d claim2car_routing_test -v ON_ERROR_STOP=1 -c "CREATE ROLE faos_migrator LOGIN; CREATE ROLE faos_app LOGIN; CREATE ROLE faos_fixture LOGIN; CREATE ROLE faos_writer NOLOGIN; CREATE EXTENSION IF NOT EXISTS pgrouting; GRANT CONNECT ON DATABASE claim2car_routing_test TO faos_migrator, faos_app, faos_fixture; GRANT USAGE, CREATE ON SCHEMA public TO faos_migrator; GRANT faos_writer TO faos_migrator;"
+          docker exec full-suite-run-routing-1 psql -U postgres -d claim2car_routing_test -v ON_ERROR_STOP=1 -c "ALTER ROLE faos_migrator PASSWORD 'synthetic-migrator-only'; ALTER ROLE faos_app PASSWORD 'synthetic-app-only';"
       - name: Apply migrations
         run: python -m database.migrate
+      - name: Apply routing migrations
+        run: python -m database.migrate
+        env:
+          MIGRATION_DATABASE_URL: postgresql://faos_migrator:synthetic-migrator-only@127.0.0.1:55433/claim2car_routing_test
       - name: Run full pytest suite
         run: |
           mkdir -p output/full-suite

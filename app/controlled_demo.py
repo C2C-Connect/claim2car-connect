@@ -23,6 +23,8 @@ from uuid import UUID, uuid4
 
 from app.artifact_storage import ArtifactKey, OriginalByteStore
 from app.capture_workflow import CaptureWorkflow, LocalDraftStore, sync_draft_to_server
+from app.carrier_messages import ATTACHMENT, ASSIGNMENT, DISPOSITION, build_attachment, build_assignment, build_disposition
+from app.dispatch_routing import AcceptanceRecord, DispatchRoutingService, InMemoryRoutingEngine, load_road_network
 from app.evidence_manifest import CANONICAL_SLOTS
 from app.review_pipeline import (
     IntegrityReport,
@@ -65,8 +67,14 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
         record["steps"].append(entry)
         return entry
 
+    # 0. Transactional outbox attached: every applied event mirrors a message.
+    from app.outbox import OutboxRelay, OutboxStore
+
+    outbox = OutboxStore()
+    carrier_messages = []
+
     # 1. Session, disclosure gate, explicit consent, VIN guard.
-    workflow = CaptureWorkflow(session_id, now=now)
+    workflow = CaptureWorkflow(session_id, now=now, outbox=outbox)
     workflow.present_disclosure("disclosure-v1")
     workflow.record_consent("synthetic-driver", True, "disclosure-v1")
     step("consent", "recorded", "disclosure-v1 presented, explicit acceptance")
@@ -161,10 +169,85 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     assert replayed.state == "reviewed"
     step("history_replay", "replayed", {"events": len(workflow.history), "final_state": replayed.state})
 
+    # 10. Acceptance-gated tow dispatch + navigation handoff (product contract
+    # §7: acceptance precedes tow dispatch — enforced by DispatchRoutingService).
+    network = load_road_network()
+    acceptance = AcceptanceRecord(
+        party_type="shop",
+        party_id="synthetic-shop-001",
+        accepted_at=fixed_now,
+        location_label="shop-a",
+    )
+    dispatch_service = DispatchRoutingService(InMemoryRoutingEngine())
+    plan = dispatch_service.plan(network, acceptance, "operator-depot", "incident-scene", "google")
+    step(
+        "tow_dispatch",
+        "planned",
+        {
+            "acceptance_party": "synthetic-shop-001",
+            "leg_1_minutes": plan.leg_to_incident.total_cost_minutes,
+            "leg_2_minutes": plan.leg_to_receiving_party.total_cost_minutes,
+            "total_minutes": plan.total_cost_minutes,
+            "navigation_handoffs": [h.uri for h in plan.handoffs],
+        },
+    )
+
+    # 11. Carrier messages (CIECA-aligned model, D-11 candidate spec).
+    attachment_message = build_attachment(workflow, seal, created_at=fixed_now)
+    disposition_message = build_disposition(workflow, decision, created_at=fixed_now)
+    assignment_message = build_assignment(workflow, plan, created_at=fixed_now)
+    carrier_messages.extend([attachment_message, disposition_message, assignment_message])
+    step(
+        "carrier_messages",
+        "formatted",
+        {
+            "attachment_digest": attachment_message.payload["manifest_digest"],
+            "disposition": disposition_message.payload["disposition"],
+            "assignment_party": assignment_message.payload["party_type"],
+        },
+    )
+
+    # 12. Outbox relay: internal carrier formatter consumer delivers
+    # exactly-once per consumer; messages formatted, nothing sent live.
+    relay = OutboxRelay(outbox)
+    delivered_kinds = []
+
+    def carrier_formatter(message):
+        delivered_kinds.append(message.kind)
+        if message.kind == "MANIFEST_SEALED":
+            carrier_messages.append(build_attachment(workflow, seal, created_at=fixed_now))
+        elif message.kind == "REVIEW_RECORDED":
+            carrier_messages.append(build_disposition(workflow, decision, created_at=fixed_now))
+
+    relay.register_consumer("MANIFEST_SEALED", carrier_formatter)
+    relay.register_consumer("REVIEW_RECORDED", carrier_formatter)
+    drain = relay.drain()
+    assert set(delivered_kinds) >= {"MANIFEST_SEALED", "REVIEW_RECORDED"}
+    undelivered = len(outbox.pending())
+    step(
+        "outbox_relay",
+        "drained",
+        {
+            "delivered_count": len(drain.delivered),
+            "pending_without_consumer": undelivered,  # events with no consumer stay pending, never lost
+        },
+    )
+
     record["final_state"] = workflow.state
     record["manifest_digest"] = seal.manifest_digest
     record["shot_list_version"] = seal.shot_list_version
     record["reviewer_decision"] = asdict(decision)
+    record["dispatch_plan"] = {
+        "acceptance": asdict(plan.acceptance),
+        "leg_to_incident": list(plan.leg_to_incident.node_path),
+        "leg_to_receiving_party": list(plan.leg_to_receiving_party.node_path),
+        "total_cost_minutes": plan.total_cost_minutes,
+        "navigation_handoffs": [{"provider": h.provider, "uri": h.uri} for h in plan.handoffs],
+    }
+    record["carrier_messages"] = [
+        {"message_type": m.message_type, "message_id": m.message_id, "payload": m.payload}
+        for m in carrier_messages
+    ]
     record["integrity"] = {
         "verified_artifact_ids": list(clean_report.verified_artifact_ids),
         "rejections": [asdict(r) for r in clean_report.rejections],

@@ -103,6 +103,7 @@ class SealService:
         )
         with workflow_span("evidence.seal", session_id=workflow.session_id, manifest_digest=manifest.digest()):
             workflow.machine.apply(event)
+            workflow.mirror_outbox(event)
         return SealRecord(
             session_id=workflow.session_id,
             manifest_digest=manifest.digest(),
@@ -282,6 +283,7 @@ class ReviewerQueue:
         )
         with workflow_span("review.decision", session_id=workflow.session_id, disposition=disposition, actor=actor):
             workflow.machine.apply(event)
+            workflow.mirror_outbox(event)
         record = ReviewDecisionRecord(
             session_id=workflow.session_id,
             disposition=disposition,
