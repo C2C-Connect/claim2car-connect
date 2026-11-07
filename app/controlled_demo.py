@@ -101,9 +101,30 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     assert len(sync["synced"]) == len(CANONICAL_SLOTS), "all slots must sync"
     step("capture_sync", "resumable-sync-complete", {"slots": len(CANONICAL_SLOTS), "revision": draft.revision()})
 
-    # 3. Quality verification on the full capture set.
-    workflow.record_quality("synthetic-driver", {s: True for s in CANONICAL_SLOTS})
-    step("quality", "passed", "all slots passed synthetic quality fixture")
+    # 3. Pre-inference quality gate (Slice 8 InputGuard pattern) + recorded verdicts.
+    from app.quality_gate import HeuristicQualityGate
+
+    def synthetic_pixels(slot: str, size: int = 24) -> list[list[int]]:
+        """Deterministic synthetic grayscale fixture per slot. Not a photograph."""
+        seed = sum(slot.encode("utf-8")) % 97
+        return [[((x * 31 + y * 17 + seed) % 200) + 20 for x in range(size)] for y in range(size)]
+
+    gate = HeuristicQualityGate()
+    gate_verdicts = gate.evaluate_all(
+        {s: (f"demo-{s}", synthetic_pixels(s)) for s in CANONICAL_SLOTS}
+    )
+    assert all(v.passed for v in gate_verdicts), "synthetic fixtures must pass the reference gate"
+    step("quality_gate", "evaluated", {
+        "gate_version": gate.gate_version,
+        "checks": sorted({c.name for v in gate_verdicts for c in v.checks}),
+        "verdicts": HeuristicQualityGate.passed_verdicts(gate_verdicts),
+    })
+    workflow.record_quality(
+        "synthetic-driver",
+        HeuristicQualityGate.passed_verdicts(gate_verdicts),
+        gate=HeuristicQualityGate.gate_metadata(gate_verdicts),
+    )
+    step("quality", "passed", "all slots passed the on-device quality gate (recorded with gate metadata)")
 
     # 4. Durable original-byte storage (administrator-controlled local root).
     store_root = (output_dir / "originals").resolve()
@@ -161,6 +182,22 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     )
     assert workflow.state == "reviewed"
     step("reviewer_decision", "reviewed", {"disposition": decision.disposition, "actor": decision.actor, "occurred_at": decision.occurred_at})
+
+    # 8b. Reviewer-decision dataset row (Slice 8: labeled data from the
+    # attributed decision — the seed of the self-learning loop).
+    from app.reviewer_dataset import ReviewerDataset, ReviewerDatasetBuilder
+
+    dataset_row = ReviewerDatasetBuilder(decision).build(workflow, seal)
+    dataset = ReviewerDataset([dataset_row])
+    (output_dir / "reviewer-dataset.json").write_text(
+        json.dumps(dataset.export(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    step("reviewer_dataset", "labeled", {
+        "dataset_version": dataset_row.schema_version,
+        "row_count": len(dataset),
+        "slots": len(dataset_row.slots),
+        "vehicle_reference": dataset_row.vehicle_reference,
+    })
 
     # 9. Full event-history replay through the frozen m1-v1 machine.
     from app.review_pipeline import replay_session

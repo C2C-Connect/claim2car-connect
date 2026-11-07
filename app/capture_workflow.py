@@ -253,7 +253,7 @@ class CaptureWorkflow:
 
     # --- quality -----------------------------------------------------------
 
-    def record_quality(self, actor: str, verdicts: dict) -> dict:
+    def record_quality(self, actor: str, verdicts: dict, gate: dict | None = None) -> dict:
         if not isinstance(actor, str) or not actor.strip():
             raise WorkflowError("INVALID_ACTOR")
         if self.pending_slots():
@@ -262,15 +262,21 @@ class CaptureWorkflow:
             raise WorkflowError("QUALITY_VERDICTS_INCOMPLETE", "one verdict per required slot")
         if not all(v is True or v is False for v in verdicts.values()):
             raise WorkflowError("INVALID_QUALITY_VERDICT")
+        if gate is not None and (type(gate) is not dict or not isinstance(gate.get("gate_version"), str)
+                                 or not gate["gate_version"].strip()):
+            raise WorkflowError("INVALID_GATE_METADATA")
         failed = sorted(s for s, v in verdicts.items() if v is not True)
         if failed:
             raise WorkflowError("QUALITY_GATE_FAILED", ",".join(failed))
         self._require_state("evidence_captured")
+        payload = {"verdicts": {s: True for s in REQUIRED_SLOTS}, "failed_slots": []}
+        if gate is not None:
+            payload["gate"] = gate
         self._emit(
             "QUALITY_RECORDED",
             actor,
             "all slots passed quality verification",
-            {"verdicts": {s: True for s in REQUIRED_SLOTS}, "failed_slots": []},
+            payload,
         )
         return {"passed": True, "state": self.state}
 

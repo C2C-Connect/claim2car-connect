@@ -1,0 +1,18 @@
+{
+  "schema_version": "0.1",
+  "dataset_version": "reviewer-decision-dataset-v1",
+  "purpose": "Attributed reviewer decisions become labeled data: the seed of the self-learning loop (recalibration brief Tier 2 item 7) and the labeled baseline any future model (CV damage localization, triage) must beat before adoption.",
+  "row_required": ["session_id", "manifest_digest", "shot_list_version", "vehicle_reference", "disposition", "actor", "occurred_at", "reason", "event_id", "sequence", "slots", "schema_version"],
+  "slot_label_required": ["slot", "artifact_id", "sha256_hex", "quality_passed", "gate_version"],
+  "rules": [
+    "Rows are built only from terminal reviewed sessions with an attributed human decision.",
+    "One row per session; rows are immutable once appended.",
+    "Compensation or incentive language is structurally refused in all text fields.",
+    "Slot labels bind the reviewer disposition to artifact digests and the quality-gate verdict that admitted them.",
+    "Exporting real-tenant data for training is counsel-gated; this contract only defines row shape and validation."
+  ],
+  "gate_versions": [
+    "quality-gate-v1 (heuristic reference)",
+    "quality-gate-v1+onnx (device runtime; parity-tested before use)"
+  ]
+}
