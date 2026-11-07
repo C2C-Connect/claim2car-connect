@@ -226,6 +226,46 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
         "monitor_version": drift_report["monitor_version"],
     })
 
+    # 8d. CV damage localization as a physics-engine input producer (Slice 10):
+    # baseline detector + reviewer-labeled annotation + benchmark evaluation.
+    # The adoption gate refuses any candidate that does not strictly beat the
+    # baseline on the labeled set — nothing is adopted here.
+    from app.damage_localization import (
+        DamageAnnotation,
+        DamageLocalizationBenchmark,
+        DamageRegion,
+        HeuristicDamageDetector,
+        PhysicsInputAdapter,
+    )
+
+    damage_grid = [[90] * 36 for _ in range(36)]
+    for y in range(12, 20):
+        for x in range(15, 22):
+            damage_grid[y][x] = 230  # synthetic high-contrast damage patch
+    detector = HeuristicDamageDetector()
+    predicted = detector.detect("front_left", damage_grid)
+    annotation = DamageAnnotation(
+        session_id=session_id, slot="front_left",
+        region=DamageRegion("front_left", 0.32, 0.32, 0.52, 0.52, "dent", 1.0),
+        annotated_by="synthetic-reviewer-01",
+    )
+    benchmark = DamageLocalizationBenchmark()
+    localization_report = benchmark.evaluate(predicted, [annotation])
+    adoption = benchmark.adoption_gate(localization_report, localization_report)
+    geometry = PhysicsInputAdapter().to_impact_geometry(predicted[0])
+    step("damage_localization", "measured", {
+        "baseline_detector": detector.model_version,
+        "labeled_samples": localization_report.labeled_samples,
+        "matched": localization_report.matched,
+        "mean_iou": localization_report.mean_iou,
+        "adoption_gate": "refused-no-strict-improvement" if not adoption.adopt else "adopted",
+        "physics_input": {
+            "zone": geometry.zone,
+            "severity_tier": geometry.severity_tier,
+            "area_fraction": geometry.area_fraction,
+        },
+    })
+
     # 9. Full event-history replay through the frozen m1-v1 machine.
     from app.review_pipeline import replay_session
 
