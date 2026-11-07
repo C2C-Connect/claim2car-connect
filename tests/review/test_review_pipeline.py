@@ -273,8 +273,10 @@ def test_controlled_demo_end_to_end(tmp_path):
         "server_hash_recomputation": "verified",
         "tamper_rejected": "rejected",
         "seal": "sealed",
+        "review_triage": "routed",
         "reviewer_decision": "reviewed",
         "reviewer_dataset": "labeled",
+        "drift_monitor": "measured",
         "history_replay": "replayed",
         "tow_dispatch": "planned",
         "carrier_messages": "formatted",
@@ -314,6 +316,14 @@ def test_controlled_demo_end_to_end(tmp_path):
     assert dataset["row_count"] == 1 and dataset["rows"][0]["disposition"] == "NOTE_ONLY"
     assert len(dataset["rows"][0]["slots"]) == len(CANONICAL_SLOTS)
     assert dataset["rows"][0]["vehicle_reference"] == "1HGCM82633A004352"
+    # Triage ordered the human queue; drift monitor measured gate-vs-reviewer agreement.
+    triage_steps = [s for s in record["steps"] if s["step"] == "review_triage"]
+    assert triage_steps and triage_steps[0]["detail"]["band"] in ("priority-review", "standard-review")
+    assert 0.0 <= triage_steps[0]["detail"]["confidence"] <= 1.0
+    drift_steps = [s for s in record["steps"] if s["step"] == "drift_monitor"]
+    assert drift_steps and drift_steps[0]["detail"]["observations"] == 1
+    assert drift_steps[0]["detail"]["baseline_agreement"] == 1.0
+    assert drift_steps[0]["detail"]["drift_flagged"] is False
 
 
 def test_demo_evidence_contains_no_payment_or_incentive_language(tmp_path):

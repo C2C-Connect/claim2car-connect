@@ -172,6 +172,20 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     # 8. Reviewer queue + attributed decision.
     queue = ReviewerQueue(now=now)
     queued = queue.enqueue(workflow, seal, clean_report, "synthetic-enqueue-actor")
+
+    # 8a. Confidence triage (Slice 9): the recorded gate margins order the
+    # human review queue. Ordering only — every session stays human-reviewed.
+    from app.learning_loop import DriftMonitor, SessionConfidenceScorer, TriagePolicy
+
+    triage = SessionConfidenceScorer().score_workflow(workflow)
+    queue_band = TriagePolicy().route(triage)
+    step("review_triage", "routed", {
+        "confidence": triage.confidence,
+        "band": queue_band,
+        "weakest_slot": triage.weakest_slot,
+        "weakest_check": triage.weakest_check,
+        "policy_version": triage.policy_version,
+    })
     decision = queue.record_decision(
         workflow,
         "NOTE_ONLY",
@@ -197,6 +211,19 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
         "row_count": len(dataset),
         "slots": len(dataset_row.slots),
         "vehicle_reference": dataset_row.vehicle_reference,
+    })
+
+    # 8c. Drift monitoring (Slice 9): the quality gate is the predictor, the
+    # reviewer disposition the outcome. The monitor measures agreement and
+    # flags drift for humans; it never adjusts anything itself.
+    drift = DriftMonitor()
+    drift.observe(True, decision.disposition == "NOTE_ONLY")
+    drift_report = drift.report()
+    step("drift_monitor", "measured", {
+        "observations": drift_report["observations"],
+        "baseline_agreement": drift_report["baseline_agreement"],
+        "drift_flagged": drift_report["drift_flagged"],
+        "monitor_version": drift_report["monitor_version"],
     })
 
     # 9. Full event-history replay through the frozen m1-v1 machine.
