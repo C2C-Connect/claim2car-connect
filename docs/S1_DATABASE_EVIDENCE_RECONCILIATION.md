@@ -67,7 +67,7 @@ These are synthetic CI database results. They are not live production database e
 1. The historical October failure record remains preserved as a failed run.
 2. The specific tenant-switch, unbound-login, malformed-timestamp, and compact-whitespace bypass cases have current migration/diagnostic coverage and passed the database-authority CI workflow on the reviewed revision.
 3. Full timestamp parser parity and full canonical JSON parity remain explicitly incomplete.
-4. The current diagnostics are not the complete 14-gate database acceptance contract; the diagnostic scripts themselves state that they award zero full-gate passes.
+4. The current diagnostics are not the complete 14-gate database acceptance contract. `database_acceptance_diagnostics.py` explicitly awards zero gate passes; `database_authority_diagnostics.py` describes itself as not full 14-gate acceptance.
 5. Live provider database roles, cloud ingress, production RLS behavior, recovery/restore, and independent security review have not been validated here.
 
 **Status:** The three historical failure classes have bounded current-main remediation and successful synthetic CI verification. Full database acceptance remains **NOT ACCEPTED** until the complete contract and all release gates are independently satisfied.
