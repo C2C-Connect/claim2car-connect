@@ -71,42 +71,44 @@ class PgRoutingEngine(RoutingEngine):
             raise RoutingError("INVALID_K")
         if origin == destination:
             raise RoutingError("SAME_ORIGIN_DESTINATION")
-        # Directed edges SQL: one row per direction; reverse cost None -> one-way.
+        # pgRouting accepts one physical edge row with forward and reverse
+        # costs. A negative reverse cost marks a one-way edge; keeping one
+        # unique id per physical edge avoids duplicate-id ambiguity.
         edges_sql = (
-            "SELECT edge_id AS id, source, target, cost_minutes AS cost FROM dispatch.network_edges "
-            "UNION ALL "
-            "SELECT edge_id, target, source, reverse_cost_minutes FROM dispatch.network_edges "
-            "WHERE reverse_cost_minutes IS NOT NULL"
+            "SELECT edge_id AS id, source, target, cost_minutes AS cost, "
+            "COALESCE(reverse_cost_minutes, -1) AS reverse_cost "
+            "FROM dispatch.network_edges"
         )
         if k == 1:
             rows = self.conn.execute(
-                "SELECT * FROM pgr_dijkstra(%s, %s, %s, directed := true)",
+                "SELECT path_seq, node, edge, agg_cost FROM pgr_dijkstra(%s, %s, %s, directed := true)",
                 (edges_sql, origin, destination),
             ).fetchall()
             if not rows:
                 raise RoutingError("NO_ROUTE", f"{origin}->{destination}")
-            # pgr_dijkstra (single pair): seq, path_seq, node, edge, cost, agg_cost
-            rows = sorted(rows, key=lambda r: r[1])  # by path_seq
-            node_path = [r[2] for r in rows]
-            edge_ids = tuple(r[3] for r in rows if r[3] != -1)
-            total = float(rows[-1][5])
+            # Select stable named columns: pgRouting adds start/end vertex
+            # columns in newer releases, so positional indexing is unsafe.
+            rows = sorted(rows, key=lambda r: r[0])  # by path_seq
+            node_path = [r[1] for r in rows]
+            edge_ids = tuple(r[2] for r in rows if r[2] != -1)
+            total = float(rows[-1][3])
             return (Route(origin, destination, tuple(node_path), edge_ids, total),)
         rows = self.conn.execute(
-            "SELECT * FROM pgr_ksp(%s, %s, %s, %s, directed := true)",
+            "SELECT path_id, path_seq, node, edge, agg_cost FROM pgr_ksp(%s, %s, %s, %s, directed := true)",
             (edges_sql, origin, destination, k),
         ).fetchall()
         if not rows:
             raise RoutingError("NO_ROUTE", f"{origin}->{destination}")
-        # pgr_ksp: seq, path_id, path_seq, node, edge, cost, agg_cost
+        # Select stable named columns across pgRouting 3.4+ result schemas.
         by_path: dict[int, list] = {}
         for r in rows:
-            by_path.setdefault(r[1], []).append(r)
+            by_path.setdefault(r[0], []).append(r)
         routes = []
         for path_id in sorted(by_path):
-            seq = sorted(by_path[path_id], key=lambda r: r[2])
-            node_path = [r[3] for r in seq]
-            edge_ids = tuple(r[4] for r in seq if r[4] != -1)
-            total = float(seq[-1][6])
+            seq = sorted(by_path[path_id], key=lambda r: r[1])
+            node_path = [r[2] for r in seq]
+            edge_ids = tuple(r[3] for r in seq if r[3] != -1)
+            total = float(seq[-1][4])
             routes.append(Route(origin, destination, tuple(node_path), edge_ids, total))
         return tuple(routes[:k])
 
@@ -125,8 +127,9 @@ class PgRoutingEngine(RoutingEngine):
             "SELECT * FROM pgr_drivingDistance(%s, %s, %s, directed := true)",
             (edges_sql, origin, float(max_minutes)),
         ).fetchall()
-        # pgr_drivingDistance: seq, node, edge, cost, agg_cost
-        costs = {int(r[1]): float(r[4]) for r in rows}
+        # Named columns work across pgRouting releases that add depth,
+        # start_vid, and predecessor fields to the result.
+        costs = {int(r[0]): float(r[1]) for r in rows}
         reachable = tuple(sorted(costs))
         return Reachability(origin, reachable, costs)
 
