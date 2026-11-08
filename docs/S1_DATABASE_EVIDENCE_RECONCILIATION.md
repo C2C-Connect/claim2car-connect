@@ -5,7 +5,7 @@
 **Reviewed:** 2026-11-08  
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
 **Current main revision inspected:** `a54ce7a08553ea7a35f70167b868ecb1ff4eb813`  
-**CI-tested source/test revision:** `50b8b5fa466643334ee51a424ffacdb929af4c85`
+**CI-tested source/test revision:** `294c11132bb344e59b193ef7b160644edfeab770`
 
 ## 1. Historical failure evidence — preserve
 
@@ -55,9 +55,9 @@ This is also bounded. The migration comments explicitly leave key ordering, Unic
 
 ## 3. Current CI evidence
 
-On source/test revision `50b8b5fa466643334ee51a424ffacdb929af4c85`:
-- Full test suite workflow `42528468397` completed successfully, including disposable PostgreSQL/routing DB setup, migrations, pytest, evidence upload, and teardown.
-- Database authority cutover workflow `42528468497`, job `authority-cutover`, completed successfully. Its steps included isolated database startup, bootstrap through the legacy baseline, pre-cutover tests, full-authority migration/integration tests, primary database upgrade through the normal full-authority entry point, post-cutover authority/validation diagnostics, evidence preservation/upload, and database teardown.
+On source/test revision `294c11132bb344e59b193ef7b160644edfeab770`:
+- Full test suite workflow `42529659428` completed successfully, including disposable PostgreSQL/routing DB setup, migrations, pytest, evidence upload, and teardown. This run includes the non-ASCII internal Bearer rejection test added in commit `8deadc370343126642e6137636d059f6b8eacf4b`.
+- Database authority cutover workflow `42529659500`, job `authority-cutover`, completed successfully. The earlier authority-cutover run `42528468497` on revision `50b8b5fa466643334ee51a424ffacdb929af4c85` also passed. Its steps included isolated database startup, bootstrap through the legacy baseline, pre-cutover tests, full-authority migration/integration tests, primary database upgrade through the normal full-authority entry point, post-cutover authority/validation diagnostics, evidence preservation/upload, and database teardown.
 - The separate `publish-evidence` job was skipped; the database test job itself succeeded.
 
 These are synthetic CI database results. They are not live production database evidence, provider deployment, a penetration test, or independent legal/field validation.
