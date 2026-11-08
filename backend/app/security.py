@@ -22,7 +22,7 @@ def require_internal_service(authorization: str | None = Header(default=None)) -
             headers={"Cache-Control": "no-store"},
         )
     supplied = authorization if isinstance(authorization, str) else ""
-    if not hmac.compare_digest(supplied, f"Bearer {expected}"):
+    if not supplied.isascii() or not hmac.compare_digest(supplied, f"Bearer {expected}"):
         raise HTTPException(
             status_code=401,
             detail={"code": "UNAUTHORIZED"},
