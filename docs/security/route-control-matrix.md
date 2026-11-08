@@ -14,9 +14,7 @@ test update, and security review. Version bump required.
 | READINESS_PROBE | No auth; reflects real dependency/authority state; no business data |
 | AUTHENTICATED_TENANT | Bearer service credential → server-derived actor/tenant via DB role binding; tenant scoping enforced server-side |
 | INTERNAL_DISABLED | Route exists but the operation is disabled pending integration; client input cannot enable it |
-| INTERNAL_SERVICE_AUTH | Internal business operation requires configured C2C_INTERNAL_SERVICE_TOKEN Bearer credential; service identity only, not end-user/tenant authorization |
-| PUBLIC_VERIFY | Intentionally public integrity verification; exposes documented verification response and requires abuse-control review before external publication |
-| INTERNAL_ANALYSIS | Internal analysis surface only; CORS allowlist is not authentication or network access control |
+| INTERNAL_ANALYSIS | Internal analysis surface only; not part of the public M1 deployment; explicit CORS allowlist, no wildcard |
 
 ## M1 public surface — foundation app (`app/main.py`)
 
@@ -47,26 +45,16 @@ Inventory enforcement: the foundation app exposes ONLY these two routes
 | Route | Method | Control | Notes |
 |---|---|---|---|
 | /health/live, /health/ready | GET | PUBLIC_HEALTH / READINESS | Separate app instance |
-| /api/v1/analysis/health | GET | INTERNAL_ANALYSIS | Health metadata only |
-| /api/v1/analysis/physics, /run | POST | INTERNAL_SERVICE_AUTH | Fail-closed service Bearer token; no end-user/tenant authorization |
-| /api/v1/triage/health | GET | INTERNAL_ANALYSIS | Health metadata only |
-| /api/v1/triage/adjudicate | POST | INTERNAL_SERVICE_AUTH | Fail-closed service Bearer token; no end-user/tenant authorization |
+| /api/v1/analysis/health, /physics, /run | GET/POST | INTERNAL_ANALYSIS | Deterministic physics/vision mirror; no persistence |
+| /api/v1/triage/health, /adjudicate | GET/POST | INTERNAL_ANALYSIS | Stateless adjudication only |
 | /api/v1/dispatch/health | GET | INTERNAL_ANALYSIS | Advertises disabled state honestly |
 | /api/v1/dispatch/build | POST | INTERNAL_DISABLED | Raises regardless of client-supplied provenance (tests/api/test_dispatch_build_containment.py) |
-| /api/v1/dispatch/redact | POST | INTERNAL_SERVICE_AUTH | Fail-closed service Bearer token; no end-user/tenant authorization |
-| /api/v1/verify/ and /api/verify/ | POST | PUBLIC_VERIFY | Public verification semantics; process-local ledger |
-| /api/v1/verify/{session_id} | GET | PUBLIC_VERIFY | Public-exhibit lookup; process-local ledger |
+| /api/v1/dispatch/redact | POST | INTERNAL_ANALYSIS | Redaction-only |
+| /api/v1/verify/{session_id} | GET | INTERNAL_ANALYSIS | Public-exhibit verification semantics (disabled in staging) |
 
 CORS: explicit allowlist via `C2C_ANALYSIS_ALLOWED_ORIGINS` only; wildcard-with-
-credentials is forbidden and enforced by test. Internal analysis physics/run,
-triage adjudication, and dispatch redaction routes now require the fail-closed
-`C2C_INTERNAL_SERVICE_TOKEN` Bearer dependency; missing/malformed configuration
-returns 503 and invalid/missing credentials return 401. This shared service token
-is not end-user identity, actor attribution, or tenant authorization. Health
-routes and public verification routes remain intentionally unauthenticated.
-Business-route isolation between the M1 surface and analysis surface is asserted
-by test. Keep the analysis app private until private ingress and tenant-aware
-authorization are independently established.
+credentials is forbidden and enforced by test. Business-route isolation between
+the M1 surface and the analysis surface is asserted by test.
 
 ## Database-level enforcement (reference)
 
