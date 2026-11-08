@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from backend.app.anchor.ledger import LEDGER
 from backend.app.dispatch.dispatcher import build_dispatch
 from backend.app.dispatch.redaction import redact_payload
 from config import forensic_constants as C
+from backend.app.security import require_internal_service
 
 router = APIRouter(tags=["dispatch"])
 
@@ -62,7 +63,7 @@ def dispatch_build(body: DispatchRequest) -> Dict[str, Any]:
     )
 
 
-@router.post("/api/v1/dispatch/redact")
+@router.post("/api/v1/dispatch/redact", dependencies=[Depends(require_internal_service)])
 def dispatch_redact(role: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     return redact_payload(role, payload)
 
