@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+from fastapi import HTTPException
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
@@ -62,6 +64,17 @@ def test_internal_routes_reject_missing_and_invalid_bearer_tokens():
         )
     assert missing.status_code == 401
     assert invalid.status_code == 401
+
+
+
+def test_internal_route_rejects_non_ascii_authorization_header_safely():
+    from backend.app.security import require_internal_service
+
+    with patch.dict(os.environ, {"C2C_INTERNAL_SERVICE_TOKEN": TOKEN}):
+        with pytest.raises(HTTPException) as exc:
+            require_internal_service("Bearer " + "é" * 43)
+    assert exc.value.status_code == 401
+    assert exc.value.detail == {"code": "UNAUTHORIZED"}
 
 
 def test_internal_route_accepts_configured_service_token():
