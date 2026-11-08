@@ -4,13 +4,13 @@
 **Revision:** 1.0  
 **Reviewed:** 2026-11-08  
 **Branch:** `cto/slice-1-control-reconciliation`  
-**Reviewed head:** `5071ff1c931bc8cf8d9533c71677afa8b5b0feee` (the branch head at this review; any subsequent commit requires refreshed evidence).
+**Reviewed source/test revision:** `50b8b5fa466643334ee51a424ffacdb929af4c85`. The PR branch subsequently advanced to `8deadc370343126642e6137636d059f6b8eacf4b` with one additional non-ASCII credential negative test; that test-only commit has not yet been associated with a fresh CI run.
 
 ## 1. Evidence boundary
 
 This document records repository/code inspection and CI evidence at the reviewed head. It does not claim a production deployment, live ingress inspection, independent penetration test, or field validation.
 
-The latest-head workflow query returned 11 completed workflow runs, all with conclusion `success`. The full-suite run (`42524756939`, job `full-suite`) completed dependency installation, disposable PostgreSQL and routing-database setup, migrations, `python -m pytest tests/ -q`, evidence upload, and database teardown successfully. The restricted staging verification run (`42524757025`) passed API/dispatch containment regressions, built and started the restricted image with a dynamic port and restricted filesystem, and verified the exact revision and live HTTP safety boundaries. Its `Deploy verified restricted staging` job was skipped, and its `Report deployment remains disabled` step was skipped by design. The remaining nine successful workflow runs covered controlled demonstration, offline guided capture, controlled-test intake/PostgreSQL, offline VIN lookup, database authority, frontend VIN/decoder/transport, legacy database components, restricted intake container, and FastAPI foundation verification. These are CI workflow results, not 14 independently enumerated check-runs, a production deployment, or independent security/field validation.
+For reviewed source/test revision `50b8b5fa466643334ee51a424ffacdb929af4c85`, 11 associated workflow runs completed with conclusion `success`. The full-suite run (`42528468397`, job `full-suite`) completed dependency installation, disposable PostgreSQL and routing-database setup, migrations, `python -m pytest tests/ -q`, evidence upload, and database teardown successfully. The restricted staging verification run (`42528468416`) passed API/dispatch containment regressions, built and started the restricted image with a dynamic port and restricted filesystem, and verified the exact revision and live HTTP safety boundaries. Its `Deploy verified restricted staging` job was skipped by design. The other nine successful workflow runs covered controlled demonstration, offline guided capture, controlled-test intake/PostgreSQL, offline VIN lookup, database authority, frontend VIN/decoder/transport, legacy database components, restricted intake container, and FastAPI foundation verification. These are CI workflow results, not 14 independently enumerated check-runs, a product deployment, or independent security/field validation. The later non-ASCII credential test at `8deadc370343126642e6137636d059f6b8eacf4b` remains pending fresh CI.
 
 ## 2. Runtime topology — verified from repository entrypoints
 
@@ -95,12 +95,12 @@ Before integration, record:
 | PR compensation output cleanup | Implemented on branch; CI tested | Latest full-suite CI success; still requires PR review/merge |
 | Triage health import regression | Corrected; CI tested | `config.forensic_constants` import restored; full suite passed |
 | Runtime topology | Inspected/documented | Actual cloud ingress and deployed service inventory remain unverified |
-| Backend route security | Service authentication implemented on internal business operations; CI tested | Latest-head full-suite and restricted-staging verification workflows passed; shared service token is not end-user/tenant authorization; keep backend private and complete ingress/tenant controls before integration |
+| Backend route security | Service authentication implemented on internal business operations; CI tested at 50b8 | Full-suite and restricted-staging workflows passed on 50b8; a subsequent non-ASCII negative test was added at 8deadc and remains CI-pending. Shared service token is not end-user/tenant authorization; keep backend private and complete ingress/tenant controls before integration |
 | App composition | Separate entrypoints verified | Formal architecture decision and integration contract remain |
 | Full-suite baseline | Tested | Latest full-suite job success on reviewed head; no independent validation claim |
 | Deployment | Not product-deployed | Restricted staging deployment job skipped; health-only staging configuration is not the integrated app |
-| Incentive audit | Scoped output cleanup implemented | Complete repository-wide and accessible-branch search/classification remains |
-| Evidence branch retention | Not completed | Index/retention policy required before any pruning |
+| Incentive audit | Scoped output cleanup implemented; partial audit record added | `docs/S1_COMPENSATION_AND_BRANCH_AUDIT.md` records default-branch findings and a 155-branch inventory; complete all-branch/all-repository search and classification remain open |
+| Governance reconciliation | Partially corrected on PR branch | `docs/GOVERNANCE.md`, `docs/SPEC_DECISIONS.md`, root `GOVERNANCE.md`, and historical milestone notices corrected; full document inventory remains |\n| Evidence branch retention | Not completed | 155 branches inventoried (131 acceptance-evidence); index/retention policy required before any pruning |
 
 ## 7. Prohibited conclusions
 
