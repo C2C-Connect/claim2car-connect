@@ -21,10 +21,13 @@ documentation are not mounted. No database or persistent evidence storage is
 used by this surface. Readiness covers this restricted process only, and its
 response explicitly reports `business_ready: false`.
 
-The broader backend currently cannot be enabled unchanged: the baseline
-analysis/physics import fails on missing `P_BRITTLE_BETA`, and the catalog import
-fails on missing `DEFAULT_TAX_RATE`. Those are pre-existing integration gaps;
-this deployment does not invent forensic or commercial constants to hide them.
+A prior note in this document stated that the broader backend could not be
+imported because `P_BRITTLE_BETA` and `DEFAULT_TAX_RATE` were missing. That
+statement is stale at the current baseline: both constants are present in
+`config/forensic_constants.py`. Their presence does not establish that every
+backend module imports successfully or that the business API is deployable.
+The backend entrypoint and its complete import/runtime behavior still require
+an explicit integration smoke test before any broader surface is enabled.
 
 ## Repository settings
 
