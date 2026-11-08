@@ -56,7 +56,6 @@ def _sample_adj():
         "detections": [{"class_name": "crush", "zone": "front", "confidence": 0.9}],
         "depths": [{"zone": "front", "mean_depth_cm": 20.0, "volume_cm3": 5000.0}],
         "formula_version": C.VERSION,
-        "operator_payout_usd": C.OPERATOR_PAYOUT_USD,
     }
 
 
