@@ -4,13 +4,13 @@
 **Revision:** 1.0  
 **Reviewed:** 2026-11-08  
 **Branch:** `cto/slice-1-control-reconciliation`  
-**Reviewed head:** `ec3aa7e69aec2d3b39189f5551b8233af98be36d`
+**Reviewed head:** `5071ff1c931bc8cf8d9533c71677afa8b5b0feee` (the branch head at this review; any subsequent commit requires refreshed evidence).
 
 ## 1. Evidence boundary
 
 This document records repository/code inspection and CI evidence at the reviewed head. It does not claim a production deployment, live ingress inspection, independent penetration test, or field validation.
 
-The full-suite workflow completed successfully on this exact head. Its job executed dependency installation, disposable PostgreSQL and routing database setup, migrations, and `python -m pytest tests/ -q`; the test step and evidence upload completed successfully. Targeted guided-capture, VIN, API, container, controlled-demo, database-authority, and CodeQL checks also completed successfully. Evidence publication and the restricted staging deployment job were skipped. A successful restricted staging verification job is a rehearsal/verification result, not proof that the product was deployed.
+The latest-head workflow query returned 11 completed workflow runs, all with conclusion `success`. The full-suite run (`42524756939`, job `full-suite`) completed dependency installation, disposable PostgreSQL and routing-database setup, migrations, `python -m pytest tests/ -q`, evidence upload, and database teardown successfully. The restricted staging verification run (`42524757025`) passed API/dispatch containment regressions, built and started the restricted image with a dynamic port and restricted filesystem, and verified the exact revision and live HTTP safety boundaries. Its `Deploy verified restricted staging` job was skipped, and its `Report deployment remains disabled` step was skipped by design. The remaining nine successful workflow runs covered controlled demonstration, offline guided capture, controlled-test intake/PostgreSQL, offline VIN lookup, database authority, frontend VIN/decoder/transport, legacy database components, restricted intake container, and FastAPI foundation verification. These are CI workflow results, not 14 independently enumerated check-runs, a production deployment, or independent security/field validation.
 
 ## 2. Runtime topology — verified from repository entrypoints
 
@@ -45,7 +45,7 @@ This is a **service-level authentication boundary**, not end-user identity, acto
 
 ### Registered routes and controls
 
-The following routes are registered by `backend/app/main.py`. Route registration is not proof of deployment reachability.
+The following routes are registered by `backend/app/main.py`. Route registration is not proof of deployment reachability. The security behavior below was exercised by the latest-head CI workflows; no provider ingress or live cloud route enumeration is claimed.
 
 | Router | Route | Method | Current handler control | Finding |
 |---|---|---:|---|---|
@@ -95,7 +95,7 @@ Before integration, record:
 | PR compensation output cleanup | Implemented on branch; CI tested | Latest full-suite CI success; still requires PR review/merge |
 | Triage health import regression | Corrected; CI tested | `config.forensic_constants` import restored; full suite passed |
 | Runtime topology | Inspected/documented | Actual cloud ingress and deployed service inventory remain unverified |
-| Backend route security | Service authentication implemented on internal business operations; CI pending | Shared service token is not end-user/tenant authorization; keep backend private and complete ingress/tenant controls before integration |
+| Backend route security | Service authentication implemented on internal business operations; CI tested | Latest-head full-suite and restricted-staging verification workflows passed; shared service token is not end-user/tenant authorization; keep backend private and complete ingress/tenant controls before integration |
 | App composition | Separate entrypoints verified | Formal architecture decision and integration contract remain |
 | Full-suite baseline | Tested | Latest full-suite job success on reviewed head; no independent validation claim |
 | Deployment | Not product-deployed | Restricted staging deployment job skipped; health-only staging configuration is not the integrated app |
