@@ -53,8 +53,6 @@ def ready():
         "environment": "development",
         "constants_version": C.VERSION,
         "scope": "milestone_5_dispatch",
-        "operator_payout_usd": C.OPERATOR_PAYOUT_USD,
-        "owner_payout": None,
     }
 
 
