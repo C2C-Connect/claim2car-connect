@@ -6,12 +6,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.app.analysis.pipeline import AnalysisPipeline, AnalysisRequest
 from backend.app.physics.darci import DarciInput, ZoneInput, run_darci
 from config import forensic_constants as C
+from backend.app.security import require_internal_service
 
 router = APIRouter(prefix="/api/v1/analysis", tags=["analysis"])
 _pipeline = AnalysisPipeline()
@@ -57,7 +58,7 @@ def analysis_health() -> Dict[str, Any]:
     }
 
 
-@router.post("/physics")
+@router.post("/physics", dependencies=[Depends(require_internal_service)])
 def physics_only(body: PhysicsOnlyRequest) -> Dict[str, Any]:
     """Run DARCI only (no vision). Useful for unit tests and adjuster tools."""
     zones = [
@@ -97,7 +98,7 @@ def physics_only(body: PhysicsOnlyRequest) -> Dict[str, Any]:
     }
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(require_internal_service)])
 def run_analysis(body: AnalyzeRequest) -> Dict[str, Any]:
     """
     Full Layer 2 pipeline with stub vision models.
