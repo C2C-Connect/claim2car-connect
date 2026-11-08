@@ -2,17 +2,18 @@
 
 **Authoritative version:** [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md)
 
-This root file exists for discoverability. The binding governance document is under `docs/` and records the **2026-11-02 Full Build Directive** (owner decision):
+This root file is a navigation pointer only. It does not preserve the superseded 2026-11-02 Full Build Directive as a competing source of authority. The current binding rules are recorded in `docs/GOVERNANCE.md`, `docs/SPEC_DECISIONS.md`, `docs/LEGAL_REVIEW.md`, and the Founder-approved five-slice execution plan.
 
-- Full feature scope from the Architecture reference document
-- Legal gates lifted for development; attorney reviews finished product via `docs/LEGAL_REVIEW.md`
-- Owner / vehicle-owner cash incentive **permanently excluded**
-- Operator $110 payout, fee_factor, marketplace, auctions, internal anchoring: in scope
-- Milestone discipline and document hierarchy as defined in `docs/GOVERNANCE.md`
+Current commercial guardrails:
+- Owner cash incentive: permanently prohibited at every amount and in every active product surface.
+- Operator payout: the $110 amount remains unresolved and disabled; no payout logic or active payout output is authorized.
+- Dealer fee: flat $375 on qualified-acquisition close.
+- Repair-shop fee: flat $275 on recorded vehicle acceptance; acceptance authorizes tow routing to that shop.
+
+Historical decision references and negative tests may be retained to document and enforce prohibitions. They are not evidence of active product functionality. See the canonical Slice 1 audit and current execution tracker for implementation status.
 
 See also:
-
-- `docs/LEGAL_REVIEW.md` — attorney checklist
-- `docs/SPEC_DECISIONS.md` — formula/conflict log
-- `docs/PROGRESS-M1-M2.md` — current milestone status
-- `config/forensic_constants.py` — versioned constants
+- `docs/LEGAL_REVIEW.md` — counsel review checklist and publication gates
+- `docs/SPEC_DECISIONS.md` — decision/conflict log
+- `docs/CTO_MASTER_EXECUTION_PLAN.md` — five-slice engineering sequence
+- `config/forensic_constants.py` — versioned technical constants
