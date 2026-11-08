@@ -1,0 +1,105 @@
+# Slice 1 — Architecture and Security Baseline
+
+**Document ID:** C2C-S1-ARCH-SEC-001  
+**Revision:** 1.0  
+**Reviewed:** 2026-11-08  
+**Branch:** `cto/slice-1-control-reconciliation`  
+**Reviewed head:** `ec3aa7e69aec2d3b39189f5551b8233af98be36d`
+
+## 1. Evidence boundary
+
+This document records repository/code inspection and CI evidence at the reviewed head. It does not claim a production deployment, live ingress inspection, independent penetration test, or field validation.
+
+The full-suite workflow completed successfully on this exact head. Its job executed dependency installation, disposable PostgreSQL and routing database setup, migrations, and `python -m pytest tests/ -q`; the test step and evidence upload completed successfully. Targeted guided-capture, VIN, API, container, controlled-demo, database-authority, and CodeQL checks also completed successfully. Evidence publication and the restricted staging deployment job were skipped. A successful restricted staging verification job is a rehearsal/verification result, not proof that the product was deployed.
+
+## 2. Runtime topology — verified from repository entrypoints
+
+### A. Foundation / M1 runtime
+
+- Entrypoint: `app/main.py`.
+- Exposes only `GET /health/live` and `GET /health/ready`.
+- Readiness probes configured PostgreSQL role and tenant/RLS authority state; it is not a business API.
+- Capture and intake are separate app factories in `app/capture_api.py` and `app/intake_api.py`. They use bearer credentials resolved by `app/identity.py`, with actor/tenant binding resolved server-side.
+- Capture/intake apps are not mounted into the health-only foundation `app.main.create_app()` surface.
+- Frontend currently consists of capture workflow/VIN modules and tests under `frontend/src/modules/capture`; repository inspection does not establish a complete operator-facing application shell or native camera project.
+
+### B. Analysis / M5 runtime
+
+- Entrypoint: `backend/app/main.py`.
+- Independently instantiates and mounts analysis, triage, and dispatch routers.
+- It is not composed into `app/main.py`.
+- `Dockerfile.railway` copies `app/railway_staging.py` and starts `python -m app.railway_staging`; that staging entrypoint creates the health-only foundation app. The Dockerfile also copies `backend/`, but copying code into an image does not mount its routers or make those routes reachable.
+- Therefore, the reviewed deployment configuration does not establish public reachability of the backend analysis routes. Actual provider ingress and running cloud state have not been independently enumerated in this review.
+
+### C. Data / persistence
+
+- Database migrations, tenant authority, capture-session and intake-draft adapters, routing migrations, and tests are present.
+- Presence of these components and passing disposable-database CI do not establish a persistent, provisioned pilot database or integrated production evidence object store.
+- Root app and backend app currently have separate runtime composition and should not be combined by import convenience alone.
+
+## 3. Backend route inventory and control gap
+
+The following routes are registered by `backend/app/main.py`. Route registration is not proof of deployment reachability.
+
+| Router | Route | Method | Current handler control | Finding |
+|---|---|---:|---|---|
+| Analysis | `/api/v1/analysis/health` | GET | None | Health metadata; no actor context |
+| Analysis | `/api/v1/analysis/physics` | POST | None | Business computation accepts caller input |
+| Analysis | `/api/v1/analysis/run` | POST | None | Analysis pipeline accepts caller input |
+| Triage | `/api/v1/triage/health` | GET | None | Health metadata; no actor context |
+| Triage | `/api/v1/triage/adjudicate` | POST | None | Adjudication accepts caller-supplied evidence/valuation inputs |
+| Dispatch | `/api/v1/dispatch/health` | GET | None | Reports disabled state |
+| Dispatch | `/api/v1/dispatch/build` | POST | Hard-disabled (503) | Does not invoke builder; keep disabled until trusted provenance and authorization are integrated |
+| Dispatch | `/api/v1/dispatch/redact` | POST | None | Redaction utility; no actor/tenant boundary |
+| Dispatch | `/api/v1/verify/` and `/api/verify/` | POST | None | Public verification semantics; process-local ledger |
+| Dispatch | `/api/v1/verify/{session_id}` | GET | None | Reads process-local ledger record |
+
+CORS allowlisting is not authentication, authorization, or network ingress control. The route-control matrix's `INTERNAL_ANALYSIS` classification describes intended isolation; it is not enforced by these handlers. The existing test suite verifies that the backend is a separate app and that dispatch build remains disabled, but it does not prove that every analysis/triage/dispatch route is authenticated or network-isolated.
+
+**Security disposition:** do not expose `backend.app.main:app` publicly or mount it into an externally reachable runtime until one of the following is implemented and negatively tested:
+1. a verifiable private-network boundary that restricts ingress to authorized internal callers, with deployment configuration and operational proof; or
+2. server-side authentication, role/tenant authorization, and actor attribution on every non-public business route.
+
+The preferred eventual state is server-side authorization even if private networking is also used. Public verification, if retained, needs a deliberate data-minimization and abuse-control review.
+
+## 4. Compensation output audit — current PR scope
+
+- The PR removes `operator_payout_usd` and `owner_payout` from the backend constants/health response, triage response, and forensic dossier output paths.
+- Regression coverage checks that generated dossier output does not contain either field and that owner payout constants are absent.
+- The unresolved $110 operator amount remains a historical/configuration decision record; no active payout calculation, eligibility, trigger, payment, or settlement has been approved.
+- This scoped change does not constitute a repository-wide legal audit of every historical document, external repository, inaccessible repository, or archived branch. Historical references and negative tests must be classified, not indiscriminately erased.
+
+## 5. Architecture decision required before integration
+
+**Current state:** two separately instantiated FastAPI application trees with different responsibilities and deployment status.
+
+**Decision direction:** retain explicit application composition. The foundation/capture runtime remains the M1 product boundary. Analysis/triage services may later be mounted behind an authenticated internal service boundary only after API contracts, identity propagation, tenant scoping, persistence ownership, error handling, observability, and authorization tests are defined. Do not merge entrypoints or expose backend routes merely to make a single server appear complete.
+
+Before integration, record:
+- canonical runtime/entrypoint and deployment target;
+- service-to-service identity and actor attribution;
+- tenant and case/session ownership mapping;
+- authoritative persistence and transaction boundaries;
+- evidence/object storage ownership and immutable original-byte handling;
+- API versioning, idempotency, retries, timeout and failure semantics;
+- health/readiness dependency semantics;
+- secrets, ingress, network policy, logs, metrics, tracing and incident response;
+- route-by-route positive and negative authorization tests.
+
+## 6. Slice 1 status at this revision
+
+| Workstream | Status | Evidence / remaining work |
+|---|---|---|
+| PR compensation output cleanup | Implemented on branch; CI tested | Latest full-suite CI success; still requires PR review/merge |
+| Triage health import regression | Corrected; CI tested | `config.forensic_constants` import restored; full suite passed |
+| Runtime topology | Inspected/documented | Actual cloud ingress and deployed service inventory remain unverified |
+| Backend route security | Gap identified; not remediated | Must implement and test boundary before exposure/integration |
+| App composition | Separate entrypoints verified | Formal architecture decision and integration contract remain |
+| Full-suite baseline | Tested | Latest full-suite job success on reviewed head; no independent validation claim |
+| Deployment | Not product-deployed | Restricted staging deployment job skipped; health-only staging configuration is not the integrated app |
+| Incentive audit | Scoped output cleanup implemented | Complete repository-wide and accessible-branch search/classification remains |
+| Evidence branch retention | Not completed | Index/retention policy required before any pruning |
+
+## 7. Prohibited conclusions
+
+Do not infer from this document that the full product is implemented, that the analysis routes have been penetrated or publicly exposed, that the full product is deployed, that model outputs are field-validated, or that hashes establish factual truth or legal admissibility.
