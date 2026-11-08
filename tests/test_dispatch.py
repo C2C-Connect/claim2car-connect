@@ -124,6 +124,18 @@ def test_dossier_seven_pages():
     assert "owner_payout" not in rendered
 
 
+
+def test_dossier_suppresses_legacy_compensation_fields_from_input():
+    # Adversarial legacy input: these values must never become recipient-facing output.
+    payload = _sample_adj()
+    payload["operator_payout_usd"] = 110.0
+    payload["owner_payout"] = None
+    dossier = build_dossier(payload, role="carrier")
+    rendered = dossier.html + dossier.plain_text
+    assert "operator_payout_usd" not in rendered
+    assert "owner_payout" not in rendered
+
+
 def test_acord_xml_contains_extensions():
     payload = _sample_adj()
     payload["vin"] = "1HGCM82633A004352"
