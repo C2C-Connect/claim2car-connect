@@ -147,8 +147,6 @@ def build_dossier(payload: Dict[str, Any], role: str = "carrier") -> ForensicDos
     })
     _kv(p7, "Attestation", {
         "formula_version": payload.get("formula_version"),
-        "operator_payout_usd": payload.get("operator_payout_usd"),
-        "owner_payout": None,
         "disclaimer": "Pending attorney review before publication. See LEGAL_REVIEW.md.",
     })
     pages.append(DossierPage(7, PAGE_TITLES[6], p7))
