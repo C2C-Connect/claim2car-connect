@@ -10,7 +10,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from backend.app.triage.adjudicate import Adjudicator
-from config import forensic_constants as C
 
 router = APIRouter(prefix="/api/v1/triage", tags=["triage"])
 _adj = Adjudicator()
@@ -165,6 +164,4 @@ def adjudicate(body: AdjudicateRequest) -> Dict[str, Any]:
         },
         "trace": result.trace,
         "formula_version": result.formula_version,
-        "operator_payout_usd": C.OPERATOR_PAYOUT_USD,
-        "owner_payout": None,
     }
