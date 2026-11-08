@@ -118,13 +118,12 @@ class PgRoutingEngine(RoutingEngine):
         if not isinstance(max_minutes, (int, float)) or max_minutes < 0:
             raise RoutingError("INVALID_BUDGET")
         edges_sql = (
-            "SELECT edge_id AS id, source, target, cost_minutes AS cost FROM dispatch.network_edges "
-            "UNION ALL "
-            "SELECT edge_id, target, source, reverse_cost_minutes FROM dispatch.network_edges "
-            "WHERE reverse_cost_minutes IS NOT NULL"
+            "SELECT edge_id AS id, source, target, cost_minutes AS cost, "
+            "COALESCE(reverse_cost_minutes, -1) AS reverse_cost "
+            "FROM dispatch.network_edges"
         )
         rows = self.conn.execute(
-            "SELECT * FROM pgr_drivingDistance(%s, %s, %s, directed := true)",
+            "SELECT node, agg_cost FROM pgr_drivingDistance(%s, %s, %s, directed := true)",
             (edges_sql, origin, float(max_minutes)),
         ).fetchall()
         # Named columns work across pgRouting releases that add depth,
