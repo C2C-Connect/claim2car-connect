@@ -109,9 +109,6 @@ class DurableTimestampRegression(unittest.TestCase):
         self.assertEqual(self.fixture.history()[-1][4],timestamp)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
 
 class DirectSqlCanonicalParityRegression(unittest.TestCase):
     """Expected-failure probes until PostgreSQL enforces the Python event contract.
@@ -195,3 +192,7 @@ class DirectSqlCanonicalParityRegression(unittest.TestCase):
             f.session, 'event-1', 1, 'SESSION_CREATED', 'synthetic-test',
             '2026-01-01T00:00:00Z', 'journal integration', '{}',
         )
+
+
+if __name__ == '__main__':
+    unittest.main()
