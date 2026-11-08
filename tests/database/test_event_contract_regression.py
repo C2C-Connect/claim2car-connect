@@ -170,7 +170,7 @@ class DirectSqlCanonicalParityRegression(unittest.TestCase):
 
     def test_direct_sql_valid_event_round_trips_exact_payload_bytes(self):
         f = self.fixture
-        payload = '{"a":1,"z":"é"}'
+        payload = '{"a":1,"z":"\\u00e9"}'
         self.assertEqual(
             f.append_event('canonical-positive-control', 2, payload), 'ACCEPTED'
         )
