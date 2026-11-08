@@ -1,5 +1,8 @@
 # Progress Marker — Batch M3 + M4 (2026-11-03)
 
+> **Historical snapshot — 2026-11-03.** Status labels below describe the scope and branch/sandbox context recorded on that date. They are not current canonical release status, integrated-product acceptance, field validation, or deployment evidence. The Founder-approved five-slice execution plan and current Slice 1/architecture evidence supersede any broader interpretation of these milestone labels.
+
+
 **Branch target:** `sandbox/m3-m4-m5-snapshot`  
 **Canonical repo:** `C2C-Connect/claim2car-connect`
 
