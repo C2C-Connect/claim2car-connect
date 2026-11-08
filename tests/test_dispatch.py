@@ -119,6 +119,9 @@ def test_dossier_seven_pages():
     assert "Executive" in d.pages[0].title
     assert "Verification" in d.pages[6].title
     assert "Forensic Dossier" in d.html
+    rendered = d.html + d.plain_text
+    assert "operator_payout_usd" not in rendered
+    assert "owner_payout" not in rendered
 
 
 def test_acord_xml_contains_extensions():
