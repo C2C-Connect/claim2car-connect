@@ -101,5 +101,5 @@ Classification: stale branch refs with no unique commits relative to current mai
 2. The hard-coded $110 settlement-on-dealer-acceptance path in `phase1-foundation-bootstrap` is a specific prohibited revival risk until the operator payout decision is resolved.
 3. The stale `owner_payout` / `operator_payout_usd` fields in the two old auth branches are another reintroduction risk; PR #24 corrects canonical main, but those branches remain stale.
 4. The 13 behind-only branches may be considered for archival after the evidence-retention policy is defined. No deletion is authorized by this audit record.
-5. The 131 `acceptance-evidence/` branches remain uninspected at content level. They must be indexed and classified before any pruning.
+5. Four representative `acceptance-evidence/` branches have been sampled across general diagnostic, API, VIN, and VPIC-live categories; their sampled contents are JSON evidence artifacts, including both failed and successful results. The other 127 branches remain uninspected at content level. Do not extrapolate the sample to all branches; index and classify all remaining evidence before any pruning.
 6. Continue to separate salvageable technical assets (RLS proof, migrations, capture workflow, VIN guard, hash-chain prototype) from stale policy, unvalidated behavior, and unsupported completion claims.
