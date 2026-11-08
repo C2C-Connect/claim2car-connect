@@ -37,30 +37,32 @@ The full-suite workflow completed successfully on this exact head. Its job execu
 - Presence of these components and passing disposable-database CI do not establish a persistent, provisioned pilot database or integrated production evidence object store.
 - Root app and backend app currently have separate runtime composition and should not be combined by import convenience alone.
 
-## 3. Backend route inventory and control gap
+## 3. Backend route inventory and control boundary
+
+A fail-closed service-authentication dependency has now been added to analysis physics/run, triage adjudication, and dispatch redaction. These routes require a configured `C2C_INTERNAL_SERVICE_TOKEN` (43–128 URL-safe characters) and matching Bearer token. If the secret is absent or malformed, the routes return 503; missing/incorrect credentials return 401. Health routes remain public. Dispatch build remains hard-disabled (503). Verification routes remain intentionally public and require a separate public-data/abuse-control decision before external publication.
+
+This is a **service-level authentication boundary**, not end-user identity, actor attribution, or tenant authorization. It is an interim gate for internal service access; before user- or tenant-scoped workflows use these endpoints, server-side actor/tenant authorization and ownership checks are still required.
+
+### Registered routes and controls
 
 The following routes are registered by `backend/app/main.py`. Route registration is not proof of deployment reachability.
 
 | Router | Route | Method | Current handler control | Finding |
 |---|---|---:|---|---|
 | Analysis | `/api/v1/analysis/health` | GET | None | Health metadata; no actor context |
-| Analysis | `/api/v1/analysis/physics` | POST | None | Business computation accepts caller input |
-| Analysis | `/api/v1/analysis/run` | POST | None | Analysis pipeline accepts caller input |
+| Analysis | `/api/v1/analysis/physics` | POST | Internal service Bearer | Fail-closed shared service token; no end-user tenant context |
+| Analysis | `/api/v1/analysis/run` | POST | Internal service Bearer | Fail-closed shared service token; no end-user tenant context |
 | Triage | `/api/v1/triage/health` | GET | None | Health metadata; no actor context |
-| Triage | `/api/v1/triage/adjudicate` | POST | None | Adjudication accepts caller-supplied evidence/valuation inputs |
+| Triage | `/api/v1/triage/adjudicate` | POST | Internal service Bearer | Fail-closed shared service token; no end-user tenant context |
 | Dispatch | `/api/v1/dispatch/health` | GET | None | Reports disabled state |
 | Dispatch | `/api/v1/dispatch/build` | POST | Hard-disabled (503) | Does not invoke builder; keep disabled until trusted provenance and authorization are integrated |
-| Dispatch | `/api/v1/dispatch/redact` | POST | None | Redaction utility; no actor/tenant boundary |
+| Dispatch | `/api/v1/dispatch/redact` | POST | Internal service Bearer | Fail-closed shared service token; no end-user tenant context |
 | Dispatch | `/api/v1/verify/` and `/api/verify/` | POST | None | Public verification semantics; process-local ledger |
 | Dispatch | `/api/v1/verify/{session_id}` | GET | None | Reads process-local ledger record |
 
-CORS allowlisting is not authentication, authorization, or network ingress control. The route-control matrix's `INTERNAL_ANALYSIS` classification describes intended isolation; it is not enforced by these handlers. The existing test suite verifies that the backend is a separate app and that dispatch build remains disabled, but it does not prove that every analysis/triage/dispatch route is authenticated or network-isolated.
+CORS allowlisting is not authentication, authorization, or network ingress control. Service authentication now gates the four internal business operations above; it does not supply user identity, actor attribution, tenant scope, or row-level ownership. Health endpoints are public metadata. The verification endpoints remain intentionally public and expose process-local ledger lookup/verification semantics.
 
-**Security disposition:** do not expose `backend.app.main:app` publicly or mount it into an externally reachable runtime until one of the following is implemented and negatively tested:
-1. a verifiable private-network boundary that restricts ingress to authorized internal callers, with deployment configuration and operational proof; or
-2. server-side authentication, role/tenant authorization, and actor attribution on every non-public business route.
-
-The preferred eventual state is server-side authorization even if private networking is also used. Public verification, if retained, needs a deliberate data-minimization and abuse-control review.
+**Security disposition:** keep the backend private. The new shared service token is a useful fail-closed internal gate, but it is not sufficient for public exposure or tenant-scoped product integration. Before exposure, require private ingress plus server-side authentication, actor attribution, role/tenant authorization, and negative tests. Public verification needs a deliberate data-minimization, rate-limit, enumeration-resistance, and abuse-control review.
 
 ## 4. Compensation output audit — current PR scope
 
@@ -93,7 +95,7 @@ Before integration, record:
 | PR compensation output cleanup | Implemented on branch; CI tested | Latest full-suite CI success; still requires PR review/merge |
 | Triage health import regression | Corrected; CI tested | `config.forensic_constants` import restored; full suite passed |
 | Runtime topology | Inspected/documented | Actual cloud ingress and deployed service inventory remain unverified |
-| Backend route security | Gap identified; not remediated | Must implement and test boundary before exposure/integration |
+| Backend route security | Service authentication implemented on internal business operations; CI pending | Shared service token is not end-user/tenant authorization; keep backend private and complete ingress/tenant controls before integration |
 | App composition | Separate entrypoints verified | Formal architecture decision and integration contract remain |
 | Full-suite baseline | Tested | Latest full-suite job success on reviewed head; no independent validation claim |
 | Deployment | Not product-deployed | Restricted staging deployment job skipped; health-only staging configuration is not the integrated app |
