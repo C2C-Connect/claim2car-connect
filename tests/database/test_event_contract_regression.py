@@ -111,3 +111,87 @@ class DurableTimestampRegression(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class DirectSqlCanonicalParityRegression(unittest.TestCase):
+    """Expected-failure probes until PostgreSQL enforces the Python event contract.
+
+    These use the restricted faos_app role and the real append function.  The
+    expectedFailure markers are intentional: each probe must become a normal
+    passing test when the database rejects the noncanonical input.  An
+    unexpected success then fails CI and forces removal of the marker.
+    """
+
+    def setUp(self):
+        import test_journal_integration as fixtures
+        self.fixture = fixtures.TestJournalIntegration()
+        self.addCleanup(self.fixture.doCleanups)
+        self.fixture.setUp()
+        self.conn = self.fixture.conn
+        self.before = self.fixture.history()
+
+    def assert_direct_sql_rejected_without_mutation(self, event_id, timestamp, payload):
+        import psycopg
+        f = self.fixture
+        with self.assertRaises(psycopg.errors.CheckViolation):
+            with self.conn.transaction():
+                self.conn.execute(
+                    'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,'
+                    '%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+                    (f.tenant, f.session, event_id, 2, 'SESSION_CREATED',
+                     'synthetic-direct-sql-probe', timestamp, 'canonical parity probe',
+                     payload, '0.1'),
+                )
+        self.assertEqual(f.history(), self.before)
+
+    @unittest.expectedFailure
+    def test_direct_sql_rejects_timezone_naive_timestamp(self):
+        self.assert_direct_sql_rejected_without_mutation(
+            'naive-timestamp', '2026-01-01T00:00:00', '{}'
+        )
+
+    @unittest.expectedFailure
+    def test_direct_sql_rejects_noncanonical_key_order(self):
+        self.assert_direct_sql_rejected_without_mutation(
+            'unordered-keys', '2026-01-01T00:00:00Z', '{"z":1,"a":2}'
+        )
+
+    @unittest.expectedFailure
+    def test_direct_sql_rejects_noncanonical_unicode_representation(self):
+        self.assert_direct_sql_rejected_without_mutation(
+            'unicode-literal', '2026-01-01T00:00:00Z', '{"label":"é"}'
+        )
+
+    @unittest.expectedFailure
+    def test_direct_sql_rejects_noncanonical_numeric_spelling(self):
+        self.assert_direct_sql_rejected_without_mutation(
+            'numeric-exponent', '2026-01-01T00:00:00Z', '{"value":1e0}'
+        )
+
+    def test_direct_sql_valid_event_round_trips_exact_payload_bytes(self):
+        f = self.fixture
+        payload = '{"a":1,"z":"é"}'
+        self.assertEqual(
+            f.append_event('canonical-positive-control', 2, payload), 'ACCEPTED'
+        )
+        row = self.conn.execute(
+            'SELECT payload_json FROM faos.events '
+            'WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
+            (f.tenant, f.session, 'canonical-positive-control'),
+        ).fetchone()
+        self.assertEqual(row[0], payload)
+        from app.domain_events import DomainEvent, EventJournal
+        event = DomainEvent(
+            f.session, 'canonical-positive-control', 2, 'SESSION_CREATED',
+            'synthetic-test', '2026-01-01T00:00:00Z',
+            'canonical positive control', payload,
+        )
+        self.assertEqual(EventJournal.replay(f.session, (self._first_event(), event)).events[-1], event)
+
+    def _first_event(self):
+        from app.domain_events import DomainEvent
+        f = self.fixture
+        return DomainEvent(
+            f.session, 'event-1', 1, 'SESSION_CREATED', 'synthetic-test',
+            '2026-01-01T00:00:00Z', 'journal integration', '{}',
+        )
