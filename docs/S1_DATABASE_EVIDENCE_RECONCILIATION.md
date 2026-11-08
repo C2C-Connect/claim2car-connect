@@ -62,7 +62,21 @@ On source/test revision `50b8b5fa466643334ee51a424ffacdb929af4c85`:
 
 These are synthetic CI database results. They are not live production database evidence, provider deployment, a penetration test, or independent legal/field validation.
 
-## 4. Remaining limits and acceptance status
+## 4. Residual direct-SQL parity gap — static finding, not yet reproduced
+
+The current database constraints close the historical whitespace and malformed-input cases, but they do not enforce the complete Python canonicalization contract:
+
+- `faos.compact_json_text` removes whitespace outside JSON strings; it does not sort object keys, normalize Unicode escaping, or normalize numeric spelling.
+- Static code inspection indicates that compact but noncanonical values such as `{"b":1,"a":2}`, literal non-ASCII strings where Python emits escapes, or alternate numeric spellings can satisfy the database compactness check.
+- `DomainEvent.validate()` reserializes with sorted keys and Python's JSON formatting, then rejects those same values as `NONCANONICAL_PAYLOAD`.
+- Therefore, a caller with direct SQL execution rights may be able to append a compact-but-noncanonical event that later fails application readback/replay. This is a potential event-history availability/integrity defect, inferred from the validator and SQL constraint; it has **not** yet been reproduced against PostgreSQL in the current CI workflow.
+- Similarly, PostgreSQL's `timestamp with time zone` input-validity check is not identical to Python's timezone-aware ISO contract. A timestamp without an explicit offset may be accepted by PostgreSQL while rejected by the Python validator; this exact direct-SQL variant is not included in the current authority diagnostics.
+
+The current authority-cutover diagnostics test one malformed timestamp and one whitespace-bearing compact-JSON payload. They do not test key-order, Unicode-escape, numeric-spelling, or timezone-naive direct-SQL variants.
+
+**Required follow-up before database acceptance:** add direct-SQL regression probes for those variants, then either enforce the same canonical contract in PostgreSQL or remove/restrict direct execution authority so untrusted actors cannot bypass the validated adapter. Do not silently normalize existing event history. Treat this as a Slice 3 evidence-integrity and pilot-readiness blocker until tested and resolved.
+
+## 5. Remaining limits and acceptance status
 
 1. The historical October failure record remains preserved as a failed run.
 2. The specific tenant-switch, unbound-login, malformed-timestamp, and compact-whitespace bypass cases have current migration/diagnostic coverage and passed the database-authority CI workflow on the reviewed revision.
