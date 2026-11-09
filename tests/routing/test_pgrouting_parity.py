@@ -1,10 +1,11 @@
 """
 pgRouting parity tests (Slice 7; requires the routing database service).
 
-The PgRoutingEngine must answer identically to the in-memory reference
-engine on the shared synthetic network: same shortest paths, same costs,
-same k-shortest sets, same reachability. Any divergence is a routing bug in
-whichever engine disagrees with the reference.
+The PgRoutingEngine must agree with the in-memory reference engine on
+shortest-path cost, path validity, k-shortest results, and reachability.
+Equal-cost shortest paths may have different node sequences because the two
+engines do not promise the same tie-break order; exact path equality is tested
+only where the route set/order is itself part of the assertion.
 """
 
 from __future__ import annotations
@@ -52,6 +53,32 @@ class TestPgRoutingParity(unittest.TestCase):
     def node(self, label):
         return self.network.node_by_label(label).node_id
 
+    def assert_route_parity(self, got, want):
+        """Compare optimal cost and validate the actual directed edge sequence.
+
+        Do not require identical node sequences for equal-cost alternatives:
+        pgRouting and the reference heap can choose different valid shortest
+        paths without disagreeing on routing cost or one-way semantics.
+        """
+        self.assertEqual(got.origin, want.origin)
+        self.assertEqual(got.destination, want.destination)
+        self.assertEqual(got.node_path[0], got.origin)
+        self.assertEqual(got.node_path[-1], got.destination)
+        self.assertEqual(len(got.edge_ids), len(got.node_path) - 1)
+        cost = 0.0
+        edges = {edge.edge_id: edge for edge in self.network.edges}
+        for source, target, edge_id in zip(got.node_path, got.node_path[1:], got.edge_ids):
+            edge = edges.get(edge_id)
+            self.assertIsNotNone(edge)
+            if edge.source == source and edge.target == target:
+                cost += edge.cost_minutes
+            elif edge.target == source and edge.source == target and edge.reverse_cost_minutes is not None:
+                cost += edge.reverse_cost_minutes
+            else:
+                self.fail(f"edge {edge_id} does not connect directed step {source}->{target}")
+        self.assertAlmostEqual(cost, got.total_cost_minutes, places=6)
+        self.assertAlmostEqual(got.total_cost_minutes, want.total_cost_minutes, places=6)
+
     def test_extension_and_schema_installed(self):
         ext = self.conn.execute(
             "SELECT extversion FROM pg_extension WHERE extname = 'pgrouting'"
@@ -68,15 +95,12 @@ class TestPgRoutingParity(unittest.TestCase):
     def test_shortest_path_parity_depot_to_incident(self):
         got = self.engine.route(self.network, self.node(DEPOT_LABEL), self.node(INCIDENT_LABEL))[0]
         want = self.reference.route(self.network, self.node(DEPOT_LABEL), self.node(INCIDENT_LABEL))[0]
-        self.assertEqual(got.node_path, want.node_path)
-        self.assertEqual(got.edge_ids, want.edge_ids)
-        self.assertAlmostEqual(got.total_cost_minutes, want.total_cost_minutes, places=6)
+        self.assert_route_parity(got, want)
 
     def test_shortest_path_parity_incident_to_shop(self):
         got = self.engine.route(self.network, self.node(INCIDENT_LABEL), self.node(SHOP_LABEL))[0]
         want = self.reference.route(self.network, self.node(INCIDENT_LABEL), self.node(SHOP_LABEL))[0]
-        self.assertEqual(got.node_path, want.node_path)
-        self.assertAlmostEqual(got.total_cost_minutes, want.total_cost_minutes, places=6)
+        self.assert_route_parity(got, want)
 
     def test_shortest_path_parity_incident_to_dealer(self):
         got = self.engine.route(self.network, self.node(INCIDENT_LABEL), self.node(DEALER_LABEL))[0]
@@ -112,5 +136,5 @@ class TestPgRoutingParity(unittest.TestCase):
         # One-way edge: node 21 -> 27 (downward only).
         got = self.engine.route(self.network, 27, 21)[0]
         want = self.reference.route(self.network, 27, 21)[0]
-        self.assertEqual(got.node_path, want.node_path)
+        self.assert_route_parity(got, want)
         self.assertNotIn((27, 21), list(zip(got.node_path, got.node_path[1:])))
