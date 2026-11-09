@@ -123,16 +123,16 @@ class CaptureSessionIntegration(unittest.TestCase):
     def test_financial_ledger_persists_retries_reversals_and_verified_export(self):
         self.store.create(self.auth(),self.key)
         ledger=PersistentFinancialLedger(self.store)
-        acceptance=PartnerAcceptanceRecord('dealer-accept-1',uuid.UUID(self.f.tenants[0]),self.key,
-            'dealer','partner-dealer-1','dealer-actor','2026-11-09T00:00:00+00:00')
+        acceptance=PartnerAcceptanceRecord('shop-accept-1',uuid.UUID(self.f.tenants[0]),self.key,
+            'shop','partner-shop-1','shop-actor','2026-11-09T00:00:00+00:00')
         entry=ledger.record_partner_acceptance_obligation(self.auth(),acceptance,
             idempotency_key='ledger-idem-1',actor_id='capture-actor-0',now_iso='2026-11-09T00:00:00+00:00')
         retry=ledger.record_partner_acceptance_obligation(self.auth(),acceptance,
             idempotency_key='ledger-idem-1',actor_id='capture-actor-0',now_iso='2026-11-09T00:00:00+00:00')
         self.assertEqual(entry,retry)
-        self.assertEqual((entry.amount_cents,entry.lines[0].direction,entry.lines[1].direction),(37500,'DEBIT','CREDIT'))
+        self.assertEqual((entry.amount_cents,entry.lines[0].direction,entry.lines[1].direction),(27500,'DEBIT','CREDIT'))
         reversal=ledger.record_reversal_or_dispute_refund(self.auth(),entry.entry_id,
-            idempotency_key='ledger-reversal-1',actor_id='capture-actor-0',reason='partner acceptance cancelled')
+            idempotency_key='ledger-reversal-1',actor_id='capture-actor-0',reason='shop acceptance cancelled')
         exported=ledger.export_audit_ledger(self.auth())
         self.assertEqual((reversal.entry_kind,exported['entry_count'],exported['balanced']),("REVERSAL_BOOKED",2,True))
         self.assertEqual(self.f.seed.execute('SELECT count(*) FROM faos.financial_ledger_entries WHERE tenant_id=%s',(self.f.tenants[0],)).fetchone()[0],2)
@@ -140,8 +140,8 @@ class CaptureSessionIntegration(unittest.TestCase):
     def test_financial_ledger_rejects_cross_tenant_acceptance(self):
         self.store.create(self.auth(),self.key)
         ledger=PersistentFinancialLedger(self.store)
-        acceptance=PartnerAcceptanceRecord('dealer-accept-other',uuid.UUID(self.f.tenants[1]),self.key,
-            'dealer','partner-dealer-2','dealer-actor','2026-11-09T00:00:00+00:00')
+        acceptance=PartnerAcceptanceRecord('shop-accept-other',uuid.UUID(self.f.tenants[1]),self.key,
+            'shop','partner-shop-2','shop-actor','2026-11-09T00:00:00+00:00')
         with self.assertRaisesRegex(ValueError,'TENANT_CONTEXT_MISMATCH'):
             ledger.record_partner_acceptance_obligation(self.auth(),acceptance,
                 idempotency_key='ledger-cross-tenant',actor_id='capture-actor-0')
