@@ -110,6 +110,7 @@ def test_integrated_runtime_refuses_missing_internal_service_secret():
         environment = _runtime_environment(directory)
         environment.pop("C2C_INTERNAL_SERVICE_TOKEN")
         with patch.dict(os.environ, environment, clear=False):
+            os.environ.pop("C2C_INTERNAL_SERVICE_TOKEN", None)
             try:
                 create_app(runtime_mode="integrated")
             except ValueError as error:
