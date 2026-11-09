@@ -85,15 +85,15 @@ tag verification retains artifact evidence without publishing an evidence branch
 Required-check/ruleset enforcement and event-specific execution still need review;
 workflow trigger configuration alone does not prevent all unverified merges.
 
-## Railway restricted staging rehearsal
+## Restricted container verification
 
-Railway project `463d410b-09a3-4117-a3b5-05e6646e7807` is the supplied hosting
-target. [The staging deployment guide](docs/railway-staging.md) describes a
-dedicated restricted runtime, exact-revision HTTP checks, and the repository
-settings needed to enable deployment. Deployment is disabled by default until
-the environment, service, and token are verified. The runtime exposes only
-scoped health checks and disabled dispatch construction, not the integrated
-claims application. The existing intake Dockerfile is unchanged.
+The provider-neutral restricted staging image is a containment rehearsal only.
+CI builds it with `Dockerfile.restricted-staging`, checks its exact revision and
+HTTP safety boundaries, and removes the disposable container afterward. It
+exposes health checks and disabled dispatch construction; it is not the
+integrated claims application or a production deployment. The root `Dockerfile`
+remains the separate intake API image. Persistent integrated deployment and
+operations are not yet established.
 
 ## San Antonio database staging target - not provisioned
 

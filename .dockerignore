@@ -1,6 +1,6 @@
 **
 !Dockerfile
-!Dockerfile.railway
+!Dockerfile.restricted-staging
 !requirements-api.txt
 !requirements-database.txt
 !app/

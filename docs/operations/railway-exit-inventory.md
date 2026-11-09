@@ -21,7 +21,7 @@
 ## What was preserved
 
 - The application source and Git history are in the connected GitHub repository.
-- The repository already contains a separate root `Dockerfile`, the restricted Railway staging image/configuration, and deployment documentation. These files remain in Git; this inventory does not delete or rewrite them.
+- The repository contains a root `Dockerfile` and Git history for the application. The provider-neutral cleanup change removes Railway-specific staging/deployment wiring and retains restricted container safety verification.
 - No Railway user-defined runtime variables, database, attached volume, public domain, or active deployment were found during this inspection.
 - No secret values were copied into this document.
 
@@ -31,13 +31,9 @@ Railway is not required to run the repository's application code. The active Rai
 
 Do not claim production readiness based on the Railway deployment history. The acceptance matrix correctly records the integrated persistent deployment gate as unpassed. Before removing any Railway resource, retain this inventory and confirm the service, deployment history, and project itself are no longer needed. Permanent deletion must be separately confirmed at the point of deletion.
 
-The technical exit path is to keep the OCI container build provider-neutral and complete a self-operated persistent deployment with PostgreSQL/PostGIS, durable evidence storage, backups and restore verification, secrets handling, TLS, monitoring, and operator runbooks. The current repository does not yet establish those operational controls or an available host. Railway-specific staging verification can be retired only after equivalent portable container verification is in place; the disabled Railway deploy job is not a replacement for a production release process.
+The technical exit path is to keep the OCI container build provider-neutral and complete a self-operated persistent deployment with PostgreSQL/PostGIS, durable evidence storage, backups and restore verification, secrets handling, TLS, monitoring, and operator runbooks. The current repository does not yet establish those operational controls or an available host. The Railway deployment workflow and account are not part of the production release process. Provider-neutral restricted-container verification remains CI-only and does not establish a production release process.
 
 ## Not inspected
 
 - Historical deployment logs and build artifacts.
-- Historical deployment logs and build artifacts.
 - The contents of Railway-generated environment variables (these are platform-provided values, not user-defined secrets).
-
-
-
