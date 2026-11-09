@@ -205,6 +205,15 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertEqual(len(sealed["manifest_digest"]), 64)
         queue = self.service.list_review_queue("reviewer-token")
         self.assertEqual(queue[0]["session_id"], self.session_id)
+        first_slot = CANONICAL_SLOTS[0]
+        first_artifact = UUID(int=201)
+        expected_bytes = ("synthetic-image:" + first_slot).encode("ascii")
+        self.assertEqual(
+            self.service.retrieve_for_review("reviewer-token", self.session_id, first_artifact),
+            expected_bytes,
+        )
+        with self.assertRaisesRegex(CaptureAuthorizationError, "REVIEWER_IDENTITY_REQUIRED"):
+            self.service.retrieve_for_review("operator-token", self.session_id, first_artifact)
         review = self.service.record_review(
             "reviewer-token", self.session_id, request_id=UUID(int=34),
             disposition="HUMAN_QC_REQUIRED", reason="Reviewer requests shop confirmation.",

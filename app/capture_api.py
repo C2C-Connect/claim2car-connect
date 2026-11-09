@@ -15,7 +15,7 @@ from uuid import UUID
 from fastapi import Depends, Header, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field, StrictBool, StrictStr
 from psycopg import ProgrammingError
 from psycopg.conninfo import conninfo_to_dict
@@ -26,7 +26,10 @@ from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound,
     CaptureSessionStore, CaptureStorageUnavailable,
 )
-from app.artifact_storage import ArtifactConflict, ArtifactIntegrityError, ArtifactStorageUnavailable, OriginalByteStore
+from app.artifact_storage import (
+    ArtifactConflict, ArtifactIntegrityError, ArtifactNotFound,
+    ArtifactStorageUnavailable, OriginalByteStore,
+)
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
@@ -233,7 +236,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
             except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
                 _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
-            except (ArtifactConflict, ArtifactIntegrityError):
+            except (ArtifactConflict, ArtifactIntegrityError, ArtifactNotFound):
                 _fail(409, 'EVIDENCE_ARTIFACT_CONFLICT')
             except ValueError:
                 _fail(422, 'INVALID_CAPTURE_EVIDENCE_REQUEST')
@@ -278,5 +281,31 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 evidence.record_review, authorization, session_id, request_id=body.request_id,
                 disposition=body.disposition, reason=body.reason,
             )
+
+        @api.get('/v1/review-sessions/{session_id}/artifacts/{artifact_id}')
+        def review_artifact(session_id: UUID, artifact_id: UUID, authorization: str = Depends(authorize)):
+            try:
+                raw = evidence.retrieve_for_review(authorization, str(session_id), str(artifact_id))
+                return Response(
+                    content=raw,
+                    media_type='application/octet-stream',
+                    headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'},
+                )
+            except AuthenticationError:
+                _fail(401, 'UNAUTHORIZED')
+            except CaptureAuthorizationError:
+                _fail(403, 'CAPTURE_AUTHORITY_DENIED')
+            except CaptureSessionNotFound:
+                _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
+            except CaptureSessionConflict:
+                _fail(409, 'CAPTURE_SESSION_CONFLICT')
+            except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
+                _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+            except (ArtifactIntegrityError, ArtifactNotFound):
+                _fail(409, 'EVIDENCE_INTEGRITY_FAILED')
+            except ValueError:
+                _fail(422, 'INVALID_REVIEW_ARTIFACT_REQUEST')
+            except Exception:
+                _fail(500, 'REVIEW_ARTIFACT_OPERATION_FAILED')
 
     return api

@@ -405,3 +405,25 @@ class CaptureEvidenceService:
                 if len(queued) == limit:
                     break
         return queued
+
+    def retrieve_for_review(self, authorization, session_id, artifact_id):
+        session_id = self._session_id(session_id)
+        artifact_id = self._request_id(artifact_id)
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=False)
+            if actor.actor_id == _session.created_by:
+                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+            if self._consent_state(history) is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            if not history or history[-1][0] != "MANIFEST_SEALED":
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            manifest = self._verified_manifest(actor, session_id, history)
+            entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
+            if entry is None:
+                raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
+            return self.byte_store.get(
+                ArtifactKey(actor.tenant_id, UUID(session_id), UUID(artifact_id)),
+                expected_sha256=entry.sha256_hex,
+            )

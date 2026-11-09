@@ -127,6 +127,7 @@ class CaptureRouteTests(unittest.TestCase):
             self.assertIn('/v1/capture-sessions/{session_id}/seal',paths)
             self.assertIn('/v1/capture-sessions/{session_id}/review',paths)
             self.assertIn('/v1/review-queue',paths)
+            self.assertIn('/v1/review-sessions/{session_id}/artifacts/{artifact_id}',paths)
 
     def test_child_capture_app_does_not_recursively_mount_integrated_runtime(self):
         with patch.dict(os.environ,{'C2C_RUNTIME_MODE':'integrated'}):
