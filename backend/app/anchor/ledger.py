@@ -231,8 +231,10 @@ class IntegerFinancialLedger:
         self.guard_prohibited_compensation(party, amount_override_cents)
 
         if party == "dealer":
-            expected, fee_type = DEALER_ACQUISITION_FEE_CENTS, "DEALER_ACQUISITION_FEE"
-            ar, rev = f"AR:DEALER:{acceptance.partner_org_id}", "REV:DEALER_ACQUISITION"
+            raise LedgerError(
+                "DEALER_FEE_REQUIRES_QUALIFIED_ACQUISITION_CLOSE",
+                "A dealer acceptance is not a qualified acquisition close.",
+            )
         elif party == "shop":
             expected, fee_type = REPAIR_SHOP_ACCEPTANCE_FEE_CENTS, "REPAIR_SHOP_ACCEPTANCE_FEE"
             ar, rev = f"AR:SHOP:{acceptance.partner_org_id}", "REV:REPAIR_SHOP_ACCEPTANCE"
