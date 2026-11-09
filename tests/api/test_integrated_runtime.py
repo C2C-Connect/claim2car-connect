@@ -13,8 +13,6 @@ from pathlib import Path
 import tempfile
 import time
 from unittest.mock import patch
-
-import pytest
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -112,10 +110,12 @@ def test_integrated_runtime_refuses_missing_internal_service_secret():
         environment = _runtime_environment(directory)
         environment.pop("C2C_INTERNAL_SERVICE_TOKEN")
         with patch.dict(os.environ, environment, clear=False):
-            with pytest.raises(
-                ValueError, match="^INTERNAL_SERVICE_AUTH_CONFIGURATION_REQUIRED$"
-            ):
+            try:
                 create_app(runtime_mode="integrated")
+            except ValueError as error:
+                assert str(error) == "INTERNAL_SERVICE_AUTH_CONFIGURATION_REQUIRED"
+            else:
+                raise AssertionError("INTEGRATED_RUNTIME_STARTED_WITHOUT_SERVICE_SECRET")
 
 
 def test_integrated_dispatch_remains_disabled_after_service_authentication():
