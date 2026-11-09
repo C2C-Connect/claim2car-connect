@@ -91,7 +91,27 @@ class CaptureEvidenceService:
             "accepted", "owner_actor_id", "disclosure_version", "scope", "request_id"
         } or type(latest.get("accepted")) is not bool or latest.get("owner_actor_id") != actor:
             raise CaptureSessionConflict("UNSUPPORTED_CONSENT_HISTORY")
+        if latest["disclosure_version"] != DISCLOSURE_VERSION or latest["scope"] != "capture_review":
+            raise CaptureSessionConflict("UNSUPPORTED_CONSENT_HISTORY")
         return (actor, latest) if latest["accepted"] is True else None
+
+    @staticmethod
+    def _has_valid_vehicle_reference(history, consent):
+        if consent is None:
+            return False
+        consent_id = "consent:" + consent[1]["request_id"]
+        consent_index = next((i for i, item in enumerate(history) if item[3] == consent_id), -1)
+        for index, (kind, _actor, payload, _event_id) in enumerate(history):
+            if index <= consent_index or kind != "VEHICLE_RECORDED":
+                continue
+            if (type(payload) is dict
+                    and set(payload) == {"request_id", "vin_hmac_sha256", "disclosure_version", "recorded_by_role"}
+                    and payload["disclosure_version"] == DISCLOSURE_VERSION
+                    and payload["recorded_by_role"] in ("operator", "supervisor")
+                    and isinstance(payload["vin_hmac_sha256"], str)
+                    and re.fullmatch(r"[0-9a-f]{64}", payload["vin_hmac_sha256"])):
+                return True
+        return False
 
     def record_consent(self, authorization, session_id, *, request_id, accepted, scope):
         session_id = self._session_id(session_id)
@@ -120,6 +140,8 @@ class CaptureEvidenceService:
             if accepted:
                 if consent_events:
                     raise CaptureSessionConflict("CONSENT_ALREADY_RECORDED")
+                if any(kind in ("VEHICLE_RECORDED", "ARTIFACT_REGISTERED", "QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for kind, *_ in history):
+                    raise CaptureSessionConflict("CONSENT_ORDER_VIOLATION")
             else:
                 if consent_events and (previous is None or previous[0] != actor.actor_id):
                     raise CaptureAuthorizationError("CONSENT_OWNER_REQUIRED")
@@ -136,7 +158,6 @@ class CaptureEvidenceService:
         if not validity.ok or validity.normalization_changed or validity.vin != vin:
             raise ValueError("VIN_VALIDATION_FAILED")
         vin_digest = hmac.new(self._vin_pepper, vin.upper().encode("ascii"), hashlib.sha256).hexdigest()
-        payload = {"request_id": request_id, "vin_hmac_sha256": vin_digest, "disclosure_version": DISCLOSURE_VERSION}
         event_id = "vehicle:" + request_id
         with self.sessions._authorized(authorization) as (conn, actor):
             if actor.actor_role not in ("operator", "supervisor"):
@@ -144,6 +165,10 @@ class CaptureEvidenceService:
             _session, history = self._history(conn, actor, session_id, creator_required=True)
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            payload = {"request_id": request_id, "vin_hmac_sha256": vin_digest,
+                       "disclosure_version": DISCLOSURE_VERSION, "recorded_by_role": actor.actor_role}
+            if any(kind == "ARTIFACT_REGISTERED" for kind, *_ in history):
+                raise CaptureSessionConflict("VEHICLE_ORDER_VIOLATION")
             for kind, _event_actor, old, old_id in history:
                 if old_id == event_id:
                     if kind == "VEHICLE_RECORDED" and old == payload:
@@ -160,7 +185,7 @@ class CaptureEvidenceService:
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
         artifact_id = self._request_id(artifact_id)
-        if slot not in _CANONICAL_SLOTS:
+        if not isinstance(slot, str) or slot not in _CANONICAL_SLOTS:
             raise ValueError("INVALID_CAPTURE_SLOT")
         if not isinstance(sha256_hex, str) or re.fullmatch("[0-9a-f]{64}", sha256_hex) is None:
             raise ValueError("INVALID_SHA256")
@@ -175,14 +200,17 @@ class CaptureEvidenceService:
         if hashlib.sha256(raw).hexdigest() != sha256_hex:
             raise ValueError("ARTIFACT_HASH_MISMATCH")
         event_id = "artifact:" + request_id
-        payload = {"request_id": request_id, "artifact_id": artifact_id, "slot": slot,
-                   "sha256": sha256_hex, "byte_length": len(raw)}
         with self.sessions._authorized(authorization) as (conn, actor):
             if actor.actor_role not in ("operator", "supervisor"):
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=True)
-            if self._consent_state(history) is None:
+            consent = self._consent_state(history)
+            if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            if not self._has_valid_vehicle_reference(history, consent):
+                raise CaptureSessionConflict("VEHICLE_REFERENCE_REQUIRED")
+            payload = {"request_id": request_id, "artifact_id": artifact_id, "slot": slot,
+                       "sha256": sha256_hex, "byte_length": len(raw), "recorded_by_role": actor.actor_role}
             for kind, _event_actor, old, old_id in history:
                 if old_id == event_id:
                     if kind == "ARTIFACT_REGISTERED" and old == payload:

@@ -136,6 +136,14 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         original = b"synthetic-original-image-bytes"
         digest = hashlib.sha256(original).hexdigest()
         encoded = base64.b64encode(original).decode("ascii")
+        with self.assertRaisesRegex(CaptureSessionConflict, "VEHICLE_REFERENCE_REQUIRED"):
+            self.service.register_artifact(
+                "operator-token", self.session_id, request_id=UUID(int=11),
+                artifact_id=UUID(int=12), slot="front", payload_base64=encoded, sha256_hex=digest,
+            )
+        self.service.record_vehicle(
+            "operator-token", self.session_id, request_id=UUID(int=16), vin="1HGCM82633A004352",
+        )
         result = self.service.register_artifact(
             "operator-token", self.session_id, request_id=UUID(int=11),
             artifact_id=UUID(int=12), slot="front", payload_base64=encoded, sha256_hex=digest,

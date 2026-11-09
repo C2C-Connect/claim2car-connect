@@ -25,7 +25,9 @@ def create_intake_app(runtime=None, *, enable_evidence=False):
         if not path:
             raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
         runtime = load_runtime(path)
-    api = create_capture_app(runtime, enable_evidence=enable_evidence)
+    # Preserve the original factory call contract for the restricted test and
+    # intake surfaces; only integrated callers opt into persistent evidence.
+    api = create_capture_app(runtime, enable_evidence=True) if enable_evidence else create_capture_app(runtime)
     drafts = IntakeDraftStore(runtime.store)
 
     @api.exception_handler(RequestValidationError)
