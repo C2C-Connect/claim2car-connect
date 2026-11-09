@@ -5,9 +5,8 @@ from hashlib import sha256
 import json
 
 from backend.app.anchor.ledger import (
-    DEALER_ACQUISITION_FEE_CENTS, REPAIR_SHOP_ACCEPTANCE_FEE_CENTS,
-    LedgerError, LedgerJournalEntry, LedgerPostingLine, PartnerAcceptanceRecord,
-    _require_strict_int_cents,
+    REPAIR_SHOP_ACCEPTANCE_FEE_CENTS, LedgerError, LedgerJournalEntry,
+    LedgerPostingLine, PartnerAcceptanceRecord, _require_strict_int_cents,
 )
 
 GENESIS = "0" * 64
