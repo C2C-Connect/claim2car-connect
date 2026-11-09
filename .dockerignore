@@ -1,5 +1,6 @@
 **
 !Dockerfile
+!Dockerfile.integrated
 !Dockerfile.railway
 !requirements-api.txt
 !requirements-database.txt
