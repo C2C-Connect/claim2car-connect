@@ -111,6 +111,36 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
 
 
 class AnalysisSurfaceIsolationTests(unittest.TestCase):
+    def test_integrated_runtime_rehomes_analysis_behind_internal_auth(self):
+        import os
+        from unittest.mock import patch
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        token = "t" * 43
+        with patch("app.intake_api.create_intake_app", return_value=FastAPI()), patch.dict(
+            os.environ, {"C2C_INTERNAL_SERVICE_TOKEN": token}
+        ):
+            integrated = create_app(Settings(), runtime_mode="integrated")
+            table = route_table(integrated)
+            self.assertIn(("/internal/v1/analysis/health", ("GET",)), table)
+            self.assertIn(("/internal/v1/triage/health", ("GET",)), table)
+            self.assertIn(("/internal/v1/dispatch/health", ("GET",)), table)
+            self.assertNotIn(("/api/v1/analysis/health", ("GET",)), table)
+
+            with TestClient(integrated) as client:
+                missing = client.get("/internal/v1/analysis/health")
+                accepted = client.get(
+                    "/internal/v1/analysis/health",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+            self.assertEqual(missing.status_code, 401)
+            self.assertEqual(accepted.status_code, 200)
+
+    def test_runtime_mode_rejects_unknown_values(self):
+        with self.assertRaisesRegex(ValueError, "INVALID_C2C_RUNTIME_MODE"):
+            create_app(Settings(), runtime_mode="anything_else")
+
     def test_analysis_app_is_separate_from_m1_surface(self):
         from backend.app.main import app as analysis_app
 

@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 import os
 import psycopg
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
 
 @dataclass(frozen=True)
@@ -34,9 +34,52 @@ def probe_database(url):
         return conn.execute(READINESS_SQL).fetchone()==(True,True,True,True)
 
 
-def create_app(settings=None):
+def _mount_internal_router(api, source_router, public_prefix, internal_prefix):
+    """Expose an existing analytical router under its internal-only URL space."""
+    from fastapi.routing import APIRoute
+    from backend.app.security import require_internal_service
+
+    for route in source_router.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        if not route.path.startswith(public_prefix):
+            continue
+        path = internal_prefix + route.path[len(public_prefix):]
+        api.add_api_route(
+            path,
+            route.endpoint,
+            methods=route.methods,
+            response_model=route.response_model,
+            status_code=route.status_code,
+            response_class=route.response_class,
+            dependencies=[Depends(require_internal_service)],
+            tags=route.tags,
+            name=f"internal_{route.name}",
+            include_in_schema=False,
+        )
+
+
+def create_app(settings=None, runtime_mode=None):
     settings = settings if settings is not None else Settings.from_environment()
     api = FastAPI(title='Claim2Car Connect foundation',docs_url=None,redoc_url=None,openapi_url=None)
+
+    # Staging stays fail-closed by default. The integrated surface is explicit
+    # opt-in and composes the already tenant-authenticated intake app with
+    # service-authenticated analytical routes.
+    mode = (runtime_mode or os.environ.get('C2C_RUNTIME_MODE', 'restricted_staging')).strip().lower()
+    if mode not in {'restricted_staging', 'integrated'}:
+        raise ValueError('INVALID_C2C_RUNTIME_MODE')
+
+    if mode == 'integrated':
+        from app.intake_api import create_intake_app
+        from backend.app.api.analysis import router as analysis_router
+        from backend.app.api.triage import router as triage_router
+        from backend.app.api.dispatch import router as dispatch_router
+
+        api.mount('/api', create_intake_app())
+        _mount_internal_router(api, analysis_router, '/api/v1/analysis', '/internal/v1/analysis')
+        _mount_internal_router(api, triage_router, '/api/v1/triage', '/internal/v1/triage')
+        _mount_internal_router(api, dispatch_router, '/api/v1/dispatch', '/internal/v1/dispatch')
 
     @api.get('/health/live')
     def live():
