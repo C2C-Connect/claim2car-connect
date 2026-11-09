@@ -1,6 +1,7 @@
 """Health-only FastAPI foundation; no authenticated business API is exposed."""
 from dataclasses import dataclass, field
 import os
+import re
 import psycopg
 from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
@@ -71,6 +72,10 @@ def create_app(settings=None, runtime_mode=None):
         raise ValueError('INVALID_C2C_RUNTIME_MODE')
 
     if mode == 'integrated':
+        service_token = os.environ.get('C2C_INTERNAL_SERVICE_TOKEN', '')
+        if re.fullmatch(r'[A-Za-z0-9_-]{43,128}', service_token) is None:
+            raise ValueError('INTERNAL_SERVICE_AUTH_CONFIGURATION_REQUIRED')
+
         from app.intake_api import create_intake_app
         from backend.app.api.analysis import router as analysis_router
         from backend.app.api.triage import router as triage_router
