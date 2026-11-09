@@ -72,7 +72,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0008_tenant_login_authority.sql')
+        self.assertEqual(plan[-1].name,'0009_integer_financial_ledger.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -87,7 +87,7 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql',))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
