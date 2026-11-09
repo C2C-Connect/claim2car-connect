@@ -237,7 +237,9 @@ class CaptureWorkflowMachine(RuleBasedStateMachine):
     def artifacts_consistent_with_state(self):
         captured = self.w.captured_slots()
         if captured:
-            assert self.w.state in ("vehicle_identified", "evidence_captured", "quality_verified", "sealed", "reviewed")
+            # Aborting is valid from any nonterminal state. It closes
+            # the workflow but does not erase the evidence already captured.
+            assert self.w.state in ("vehicle_identified", "evidence_captured", "quality_verified", "sealed", "reviewed", "aborted")
             ids = [self.w._artifacts[s].artifact_id for s in captured]
             assert len(ids) == len(set(ids))
 
