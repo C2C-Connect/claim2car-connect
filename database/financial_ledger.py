@@ -26,7 +26,10 @@ class PersistentFinancialLedger:
             raise LedgerError("IDEMPOTENCY_KEY_REQUIRED")
         party = acceptance.party_type.strip().lower()
         if party == "dealer":
-            amount, fee, ar, revenue = DEALER_ACQUISITION_FEE_CENTS, "DEALER_ACQUISITION_FEE", f"AR:DEALER:{acceptance.partner_org_id}", "REV:DEALER_ACQUISITION"
+            raise LedgerError(
+                "DEALER_FEE_REQUIRES_QUALIFIED_ACQUISITION_CLOSE",
+                "A dealer acceptance is not a qualified acquisition close.",
+            )
         elif party == "shop":
             amount, fee, ar, revenue = REPAIR_SHOP_ACCEPTANCE_FEE_CENTS, "REPAIR_SHOP_ACCEPTANCE_FEE", f"AR:SHOP:{acceptance.partner_org_id}", "REV:REPAIR_SHOP_ACCEPTANCE"
         else:
