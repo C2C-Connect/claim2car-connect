@@ -21,9 +21,18 @@ TOKEN = "T" * 43
 
 
 def _routes():
+    from backend.app.api import analysis, dispatch, triage
+
+    route_sets = [
+        app.routes,
+        analysis.router.routes,
+        triage.router.routes,
+        dispatch.router.routes,
+    ]
     return {
         (route.path, method): route
-        for route in app.routes
+        for routes in route_sets
+        for route in routes
         if isinstance(route, APIRoute)
         for method in (route.methods or set())
     }
@@ -73,8 +82,8 @@ def test_internal_route_rejects_non_ascii_authorization_header_safely():
     with patch.dict(os.environ, {"C2C_INTERNAL_SERVICE_TOKEN": TOKEN}):
         with pytest.raises(HTTPException) as exc:
             require_internal_service("Bearer " + "é" * 43)
-    assert exc.value.status_code == 401
-    assert exc.value.detail == {"code": "UNAUTHORIZED"}
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": "NON_ASCII_AUTHORIZATION_HEADER"}
 
 
 def test_internal_route_accepts_configured_service_token():

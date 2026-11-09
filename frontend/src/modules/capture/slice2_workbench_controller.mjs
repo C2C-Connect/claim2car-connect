@@ -52,6 +52,8 @@ export class OperatorRoadsideController {
   recordConsent({ ownerActorId, accepted, scope = "m1-capture-and-human-review" }) {
     if (!this.disclosureVersion) throw new Error("DISCLOSURE_REQUIRED_BEFORE_CONSENT");
     if (!ownerActorId) throw new Error("OWNER_ACTOR_ID_REQUIRED");
+    if (typeof accepted !== "boolean") throw new Error("CONSENT_BOOLEAN_REQUIRED");
+    if (typeof scope !== "string" || !scope.trim()) throw new Error("CONSENT_SCOPE_REQUIRED");
     this.consent = {
       ownerActorId, accepted: Boolean(accepted), disclosureVersion: this.disclosureVersion,
       scope, recordedAt: this.now(), withdrawnAt: null,
@@ -97,7 +99,9 @@ export class OperatorRoadsideController {
       throw new Error(`CAPTURE_NOT_ACTIVE:${this.state}`);
     }
     if (!CANONICAL_SLOTS.includes(slot)) throw new Error(`INVALID_CANONICAL_SLOT:${slot}`);
-    if (!artifactId || !/^[a-f0-9]{64}$/i.test(sha256Hex) || byteLength <= 0) {
+    if (typeof artifactId !== "string" || !artifactId.trim()
+        || !/^[a-f0-9]{64}$/i.test(sha256Hex)
+        || !Number.isSafeInteger(byteLength) || byteLength <= 0) {
       throw new Error("INVALID_ORIGINAL_ARTIFACT_METADATA");
     }
     const previous = this.slots.get(slot);
@@ -195,8 +199,14 @@ export class ReviewerWorkbenchController {
   }
 
   ingestSealedCase(caseEnvelope) {
+    if (!caseEnvelope || typeof caseEnvelope.sessionId !== "string" || !caseEnvelope.sessionId.trim()) {
+      throw new Error("SESSION_ID_REQUIRED");
+    }
     if (caseEnvelope.tenantId !== this.tenantId) throw new Error("CROSS_TENANT_ACCESS_DENIED");
     if (!caseEnvelope.integrityVerified) throw new Error("UNVERIFIED_MANIFEST_CANNOT_ENTER_QUEUE");
+    if (!Number.isFinite(caseEnvelope.confidence) || caseEnvelope.confidence < 0 || caseEnvelope.confidence > 1) {
+      throw new Error("INVALID_REVIEW_CONFIDENCE");
+    }
     const band = caseEnvelope.confidence < 0.5 ? "priority-review" : "standard-review";
     const record = {
       ...caseEnvelope, band, lockedBy: null, lockedAt: null,
@@ -232,6 +242,7 @@ export class ReviewerWorkbenchController {
     if (!Array.isArray(slotsToRetake) || slotsToRetake.length === 0) {
       throw new Error("RETAKE_SLOTS_REQUIRED");
     }
+    if (!reasonCode || !String(reasonCode).trim()) throw new Error("RETAKE_REASON_REQUIRED");
     for (const slot of slotsToRetake) {
       if (!CANONICAL_SLOTS.includes(slot)) throw new Error(`INVALID_RETAKE_SLOT:${slot}`);
     }
@@ -250,6 +261,10 @@ export class ReviewerWorkbenchController {
     if (!reasonCode || !String(reasonCode).trim()) throw new Error("REASON_CODE_REQUIRED");
     if (!Array.isArray(verifiedArtifactIds) || verifiedArtifactIds.length === 0) {
       throw new Error("VERIFIED_ARTIFACT_IDS_REQUIRED");
+    }
+    if (verifiedArtifactIds.some((id) => typeof id !== "string" || !id.trim())
+        || new Set(verifiedArtifactIds).size !== verifiedArtifactIds.length) {
+      throw new Error("INVALID_VERIFIED_ARTIFACT_IDS");
     }
     const decision = Object.freeze({
       sessionId, tenantId: this.tenantId, disposition, reviewerId: this.reviewerId,

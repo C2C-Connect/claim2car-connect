@@ -1,5 +1,7 @@
 # Claim2Car Connect / FAOS - San Antonio pilot
 
+Current implementation and release evidence are tracked in the [Acceptance & Release Gate Matrix](docs/acceptance/ACCEPTANCE_MATRIX.md). It distinguishes tested code from field validation and deployment authorization.
+
 ## Canonical product line
 
 C2C-Connect/claim2car-connect is the single canonical product repository.

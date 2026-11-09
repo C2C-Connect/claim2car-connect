@@ -1,5 +1,7 @@
 # Claim2Car Connect — Project Governance and Decision Register
 
+The current requirement-to-evidence status is recorded in the [Acceptance & Release Gate Matrix](acceptance/ACCEPTANCE_MATRIX.md); it does not replace the decisions and release controls in this register.
+
 **Status:** Active  
 **Effective:** 2026-11-06 (aligned to Master Pilot Execution Plan v1.3)  
 **Supersedes:** All prior pilot, M0/M1, review-posture, and Full Build Directive (2026-11-02) governance documents

@@ -13,8 +13,11 @@ class CommercialProhibitionTests(unittest.TestCase):
         from backend.app.reports import forensic_pdf
         from backend.app.triage import adjudicate
 
-        for module in (adjudicate, forensic_pdf):
-            source = inspect.getsource(module)
+        source_by_module = {
+            "triage": inspect.getsource(adjudicate),
+            "dossier_output_builder": inspect.getsource(forensic_pdf.build_dossier),
+        }
+        for source in source_by_module.values():
             for field in ('"owner_payout"', "'owner_payout'", '"owner_incentive"',
                           '"operator_payout_usd"', '"operator_payout"'):
                 self.assertNotIn(field, source)

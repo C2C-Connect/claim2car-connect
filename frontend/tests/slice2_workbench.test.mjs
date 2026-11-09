@@ -11,6 +11,7 @@ const operator = new OperatorRoadsideController({
   sessionId: "session-s2", tenantId: "tenant-a", operatorId: "operator-a", now,
 });
 operator.presentDisclosure("disclosure-v1");
+assert.throws(() => operator.recordConsent({ ownerActorId: "owner-a", accepted: "false" }), /CONSENT_BOOLEAN/);
 operator.recordConsent({ ownerActorId: "owner-a", accepted: true });
 operator.recordVehicleIdentification({ vin: "1HGCM82633A004352" });
 operator.pauseForRoadsideSafety("police_control");
@@ -28,6 +29,7 @@ assert.equal(restored.auditLog.find((e) => e.kind === "VEHICLE_IDENTIFIED").payl
 const reviewer = new ReviewerWorkbenchController({ reviewerId: "reviewer-a", tenantId: "tenant-a", now });
 assert.throws(() => reviewer.ingestSealedCase({ sessionId: "cross", tenantId: "tenant-b", integrityVerified: true }), /CROSS_TENANT/);
 assert.throws(() => reviewer.ingestSealedCase({ sessionId: "bad", tenantId: "tenant-a", integrityVerified: false }), /UNVERIFIED_MANIFEST/);
+assert.throws(() => reviewer.ingestSealedCase({ sessionId: "bad-confidence", tenantId: "tenant-a", integrityVerified: true, confidence: 2 }), /INVALID_REVIEW_CONFIDENCE/);
 reviewer.ingestSealedCase({ sessionId: "priority", tenantId: "tenant-a", integrityVerified: true, confidence: 0.2 });
 reviewer.ingestSealedCase({ sessionId: "standard", tenantId: "tenant-a", integrityVerified: true, confidence: 0.9 });
 assert.equal(reviewer.getOrderedQueue()[0].sessionId, "priority");
