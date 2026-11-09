@@ -1,0 +1,36 @@
+# Integrated Claim2Car runtime: capture, review, and internal analysis.
+# Requires mounted persistent evidence storage and out-of-band runtime secrets.
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    C2C_RUNTIME_MODE=integrated \
+    C2C_CAPTURE_CONFIG_FILE=/run/secrets/claim2car-runtime.json \
+    C2C_ARTIFACT_STORAGE_ROOT=/var/lib/claim2car/evidence
+
+WORKDIR /srv/claim2car
+COPY requirements-api.txt requirements-database.txt ./
+RUN pip install --no-cache-dir -r requirements-api.txt \
+    && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin claim2car \
+    && mkdir -p /var/lib/claim2car/evidence \
+    && chown -R 10001:10001 /var/lib/claim2car
+
+COPY app/ ./app/
+COPY backend/ ./backend/
+COPY config/ ./config/
+COPY database/ ./database/
+COPY contracts/ ./contracts/
+COPY migrations/ ./migrations/
+COPY authority_migrations/ ./authority_migrations/
+
+USER 10001:10001
+EXPOSE 8000
+VOLUME ["/var/lib/claim2car/evidence"]
+
+# Liveness is intentionally independent of database availability. Orchestrators
+# should use /health/ready for readiness and traffic admission.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3).read()"
+
+CMD ["python", "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-proxy-headers"]
