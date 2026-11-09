@@ -136,3 +136,22 @@ class OriginalByteStore:
             raise ArtifactNotFound('ARTIFACT_NOT_FOUND') from None
         except OSError:
             raise ArtifactStorageUnavailable('ARTIFACT_STORAGE_UNAVAILABLE') from None
+
+    def delete(self, key):
+        """Idempotently remove one original object and persist the directory change."""
+        if not isinstance(key, ArtifactKey):
+            raise ValueError('INVALID_ARTIFACT_KEY')
+        try:
+            with self._directory(key, create=False) as directory:
+                try:
+                    os.unlink(str(key.artifact_id) + '.original', dir_fd=directory)
+                except FileNotFoundError:
+                    return False
+                os.fsync(directory)
+                return True
+        except FileNotFoundError:
+            if not self.root.is_dir():
+                raise ArtifactStorageUnavailable('ARTIFACT_STORAGE_UNAVAILABLE') from None
+            return False
+        except OSError:
+            raise ArtifactStorageUnavailable('ARTIFACT_STORAGE_UNAVAILABLE') from None

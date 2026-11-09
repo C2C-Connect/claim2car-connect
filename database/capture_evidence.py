@@ -2,7 +2,7 @@
 
 Metadata is committed to the existing RLS-protected append-only event journal.
 Original media is written to the administrator-provisioned POSIX byte store;
-no raw VIN is persisted, and consent withdrawal blocks subsequent evidence use.
+no raw VIN is persisted, and consent withdrawal deletes registered originals.
 """
 from __future__ import annotations
 
@@ -131,23 +131,37 @@ class CaptureEvidenceService:
                 "scope": scope,
                 "request_id": request_id,
             }
+            replayed = False
             for kind, _event_actor, old, old_id in history:
                 if old_id == event_id:
                     if kind == "CONSENT_RECORDED" and old == payload:
-                        return {"session_id": session_id, "accepted": accepted, "replayed": True}
+                        replayed = True
+                        break
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
-            consent_events = [(who, data) for kind, who, data, _ in history if kind == "CONSENT_RECORDED"]
-            if accepted:
-                if consent_events:
-                    raise CaptureSessionConflict("CONSENT_ALREADY_RECORDED")
-                if any(kind in ("VEHICLE_RECORDED", "ARTIFACT_REGISTERED", "QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for kind, *_ in history):
-                    raise CaptureSessionConflict("CONSENT_ORDER_VIOLATION")
-            else:
-                if consent_events and (previous is None or previous[0] != actor.actor_id):
+            if not replayed:
+                consent_events = [(who, data) for kind, who, data, _ in history if kind == "CONSENT_RECORDED"]
+                if accepted:
+                    if consent_events:
+                        raise CaptureSessionConflict("CONSENT_ALREADY_RECORDED")
+                    if any(kind in ("VEHICLE_RECORDED", "ARTIFACT_REGISTERED", "QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for kind, *_ in history):
+                        raise CaptureSessionConflict("CONSENT_ORDER_VIOLATION")
+                elif consent_events and (previous is None or previous[0] != actor.actor_id):
                     raise CaptureAuthorizationError("CONSENT_OWNER_REQUIRED")
-            self._append(conn, actor, session_id, history, event_id=event_id,
-                         kind="CONSENT_RECORDED", reason="owner consent state recorded", payload=payload)
-        return {"session_id": session_id, "accepted": accepted, "replayed": False}
+                self._append(conn, actor, session_id, history, event_id=event_id,
+                             kind="CONSENT_RECORDED", reason="owner consent state recorded", payload=payload)
+                history.append(("CONSENT_RECORDED", actor.actor_id, payload, event_id))
+            if not accepted:
+                artifacts = [data["artifact_id"] for kind, _who, data, _ in history
+                    if kind == "ARTIFACT_REGISTERED" and type(data) is dict
+                    and isinstance(data.get("artifact_id"), str)]
+                deletion_tenant = actor.tenant_id
+            else:
+                artifacts = []
+                deletion_tenant = actor.tenant_id
+        deleted = sum(bool(self.byte_store.delete(
+            ArtifactKey(deletion_tenant, UUID(session_id), UUID(artifact_id)))) for artifact_id in artifacts)
+        return {"session_id": session_id, "accepted": accepted, "replayed": replayed,
+                "deleted_original_artifacts": deleted}
 
     def record_vehicle(self, authorization, session_id, *, request_id, vin):
         session_id = self._session_id(session_id)

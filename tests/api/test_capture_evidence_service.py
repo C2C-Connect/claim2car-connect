@@ -82,6 +82,9 @@ class RecordingByteStore(OriginalByteStore):
             raise ValueError("ARTIFACT_HASH_MISMATCH")
         return data
 
+    def delete(self, key):
+        return self.originals.pop(key, None) is not None
+
 
 class CaptureEvidenceServiceTests(unittest.TestCase):
     def setUp(self):
@@ -171,6 +174,7 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
             "owner-token", self.session_id, request_id=UUID(int=13),
             accepted=False, scope="capture_review",
         )
+        self.assertEqual(len(self.byte_store.originals), 0)
         with self.assertRaisesRegex(CaptureSessionConflict, "ACTIVE_OWNER_CONSENT_REQUIRED"):
             self.service.register_artifact(
                 "operator-token", self.session_id, request_id=UUID(int=14),

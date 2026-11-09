@@ -73,6 +73,14 @@ class OriginalByteStoreTests(unittest.TestCase):
             with self.assertRaises(ArtifactNotFound):
                 self.store.get(key, expected_sha256=self.digest)
 
+    def test_delete_is_durable_and_idempotent(self):
+        self.put()
+        self.assertTrue(self.store.delete(self.key))
+        self.assertFalse(self.path().exists())
+        self.assertFalse(self.store.delete(self.key))
+        with self.assertRaises(ArtifactNotFound):
+            self.store.get(self.key, expected_sha256=self.digest)
+
     def test_concurrent_identical_writers_create_once(self):
         with ThreadPoolExecutor(max_workers=8) as workers:
             receipts = list(workers.map(lambda _: self.put(), range(16)))
