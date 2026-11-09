@@ -181,7 +181,7 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
                 artifact_id=UUID(int=15), slot="front_left", payload_base64=encoded,
                 sha256_hex=digest,
             )
-        self.assertEqual(len(self.byte_store.originals), 1)
+        self.assertEqual(len(self.byte_store.originals), 0)
 
     def test_quality_is_advisory_then_integrity_seal_and_human_review(self):
         self.service.record_consent(
