@@ -81,6 +81,34 @@ class TenantAuthorityIntegration(unittest.TestCase):
         for tenant in self.tenants:
             self.assert_no_authority(self.unbound,tenant)
 
+    def test_dealer_fee_cannot_be_booked_from_partner_acceptance(self):
+        tenant = self.tenants[0]
+        conn = self.connections[0]
+        lines = [
+            {"account_code": "AR:DEALER:dealer-org", "direction": "DEBIT", "amount_cents": 37500},
+            {"account_code": "REV:DEALER_ACQUISITION", "direction": "CREDIT", "amount_cents": 37500},
+        ]
+        with tenant_transaction(conn, tenant):
+            with self.assertRaises(psycopg.errors.RaiseException) as caught:
+                conn.execute(
+                    "SELECT faos.append_financial_entry("
+                    "%s::uuid,%s::text,%s::bigint,%s::text,%s::text,%s::text,"
+                    "%s::text,%s::text,%s::text,%s::bigint,%s::text,%s::text,"
+                    "%s::text,%s::text,%s::text,%s::text,%s::text,%s::jsonb)",
+                    (
+                        tenant, "dealer-acceptance-attempt", 1, "dealer-acceptance-attempt",
+                        self.session, "OBLIGATION_BOOKED", "DEALER_ACQUISITION_FEE",
+                        "dealer-org", "acceptance-not-close", 37500, "USD_CENTS",
+                        "operator-1", "2026-11-09T00:00:00+00:00",
+                        "attempted fee on dealer acceptance", None, "0" * 64,
+                        "1" * 64, json.dumps(lines),
+                    ),
+                )
+        self.assertEqual(
+            caught.exception.diag.message_primary,
+            "DEALER_QUALIFIED_CLOSE_WORKFLOW_NOT_ENABLED",
+        )
+
     def test_application_cannot_read_or_modify_authority_registry(self):
         for statement in ('SELECT * FROM faos.tenant_login_bindings','UPDATE faos.tenant_login_bindings SET enabled=enabled'):
             with self.subTest(statement=statement):
