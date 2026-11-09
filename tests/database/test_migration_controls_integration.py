@@ -96,6 +96,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0008_tenant_login_authority'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0009_integer_financial_ledger'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
