@@ -1,0 +1,161 @@
+name: Integrated runtime container smoke
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile.integrated"
+      - ".dockerignore"
+      - "requirements-api.txt"
+      - "requirements-database.txt"
+      - "app/**"
+      - "backend/**"
+      - "config/**"
+      - "database/**"
+      - "contracts/**"
+      - "migrations/**"
+      - "authority_migrations/**"
+      - ".github/workflows/integrated-container-smoke.yml"
+  push:
+    branches: [main, "cto/**"]
+    paths:
+      - "Dockerfile.integrated"
+      - ".dockerignore"
+      - "requirements-api.txt"
+      - "requirements-database.txt"
+      - "app/**"
+      - "backend/**"
+      - "config/**"
+      - "database/**"
+      - "contracts/**"
+      - "migrations/**"
+      - "authority_migrations/**"
+      - ".github/workflows/integrated-container-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build integrated application image
+        run: docker build --file Dockerfile.integrated --tag claim2car-integrated:ci .
+
+      - name: Prepare synthetic runtime configuration
+        env:
+          C2C_INTERNAL_SERVICE_TOKEN: "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
+          C2C_VIN_HMAC_PEPPER: "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+          C2C_OPERATOR_TOKEN: "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO"
+        run: |
+          mkdir -p "$RUNNER_TEMP/claim2car-evidence"
+          chmod 0777 "$RUNNER_TEMP/claim2car-evidence"
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import time
+          import uuid
+          from pathlib import Path
+
+          token = os.environ["C2C_OPERATOR_TOKEN"]
+          value = {
+              "health_database_url": "postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test",
+              "dsn_by_role": {
+                  "tenant_login_operator": "postgresql://tenant_login_operator:synthetic-operator-only@127.0.0.1:55432/claim2car_test"
+              },
+              "credentials": [{
+                  "actor_id": "ci-operator",
+                  "tenant_id": str(uuid.UUID(int=1)),
+                  "database_role": "tenant_login_operator",
+                  "token_sha256": hashlib.sha256(token.encode("ascii")).hexdigest(),
+                  "expires_at": int(time.time()) + 3600,
+                  "enabled": True,
+                  "actor_role": "operator"
+              }]
+          }
+          Path(os.environ["RUNNER_TEMP"], "claim2car-runtime.json").write_text(
+              json.dumps(value), encoding="utf-8"
+          )
+          PY
+
+      - name: Start integrated container
+        env:
+          C2C_INTERNAL_SERVICE_TOKEN: "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
+          C2C_VIN_HMAC_PEPPER: "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+        run: |
+          docker run --detach --name claim2car-integrated-ci \
+            --publish 127.0.0.1:18080:8000 \
+            --mount "type=bind,src=$RUNNER_TEMP/claim2car-runtime.json,dst=/run/secrets/claim2car-runtime.json,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/claim2car-evidence,dst=/var/lib/claim2car/evidence" \
+            --env C2C_INTERNAL_SERVICE_TOKEN="$C2C_INTERNAL_SERVICE_TOKEN" \
+            --env C2C_VIN_HMAC_PEPPER="$C2C_VIN_HMAC_PEPPER" \
+            claim2car-integrated:ci
+
+      - name: Verify integrated routes and security boundaries
+        env:
+          C2C_INTERNAL_SERVICE_TOKEN: "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          from urllib.error import HTTPError
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:18080"
+          token = os.environ["C2C_INTERNAL_SERVICE_TOKEN"]
+
+          def request(path, *, method="GET", body=None, bearer=None):
+              headers = {}
+              data = None
+              if body is not None:
+                  data = json.dumps(body).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+              if bearer:
+                  headers["Authorization"] = "Bearer " + bearer
+              req = Request(base + path, data=data, headers=headers, method=method)
+              try:
+                  with urlopen(req, timeout=5) as response:
+                      return response.status, response.read()
+              except HTTPError as error:
+                  return error.code, error.read()
+
+          for attempt in range(45):
+              try:
+                  status, _ = request("/health/live")
+                  if status == 200:
+                      break
+              except Exception:
+                  pass
+              time.sleep(1)
+          else:
+              raise RuntimeError("INTEGRATED_CONTAINER_DID_NOT_BECOME_LIVE")
+
+          assert request("/internal/v1/analysis/health")[0] == 401
+          assert request("/internal/v1/analysis/health", bearer=token)[0] == 200
+          status, body = request(
+              "/internal/v1/analysis/physics",
+              method="POST",
+              bearer=token,
+              body={"mass_kg": 1500, "velocity_kph": 30, "zones": []},
+          )
+          assert status == 200, body.decode("utf-8", errors="replace")
+          assert b"e_k_j" in body
+          assert request("/api/v1/review-queue")[0] == 401
+          assert request(
+              "/api/v1/analysis/physics",
+              method="POST",
+              body={"mass_kg": 1500, "velocity_kph": 30, "zones": []},
+          )[0] == 404
+          PY
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs claim2car-integrated-ci || true
+
+      - name: Stop integrated container
+        if: always()
+        run: docker rm --force claim2car-integrated-ci || true
