@@ -6,8 +6,20 @@ import unittest
 
 from config import forensic_constants as C
 
+PROHIBITED_CONSTANT_NAMES = frozenset({
+    "OWNER_PAYOUT", "OWNER_INCENTIVE", "OWNER_CASH_INCENTIVE",
+    "VEHICLE_OWNER_INCENTIVE", "OPERATOR_PAYOUT", "TOW_OPERATOR_PAYOUT",
+    "OPERATOR_PAYOUT_USD",
+})
+
 
 class CommercialProhibitionTests(unittest.TestCase):
+    def test_prohibited_and_gated_compensation_constants_are_absent(self):
+        exported = {name for name in dir(C) if not name.startswith("__")}
+        self.assertFalse(PROHIBITED_CONSTANT_NAMES & exported)
+        self.assertTrue(hasattr(C, "P_BRITTLE_BETA"))
+        self.assertTrue(hasattr(C, "DEFAULT_TAX_RATE"))
+
     def test_owner_cash_incentive_and_operator_payout_are_not_active_outputs(self):
         """The owner incentive is prohibited; operator compensation is not approved."""
         from backend.app.reports import forensic_pdf

@@ -163,8 +163,8 @@ def test_build_dispatch_four_packages():
 
 
 def test_no_owner_payout():
-    # The unresolved operator amount is retained as a decision record only;
-    # no owner payout constant or payout field is exposed in generated output.
-    assert C.OPERATOR_PAYOUT_USD == 110.0
+    # The unresolved operator policy is retained in governance only; no amount
+    # constant or payout field is exposed in generated output.
+    assert not hasattr(C, "OPERATOR_PAYOUT_USD")
     assert not hasattr(C, "OWNER_PAYOUT_USD")
     assert not hasattr(C, "OWNER_CONSENT_PAYOUT_USD")

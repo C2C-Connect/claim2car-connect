@@ -6,10 +6,10 @@ Single source of truth for weights, thresholds, and commercial parameters.
 VERSION = "2026.11.06.1"  # Owner fee decision 2026-11-06: flat dealer $375, shop $275
 
 # --- Commercial ---
-OPERATOR_PAYOUT_USD = 110.0
 # OWNER payout intentionally absent — permanently excluded per legal counsel.
-# Operator payout trigger: OPEN (plan v1.3 D-04) — amount carried forward only;
-# eligibility, trigger, split, reversals, and ledger treatment not yet decided.
+# Operator payout remains disabled (plan v1.3 D-04); no amount constant or
+# settlement path is active until eligibility, trigger, split, reversals, and
+# ledger treatment receive explicit policy approval.
 # Shop acceptance of the vehicle authorizes tow dispatch to that shop (confirmed
 # in plan v1.3), independent of payout. See docs/acceptance/product-contract.md.
 

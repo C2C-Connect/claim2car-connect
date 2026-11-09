@@ -147,5 +147,5 @@ def test_adjudicator_end_to_end():
 
 
 def test_no_owner_payout_constant():
-    assert C.OPERATOR_PAYOUT_USD == 110.0
+    assert not hasattr(C, "OPERATOR_PAYOUT_USD")
     assert not hasattr(C, "OWNER_PAYOUT_USD")
