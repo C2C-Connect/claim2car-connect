@@ -89,8 +89,8 @@ class TenantAuthorityIntegration(unittest.TestCase):
             {"account_code": "AR:DEALER:dealer-org", "direction": "DEBIT", "amount_cents": 37500},
             {"account_code": "REV:DEALER_ACQUISITION", "direction": "CREDIT", "amount_cents": 37500},
         ]
-        with tenant_transaction(conn, tenant):
-            with self.assertRaises(psycopg.errors.RaiseException) as caught:
+        with self.assertRaises(psycopg.errors.RaiseException) as caught:
+            with tenant_transaction(conn, tenant):
                 conn.execute(
                     "SELECT faos.append_financial_entry("
                     "%s::uuid,%s::text,%s::bigint,%s::text,%s::text,%s::text,"
