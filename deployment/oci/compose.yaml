@@ -1,0 +1,116 @@
+name: claim2car
+
+services:
+  postgres:
+    image: ${C2C_POSTGRES_IMAGE:?Set C2C_POSTGRES_IMAGE to a verified immutable digest}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: claim2car
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    secrets:
+      - postgres_password
+    volumes:
+      - type: bind
+        source: /srv/claim2car/data/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d claim2car"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  app:
+    image: ${C2C_IMAGE:?Set C2C_IMAGE to an immutable OCI Registry image digest}
+    restart: unless-stopped
+    env_file:
+      - /etc/claim2car/runtime.env
+    environment:
+      C2C_RUNTIME_MODE: integrated
+      C2C_CAPTURE_CONFIG_FILE: /run/secrets/claim2car-runtime.json
+      C2C_ARTIFACT_STORAGE_ROOT: /var/lib/claim2car/evidence
+    secrets:
+      - claim2car_runtime
+    volumes:
+      - type: bind
+        source: /srv/claim2car/data/evidence
+        target: /var/lib/claim2car/evidence
+        bind:
+          create_host_path: false
+    networks:
+      - edge
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
+
+  migrator:
+    image: ${C2C_IMAGE:?Set C2C_IMAGE to an immutable OCI Registry image digest}
+    profiles: [migrations]
+    env_file:
+      - /etc/claim2car/migration.env
+    command: ["python", "-m", "database.authority_migrate"]
+    networks:
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: ${C2C_CADDY_IMAGE:?Set C2C_CADDY_IMAGE to a verified immutable digest}
+    restart: unless-stopped
+    environment:
+      C2C_DOMAIN: ${C2C_DOMAIN:?Set C2C_DOMAIN to the DNS name assigned to the instance}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - edge
+    depends_on:
+      app:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  edge: {}
+  data:
+    internal: true
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  postgres_password:
+    file: /etc/claim2car/secrets/postgres_password
+  claim2car_runtime:
+    file: /etc/claim2car/secrets/claim2car-runtime.json

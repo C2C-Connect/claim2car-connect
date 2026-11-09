@@ -1,0 +1,15 @@
+[Unit]
+Description=Quiesced Claim2Car database and evidence backup to OCI Object Storage
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/claim2car/deployment/oci/backup.sh
+User=root
+Group=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/claim2car /srv/claim2car/data /var/lib/docker /run/docker.sock /etc/claim2car

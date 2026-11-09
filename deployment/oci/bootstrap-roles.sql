@@ -1,0 +1,9 @@
+-- Run once against the empty `claim2car` database as its administrator.
+-- Set login passwords out-of-band through the OCI Vault secret workflow.
+CREATE ROLE faos_migrator LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+CREATE ROLE faos_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+CREATE ROLE faos_fixture NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+CREATE ROLE faos_writer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+GRANT CONNECT, CREATE ON DATABASE claim2car TO faos_migrator;
+GRANT USAGE, CREATE ON SCHEMA public TO faos_migrator;
+GRANT faos_writer TO faos_migrator;
