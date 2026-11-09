@@ -118,7 +118,11 @@ class AnalysisSurfaceIsolationTests(unittest.TestCase):
         from fastapi.testclient import TestClient
 
         token = "t" * 43
-        with patch("app.intake_api.create_intake_app", return_value=FastAPI()), patch.dict(
+        intake = FastAPI()
+        intake.get("/v1/capture-sessions")(
+            lambda: {"scope": "tenant-authenticated-intake"}
+        )
+        with patch("app.intake_api.create_intake_app", return_value=intake), patch.dict(
             os.environ, {"C2C_INTERNAL_SERVICE_TOKEN": token}
         ):
             integrated = create_app(Settings(), runtime_mode="integrated")
@@ -134,8 +138,12 @@ class AnalysisSurfaceIsolationTests(unittest.TestCase):
                     "/internal/v1/analysis/health",
                     headers={"Authorization": f"Bearer {token}"},
                 )
+                intake_route = client.get("/api/v1/capture-sessions")
             self.assertEqual(missing.status_code, 401)
             self.assertEqual(accepted.status_code, 200)
+            self.assertEqual(
+                intake_route.json(), {"scope": "tenant-authenticated-intake"}
+            )
 
     def test_runtime_mode_rejects_unknown_values(self):
         with self.assertRaisesRegex(ValueError, "INVALID_C2C_RUNTIME_MODE"):
