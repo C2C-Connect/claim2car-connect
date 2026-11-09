@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1",
+  "model_version": "carrier-message-v1",
+  "alignment": "CIECA BMS/API message categories (Claim, FNOL, Assignment, Estimate, Attachment, Disposition, Status). Field-level CIECA mapping requires CIECA membership access to the standard; see docs/carrier-integration.md. No CIECA compliance is claimed.",
+  "message_types": {
+    "CLAIM_STATUS": {
+      "required_payload": ["status", "session_id"],
+      "optional_payload": ["vin"]
+    },
+    "ASSIGNMENT": {
+      "required_payload": ["party_type", "party_id", "accepted_at", "location_label", "dispatch_total_minutes"],
+      "optional_payload": []
+    },
+    "ATTACHMENT": {
+      "required_payload": ["manifest_digest", "shot_list_version", "artifact_count"],
+      "optional_payload": []
+    },
+    "DISPOSITION": {
+      "required_payload": ["disposition", "actor", "occurred_at", "reason", "artifact_ids"],
+      "optional_payload": []
+    },
+    "ESTIMATE": {
+      "required_payload": [],
+      "optional_payload": [],
+      "note": "Reserved for M5 analysis output; not built in this version."
+    }
+  },
+  "envelope_required": ["message_id", "message_type", "schema_version", "model_version", "created_at", "session_id", "source_event_id"]
+}

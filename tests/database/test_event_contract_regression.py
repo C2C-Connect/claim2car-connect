@@ -109,5 +109,99 @@ class DurableTimestampRegression(unittest.TestCase):
         self.assertEqual(self.fixture.history()[-1][4],timestamp)
 
 
+
+class DirectSqlCanonicalParityRegression(unittest.TestCase):
+    """Characterize direct-SQL bypasses until #26's database fix lands.
+
+    These tests intentionally prove the current defect: the restricted app
+    role can append representations rejected by DomainEvent.validate() on
+    readback. Replace these assertions with rejection/no-mutation assertions
+    when PostgreSQL enforces full Python contract parity.
+    """
+
+    def setUp(self):
+        import test_journal_integration as fixtures
+        self.fixture = fixtures.TestJournalIntegration()
+        self.addCleanup(self.fixture.doCleanups)
+        self.fixture.setUp()
+        self.conn = self.fixture.conn
+        self.before = self.fixture.history()
+
+    def append_direct_and_assert_readback_rejects(self, event_id, timestamp, payload, error):
+        from app.domain_events import DomainEvent
+        f = self.fixture
+        result = self.conn.execute(
+            'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,'
+            '%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+            (f.tenant, f.session, event_id, 2, 'SESSION_CREATED',
+             'synthetic-direct-sql-probe', timestamp, 'canonical parity probe',
+             payload, '0.1'),
+        ).fetchone()[0]
+        self.assertEqual(result, 'ACCEPTED')
+        row = self.conn.execute(
+            'SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,'
+            'payload_json,schema_version FROM faos.events '
+            'WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
+            (f.tenant, f.session, event_id),
+        ).fetchone()
+        self.assertIsNotNone(row)
+        with self.assertRaisesRegex(ValueError, '^' + error + '$'):
+            DomainEvent(*row).validate()
+        after = f.history()
+        self.assertEqual(len(after), len(self.before) + 1)
+        self.assertEqual(after[:-1], self.before)
+
+    def test_direct_sql_accepts_timezone_naive_timestamp_that_readback_rejects(self):
+        self.append_direct_and_assert_readback_rejects(
+            'naive-timestamp', '2026-01-01T00:00:00', '{}', 'INVALID_TIMESTAMP'
+        )
+
+    def test_direct_sql_accepts_noncanonical_key_order_that_readback_rejects(self):
+        self.append_direct_and_assert_readback_rejects(
+            'unordered-keys', '2026-01-01T00:00:00Z',
+            '{"z":1,"a":2}', 'NONCANONICAL_PAYLOAD'
+        )
+
+    def test_direct_sql_accepts_literal_unicode_that_readback_rejects(self):
+        self.append_direct_and_assert_readback_rejects(
+            'unicode-literal', '2026-01-01T00:00:00Z',
+            '{"label":"é"}', 'NONCANONICAL_PAYLOAD'
+        )
+
+    def test_direct_sql_accepts_numeric_exponent_that_readback_rejects(self):
+        self.append_direct_and_assert_readback_rejects(
+            'numeric-exponent', '2026-01-01T00:00:00Z',
+            '{"value":1e0}', 'NONCANONICAL_PAYLOAD'
+        )
+
+    def test_direct_sql_valid_event_round_trips_exact_payload_bytes(self):
+        from app.domain_events import DomainEvent, EventJournal
+        f = self.fixture
+        payload = '{"a":1,"z":"\\u00e9"}'
+        result = self.conn.execute(
+            'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,'
+            '%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+            (f.tenant, f.session, 'canonical-positive-control', 2,
+             'SESSION_CREATED', 'synthetic-test', '2026-01-01T00:00:00Z',
+             'canonical positive control', payload, '0.1'),
+        ).fetchone()[0]
+        self.assertEqual(result, 'ACCEPTED')
+        row = self.conn.execute(
+            'SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,'
+            'payload_json,schema_version FROM faos.events '
+            'WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
+            (f.tenant, f.session, 'canonical-positive-control'),
+        ).fetchone()
+        self.assertEqual(row[7], payload)
+        event = DomainEvent(*row)
+        first = DomainEvent(
+            f.session, 'event-1', 1, 'SESSION_CREATED', 'synthetic-test',
+            '2026-01-01T00:00:00Z', 'journal integration', '{}',
+        )
+        self.assertEqual(
+            EventJournal.replay(f.session, (first, event)).events[-1], event
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
