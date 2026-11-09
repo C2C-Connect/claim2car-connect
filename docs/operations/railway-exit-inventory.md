@@ -9,14 +9,14 @@
 
 ## Observed resources
 
-- The workspace dashboard listed one project and the project canvas showed one application service.
+- The workspace dashboard listed one project and the project canvas showed one application service. The account workspace selector showed the current workspace and an option to create another; no other existing workspace was listed.
 - The service source is `C2C-Connect/claim2car-connect` on GitHub. Railway showed the connected repository as current.
 - The service had no active deployment. Railway reported that its deployment had been removed after remaining crashed too long.
 - The service had no public domain. It had an internal `claim2car-connect.railway.internal` DNS name.
 - Auto deploy was disabled. The builder was Railway Railpack.
-- The service Variables page showed no user-defined environment variables. It listed seven Railway-provided system variables; no values were exported.
-- The project canvas showed no database or other service. No attached volume was visible.
-- Workspace settings showed a **Trial Workspace** plan with a $5 credit balance. Railway says deployments shut down when credits are exhausted. A billing-information section displayed a payment-method area labeled “Used for verification purposes”; payment details were not opened or copied. No paid plan was visible.
+- The service Variables page showed no user-defined environment variables. It listed seven Railway-provided system variables; no values were exported. The workspace had one API token, created 2026-11-05; its token value was masked and not copied. No workspace SSH keys were registered.
+- The project canvas showed no database or other service. No attached volume was visible. The workspace had no Railway-managed custom domains. The People page listed one admin member; two-factor authentication was off.
+- Workspace settings showed a **Trial Workspace** plan with a $5 credit balance. Railway says deployments shut down when credits are exhausted. There was no payment method on file, no billing history, and no paid plan.
 
 ## What was preserved
 
@@ -35,8 +35,9 @@ The technical exit path is to keep the OCI container build provider-neutral and 
 
 ## Not inspected
 
-- Billing history and payment-method details. The plan screen showed Trial Workspace and no paid plan.
+- Historical deployment logs and build artifacts.
 - Historical deployment logs and build artifacts.
 - The contents of Railway-generated environment variables (these are platform-provided values, not user-defined secrets).
+
 
 
