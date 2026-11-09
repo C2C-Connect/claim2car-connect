@@ -61,7 +61,7 @@ class IntegerFinancialLedgerTests(unittest.TestCase):
             self.acceptance("shop"), idempotency_key="same", actor_id="marketplace"
         )
         self.assertIs(entry, self.ledger.record_partner_acceptance_obligation(
-            self.acceptance(), idempotency_key="same", actor_id="marketplace"
+            self.acceptance("shop"), idempotency_key="same", actor_id="marketplace"
         ))
         reversal = self.ledger.record_reversal_or_dispute_refund(
             entry.entry_id, idempotency_key="reverse-1", actor_id="finance", reason="disputed"
