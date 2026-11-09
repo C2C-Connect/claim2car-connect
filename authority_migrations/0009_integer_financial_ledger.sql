@@ -95,6 +95,10 @@ BEGIN
  IF p_entry_kind='OBLIGATION_BOOKED' THEN
   IF p_reverses IS NOT NULL THEN RAISE EXCEPTION 'INVALID_REVERSAL_REFERENCE'; END IF;
   IF p_fee_type='DEALER_ACQUISITION_FEE' THEN
+   -- A dealer acceptance is not the approved fee trigger. Until the
+   -- qualified-acquisition-close event is integrated, fail closed even for
+   -- direct calls to this SECURITY DEFINER function.
+   RAISE EXCEPTION 'DEALER_QUALIFIED_CLOSE_WORKFLOW_NOT_ENABLED';
    IF p_amount<>37500 THEN RAISE EXCEPTION 'FEE_SCHEDULE_MISMATCH'; END IF;
    expected_lines:=jsonb_build_array(
     jsonb_build_object('account_code','AR:DEALER:'||p_partner,'direction','DEBIT','amount_cents',37500),
