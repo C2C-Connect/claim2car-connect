@@ -1,4 +1,4 @@
-# Health-only FastAPI foundation
+# FastAPI foundation and integrated runtime
 
 ## Run locally
 
@@ -9,9 +9,19 @@ securely for an approved restricted application login, then run:
 python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-No database URL fallback, migrations, seeds, cloud provisioning or business writes
-occur at application startup. Missing configuration still allows liveness but
-returns HTTP503 for readiness. The default bind in this command is loopback only.
+The default runtime mode is `restricted_staging`: no database URL fallback,
+migrations, seeds, cloud provisioning or business writes occur at startup.
+Missing configuration still allows liveness but returns HTTP503 for readiness.
+The default bind in this command is loopback only.
+
+The integrated runtime is an explicit opt-in for a separately provisioned
+environment. It requires `C2C_RUNTIME_MODE=integrated`, a private
+`C2C_CAPTURE_CONFIG_FILE`, `C2C_ARTIFACT_STORAGE_ROOT` on administrator-owned
+persistent POSIX storage, and a random ASCII `C2C_VIN_HMAC_PEPPER` with at least
+32 characters. The capture config contains the health DSN, one least-privilege
+tenant login DSN per credential, and server-owned actor/tenant/role bindings.
+Owner roles must be explicitly configured; omitted roles default to operator.
+Never place these values in source, image layers, or logs.
 
 ## Endpoint contract
 
@@ -22,8 +32,13 @@ returns HTTP503 for readiness. The default bind in this command is loopback only
   FORCE RLS. The query reads catalogs only; it does not read tenant data or the
   private authority registry. Otherwise HTTP503; exception details/DSNs are not
   returned. Both outcomes carry `scope: infrastructure-only` and no-store headers.
-- No packet intake, authentication, dealer routing, payment or other business
-  mutation endpoint is exposed. OpenAPI/docs routes are disabled in this increment.
+- `restricted_staging` exposes only the liveness/readiness routes documented below.
+- `integrated` mounts tenant-authenticated intake at `/api/v1/*` and fail-closed,
+  service-authenticated analytical routes at `/internal/v1/{analysis,triage,dispatch}/*`.
+- Consent, HMAC VIN references, and immutable original-byte uploads require
+  the integrated mode and provisioned persistent storage/pepper settings.
+- OpenAPI/docs routes remain disabled. Payments and external delivery are not
+  part of this runtime.
 
 Readiness is a bounded infrastructure prerequisite check, not migration checksum
 attestation, tenant enrollment/authorization, end-to-end business readiness or

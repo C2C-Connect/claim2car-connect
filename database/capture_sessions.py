@@ -1,7 +1,8 @@
-"""Controlled-test capture sessions; service methods only, no HTTP routes.
+"""Tenant-authorized capture session journal operations.
 
-Server-owned credentials/DSNs are required. This creates synthetic draft sessions,
-not consent records, uploaded evidence, diagnoses, or production-ready intake.
+Server-owned credentials/DSNs and PostgreSQL RLS are required. Session creation
+is only a synthetic draft; consent and evidence methods live in
+`database.capture_evidence` and require explicitly configured roles/storage.
 """
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -97,6 +98,8 @@ class CaptureSessionStore:
     def create(self,authorization,session_id):
         session_id=self._identifier(session_id)
         with self._authorized(authorization) as (conn,actor):
+            if actor.actor_role not in ('operator','supervisor'):
+                raise CaptureAuthorizationError('OPERATOR_IDENTITY_REQUIRED')
             inserted=conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s) '
                                   'ON CONFLICT DO NOTHING RETURNING session_id',(actor.tenant_id,session_id)).fetchone() is not None
             if inserted:

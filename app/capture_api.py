@@ -1,7 +1,9 @@
-"""Controlled-test capture API. No images, consent or diagnosis endpoints.
+"""Tenant-bound capture APIs over server-owned credentials and PostgreSQL RLS.
 
-Run app.capture_api:create_capture_app --factory using a private server-owned
-C2C_CAPTURE_CONFIG_FILE. Service credentials are not end-user sign-in.
+Session/draft routes support controlled tests. Consent, HMAC VIN-reference and
+original-byte registration routes are added only by the integrated runtime,
+which requires separately provisioned persistent storage and secrets. Service
+credentials are not end-user sign-in; actor roles come from private config.
 """
 from dataclasses import asdict, dataclass, field
 import json
@@ -14,7 +16,7 @@ from fastapi import Depends, Header, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, StrictBool, StrictStr
 from psycopg import ProgrammingError
 from psycopg.conninfo import conninfo_to_dict
 
@@ -24,6 +26,8 @@ from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound,
     CaptureSessionStore, CaptureStorageUnavailable,
 )
+from app.artifact_storage import ArtifactConflict, ArtifactIntegrityError, ArtifactStorageUnavailable, OriginalByteStore
+from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
 CONFIGURATION_SIZE_LIMIT = 65536
@@ -37,6 +41,28 @@ class CaptureRuntime:
 
 class SessionRequest(BaseModel):
     session_id: UUID
+    class Config:
+        extra = 'forbid'
+
+class ConsentRequest(BaseModel):
+    request_id: UUID
+    accepted: StrictBool
+    scope: StrictStr = Field(min_length=1, max_length=128)
+    class Config:
+        extra = 'forbid'
+
+class VehicleReferenceRequest(BaseModel):
+    request_id: UUID
+    vin: StrictStr = Field(min_length=17, max_length=17)
+    class Config:
+        extra = 'forbid'
+
+class EvidenceArtifactRequest(BaseModel):
+    request_id: UUID
+    artifact_id: UUID
+    slot: StrictStr = Field(min_length=1, max_length=64)
+    payload_base64: StrictStr = Field(min_length=4, max_length=((MAX_EVIDENCE_BYTES + 2) // 3) * 4)
+    sha256: StrictStr = Field(min_length=64, max_length=64)
     class Config:
         extra = 'forbid'
 
@@ -86,11 +112,17 @@ def load_runtime(path):
                 raise ValueError('DATABASE_TARGET_OR_LOGIN_MISMATCH')
         credentials = []
         for record in records:
-            if type(record) is not dict or set(record) != {'actor_id', 'tenant_id', 'database_role', 'token_sha256', 'expires_at', 'enabled'}:
+            if type(record) is not dict or set(record) not in (
+                {'actor_id', 'tenant_id', 'database_role', 'token_sha256', 'expires_at', 'enabled'},
+                {'actor_id', 'tenant_id', 'database_role', 'token_sha256', 'expires_at', 'enabled', 'actor_role'},
+            ):
                 raise ValueError('INVALID_CREDENTIAL_FIELDS')
-            if not isinstance(record['tenant_id'], str) or not isinstance(record['database_role'], str) or not isinstance(record['token_sha256'], str) or type(record['enabled']) is not bool:
+            if (not isinstance(record['tenant_id'], str) or not isinstance(record['database_role'], str)
+                    or not isinstance(record['token_sha256'], str) or type(record['enabled']) is not bool
+                    or ('actor_role' in record and not isinstance(record['actor_role'], str))):
                 raise ValueError('INVALID_CREDENTIAL_TYPES')
-            binding = ActorBinding(record['actor_id'], UUID(record['tenant_id']), record['database_role'])
+            binding = ActorBinding(record['actor_id'], UUID(record['tenant_id']), record['database_role'],
+                                   record.get('actor_role', 'operator'))
             if binding.database_role not in dsns:
                 raise ValueError('MISSING_SERVER_LOGIN')
             credentials.append(Credential(record['token_sha256'], binding, record['expires_at'], record['enabled']))
@@ -106,13 +138,25 @@ def _fail(status, detail) -> NoReturn:
         headers['WWW-Authenticate'] = 'Bearer'
     raise HTTPException(status_code=status, detail=detail, headers=headers)
 
-def create_capture_app(runtime=None):
+def create_capture_app(runtime=None, *, enable_evidence=False):
     if runtime is None:
         path = os.environ.get('C2C_CAPTURE_CONFIG_FILE')
         if not path:
             raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
         runtime = load_runtime(path)
-    api = create_app(runtime.health_settings)
+    # Child intake apps carry only the health handlers they have always owned;
+    # never recursively compose the integrated parent when C2C_RUNTIME_MODE is set.
+    api = create_app(runtime.health_settings, runtime_mode='restricted_staging')
+    api.state.health_settings = runtime.health_settings
+    evidence = None
+    if enable_evidence:
+        root = os.environ.get('C2C_ARTIFACT_STORAGE_ROOT')
+        pepper = os.environ.get('C2C_VIN_HMAC_PEPPER')
+        if not root or not Path(root).is_absolute() or not pepper:
+            raise ValueError('PERSISTENT_EVIDENCE_CONFIGURATION_REQUIRED')
+        evidence = CaptureEvidenceService(
+            runtime.store, OriginalByteStore(root, max_bytes=MAX_EVIDENCE_BYTES), pepper
+        )
 
     @api.exception_handler(RequestValidationError)
     async def invalid_capture_request(request, error):
@@ -153,5 +197,45 @@ def create_capture_app(runtime=None):
     @api.get('/v1/capture-sessions/{session_id}')
     def get_session(session_id: UUID, authorization: str = Depends(authorize)):
         return invoke(runtime.store.get, authorization, session_id)
+
+    if evidence is not None:
+        def invoke_evidence(action, authorization, session_id, **kwargs):
+            try:
+                result = action(authorization, str(session_id), **kwargs)
+                return JSONResponse(jsonable_encoder(result), headers=dict(NO_STORE_HEADERS))
+            except AuthenticationError:
+                _fail(401, 'UNAUTHORIZED')
+            except CaptureAuthorizationError:
+                _fail(403, 'CAPTURE_AUTHORITY_DENIED')
+            except CaptureSessionConflict:
+                _fail(409, 'CAPTURE_SESSION_CONFLICT')
+            except CaptureSessionNotFound:
+                _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
+            except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
+                _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+            except (ArtifactConflict, ArtifactIntegrityError):
+                _fail(409, 'EVIDENCE_ARTIFACT_CONFLICT')
+            except ValueError:
+                _fail(422, 'INVALID_CAPTURE_EVIDENCE_REQUEST')
+            except Exception:
+                _fail(500, 'CAPTURE_EVIDENCE_OPERATION_FAILED')
+
+        @api.post('/v1/capture-sessions/{session_id}/consent')
+        def record_consent(session_id: UUID, body: ConsentRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.record_consent, authorization, session_id,
+                                   request_id=body.request_id, accepted=body.accepted, scope=body.scope)
+
+        @api.post('/v1/capture-sessions/{session_id}/vehicle-reference')
+        def record_vehicle(session_id: UUID, body: VehicleReferenceRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.record_vehicle, authorization, session_id,
+                                   request_id=body.request_id, vin=body.vin)
+
+        @api.post('/v1/capture-sessions/{session_id}/artifacts')
+        def register_artifact(session_id: UUID, body: EvidenceArtifactRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(
+                evidence.register_artifact, authorization, session_id, request_id=body.request_id,
+                artifact_id=body.artifact_id, slot=body.slot, payload_base64=body.payload_base64,
+                sha256_hex=body.sha256,
+            )
 
     return api

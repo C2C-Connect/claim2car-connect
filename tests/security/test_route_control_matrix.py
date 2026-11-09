@@ -119,6 +119,7 @@ class AnalysisSurfaceIsolationTests(unittest.TestCase):
 
         token = "t" * 43
         intake = FastAPI()
+        intake.state.health_settings = Settings("integrated-health-dsn")
         intake.get("/v1/capture-sessions")(
             lambda: {"scope": "tenant-authenticated-intake"}
         )
@@ -132,18 +133,22 @@ class AnalysisSurfaceIsolationTests(unittest.TestCase):
             self.assertIn(("/internal/v1/dispatch/health", ("GET",)), table)
             self.assertNotIn(("/api/v1/analysis/health", ("GET",)), table)
 
-            with TestClient(integrated) as client:
-                missing = client.get("/internal/v1/analysis/health")
-                accepted = client.get(
-                    "/internal/v1/analysis/health",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                intake_route = client.get("/api/v1/capture-sessions")
+            with patch("app.main.probe_database", return_value=True) as probe:
+                with TestClient(integrated) as client:
+                    missing = client.get("/internal/v1/analysis/health")
+                    accepted = client.get(
+                        "/internal/v1/analysis/health",
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                    intake_route = client.get("/api/v1/capture-sessions")
+                    readiness = client.get("/health/ready")
+                probe.assert_called_once_with("integrated-health-dsn")
             self.assertEqual(missing.status_code, 401)
             self.assertEqual(accepted.status_code, 200)
             self.assertEqual(
                 intake_route.json(), {"scope": "tenant-authenticated-intake"}
             )
+            self.assertEqual(readiness.json()["status"], "ready")
 
     def test_runtime_mode_rejects_unknown_values(self):
         with self.assertRaisesRegex(ValueError, "INVALID_C2C_RUNTIME_MODE"):

@@ -76,7 +76,9 @@ def create_app(settings=None, runtime_mode=None):
         from backend.app.api.triage import router as triage_router
         from backend.app.api.dispatch import router as dispatch_router
 
-        api.mount('/api', create_intake_app())
+        intake_app = create_intake_app(enable_evidence=True)
+        settings = getattr(intake_app.state, 'health_settings', settings)
+        api.mount('/api', intake_app)
         _mount_internal_router(api, analysis_router, '/api/v1/analysis', '/internal/v1/analysis')
         _mount_internal_router(api, triage_router, '/api/v1/triage', '/internal/v1/triage')
         _mount_internal_router(api, dispatch_router, '/api/v1/dispatch', '/internal/v1/dispatch')

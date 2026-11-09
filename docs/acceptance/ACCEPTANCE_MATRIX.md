@@ -21,9 +21,9 @@
 | Gate | Exit requirement | Evidence | Current status |
 |---|---|---|---|
 | GATE-01 Governance | Commercial rules reconciled across active outputs, ledger, and docs | Commercial and ledger suites; this matrix | In progress on PR #24 |
-| GATE-02 Security | Server-derived actor and tenant authority, PostgreSQL RLS, original-byte integrity, authenticated internal routes | Existing database/security suites; integrated route/auth regression in `tests/security/test_route_control_matrix.py` | Core controls implemented; tenant-backed capture APIs remain limited to controlled-test workflows |
+| GATE-02 Security | Server-derived actor and tenant authority, PostgreSQL RLS, original-byte integrity, authenticated internal routes | Database/security suites; integrated route and capture evidence service tests | Configured actor roles, owner consent events, keyed VIN references, and original-byte registration are implemented; persistent integrated deployment remains unverified |
 | GATE-03 Product | Operator capture and reviewer workbench demonstrated end-to-end on qualified iPad hardware | Slice 2 controller tests only | Not passed; hardware and connected UI demonstration outstanding |
-| GATE-04 Data | Persistent database/object storage, backup restore, consent withdrawal deletion | Database tests cover bounded authority controls | Not passed; pilot storage and restore drill outstanding |
+| GATE-04 Data | Persistent database/object storage, backup restore, consent withdrawal deletion | RLS event journal and POSIX original-byte store; capture evidence service tests | Partial; withdrawal blocks subsequent capture use, but storage encryption, backup/restore, and deletion policy are not verified |
 | GATE-05 Deployment | One integrated runtime deployed and verified in persistent staging | `app.main:create_app(runtime_mode="integrated")` composes intake and internal analytical routes; Railway CI verifies the separate restricted runtime | Not passed; integrated mode remains opt-in and has not been deployed against persistent staging |
 | GATE-06 Operations | Pilot owner, onboarding, grading, and reconciliation procedures | No field evidence in this branch | Not passed |
 | GATE-07 Legal & partner | Counsel review and signed partner/data agreements | `docs/LEGAL_REVIEW.md` | Not passed |

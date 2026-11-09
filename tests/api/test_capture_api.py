@@ -103,6 +103,33 @@ class CaptureRouteTests(unittest.TestCase):
                 self.assertEqual(client.get('/health/live').status_code,200)
             connect.assert_not_called()
 
+    def test_runtime_role_is_server_configured_and_resolved_with_identity(self):
+        value=self.config()
+        value['credentials'][0]['actor_role']='owner'
+        runtime=self.load(value)
+        resolved=runtime.resolver.resolve('Bearer '+self.token)
+        self.assertEqual(resolved.actor_id,'test-actor')
+        self.assertEqual(resolved.actor_role,'owner')
+
+    def test_evidence_routes_require_provisioned_storage_and_pepper(self):
+        with patch.dict(os.environ,{},clear=True):
+            with self.assertRaisesRegex(ValueError,'PERSISTENT_EVIDENCE_CONFIGURATION_REQUIRED'):
+                create_capture_app(self.runtime,enable_evidence=True)
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ,{'C2C_ARTIFACT_STORAGE_ROOT':directory,'C2C_VIN_HMAC_PEPPER':'P'*43}
+        ):
+            app=create_capture_app(self.runtime,enable_evidence=True)
+            paths={route.path for route in app.routes}
+            self.assertIn('/v1/capture-sessions/{session_id}/consent',paths)
+            self.assertIn('/v1/capture-sessions/{session_id}/vehicle-reference',paths)
+            self.assertIn('/v1/capture-sessions/{session_id}/artifacts',paths)
+
+    def test_child_capture_app_does_not_recursively_mount_integrated_runtime(self):
+        with patch.dict(os.environ,{'C2C_RUNTIME_MODE':'integrated'}):
+            app=create_capture_app(self.runtime)
+        paths={route.path for route in app.routes if hasattr(route,'path')}
+        self.assertNotIn('/internal/v1/analysis/health',paths)
+
     def test_config_database_target_and_login_must_match(self):
         for dsn in ('postgresql://tenant_login_a:synthetic@127.0.0.1:55432/other','postgresql://postgres:synthetic@127.0.0.1:55432/claim2car_test'):
             value=self.config()
