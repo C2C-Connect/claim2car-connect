@@ -95,20 +95,14 @@ BEGIN
  IF p_entry_kind='OBLIGATION_BOOKED' THEN
   IF p_reverses IS NOT NULL THEN RAISE EXCEPTION 'INVALID_REVERSAL_REFERENCE'; END IF;
   IF p_fee_type='DEALER_ACQUISITION_FEE' THEN
-   -- A dealer acceptance is not the approved fee trigger. Until the
-   -- qualified-acquisition-close event is integrated, fail closed even for
-   -- direct calls to this SECURITY DEFINER function.
+   -- Dealer acceptance is not the approved fee trigger. No qualified-close
+   -- source event is integrated yet, so fail closed even for direct SQL calls.
    RAISE EXCEPTION 'DEALER_QUALIFIED_CLOSE_WORKFLOW_NOT_ENABLED';
-   IF p_amount<>37500 THEN RAISE EXCEPTION 'FEE_SCHEDULE_MISMATCH'; END IF;
-   expected_lines:=jsonb_build_array(
-    jsonb_build_object('account_code','AR:DEALER:'||p_partner,'direction','DEBIT','amount_cents',37500),
-    jsonb_build_object('account_code','REV:DEALER_ACQUISITION','direction','CREDIT','amount_cents',37500));
-  ELSE
-   IF p_amount<>27500 THEN RAISE EXCEPTION 'FEE_SCHEDULE_MISMATCH'; END IF;
-   expected_lines:=jsonb_build_array(
-    jsonb_build_object('account_code','AR:SHOP:'||p_partner,'direction','DEBIT','amount_cents',27500),
-    jsonb_build_object('account_code','REV:REPAIR_SHOP_ACCEPTANCE','direction','CREDIT','amount_cents',27500));
   END IF;
+  IF p_amount<>27500 THEN RAISE EXCEPTION 'FEE_SCHEDULE_MISMATCH'; END IF;
+  expected_lines:=jsonb_build_array(
+   jsonb_build_object('account_code','AR:SHOP:'||p_partner,'direction','DEBIT','amount_cents',27500),
+   jsonb_build_object('account_code','REV:REPAIR_SHOP_ACCEPTANCE','direction','CREDIT','amount_cents',27500));
  ELSE
   IF p_reverses IS NULL THEN RAISE EXCEPTION 'REVERSAL_REFERENCE_REQUIRED'; END IF;
   SELECT * INTO original FROM faos.financial_ledger_entries
