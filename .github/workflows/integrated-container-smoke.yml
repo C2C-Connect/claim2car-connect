@@ -16,7 +16,7 @@ on:
       - "authority_migrations/**"
       - ".github/workflows/integrated-container-smoke.yml"
   push:
-    branches: [main, "cto/**"]
+    branches: [main]
     paths:
       - "Dockerfile.integrated"
       - ".dockerignore"
