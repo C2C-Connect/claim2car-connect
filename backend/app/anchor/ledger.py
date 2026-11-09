@@ -196,7 +196,9 @@ class LedgerJournalEntry:
 
 class IntegerFinancialLedger:
     def __init__(self, *, operator_payout_policy_approved: bool = False) -> None:
-        self.operator_payout_policy_approved = bool(operator_payout_policy_approved)
+        if type(operator_payout_policy_approved) is not bool:
+            raise LedgerError("OPERATOR_PAYOUT_POLICY_FLAG_MUST_BE_BOOLEAN")
+        self.operator_payout_policy_approved = operator_payout_policy_approved
         self._entries: list[LedgerJournalEntry] = []
         self._by_idempotency: dict[str, LedgerJournalEntry] = {}
         self._by_entry_id: dict[str, LedgerJournalEntry] = {}
@@ -247,8 +249,10 @@ class IntegerFinancialLedger:
 
         existing = self._by_idempotency.get(idempotency_key)
         if existing is not None:
-            if (existing.session_id == acceptance.session_id
+            if (existing.tenant_id == str(acceptance.tenant_id)
+                    and existing.session_id == acceptance.session_id
                     and existing.partner_org_id == acceptance.partner_org_id
+                    and existing.acceptance_id == acceptance.acceptance_id
                     and existing.amount_cents == expected
                     and existing.fee_type == fee_type):
                 return existing

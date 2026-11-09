@@ -76,6 +76,26 @@ class IntegerFinancialLedgerTests(unittest.TestCase):
             with self.assertRaises(LedgerError):
                 self.ledger.guard_prohibited_compensation(label, amount)
 
+    def test_idempotency_cannot_cross_tenant_or_acceptance(self):
+        self.ledger.record_partner_acceptance_obligation(
+            self.acceptance(), idempotency_key="shared-key", actor_id="marketplace"
+        )
+        different_tenant = PartnerAcceptanceRecord(
+            acceptance_id="accept-1", tenant_id=UUID("87654321-4321-8765-4321-876543218765"),
+            session_id="session-1", party_type="dealer", partner_org_id="dealer-org",
+            accepted_by_actor="partner-user", accepted_at="2026-11-08T18:00:00+00:00",
+        )
+        different_acceptance = self.acceptance(key="accept-other")
+        for acceptance in (different_tenant, different_acceptance):
+            with self.assertRaisesRegex(LedgerError, "IDEMPOTENCY_KEY_CONFLICT"):
+                self.ledger.record_partner_acceptance_obligation(
+                    acceptance, idempotency_key="shared-key", actor_id="marketplace"
+                )
+
+    def test_operator_policy_gate_requires_boolean_configuration(self):
+        with self.assertRaisesRegex(LedgerError, "POLICY_FLAG_MUST_BE_BOOLEAN"):
+            IntegerFinancialLedger(operator_payout_policy_approved="false")
+
 
 if __name__ == "__main__":
     unittest.main()
