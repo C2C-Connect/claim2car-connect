@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 from uuid import UUID
 
-from backend.app.anchor.ledger import IntegerFinancialLedger, PartnerAcceptanceRecord
+from backend.app.anchor.ledger import (
+    IntegerFinancialLedger, LedgerJournalEntry, LedgerPostingLine, PartnerAcceptanceRecord,
+)
 from backend.app.reports.forensic_pdf import (
     ConsentSnapshot,
     DossierGenerationError,
@@ -30,6 +32,26 @@ class FourTierDossierTests(unittest.TestCase):
         )
 
     def ledger_entry(self, party):
+        if party == "dealer":
+            # Dossier rendering consumes a verified close-ledger record. This
+            # fixture tests document formatting only; it does not book a fee
+            # from dealer acceptance or bypass the production close-event gate.
+            amount = 37_500
+            return LedgerJournalEntry(
+                sequence=1, entry_id="fixture-dealer-close", idempotency_key="fixture-close",
+                tenant_id=str(self.tenant), session_id="session-1",
+                entry_kind="OBLIGATION_BOOKED", fee_type="DEALER_ACQUISITION_FEE",
+                partner_org_id="dealer-org", acceptance_id="qualified-close-1",
+                amount_cents=amount,
+                currency="USD_CENTS",
+                lines=(
+                    LedgerPostingLine("AR:DEALER:dealer-org", "DEBIT", amount),
+                    LedgerPostingLine("REV:DEALER_ACQUISITION", "CREDIT", amount),
+                ),
+                actor_id="marketplace", occurred_at="2026-11-08T18:00:00+00:00",
+                reason="Verified qualified acquisition close (qualified-close-1)",
+                reverses_entry_id=None, previous_hash="0" * 64, entry_hash="1" * 64,
+            )
         ledger = IntegerFinancialLedger()
         acceptance = PartnerAcceptanceRecord(
             acceptance_id=f"accept-{party}", tenant_id=self.tenant, session_id="session-1",
