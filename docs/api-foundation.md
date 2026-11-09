@@ -37,6 +37,11 @@ Never place these values in source, image layers, or logs.
   service-authenticated analytical routes at `/internal/v1/{analysis,triage,dispatch}/*`.
 - Consent, HMAC VIN references, and immutable original-byte uploads require
   the integrated mode and provisioned persistent storage/pepper settings.
+- Integrated capture records advisory quality for all twelve frozen capture
+  slots, seals only after server-side hash verification, and exposes a
+  tenant-scoped reviewer queue. A separately configured reviewer or supervisor
+  records the final human decision; failed quality advisories do not block
+  roadside progression.
 - OpenAPI/docs routes remain disabled. Payments and external delivery are not
   part of this runtime.
 

@@ -10,6 +10,7 @@ import unittest
 from uuid import UUID
 
 from app.artifact_storage import OriginalByteStore
+from app.evidence_manifest import CANONICAL_SLOTS
 from database.capture_evidence import CaptureEvidenceService
 from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSession, CaptureSessionConflict, CaptureSessionStore,
@@ -36,6 +37,8 @@ class FakeConnection:
         self.appended = []
 
     def execute(self, sql, args=()):
+        if "SELECT s.session_id FROM faos.sessions" in sql:
+            return Result(many=[(str(UUID(int=2)),)])
         if "SELECT sequence,kind,actor,payload_json,event_id" in sql:
             return Result(many=list(self.rows))
         if "faos.append_event" in sql:
@@ -73,6 +76,12 @@ class RecordingByteStore(OriginalByteStore):
             raise ValueError("ARTIFACT_ALREADY_EXISTS_WITH_DIFFERENT_BYTES")
         return type("Receipt", (), {"created": old == data})()
 
+    def get(self, key, *, expected_sha256):
+        data = self.originals[key]
+        if hashlib.sha256(data).hexdigest() != expected_sha256:
+            raise ValueError("ARTIFACT_HASH_MISMATCH")
+        return data
+
 
 class CaptureEvidenceServiceTests(unittest.TestCase):
     def setUp(self):
@@ -80,8 +89,12 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.tenant = UUID(int=1)
         self.operator = Actor("operator-1", self.tenant, "operator")
         self.owner = Actor("owner-1", self.tenant, "owner")
+        self.reviewer = Actor("reviewer-1", self.tenant, "reviewer")
         self.sessions = FakeSessions(self.operator.actor_id)
-        self.sessions.actors = {"operator-token": self.operator, "owner-token": self.owner}
+        self.sessions.actors = {
+            "operator-token": self.operator, "owner-token": self.owner,
+            "reviewer-token": self.reviewer,
+        }
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         # This suite does not write the byte store; POSIX byte publication has
@@ -165,6 +178,39 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
                 sha256_hex=digest,
             )
         self.assertEqual(len(self.byte_store.originals), 1)
+
+    def test_quality_is_advisory_then_integrity_seal_and_human_review(self):
+        self.service.record_consent(
+            "owner-token", self.session_id, request_id=UUID(int=30),
+            accepted=True, scope="capture_review",
+        )
+        self.service.record_vehicle(
+            "operator-token", self.session_id, request_id=UUID(int=31), vin="1HGCM82633A004352",
+        )
+        for index, slot in enumerate(CANONICAL_SLOTS, start=1):
+            original = ("synthetic-image:" + slot).encode("ascii")
+            self.service.register_artifact(
+                "operator-token", self.session_id,
+                request_id=UUID(int=100 + index), artifact_id=UUID(int=200 + index),
+                slot=slot, payload_base64=base64.b64encode(original).decode("ascii"),
+                sha256_hex=hashlib.sha256(original).hexdigest(),
+            )
+        quality = {slot: slot != "front" for slot in CANONICAL_SLOTS}
+        self.assertTrue(self.service.record_quality(
+            "operator-token", self.session_id, request_id=UUID(int=32), results=quality,
+        )["advisory_only"])
+        sealed = self.service.seal_capture(
+            "operator-token", self.session_id, request_id=UUID(int=33),
+        )
+        self.assertEqual(len(sealed["manifest_digest"]), 64)
+        queue = self.service.list_review_queue("reviewer-token")
+        self.assertEqual(queue[0]["session_id"], self.session_id)
+        review = self.service.record_review(
+            "reviewer-token", self.session_id, request_id=UUID(int=34),
+            disposition="HUMAN_QC_REQUIRED", reason="Reviewer requests shop confirmation.",
+        )
+        self.assertEqual(review["manifest_digest"], sealed["manifest_digest"])
+        self.assertEqual(self.sessions.conn.appended[-1][1], "reviewer-1")
 
 
 if __name__ == "__main__":

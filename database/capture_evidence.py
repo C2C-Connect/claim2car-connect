@@ -16,7 +16,7 @@ import re
 from uuid import UUID
 
 from app.artifact_storage import ArtifactKey, OriginalByteStore
-from app.evidence_manifest import CANONICAL_SLOTS
+from app.evidence_manifest import CANONICAL_SLOTS, ManifestEntry, build_manifest
 from app.vin_guard import validate_vin
 from database.capture_sessions import (
     CaptureAuthorizationError,
@@ -209,6 +209,9 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
             if not self._has_valid_vehicle_reference(history, consent):
                 raise CaptureSessionConflict("VEHICLE_REFERENCE_REQUIRED")
+            if any(kind in ("QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED")
+                   for kind, *_ in history):
+                raise CaptureSessionConflict("CAPTURE_SET_ALREADY_QUALITY_CHECKED")
             payload = {"request_id": request_id, "artifact_id": artifact_id, "slot": slot,
                        "sha256": sha256_hex, "byte_length": len(raw), "recorded_by_role": actor.actor_role}
             for kind, _event_actor, old, old_id in history:
@@ -226,3 +229,179 @@ class CaptureEvidenceService:
             self._append(conn, actor, session_id, history, event_id=event_id,
                          kind="ARTIFACT_REGISTERED", reason="original evidence bytes registered", payload=payload)
         return {**payload, "replayed": False}
+
+    @staticmethod
+    def _artifact_set(history):
+        latest = {}
+        for kind, actor, payload, _event_id in history:
+            if kind != "ARTIFACT_REGISTERED":
+                continue
+            if (type(payload) is not dict
+                    or set(payload) != {"request_id", "artifact_id", "slot", "sha256", "byte_length", "recorded_by_role"}
+                    or not isinstance(payload["slot"], str) or payload["slot"] not in _CANONICAL_SLOTS
+                    or not isinstance(payload["sha256"], str) or re.fullmatch(r"[0-9a-f]{64}", payload["sha256"]) is None
+                    or type(payload["byte_length"]) is not int or payload["byte_length"] <= 0
+                    or payload["recorded_by_role"] not in ("operator", "supervisor")):
+                raise CaptureSessionConflict("UNSUPPORTED_ARTIFACT_HISTORY")
+            try:
+                UUID(payload["artifact_id"])
+                UUID(payload["request_id"])
+            except (ValueError, TypeError, AttributeError):
+                raise CaptureSessionConflict("UNSUPPORTED_ARTIFACT_HISTORY") from None
+            latest[payload["slot"]] = (actor, payload)
+        if set(latest) != _CANONICAL_SLOTS:
+            raise CaptureSessionConflict("CAPTURE_SET_INCOMPLETE")
+        return latest
+
+    def _verified_manifest(self, actor, session_id, history):
+        latest = self._artifact_set(history)
+        manifest = build_manifest(
+            session_id,
+            tuple(ManifestEntry(data["artifact_id"], slot, data["sha256"])
+                  for slot, (_actor, data) in latest.items()),
+        )
+        for entry in manifest.entries:
+            record = latest[entry.slot][1]
+            original = self.byte_store.get(
+                ArtifactKey(actor.tenant_id, UUID(session_id), UUID(entry.artifact_id)),
+                expected_sha256=entry.sha256_hex,
+            )
+            if len(original) != record["byte_length"]:
+                raise CaptureSessionConflict("EVIDENCE_BYTE_LENGTH_MISMATCH")
+        return manifest
+
+    def record_quality(self, authorization, session_id, *, request_id, results):
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if (type(results) is not dict or set(results) != _CANONICAL_SLOTS
+                or any(type(value) is not bool for value in results.values())):
+            raise ValueError("INVALID_ADVISORY_QUALITY_RESULTS")
+        event_id = "quality:" + request_id
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            consent = self._consent_state(history)
+            if consent is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            if not self._has_valid_vehicle_reference(history, consent):
+                raise CaptureSessionConflict("VEHICLE_REFERENCE_REQUIRED")
+            for kind, _who, old, old_id in history:
+                if old_id == event_id:
+                    if kind == "QUALITY_RECORDED" and old == {
+                        "request_id": request_id, "results": results, "advisory_only": True,
+                    }:
+                        return {"session_id": session_id, "advisory_only": True, "replayed": True}
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+            if any(kind in ("QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED")
+                   for kind, *_ in history):
+                raise CaptureSessionConflict("QUALITY_ALREADY_RECORDED")
+            self._verified_manifest(actor, session_id, history)
+            payload = {"request_id": request_id, "results": results, "advisory_only": True}
+            self._append(conn, actor, session_id, history, event_id=event_id,
+                         kind="QUALITY_RECORDED", reason="advisory image quality recorded", payload=payload)
+        return {"session_id": session_id, "advisory_only": True, "replayed": False}
+
+    def seal_capture(self, authorization, session_id, *, request_id):
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        event_id = "seal:" + request_id
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            if self._consent_state(history) is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            for kind, _who, old, old_id in history:
+                if old_id == event_id:
+                    if kind == "MANIFEST_SEALED" and type(old) is dict:
+                        return {"session_id": session_id, **old, "replayed": True}
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+            if not history or history[-1][0] != "QUALITY_RECORDED":
+                raise CaptureSessionConflict("QUALITY_REVIEW_REQUIRED_BEFORE_SEAL")
+            manifest = self._verified_manifest(actor, session_id, history)
+            payload = {
+                "schema_version": "0.1",
+                "request_id": request_id,
+                "manifest_digest": manifest.digest(),
+                "shot_list_version": manifest.shot_list_version,
+                "artifact_ids": [entry.artifact_id for entry in manifest.entries],
+            }
+            self._append(conn, actor, session_id, history, event_id=event_id,
+                         kind="MANIFEST_SEALED", reason="verified original-byte manifest sealed", payload=payload)
+        return {"session_id": session_id, **payload, "replayed": False}
+
+    def record_review(self, authorization, session_id, *, request_id, disposition, reason):
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if disposition not in ("NOTE_ONLY", "HUMAN_QC_REQUIRED"):
+            raise ValueError("INVALID_REVIEW_DISPOSITION")
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
+            raise ValueError("INVALID_REVIEW_REASON")
+        event_id = "review:" + request_id
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            session, history = self._history(conn, actor, session_id, creator_required=False)
+            if actor.actor_id == session.created_by:
+                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+            consent = self._consent_state(history)
+            if consent is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            for kind, _who, old, old_id in history:
+                if old_id == event_id:
+                    if kind == "REVIEW_RECORDED" and type(old) is dict and old.get("disposition") == disposition and old.get("reason") == reason:
+                        return {"session_id": session_id, **old, "replayed": True}
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+            if not history or history[-1][0] != "MANIFEST_SEALED":
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            manifest = self._verified_manifest(actor, session_id, history)
+            seal = history[-1][2]
+            if seal.get("manifest_digest") != manifest.digest():
+                raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
+            payload = {
+                "request_id": request_id,
+                "manifest_digest": manifest.digest(),
+                "disposition": disposition,
+                "reason": reason.strip(),
+                "artifact_ids": [entry.artifact_id for entry in manifest.entries],
+            }
+            self._append(conn, actor, session_id, history, event_id=event_id,
+                         kind="REVIEW_RECORDED", reason="independent human review recorded", payload=payload)
+        return {"session_id": session_id, **payload, "replayed": False}
+
+    def list_review_queue(self, authorization, *, limit=100):
+        if type(limit) is not int or not 1 <= limit <= 200:
+            raise ValueError("INVALID_REVIEW_QUEUE_LIMIT")
+        queued = []
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            rows = conn.execute(
+                "SELECT s.session_id FROM faos.sessions s "
+                "JOIN LATERAL (SELECT kind,occurred_at FROM faos.events e "
+                "WHERE e.tenant_id=s.tenant_id AND e.session_id=s.session_id "
+                "ORDER BY sequence DESC LIMIT 1) last_event ON last_event.kind='MANIFEST_SEALED' "
+                "WHERE s.tenant_id=%s ORDER BY last_event.occurred_at,s.session_id LIMIT %s",
+                (actor.tenant_id, limit),
+            ).fetchall()
+            for (session_id,) in rows:
+                session_id = self._session_id(session_id)
+                _session, history = self._history(conn, actor, session_id, creator_required=False)
+                if not history or history[-1][0] != "MANIFEST_SEALED" or self._consent_state(history) is None:
+                    continue
+                seal_payload = history[-1][2]
+                if (type(seal_payload) is not dict
+                        or set(seal_payload) != {"schema_version", "request_id", "manifest_digest", "shot_list_version", "artifact_ids"}
+                        or not isinstance(seal_payload.get("manifest_digest"), str)):
+                    raise CaptureSessionConflict("UNSUPPORTED_SEAL_HISTORY")
+                queued.append({
+                    "session_id": session_id,
+                    "manifest_digest": seal_payload["manifest_digest"],
+                    "shot_list_version": seal_payload["shot_list_version"],
+                    "artifact_count": len(seal_payload["artifact_ids"]),
+                    "reviewer_must_decide": True,
+                })
+                if len(queued) == limit:
+                    break
+        return queued
