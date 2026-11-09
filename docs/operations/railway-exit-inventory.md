@@ -16,7 +16,7 @@
 - Auto deploy was disabled. The builder was Railway Railpack.
 - The service Variables page showed no user-defined environment variables. It listed seven Railway-provided system variables; no values were exported.
 - The project canvas showed no database or other service. No attached volume was visible.
-- The workspace dashboard showed 27 days or $5 remaining and warned that services would go offline unless the plan was upgraded.
+- Workspace settings showed a **Trial Workspace** plan with a $5 credit balance. Railway says deployments shut down when credits are exhausted. A billing-information section displayed a payment-method area labeled “Used for verification purposes”; payment details were not opened or copied. No paid plan was visible.
 
 ## What was preserved
 
@@ -35,6 +35,8 @@ The technical exit path is to keep the OCI container build provider-neutral and 
 
 ## Not inspected
 
-- Billing history, payment method, and workspace subscription settings.
+- Billing history and payment-method details. The plan screen showed Trial Workspace and no paid plan.
 - Historical deployment logs and build artifacts.
 - The contents of Railway-generated environment variables (these are platform-provided values, not user-defined secrets).
+
+
