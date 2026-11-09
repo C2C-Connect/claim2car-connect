@@ -21,10 +21,10 @@
 | Gate | Exit requirement | Evidence | Current status |
 |---|---|---|---|
 | GATE-01 Governance | Commercial rules reconciled across active outputs, ledger, and docs | Commercial and ledger suites; this matrix | In progress on PR #24 |
-| GATE-02 Security | Server-derived actor and tenant authority, PostgreSQL RLS, original-byte integrity, authenticated internal routes | Existing database/security suites and CI evidence | In progress; integrated runtime route mapping and staging reachability remain to be verified |
+| GATE-02 Security | Server-derived actor and tenant authority, PostgreSQL RLS, original-byte integrity, authenticated internal routes | Existing database/security suites; integrated route/auth regression in `tests/security/test_route_control_matrix.py` | Core controls implemented; tenant-backed capture APIs remain limited to controlled-test workflows |
 | GATE-03 Product | Operator capture and reviewer workbench demonstrated end-to-end on qualified iPad hardware | Slice 2 controller tests only | Not passed; hardware and connected UI demonstration outstanding |
 | GATE-04 Data | Persistent database/object storage, backup restore, consent withdrawal deletion | Database tests cover bounded authority controls | Not passed; pilot storage and restore drill outstanding |
-| GATE-05 Deployment | One integrated runtime deployed and verified in persistent staging | Current deployment is restricted staging only | Not passed; product runtime is not deployed |
+| GATE-05 Deployment | One integrated runtime deployed and verified in persistent staging | `app.main:create_app(runtime_mode="integrated")` composes intake and internal analytical routes; Railway CI verifies the separate restricted runtime | Not passed; integrated mode remains opt-in and has not been deployed against persistent staging |
 | GATE-06 Operations | Pilot owner, onboarding, grading, and reconciliation procedures | No field evidence in this branch | Not passed |
 | GATE-07 Legal & partner | Counsel review and signed partner/data agreements | `docs/LEGAL_REVIEW.md` | Not passed |
 | GATE-08 Measurement | Scene-time, retakes, and model performance calibrated against shop ground truth | Synthetic benchmarks only | Not passed; no field validation claimed |
