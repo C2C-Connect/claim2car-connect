@@ -29,7 +29,7 @@ def denied(conn,tenant,event):
     else:
         raise AssertionError('UNAUTHORIZED_APPEND_ALLOWED')
 
-TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts')
+TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings')
 CHECKS = ('rls_flags','own_read','cross_read','cross_insert','cross_update','cross_delete','tenant_reassignment','spoofed_context','missing_context','malformed_context')
 
 def reject_mutation(conn,tenant,statement,parameters):
@@ -65,6 +65,11 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,session,seal,sequence,'MANIFEST_SEALED','synthetic-matrix','2026-01-01T00:00:00Z','storage isolation fixture only',payload,'0.1'))
             admin.execute('INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) VALUES (%s,%s,%s,%s,%s)',(tenant,session,seal,digest,'claims2car-12-v1'))
             admin.execute('INSERT INTO faos.completion_receipts(tenant_id,session_id,request_id,seal_event_id,event_sequence) VALUES (%s,%s,%s,%s,%s)',(tenant,session,ids['request'],seal,sequence))
+            ledger_id='matrix-ledger-'+uuid.uuid4().hex
+            admin.execute('INSERT INTO faos.financial_ledger_entries(tenant_id,entry_id,sequence,idempotency_key,session_id,entry_kind,fee_type,partner_org_id,acceptance_id,amount_cents,currency,actor_id,occurred_at,reason,previous_hash,entry_hash) VALUES (%s,%s,1,%s,%s,%s,%s,%s,%s,37500,%s,%s,%s,%s,%s,%s)',
+                (tenant,ledger_id,'matrix-ledger-idem-'+uuid.uuid4().hex,session,'OBLIGATION_BOOKED','DEALER_ACQUISITION_FEE','matrix-partner','matrix-acceptance','USD_CENTS','diagnostics','2026-01-01T00:00:00Z','diagnostic storage fixture','0'*64,'1'*64))
+            admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,37500),(%s,%s,2,%s,%s,37500)',
+                (tenant,ledger_id,'AR:DEALER:matrix-partner','DEBIT',tenant,ledger_id,'REV:DEALER_ACQUISITION','CREDIT'))
         for index,conn in enumerate(connections):
             own,other = tenants[index],tenants[1-index]
             for table in TABLES:
@@ -132,6 +137,8 @@ def verify(report,admin,connections,tenants,session):
         matrix['status'] = 'PASS'
     finally:
         for tenant in tenants:
+            admin.execute('DELETE FROM faos.financial_ledger_postings WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
+            admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             for table in ('completion_receipts','manifest_roots','location_brands'):
                 admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(tenant,session,seal))
@@ -150,7 +157,7 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        expect(report['migration_inventory'][-1][0]=='0008_tenant_login_authority.sql','AUTHORITY_MIGRATION_REQUIRED')
+        expect(report['migration_inventory'][-1][0]=='0009_integer_financial_ledger.sql','FINANCIAL_LEDGER_MIGRATION_REQUIRED')
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:

@@ -74,7 +74,7 @@ jobs:
                       'event':os.environ['GITHUB_EVENT_NAME'],'ref':os.environ['GITHUB_REF'],
                       'classification':'phased-authority-cutover-not-gate-certification','gate_passes_awarded':0,
                       'component_phase':'legacy primary through0007; isolated full-authority migration and integration databases',
-                      'diagnostic_phase':'primary after full default migration plan through0008'}
+                      'diagnostic_phase':'primary after full default migration plan through0009'}
           report = Path('output/acceptance-diagnostics/report.json')
           metadata['diagnostic_report_present'] = report.is_file()
           if report.is_file():
