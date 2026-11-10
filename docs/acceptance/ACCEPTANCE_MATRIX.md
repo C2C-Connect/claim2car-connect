@@ -2,7 +2,7 @@
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
 **Candidate branch:** `cto/spec-production-implementation` (PR #29)  
-**Last code validation revision:** `ef829f0fd2a3c0c6664f441d4461fd76fde78298`  
+**Last code validation revision:** `01d4720dc06f95d26e7de6d880626ff853001049`  
 **Machine contract:** `m1-v1`  
 **Status rule:** code, CI, field validation, review, and release authorization are recorded separately. A passing synthetic test does not establish product acceptance or production readiness. The candidate revision is not merged and has no submitted independent review.
 
@@ -100,7 +100,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 ## Browser-persistent original evidence queue — 2026-11-10
 
-**Candidate revision:** `ff9b3f744d706fd95f33ee952efb16fc3ce94d21` (implementation and verification revision; subsequent documentation and readiness-gate commits follow it).
+**Candidate revision:** `01d4720dc06f95d26e7de6d880626ff853001049` (current code and verification revision).
 
 **Implemented on PR #29:**
 - The integrated operator shell stores selected original image bytes in IndexedDB before attempting upload. It does not transform or recompress the bytes.
@@ -112,11 +112,11 @@ The current Railway configuration is a restricted synthetic containment service.
 - The owner can withdraw capture consent. After server confirmation, the same browser purges all local queue entries for that tenant/session. If withdrawal occurs on another device, the operator device can purge its pending queue when it next reconnects and checks server readiness.
 
 **Verification at the implementation revision:**
-- Offline guided-capture workflow, queue behavior assertions, and integrated browser-module syntax checks passed — [run 42779319560](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319560).
-- Full repository suite passed — [run 42779319532](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319532).
-- Database authority/cutover verification passed — [run 42779319539](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319539).
-- Integrated container smoke passed — [run 42779319245](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319245).
-- Restricted Railway smoke passed — [run 42779319299](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319299); its deploy job was skipped. No integrated staging deployment is claimed.
+- Offline guided-capture workflow, queue behavior assertions, and integrated browser-module syntax checks passed — [run 42780067921](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780067921).
+- Full repository suite passed — [run 42780068007](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780068007).
+- Database authority/cutover verification passed — [run 42780067929](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780067929).
+- Integrated container smoke passed — [run 42780068135](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780068135).
+- Restricted Railway smoke passed — [run 42780067923](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780067923); its deploy job was skipped. No integrated staging deployment is claimed.
 
 **Important limits — not field acceptance:**
 - Queue behavior assertions use an injected in-memory store; CI syntax-checks the IndexedDB adapter but does not execute it in a real browser.
