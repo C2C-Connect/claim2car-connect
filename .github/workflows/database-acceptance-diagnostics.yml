@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install synthetic test dependencies
-        run: pip install 'psycopg[binary,pool]>=3.1.18'
+        run: pip install -r requirements.txt -r requirements-api.txt
       - name: Start isolated database
         run: docker compose -p faos-active-run -f compose.database-tests.yml up -d --wait
       - name: Bootstrap and initialize explicit legacy test baseline through 0007
