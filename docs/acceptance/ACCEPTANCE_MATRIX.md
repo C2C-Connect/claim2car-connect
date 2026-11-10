@@ -2,7 +2,7 @@
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
 **Candidate branch:** `cto/spec-production-implementation` (PR #29)  
-**Last code validation revision:** `d73d568c4426dd3c4a97b8aea0e8143029b2b2d5`  
+**Last code validation revision:** `0ebe7337b74c5fe82ba7b2e39cc1c08aedbf7737`  
 **Machine contract:** `m1-v1`  
 **Status rule:** code, CI, field validation, review, and release authorization are recorded separately. A passing synthetic test does not establish product acceptance or production readiness. The candidate revision is not merged and has no submitted independent review.
 
@@ -100,7 +100,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 ## Browser-persistent original evidence queue — 2026-11-10
 
-**Candidate revision:** `d73d568c4426dd3c4a97b8aea0e8143029b2b2d5` (current code and verification revision).
+**Candidate revision:** `0ebe7337b74c5fe82ba7b2e39cc1c08aedbf7737` (current code and verification revision; subsequent commits update documentation only).
 
 **Implemented on PR #29:**
 - The integrated operator shell stores selected original image bytes in IndexedDB before attempting upload. It does not transform or recompress the bytes.
@@ -112,12 +112,12 @@ The current Railway configuration is a restricted synthetic containment service.
 - The owner can withdraw capture consent. After server confirmation, the same browser purges all local queue entries for that tenant/session. If withdrawal occurs on another device, the operator device can purge its pending queue on its next synchronization attempt or case reopen while online and after checking server readiness.
 
 **Verification at the implementation revision:**
-- Offline guided-capture workflow, queue behavior assertions, and integrated browser-module syntax checks passed — [run 42780921534](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780921534).
-- Full repository suite passed — [run 42780921545](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780921545).
-- Database authority/cutover verification passed — [run 42780921955](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780921955).
-- Restricted intake container verification passed — [run 42780921796](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780921796). This is not an integrated Claim2Car deployment.
-- Restricted Railway smoke passed — [run 42780921872](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780921872); its deploy job was skipped. No integrated staging deployment is claimed.
-- Actual Chromium/IndexedDB browser verification passed — [run 42780921723](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780921723). It exercised offline local writes, page-reload recovery, FIFO fail-stop, stable retry identifiers, local binary removal, tenant/actor isolation, and tenant/session purge using synthetic bytes and a mocked upload callback.
+- Offline guided-capture workflow, queue behavior assertions, and integrated browser-module syntax checks passed — [run 42781775036](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42781775036).
+- Full repository suite passed — [run 42781775011](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42781775011).
+- Database authority/cutover verification passed — [run 42781774737](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42781774737).
+- Restricted intake container verification passed — [run 42781774732](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42781774732). This is not an integrated Claim2Car deployment.
+- Restricted Railway smoke passed — [run 42781774969](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42781774969); its deploy job was skipped. No integrated staging deployment is claimed.
+- Actual Chromium/IndexedDB browser verification passed — [run 42781774794](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42781774794). It exercised offline local writes, page-reload recovery, FIFO fail-stop, stable retry identifiers, local binary removal, tenant/actor isolation, and tenant/session purge using synthetic bytes and a mocked upload callback.
 
 **Important limits — not field acceptance:**
 - Pure queue-logic assertions also use an injected in-memory store. The separate Chromium run exercises the real IndexedDB adapter, but uses synthetic bytes and a mocked upload callback; it does not exercise the integrated app-to-API upload path.
