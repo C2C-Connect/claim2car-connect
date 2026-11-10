@@ -110,16 +110,16 @@ class MigrationControlsIntegration(unittest.TestCase):
                      timestamp, 'event contract integration', payload, '0.1'),
                 ).fetchone()[0]
 
+            self.admin.execute(
+                'INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                (tenant, 'synthetic event contract fixture'),
+            )
+            self.admin.execute(
+                'INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                (tenant, session),
+            )
             with app.transaction():
                 app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
-                app.execute(
-                    'INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
-                    (tenant, 'synthetic event contract fixture'),
-                )
-                app.execute(
-                    'INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
-                    (tenant, session),
-                )
                 self.assertEqual(append(
                     'event-1', 1, 'SESSION_CREATED', '2026-01-01T00:00:00Z', '{}'
                 ), 'ACCEPTED')
