@@ -60,8 +60,9 @@
         <button id="save-vin" class="secondary">Validate and record VIN</button>
         <div class="rule"></div>
         <h4>Original evidence capture</h4>
-        <p class="fine">Choose a photo for each slot. On supported mobile devices, the file picker can open the camera. Original file bytes are hashed in the browser and uploaded unchanged. Review each image yourself and check its quality box only when the required view is clear and usable; this is an advisory operator attestation, not an automated image-quality assessment.</p>
+        <p class="fine">Choose a photo for each slot. On supported mobile devices, the file picker can open the camera. Original file bytes are first saved in this browser's IndexedDB queue, then uploaded unchanged in FIFO order. Pending originals can be retried after connectivity returns or the page is reopened on a supported browser. Browser storage is not an encrypted vault, WORM store, or field-qualified durability guarantee; this remains a controlled test surface. Review each image yourself and check its quality box only when the required view is clear and usable; this is an advisory operator attestation, not an automated image-quality assessment.</p>
         <div id="capture-slots" class="slot-list"></div>
+        <button id="sync-pending-evidence" class="secondary" disabled>All originals synced</button>
         <button id="record-quality" class="secondary">Record advisory quality checks</button>
         <button id="seal-case" class="primary">Seal verified evidence manifest</button>
         <p id="operator-message" class="message" role="status"></p>
