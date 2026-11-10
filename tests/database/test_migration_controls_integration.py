@@ -119,6 +119,11 @@ class MigrationControlsIntegration(unittest.TestCase):
                 'INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                 (tenant, session),
             )
+            self.admin.execute(
+                'INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) '
+                'SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=%s',
+                (tenant, 'faos_app'),
+            )
             with tenant_transaction(app, tenant):
                 self.assertEqual(append(
                     'event-1', 1, 'SESSION_CREATED', '2026-01-01T00:00:00Z', '{}'
