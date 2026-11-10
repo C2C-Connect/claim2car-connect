@@ -34,6 +34,7 @@ Inventory enforcement: the foundation app exposes ONLY these two routes
 |---|---|---|---|
 | /v1/capture-sessions | POST | AUTHENTICATED_TENANT | 401: missing/unknown/expired/disabled token (test_capture_api.py); client cannot choose tenant/actor/login (body-forbidden test) |
 | /v1/capture-sessions/{session_id} | GET | AUTHENTICATED_TENANT | 401 set; query/header tenant override ignored (server-derived only); 403 CAPTURE_AUTHORITY_DENIED on cross-tenant access; 404 unknown session |
+| /v1/capture-sessions/{session_id}/evidence-readiness | GET | AUTHENTICATED_TENANT | Creator operator/supervisor only; reports current owner-consent and vehicle-reference gates without returning evidence or owner identity |
 
 ## Intake API (`app/intake_api.py`)
 
