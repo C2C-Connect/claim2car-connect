@@ -122,6 +122,13 @@ class CaptureEvidenceService:
             if actor.actor_role != "owner":
                 raise CaptureAuthorizationError("OWNER_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=False)
+            if _session.scope == "persistent-claim-case":
+                binding = conn.execute(
+                    "SELECT faos.bind_claim_case_owner(%s::uuid,%s::text,%s::text)",
+                    (actor.tenant_id, session_id, actor.actor_id),
+                ).fetchone()[0]
+                if binding != "BOUND":
+                    raise CaptureAuthorizationError("CLAIM_CASE_OWNER_BINDING_DENIED")
             previous = self._consent_state(history)
             event_id = "consent:" + request_id
             payload = {

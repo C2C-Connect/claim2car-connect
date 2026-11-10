@@ -1,17 +1,8 @@
-"""Tenant-scoped persistent claim-case identity records.
-
-This is the first production-domain persistence slice, not a complete claim
-intake record. It deliberately stores no claimant PII, incident narrative,
-VIN, policy data, or evidence bytes. Those belong to separately authorized,
-consent-aware intake contracts.
-"""
+"""Tenant-scoped persistent claim-case identity and capture-session association."""
 from dataclasses import dataclass
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from database.capture_sessions import (
-    CaptureAuthorizationError,
-    CaptureSessionStore,
-)
+from database.capture_sessions import CaptureAuthorizationError, CaptureSessionStore
 
 
 class ClaimCaseNotFound(LookupError):
@@ -30,6 +21,7 @@ class ClaimCase:
     created_at: str
     state: str
     created: bool
+    capture_session_id: str | None
 
 
 class ClaimCaseStore:
@@ -50,12 +42,9 @@ class ClaimCaseStore:
         if row is None:
             raise ClaimCaseNotFound("CLAIM_CASE_NOT_FOUND")
         return ClaimCase(
-            claim_id=str(row[0]),
-            tenant_id=str(row[1]),
-            created_by=row[2],
-            created_at=row[3].isoformat(),
-            state=row[4],
-            created=created,
+            claim_id=str(row[0]), tenant_id=str(row[1]), created_by=row[2],
+            created_at=row[3].isoformat(), state=row[4], created=created,
+            capture_session_id=str(row[5]) if row[5] is not None else None,
         )
 
     @staticmethod
@@ -66,18 +55,19 @@ class ClaimCaseStore:
     def create(self, authorization, *, claim_id, request_id):
         claim_id = self._identifier(claim_id, "INVALID_CLAIM_CASE_ID")
         request_id = self._identifier(request_id, "INVALID_CLAIM_CASE_REQUEST_ID")
+        session_id = str(uuid4())
         with self.sessions._authorized(authorization) as (conn, actor):
             self._require_operator(actor)
             outcome = conn.execute(
-                "SELECT faos.create_claim_case(%s::uuid,%s::uuid,%s::uuid,%s::text)",
-                (actor.tenant_id, claim_id, request_id, actor.actor_id),
+                "SELECT faos.create_claim_case(%s::uuid,%s::uuid,%s::uuid,%s::text,%s::text)",
+                (actor.tenant_id, claim_id, request_id, actor.actor_id, session_id),
             ).fetchone()[0]
             if outcome not in ("ACCEPTED", "DUPLICATE"):
                 raise ClaimCaseConflict("CLAIM_CASE_CREATE_NOT_ACCEPTED")
             row = conn.execute(
-                "SELECT claim_id,tenant_id,created_by,created_at,state "
-                "FROM faos.claim_cases WHERE tenant_id=%s AND claim_id=%s",
-                (actor.tenant_id, claim_id),
+                "SELECT claim_id,tenant_id,created_by,created_at,state,capture_session_id "
+                "FROM faos.claim_cases WHERE tenant_id=%s AND request_id=%s",
+                (actor.tenant_id, request_id),
             ).fetchone()
             return self._record(row, created=(outcome == "ACCEPTED"))
 
@@ -86,7 +76,7 @@ class ClaimCaseStore:
         with self.sessions._authorized(authorization) as (conn, actor):
             self._require_operator(actor)
             row = conn.execute(
-                "SELECT claim_id,tenant_id,created_by,created_at,state "
+                "SELECT claim_id,tenant_id,created_by,created_at,state,capture_session_id "
                 "FROM faos.claim_cases WHERE tenant_id=%s AND claim_id=%s AND created_by=%s",
                 (actor.tenant_id, claim_id, actor.actor_id),
             ).fetchone()
@@ -98,7 +88,7 @@ class ClaimCaseStore:
         with self.sessions._authorized(authorization) as (conn, actor):
             self._require_operator(actor)
             rows = conn.execute(
-                "SELECT claim_id,tenant_id,created_by,created_at,state "
+                "SELECT claim_id,tenant_id,created_by,created_at,state,capture_session_id "
                 "FROM faos.claim_cases WHERE tenant_id=%s AND created_by=%s "
                 "ORDER BY created_at DESC,claim_id DESC LIMIT %s",
                 (actor.tenant_id, actor.actor_id, limit),
