@@ -43,4 +43,24 @@
 
 The current Railway configuration is a restricted synthetic containment service. It is not the integrated product. Live dispatch, payments, partner/carrier delivery, production publication, and real participant data remain disabled until their legal, security, partner, operational, and deployment gates have actual evidence.
 
+## Persistent claim-case register increment — 2026-11-10
 
+**Candidate revision:** `9c2aaac8d68a0b7a8593305c78a94265339cc2a4`  
+**Implementation status:** Implemented and automated-test verified on PR #29; not field-validated or deployed.
+
+- Added authority migrations `0010_claim_case_registry.sql` through `0012_claim_case_retry_without_update_lock.sql`.
+- Added `faos.claim_cases` with tenant-scoped identifiers, immutable creator/time/state metadata, row-level security, and a server-owned idempotent creation function.
+- Application identities receive read-only table access; inserts occur through the narrowly granted database function. The table has no application update/delete grant.
+- Added authenticated `POST /v1/claim-cases`, `GET /v1/claim-cases`, and `GET /v1/claim-cases/{claim_id}` routes, with creator scoping and bounded listing.
+- Added the operator claim register with create, list, and reopen behavior. Client retries reuse the same idempotency request ID while the page remains active.
+- The UI explicitly labels the older evidence-capture session workflow as controlled-test only.
+
+**Deliberate boundary:** this increment persists claim-case identity and ownership metadata only. It does not yet store claimant personal information, incident narrative/location, policy details, or VIN; it does not yet associate a production claim record with an evidence-capture session. It is not complete claim intake, an adjudication workflow, or permission to process real participant data.
+
+**Verification evidence at the candidate revision:**
+- Full repository suite: **677 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42754108832](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42754108832).
+- Database authority cutover and post-cutover tenant-isolation diagnostics: passed — run [42754108748](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42754108748).
+- FastAPI foundation, controlled-test PostgreSQL, restricted-container, frontend VIN/transport, offline capture, and synthetic demonstration workflows: passed on this revision.
+- Railway verification remains the restricted synthetic containment smoke test. It is not deployment of the integrated Claim2Car application.
+
+**Next implementation slice:** define and persist the incident intake fields under the approved data-minimization and consent boundaries; associate the claim record with a production-scoped capture session; then connect owner consent, keyed VIN, original evidence, and reviewer access to that case without allowing controlled-test sessions to masquerade as production claims.
