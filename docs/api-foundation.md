@@ -37,6 +37,8 @@ Never place these values in source, image layers, or logs.
   service-authenticated analytical routes at `/internal/v1/{analysis,triage,dispatch}/*`.
 - Consent, HMAC VIN references, and immutable original-byte uploads require
   the integrated mode and provisioned persistent storage/pepper settings.
+- GET /api/v1/capture-sessions/{session_id}/evidence-readiness is authenticated and creator-scoped; it reports whether active owner consent and a valid vehicle reference permit evidence capture, without returning evidence bytes or owner identity.
+- The integrated browser shell uses an IndexedDB original-byte queue with tenant/actor/session scoping, FIFO retry, stable idempotency identifiers, and local purge after confirmed consent withdrawal. This is a controlled-test recovery aid, not encrypted or field-qualified storage; see the acceptance matrix.
 - Integrated capture records advisory quality for all twelve frozen capture
   slots, seals only after server-side hash verification, and exposes a
   tenant-scoped reviewer queue and byte-preserving review-artifact endpoint. A separately configured reviewer or supervisor
