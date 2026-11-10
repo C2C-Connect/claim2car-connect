@@ -28,7 +28,7 @@ Never place these values in source, image layers, or logs.
 - GET /health/live: HTTP200, `{"status":"alive"}`; never opens a database connection.
 - GET /health/ready: HTTP200 only when the configured login is non-superuser,
   non-BYPASSRLS, a member of faos_app, the binding registry exists, tenant_id() is
-  security-definer-owned by faos_writer, and the ten expected tables have RLS and
+  security-definer-owned by faos_writer, and all twelve required tenant tables—including claim cases and separately consented incident-intake records—have RLS and
   FORCE RLS. The query reads catalogs only; it does not read tenant data or the
   private authority registry. Otherwise HTTP503; exception details/DSNs are not
   returned. Both outcomes carry `scope: infrastructure-only` and no-store headers.
