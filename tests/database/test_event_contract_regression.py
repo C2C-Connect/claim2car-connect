@@ -65,16 +65,15 @@ class EventContractRegression(unittest.TestCase):
             ({'payload_json': '{"a": 1}'}, 'NONCANONICAL_PAYLOAD'),
             ({'payload_json': '[]'}, 'NONCANONICAL_PAYLOAD'),
             ({'payload_json': '{"a":NaN}'}, 'INVALID_PAYLOAD'),
-            ({'payload_json': '{"value":1.0}'}, 'INVALID_PAYLOAD'),
-            ({'payload_json': '{"value":1e0}'}, 'INVALID_PAYLOAD'),
+            ({'payload_json': '{"value":1e0}'}, 'NONCANONICAL_PAYLOAD'),
         ]
         for changes, error in cases:
             with self.subTest(changes=changes):
                 with self.assertRaisesRegex(ValueError, '^' + error + '$'):
                     replace(self.event, **changes).validate()
 
-    def test_canonical_unicode_payload_uses_utf8_text(self):
-        event = replace(self.event, payload_json='{"label":"é"}')
+    def test_canonical_unicode_and_decimal_payload_uses_utf8_fixed_notation(self):
+        event = replace(self.event, payload_json='{"label":"é","metric":0.00001}')
         self.assertIs(event.validate(), event)
 
     def test_event_is_frozen_and_payload_read_is_independent(self):
@@ -159,8 +158,19 @@ class DirectSqlCanonicalParityRegression(unittest.TestCase):
     def test_direct_sql_rejects_noncanonical_numeric_exponent(self):
         self.assert_payload_rejected_without_mutation('numeric-exponent', '{"value":1e0}')
 
-    def test_direct_sql_rejects_non_integer_numbers(self):
-        self.assert_payload_rejected_without_mutation('decimal-number', '{"value":1.0}')
+    def test_direct_sql_accepts_canonical_decimal_values_and_python_reads_them(self):
+        from app.domain_events import DomainEvent
+        f = self.fixture
+        payload = '{"large":100000000000000000000,"small":0.00001,"value":1.25}'
+        self.assertEqual(self.append_direct('canonical-decimals', payload), 'ACCEPTED')
+        row = self.conn.execute(
+            'SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version '
+            'FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
+            (f.tenant, f.session, 'canonical-decimals'),
+        ).fetchone()
+        event = DomainEvent(*row).validate()
+        self.assertEqual(event.payload['value'], 1.25)
+        self.assertEqual(len(self.fixture.history()), len(self.before) + 1)
 
     def test_direct_sql_rejects_whitespace_outside_json_strings(self):
         self.assert_payload_rejected_without_mutation('spaced-json', '{ "a":1}')
