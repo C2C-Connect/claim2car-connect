@@ -110,6 +110,24 @@ class CaptureSessionStore:
                     raise RuntimeError('CAPTURE_CREATION_FAILED')
             return self._read(conn,actor,session_id,created=inserted)
 
+    def list_owned(self,authorization,*,limit=100):
+        """List only the authenticated operator's own controlled capture drafts."""
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError('INVALID_CAPTURE_SESSION_LIMIT')
+        with self._authorized(authorization) as (conn,actor):
+            if actor.actor_role not in ('operator','supervisor'):
+                raise CaptureAuthorizationError('OPERATOR_IDENTITY_REQUIRED')
+            rows=conn.execute(
+                'SELECT s.session_id FROM faos.sessions s '
+                'JOIN faos.events e ON e.tenant_id=s.tenant_id AND e.session_id=s.session_id '
+                'AND e.sequence=1 '
+                "WHERE s.tenant_id=%s AND e.actor=%s AND e.event_id='capture-created' "
+                "AND e.kind='SESSION_CREATED' "
+                'ORDER BY e.occurred_at DESC,s.session_id DESC LIMIT %s',
+                (actor.tenant_id,actor.actor_id,limit),
+            ).fetchall()
+            return [self._read(conn,actor,self._identifier(row[0])) for row in rows]
+
     def get(self,authorization,session_id):
         session_id=self._identifier(session_id)
         with self._authorized(authorization) as (conn,actor):

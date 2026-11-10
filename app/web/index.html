@@ -41,6 +41,8 @@
         <label for="session-id">Case / session ID</label>
         <input id="session-id" autocomplete="off" placeholder="Session UUID">
         <button id="resume-case" class="secondary">Resume case</button>
+        <div class="session-list-head"><h4>Your recent capture drafts</h4><button id="refresh-sessions" class="quiet">Refresh</button></div>
+        <div id="owned-sessions" class="owned-sessions" aria-live="polite"></div>
         <div class="rule"></div>
         <h4>Vehicle reference</h4>
         <label for="vin">VIN</label><input id="vin" maxlength="17" autocomplete="off" placeholder="17-character VIN">

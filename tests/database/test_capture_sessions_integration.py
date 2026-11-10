@@ -43,6 +43,18 @@ class CaptureSessionIntegration(unittest.TestCase):
         self.assertEqual((reopened.session_id,reopened.tenant_id,reopened.created_by,reopened.created_at),(first.session_id,first.tenant_id,first.created_by,first.created_at))
         self.assertEqual(self.f.seed.execute('SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s',(self.f.tenants[0],self.key)).fetchone()[0],1)
 
+    def test_operator_lists_only_own_sessions_within_tenant(self):
+        own_ids=[str(uuid.uuid4()),str(uuid.uuid4())]
+        other_id=str(uuid.uuid4())
+        for session_id in own_ids:
+            self.store.create(self.auth(),session_id)
+        self.store.create(self.auth(1),other_id)
+        listed=self.store.list_owned(self.auth(),limit=10)
+        self.assertEqual({item.session_id for item in listed},set(own_ids))
+        self.assertTrue(all(item.created_by=='capture-actor-0' for item in listed))
+        self.assertNotIn(other_id,{item.session_id for item in listed})
+        self.assertEqual(len(self.store.list_owned(self.auth(),limit=1)),1)
+
     def test_other_tenant_cannot_read_capture_session(self):
         self.store.create(self.auth(),self.key)
         with self.assertRaises(CaptureSessionNotFound):

@@ -45,6 +45,23 @@ class CaptureRouteTests(unittest.TestCase):
         with self.client() as client:
             self.assertEqual(client.post('/v1/capture-sessions',json={'session_id':self.session.session_id},headers=self.headers).status_code,200)
 
+    def test_operator_session_list_returns_server_owned_records(self):
+        self.store.list_owned.return_value=[self.session]
+        with self.client() as client:
+            response=client.get('/v1/capture-sessions?limit=25',headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(len(response.json()),1)
+        self.assertEqual(response.json()[0]['session_id'],self.session.session_id)
+        self.assertEqual(response.json()[0]['scope'],'controlled-test')
+        self.assertEqual(response.headers['cache-control'],'no-store')
+        self.store.list_owned.assert_called_once_with('Bearer '+self.token,limit=25)
+
+    def test_operator_session_list_requires_authentication_and_valid_limit(self):
+        with self.client() as client:
+            self.assertEqual(client.get('/v1/capture-sessions').status_code,401)
+            self.assertEqual(client.get('/v1/capture-sessions?limit=0',headers=self.headers).status_code,422)
+        self.store.list_owned.assert_not_called()
+
     def test_get_ignores_attempted_query_and_header_tenant_override(self):
         with self.client() as client:
             response=client.get('/v1/capture-sessions/'+self.session.session_id+'?tenant_id=other',headers={**self.headers,'X-Tenant-ID':'other'})

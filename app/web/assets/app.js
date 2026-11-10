@@ -49,6 +49,7 @@ async function connect() {
     for (const id of ["operator-view","owner-view","reviewer-view"]) $(id).hidden = id !== target;
     $("role-nav").textContent = identity.actor_role === "supervisor" ? "Supervisor · Reviewer queue" : identity.actor_role;
     if (target === "reviewer-view") await refreshQueue();
+    if (target === "operator-view") await refreshOwnedSessions();
   } catch (error) {
     token = null; identity = null;
     $("sign-in-error").textContent = error.message === "UNAUTHORIZED" ? "Access token was rejected." : error.message;
@@ -67,7 +68,33 @@ async function createCase() {
     setCase(id);
     $("case-created").textContent = result.created ? "Case created." : "Existing case resumed.";
     message("operator-message", "Case ready. Ask the owner to record consent using their own account.");
+    await refreshOwnedSessions();
   } catch (error) { message("operator-message", error.message, true); }
+}
+async function refreshOwnedSessions() {
+  const root=$("owned-sessions");
+  root.replaceChildren();
+  try {
+    const items=await api("/api/v1/capture-sessions?limit=50");
+    if (!items.length) { root.textContent="No capture drafts have been created by this operator."; return; }
+    for (const item of items) {
+      const row=document.createElement("article"); row.className="owned-session";
+      const details=document.createElement("div");
+      const heading=document.createElement("strong"); heading.textContent=item.session_id;
+      const date=document.createElement("p"); date.className="fine";
+      date.textContent="Created "+new Date(item.created_at).toLocaleString();
+      details.append(heading,date);
+      const open=document.createElement("button"); open.className="secondary"; open.textContent="Open";
+      open.addEventListener("click",async()=>{
+        try {
+          await api("/api/v1/capture-sessions/"+encodeURIComponent(item.session_id));
+          setCase(item.session_id);
+          message("operator-message","Capture draft reopened from the server.");
+        } catch(error) { message("operator-message",error.message,true); }
+      });
+      row.append(details,open); root.append(row);
+    }
+  } catch(error) { root.textContent=error.message; }
 }
 async function resumeCase() {
   const id = $("session-id").value.trim();
@@ -75,6 +102,7 @@ async function resumeCase() {
   try {
     await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}`);
     setCase(id); message("operator-message","Case access verified.");
+    await refreshOwnedSessions();
   } catch (error) { message("operator-message",error.message,true); }
 }
 async function recordConsent() {
@@ -232,6 +260,7 @@ $("connect").addEventListener("click",connect);
 $("disconnect").addEventListener("click",disconnect);
 $("new-case").addEventListener("click",createCase);
 $("resume-case").addEventListener("click",resumeCase);
+$("refresh-sessions").addEventListener("click",refreshOwnedSessions);
 $("record-consent").addEventListener("click",recordConsent);
 $("save-vin").addEventListener("click",recordVin);
 $("record-quality").addEventListener("click",recordQuality);

@@ -215,6 +215,23 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
     def create_session(body: SessionRequest, authorization: str = Depends(authorize)):
         return invoke(runtime.store.create, authorization, body.session_id, creating=True)
 
+    @api.get('/v1/capture-sessions')
+    def list_sessions(limit: int = Query(default=100, ge=1, le=100), authorization: str = Depends(authorize)):
+        try:
+            sessions=runtime.store.list_owned(authorization,limit=limit)
+            payload=[{**asdict(item),'scope':'controlled-test'} for item in sessions]
+            return JSONResponse(jsonable_encoder(payload),headers=dict(NO_STORE_HEADERS))
+        except AuthenticationError:
+            _fail(401,'UNAUTHORIZED')
+        except CaptureAuthorizationError:
+            _fail(403,'CAPTURE_AUTHORITY_DENIED')
+        except CaptureStorageUnavailable:
+            _fail(503,'CAPTURE_STORAGE_UNAVAILABLE')
+        except ValueError:
+            _fail(422,'INVALID_CAPTURE_SESSION_REQUEST')
+        except Exception:
+            _fail(500,'CAPTURE_OPERATION_FAILED')
+
     @api.get('/v1/capture-sessions/{session_id}')
     def get_session(session_id: UUID, authorization: str = Depends(authorize)):
         return invoke(runtime.store.get, authorization, session_id)
