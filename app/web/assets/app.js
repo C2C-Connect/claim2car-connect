@@ -127,7 +127,7 @@ async function createCase() {
     const result = await api("/api/v1/capture-sessions", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:id})});
     setCase(id);
     $("case-created").textContent = result.created ? "Case created." : "Existing case resumed.";
-    message("operator-message", "Case ready. Ask the owner to record consent using their own account.");
+    message("operator-message", "Case ready. Owner consent must be recorded with the provisioned owner actor credential; this workspace does not provide end-user login.");
     await refreshOwnedSessions();
   } catch (error) { message("operator-message", error.message, true); }
 }

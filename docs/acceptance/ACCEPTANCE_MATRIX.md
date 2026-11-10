@@ -43,26 +43,25 @@
 
 The current Railway configuration is a restricted synthetic containment service. It is not the integrated product. Live dispatch, payments, partner/carrier delivery, production publication, and real participant data remain disabled until their legal, security, partner, operational, and deployment gates have actual evidence.
 
-## Persistent claim-case register and capture-session association — 2026-11-10
+## Persistent claim-case register and owner-bound evidence journey — 2026-11-10
 
-**Candidate revision:** `233739cba238e847c673159ded6123378e85ae6e`  
-**Implementation status:** Implemented and automated-test verified on PR #29; not field-validated or deployed.
+**Candidate revision:** `7b1ea6e6d3f7dc586a6981123a4207078fff8064`  
+**Implementation status:** Implemented and automated-test verified on PR #29 using synthetic test identities and synthetic image bytes; not field-validated or deployed.
 
 - Added authority migrations `0010_claim_case_registry.sql` through `0013_claim_case_capture_session.sql`.
-- Added `faos.claim_cases` with tenant-scoped identifiers, immutable creator/time/state metadata, row-level security, and a server-owned idempotent creation function.
-- Application identities receive read-only table access; creation occurs through a narrowly granted database function. Application identities have no table update/delete grant.
-- Each newly created persistent claim record now provisions a distinct capture session whose first journal event explicitly identifies it as a persistent claim session, not a synthetic controlled-test session.
-- Added an owner-binding function: the first configured owner actor to record consent is bound to that claim. A different owner actor in the same tenant cannot take over or consent to that case.
-- Added authenticated create/list/reopen APIs with creator scoping, bounded listing, and session-scope disclosure. Owner actor IDs are not returned by the session API.
-- Added the operator-facing persistent claim register; creating/reopening a claim opens its associated capture session. The standalone `POST /v1/capture-sessions` workflow remains explicitly controlled-test only.
+- Added `faos.claim_cases` with tenant-scoped identifiers, immutable creator/time/state metadata, RLS, and a server-owned idempotent creation function. App identities read; creation occurs through a narrowly granted database function; app identities have no table update/delete grant.
+- Each persistent claim record provisions a distinct capture session with a first journal event explicitly identifying it as a persistent claim session, not a controlled-test session.
+- The first provisioned owner actor credential to record consent is bound to the case. A different owner actor in the same tenant cannot take over or consent to that case.
+- Added authenticated create/list/reopen APIs, bounded listing, creator scoping, explicit session scope, and operator UI controls that open the linked capture session.
+- Kept the standalone `POST /v1/capture-sessions` route explicitly controlled-test only.
+- Added PostgreSQL end-to-end coverage for the persistent claim session: owner consent, keyed VIN HMAC (raw VIN not journaled), original bytes for every canonical capture slot, advisory quality, manifest sealing, reviewer queue/details, integrity-checked original retrieval, and a supported human-review outcome.
 
-**Deliberate boundary:** the persistent case currently stores identity, creator/time/state, and a linked capture-session identifier. It does not yet store incident details/location/narrative, claimant personal information, policy details, or VIN. The owner binding currently uses a server-provisioned owner actor credential; that is not a real end-user login, identity proofing, or claimant invitation flow. The PostgreSQL integration test verifies case/session creation and first-owner binding, but a full production-scoped VIN/original-byte/manifest/reviewer journey still requires dedicated end-to-end verification. This is not complete claim intake, adjudication, field acceptance, or permission to process real participant data.
+**Deliberate boundary:** the automated journey uses synthetic VIN and image bytes. The current case stores identity, creator/time/state, and capture-session association; it does not yet store incident details/location/narrative, claimant personal information, or policy details. Owner binding relies on a server-provisioned owner actor credential; this is not end-user login, identity proofing, or claimant invitation. The end-to-end test is not field acceptance, live participant-data approval, automated adjudication, or proof of a deployed customer-facing environment.
 
 **Verification evidence at the candidate revision:**
-- Full repository suite: **682 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42755062529](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755062529).
-- Database authority cutover and post-cutover tenant-isolation diagnostics: passed — run [42755062520](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755062520).
-- FastAPI foundation: passed — run [42755062645](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755062645).
-- Restricted intake container, offline capture, frontend VIN/transport, controlled-test PostgreSQL, synthetic demonstration, and PR #29 checks: passed.
-- Railway restricted staging verification: passed — run [42755062755](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755062755). The actual deploy job was skipped; this is a restricted synthetic smoke test, not deployment of the integrated Claim2Car application.
+- Full repository suite: **685 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42755387422](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387422).
+- Database authority cutover and post-cutover tenant-isolation diagnostics: passed — run [42755387498](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387498).
+- FastAPI foundation, restricted intake container, offline capture, frontend VIN/transport, controlled-test PostgreSQL, synthetic demonstration, Railway restricted smoke, and PR #29 checks: passed.
+- Railway restricted staging verification passed — run [42755387517](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387517). The actual deploy job was skipped; this is not deployment of the integrated Claim2Car application.
 
-**Next implementation slice:** add the approved incident intake schema and UI; replace static owner actor credentials with a real authenticated owner invitation/consent flow; then run the full persistent-claim evidence path (keyed VIN, original bytes, manifest sealing, reviewer retrieval and outcomes) against the production-scoped session before staging deployment.
+**Next implementation slice:** establish the incident intake data contract and consent/disclosure scope; implement real owner login/invitation rather than static owner actor credentials; then deploy the integrated app to a restricted staging environment and validate the workflow with approved test participants before any production release.

@@ -42,7 +42,7 @@
         <div id="claim-cases" class="owned-sessions" aria-live="polite"></div>
         <div class="rule"></div>
         <h4>Controlled-test evidence capture</h4>
-        <p class="fine">The following capture-session workflow remains explicitly controlled-test only. It is not a production claim record. Owner consent must be recorded by an authenticated owner identity before vehicle details or evidence can be added.</p>
+        <p class="fine">The following capture-session workflow remains explicitly controlled-test only. It is not a production claim record. Owner consent must be recorded by the provisioned owner actor credential. This workspace does not provide end-user login or identity proofing.</p>
         <div class="actions"><button id="new-case" class="secondary">Create controlled-test capture draft</button><span id="case-created" class="fine"></span></div>
         <label for="session-id">Capture session ID</label>
         <input id="session-id" autocomplete="off" placeholder="Session UUID">
@@ -63,7 +63,7 @@
       </section>
       <section id="owner-view" class="panel" hidden>
         <h3>Owner consent</h3>
-        <p class="muted">Consent is recorded under the authenticated owner identity. The operator cannot grant consent on the owner's behalf.</p>
+        <p class="muted">Consent is recorded under the provisioned owner actor credential. The operator cannot grant consent on the owner's behalf. This workspace does not provide end-user login or identity proofing.</p>
         <label for="owner-session-id">Case / session ID supplied by the operator</label>
         <input id="owner-session-id" autocomplete="off" placeholder="Session UUID">
         <div class="disclosure" aria-label="Disclosure version disclosure-v1">
