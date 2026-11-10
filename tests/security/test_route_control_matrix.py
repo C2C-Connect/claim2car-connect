@@ -67,6 +67,7 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
         self.assertEqual(
             set(secured),
             {
+                ("/v1/capture-sessions", ("GET",)),
                 ("/v1/capture-sessions", ("POST",)),
                 ("/v1/capture-sessions/{session_id}", ("GET",)),
             },
@@ -79,6 +80,7 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
         self.assertEqual(
             set(secured),
             {
+                ("/v1/capture-sessions", ("GET",)),
                 ("/v1/capture-sessions", ("POST",)),
                 ("/v1/capture-sessions/{session_id}", ("GET",)),
                 ("/v1/capture-sessions/{session_id}/draft", ("GET",)),
