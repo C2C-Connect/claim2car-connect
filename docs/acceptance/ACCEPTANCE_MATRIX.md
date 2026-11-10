@@ -2,7 +2,7 @@
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
 **Candidate branch:** `cto/spec-production-implementation` (PR #29)  
-**Last code validation revision:** `0ebe7337b74c5fe82ba7b2e39cc1c08aedbf7737`  
+**Last code validation revision:** `c6f36810affb72f61a4e4fb3e6d8345705cffb73`  
 **Machine contract:** `m1-v1`  
 **Status rule:** code, CI, field validation, review, and release authorization are recorded separately. A passing synthetic test does not establish product acceptance or production readiness. The candidate revision is not merged and has no submitted independent review.
 
@@ -125,3 +125,28 @@ The current Railway configuration is a restricted synthetic containment service.
 - IndexedDB is not an encrypted vault, WORM store, or production durability guarantee. This feature remains a controlled-test aid and is not authorized for real participant evidence.
 - The last verified readiness result is held in page memory, not a signed offline consent permit. After a page restart while offline, new evidence cannot be queued until the server can revalidate readiness. If consent is withdrawn elsewhere while the operator device remains offline, already queued local bytes cannot be remotely erased until that device reconnects.
 - No claim is made that this completes the offline-first field-capture requirement. Native/device-qualified storage, explicit local retention controls, integrated app-to-API browser tests, and iPad field validation remain open.
+
+
+## Event-journal SQL/Python contract parity — 2026-11-10
+
+**Validated candidate code revision:** `c6f36810affb72f61a4e4fb3e6d8345705cffb73` (PR #29; still draft and unmerged).
+
+- Added authority migration `0017_event_contract_parity.sql`. It requires RFC3339 timestamps with an explicit timezone, checks calendar validity, enforces compact canonical JSON with lexically ordered object keys and consistent UTF-8 string encoding, and aligns the SQL event-kind allowlist with Python.
+- The shared Python serializer now emits deterministic compact JSON, preserves legitimate decimal quality metrics using fixed decimal notation, and is used by capture, manifest-sealing, and review event producers.
+- Direct SQL writes that bypass Python validation are rejected by database constraints. The migration does not rewrite historical rows; incompatible existing rows block migration for explicit investigation.
+- Replaced defect-characterization assertions with full-plan PostgreSQL integration coverage using a restricted, tenant-bound application login. Tests verify rejection/no-history-mutation for timezone-naive and malformed timestamps, whitespace, unordered keys, and exponent-form numbers; they also verify canonical UTF-8/decimal round-trip and the complete event-kind allowlist.
+- The test fixture registers the authenticated database login-to-tenant binding required by the authority model; it does not rely on superuser execution for application writes.
+
+**Verification at candidate revision `c6f3681...`:**
+- Full repository pytest suite: **691 passed, 200 subtests passed, 23 warnings** — [GitHub Actions run 42789801371](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42789801371).
+- Database authority full-plan migration, restricted-login integration, post-cutover diagnostics, and tenant-isolation checks: **passed** — [run 42789801486](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42789801486).
+- Controlled synthetic demonstration: [passed](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42789801288).
+- Chromium/Playwright IndexedDB persistence and recovery: [passed](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42789801223).
+- FastAPI foundation and API health: [passed](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42789801311).
+- Offline guided capture: [passed](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42789801497).
+- Restricted intake container: [passed](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42789801572).
+- Railway restricted-container smoke: [passed](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42789801199); the separate deployment job was **skipped**. This is not an integrated staging or production deployment.
+
+**Boundary:** the successful database workflow uses isolated/disposable PostgreSQL test databases and synthetic records. It does not establish production database migration safety against unknown live historical rows, durable cloud storage, backup/restore, production deployment, Safari/iPad qualification, field validation, or legal admissibility. Hashes and canonical journal serialization establish consistency and replayability, not the truth of a claim or capture provenance.
+
+**Next P0 slice:** exercise the complete authenticated HTTP path against the full authority schema and durable artifact store, including process restart, manifest seal/readback, independent reviewer retrieval, cross-tenant denial, consent withdrawal, and tampered-byte rejection. Keep deployment disabled until that integrated path and the persistent storage/recovery controls have evidence.
