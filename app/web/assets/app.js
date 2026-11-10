@@ -213,6 +213,21 @@ async function recordConsent() {
     message("owner-message",result.replayed ? "Consent record confirmed." : "Consent recorded for this case.");
   } catch (error) { message("owner-message",error.message,true); }
 }
+async function withdrawCaptureConsent() {
+  const id = $("owner-session-id").value.trim();
+  if (!id) return message("owner-message","Enter the case ID before withdrawing consent.",true);
+  try {
+    const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/consent`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({request_id:uuid(),accepted:false,scope:"capture_review"})
+    });
+    const localDeleted = evidenceQueue ? await evidenceQueue.deleteSession(id) : 0;
+    if (activeSession === id) await refreshCaptureQueueStatus(id);
+    message("owner-message",`Capture consent withdrawn. Server deleted ${result.deleted_original_artifacts ?? 0} original(s); local browser queue removed ${localDeleted} item(s).`);
+  } catch (error) {
+    message("owner-message",`Withdrawal was not confirmed by the server; local evidence was not purged. ${error.message}`,true);
+  }
+}
 async function recordIncidentConsent(accepted = true) {
   const id = $("owner-session-id").value.trim();
   if (!id || (accepted && !$("incident-consent-accepted").checked)) return message("incident-message","Enter the case ID and explicitly accept the supplemental notice.",true);
@@ -448,6 +463,7 @@ $("create-claim-case").addEventListener("click",createClaimCase);
 $("resume-case").addEventListener("click",resumeCase);
 $("refresh-sessions").addEventListener("click",refreshOwnedSessions);
 $("record-consent").addEventListener("click",recordConsent);
+$("withdraw-capture-consent").addEventListener("click",withdrawCaptureConsent);
 $("load-incident-details").addEventListener("click",refreshIncidentDetails);
 $("record-incident-consent").addEventListener("click",()=>recordIncidentConsent(true));
 $("withdraw-incident-consent").addEventListener("click",()=>recordIncidentConsent(false));
