@@ -22,12 +22,12 @@ SELECT NOT r.rolsuper AND NOT r.rolbypassrls
        to_regclass('faos.tenant_login_bindings') IS NOT NULL,
        EXISTS(SELECT 1 FROM pg_proc p WHERE p.oid=to_regprocedure('faos.tenant_id()')
               AND p.prosecdef AND pg_get_userbyid(p.proowner)='faos_writer'),
-       (SELECT count(*)=11 AND bool_and(c.relrowsecurity AND c.relforcerowsecurity)
+       (SELECT count(*)=12 AND bool_and(c.relrowsecurity AND c.relforcerowsecurity)
         FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname='faos' AND c.relkind='r'
         AND c.relname IN ('organizations','users','memberships','dealer_groups',
                          'dealer_locations','location_brands','sessions','events',
-                         'manifest_roots','completion_receipts','claim_cases'))
+                         'manifest_roots','completion_receipts','claim_cases','claim_case_incident_intake'))
 FROM pg_roles r WHERE r.rolname=current_user
 """
 
