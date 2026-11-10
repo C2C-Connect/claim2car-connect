@@ -47,7 +47,7 @@ Each credential entry in the private runtime JSON has this shape:
   "tenant_id": "00000000-0000-0000-0000-000000000001",
   "database_role": "tenant_login_operator",
   "token_sha256": "<64-character-lowercase-sha256-digest>",
-  "expires_at": 1790000000,
+  "expires_at": 1800000000,
   "enabled": true,
   "actor_role": "operator"
 }
