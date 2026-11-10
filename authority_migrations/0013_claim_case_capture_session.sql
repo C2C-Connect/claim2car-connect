@@ -10,6 +10,7 @@ CREATE UNIQUE INDEX claim_cases_capture_session_uq
  ON faos.claim_cases(tenant_id,capture_session_id)
  WHERE capture_session_id IS NOT NULL;
 GRANT UPDATE(owner_actor_id) ON faos.claim_cases TO faos_writer;
+GRANT INSERT ON faos.sessions TO faos_writer;
 
 DROP FUNCTION faos.create_claim_case(uuid,uuid,uuid,text);
 CREATE FUNCTION faos.create_claim_case(

@@ -158,7 +158,7 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        expect(report['migration_inventory'][-1][0]=='0012_claim_case_retry_without_update_lock.sql','CLAIM_CASE_MIGRATION_REQUIRED')
+        expect(report['migration_inventory'][-1][0]=='0013_claim_case_capture_session.sql','CLAIM_CASE_MIGRATION_REQUIRED')
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:
