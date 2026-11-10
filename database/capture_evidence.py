@@ -113,6 +113,22 @@ class CaptureEvidenceService:
                 return True
         return False
 
+    def evidence_readiness(self, authorization, session_id):
+        """Return the server-authoritative consent/VIN gate before local evidence is queued."""
+        session_id = self._session_id(session_id)
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            consent = self._consent_state(history)
+            vehicle_present = self._has_valid_vehicle_reference(history, consent)
+            return {
+                "session_id": session_id,
+                "consent_active": consent is not None,
+                "vehicle_reference_present": vehicle_present,
+                "capture_allowed": consent is not None and vehicle_present,
+            }
+
     def record_consent(self, authorization, session_id, *, request_id, accepted, scope):
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
