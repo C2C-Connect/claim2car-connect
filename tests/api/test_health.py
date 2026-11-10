@@ -95,6 +95,7 @@ class HealthTests(unittest.TestCase):
             response=client.get('/health/build')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['runtime_mode'],'restricted_staging')
+        self.assertEqual(set(response.json()),{'revision','runtime_mode'})
         self.assertIn('revision',response.json())
 
 if __name__=='__main__':

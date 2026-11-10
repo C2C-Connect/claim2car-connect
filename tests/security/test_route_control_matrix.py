@@ -39,7 +39,7 @@ class M1PublicSurfaceTests(unittest.TestCase):
         table = route_table(create_app(Settings()))
         self.assertEqual(
             table,
-            {("/health/live", ("GET",)), ("/health/ready", ("GET",))},
+            {("/health/live", ("GET",)), ("/health/ready", ("GET",)), ("/health/build", ("GET",))},
             "The M1 public surface must expose only health routes — no business API.",
         )
 
