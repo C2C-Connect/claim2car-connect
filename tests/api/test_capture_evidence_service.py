@@ -216,7 +216,7 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertEqual(
             {item["slot"] for item in details["artifacts"]}, set(CANONICAL_SLOTS)
         )
-        self.assertNotIn("vin", json.dumps(details))
+        self.assertNotIn("1HGCM82633A004352", json.dumps(details))
 
         first_slot = CANONICAL_SLOTS[0]
         first_artifact = UUID(int=201)

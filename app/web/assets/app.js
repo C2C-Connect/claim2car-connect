@@ -1,9 +1,11 @@
+// Keep this list byte-for-byte aligned with app/evidence_manifest.py and
+// contracts/shot-list.json (claims2car-12-v1).
 const SLOTS = [
-  ["front_center","Front center"],["front_left","Front left"],["left_side","Left side"],
-  ["rear_left","Rear left"],["rear_center","Rear center"],["rear_right","Rear right"],
-  ["right_side","Right side"],["front_right","Front right"],["vin_plate","VIN plate"],
-  ["odometer_cluster","Odometer cluster"],["primary_impact_closeup","Primary impact close-up"],
-  ["undercarriage_or_wheel_well","Undercarriage / wheel well"]
+  ["vin_ocr","VIN plate"],["doc_ocr","Registration / document"],["front","Front"],
+  ["front_left","Front left"],["driver_side","Driver side"],["rear_left","Rear left"],
+  ["rear","Rear"],["rear_right","Rear right"],["passenger_side","Passenger side"],
+  ["front_right","Front right"],["interior_front","Front interior"],
+  ["undercarriage_engine","Undercarriage / engine"]
 ];
 let token = null;
 let identity = null;
