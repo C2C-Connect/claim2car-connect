@@ -1,6 +1,7 @@
 """Real PostgreSQL-backed service tests; not HTTP or real-image intake proof."""
 from dataclasses import replace
 import hashlib
+import base64
 import time
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ from database.financial_ledger import PersistentFinancialLedger
 from backend.app.anchor.ledger import PartnerAcceptanceRecord
 from app.artifact_storage import OriginalByteStore
 from database.capture_evidence import CaptureEvidenceService
+from app.evidence_manifest import CANONICAL_SLOTS
 
 class CaptureSessionIntegration(unittest.TestCase):
     def setUp(self):
@@ -33,11 +35,14 @@ class CaptureSessionIntegration(unittest.TestCase):
             self.credentials.append(Credential(hashlib.sha256(self.tokens[index].encode()).hexdigest(),binding,int(time.time())+3600))
         self.owner_token='C'*43
         self.other_owner_token='D'*43
+        self.reviewer_token='E'*43
         self.credentials.extend([
             Credential(hashlib.sha256(self.owner_token.encode()).hexdigest(),
                 ActorBinding('claim-owner-0',uuid.UUID(self.f.tenants[0]),self.f.roles[0],'owner'),int(time.time())+3600),
             Credential(hashlib.sha256(self.other_owner_token.encode()).hexdigest(),
                 ActorBinding('claim-owner-1',uuid.UUID(self.f.tenants[0]),self.f.roles[0],'owner'),int(time.time())+3600),
+            Credential(hashlib.sha256(self.reviewer_token.encode()).hexdigest(),
+                ActorBinding('claim-reviewer-0',uuid.UUID(self.f.tenants[0]),self.f.roles[0],'reviewer'),int(time.time())+3600),
         ])
         self.store=CaptureSessionStore(CredentialResolver(self.credentials),self.dsns)
         self.claim_cases=ClaimCaseStore(self.store)
@@ -48,6 +53,9 @@ class CaptureSessionIntegration(unittest.TestCase):
 
     def owner_auth(self,other=False):
         return 'Bearer '+(self.other_owner_token if other else self.owner_token)
+
+    def reviewer_auth(self):
+        return 'Bearer '+self.reviewer_token
 
     def test_claim_case_create_retry_and_owned_readback(self):
         claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -85,6 +93,46 @@ class CaptureSessionIntegration(unittest.TestCase):
         self.assertEqual(self.f.seed.execute(
             "SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s AND kind='CONSENT_RECORDED'",
             (self.f.tenants[0],case.capture_session_id)).fetchone()[0], 1)
+
+    def test_persistent_claim_capture_completes_original_evidence_and_review_path(self):
+        claim_id = str(uuid.uuid4())
+        case = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()))
+        with tempfile.TemporaryDirectory() as root:
+            byte_store = OriginalByteStore(root)
+            service = CaptureEvidenceService(self.store, byte_store, 'P'*43)
+            service.record_consent(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=True, scope='capture_review')
+            service.record_vehicle(self.auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), vin='1HGCM82633A004352')
+            originals = {}
+            for slot in CANONICAL_SLOTS:
+                raw = ('claim-case-original:' + slot).encode('ascii')
+                artifact_id = str(uuid.uuid4())
+                originals[artifact_id] = raw
+                service.register_artifact(self.auth(), case.capture_session_id,
+                    request_id=uuid.uuid4(), artifact_id=artifact_id, slot=slot,
+                    payload_base64=base64.b64encode(raw).decode('ascii'),
+                    sha256_hex=hashlib.sha256(raw).hexdigest())
+            quality = {slot: True for slot in CANONICAL_SLOTS}
+            self.assertTrue(service.record_quality(self.auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), results=quality)['advisory_only'])
+            sealed = service.seal_capture(self.auth(), case.capture_session_id, request_id=uuid.uuid4())
+            queue = service.list_review_queue(self.reviewer_auth())
+            self.assertIn(case.capture_session_id, {item['session_id'] for item in queue})
+            details = service.get_review_details(self.reviewer_auth(), case.capture_session_id)
+            self.assertEqual(details['manifest_digest'], sealed['manifest_digest'])
+            self.assertEqual(len(details['artifacts']), len(CANONICAL_SLOTS))
+            first_artifact = next(iter(originals))
+            self.assertEqual(service.retrieve_for_review(
+                self.reviewer_auth(), case.capture_session_id, first_artifact), originals[first_artifact])
+            review = service.record_review(self.reviewer_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), disposition='NOTE_ONLY',
+                reason='Synthetic integration verification; no real claim decision.')
+            self.assertEqual(review['manifest_digest'], sealed['manifest_digest'])
+            self.assertNotIn('1HGCM82633A004352', str(details))
+        persisted = self.store.get(self.auth(), case.capture_session_id)
+        self.assertEqual((persisted.scope, persisted.claim_id, persisted.owner_actor_id),
+                         ('persistent-claim-case', claim_id, 'claim-owner-0'))
 
     def test_claim_case_idempotency_conflict_is_rejected(self):
         request_id = str(uuid.uuid4())
