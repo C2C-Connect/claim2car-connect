@@ -185,6 +185,13 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertFalse(withdrawn["consent_active"])
         self.assertFalse(withdrawn["capture_allowed"])
 
+    def test_evidence_readiness_requires_creator_operator_or_supervisor(self):
+        self.sessions.actors["other-operator-token"] = Actor("operator-2", self.tenant, "operator")
+        with self.assertRaisesRegex(CaptureAuthorizationError, "CAPTURE_AUTHORITY_DENIED"):
+            self.service.evidence_readiness("other-operator-token", self.session_id)
+        with self.assertRaisesRegex(CaptureAuthorizationError, "OPERATOR_IDENTITY_REQUIRED"):
+            self.service.evidence_readiness("reviewer-token", self.session_id)
+
     def test_only_owner_role_can_record_consent_and_only_operator_can_record_vehicle(self):
         with self.assertRaisesRegex(CaptureAuthorizationError, "OWNER_IDENTITY_REQUIRED"):
             self.service.record_consent(
