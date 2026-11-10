@@ -1,9 +1,10 @@
 """Tenant-bound capture APIs over server-owned credentials and PostgreSQL RLS.
 
-Session/draft routes support controlled tests. Consent, HMAC VIN-reference and
-original-byte registration routes are added only by the integrated runtime,
-which requires separately provisioned persistent storage and secrets. Service
-credentials are not end-user sign-in; actor roles come from private config.
+The standalone session-create route remains controlled-test only. Persistent
+claim-case creation provisions its own production-scoped capture session; the
+integrated evidence routes then require consent, keyed VIN references, and
+separately provisioned original-byte storage. Service credentials are not
+end-user sign-in; actor roles come from private config.
 """
 from dataclasses import asdict, dataclass, field
 import json
@@ -207,7 +208,10 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
     def invoke(action, authorization, session_id, creating=False):
         try:
             result = action(authorization, str(session_id))
-            payload = jsonable_encoder({**asdict(result), 'scope': 'controlled-test'})
+            payload_data = asdict(result)
+            payload_data.pop('owner_actor_id', None)
+            payload_data['scope'] = result.scope
+            payload = jsonable_encoder(payload_data)
             return JSONResponse(payload, status_code=201 if creating and result.created else 200, headers=dict(NO_STORE_HEADERS))
         except AuthenticationError:
             _fail(401, 'UNAUTHORIZED')

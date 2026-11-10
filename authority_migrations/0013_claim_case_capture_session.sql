@@ -17,9 +17,10 @@ CREATE FUNCTION faos.create_claim_case(
 ) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,faos,pg_temp
 AS $$
-DECLARE existing faos.claim_cases%ROWTYPE;
-DECLARE created_session text;
-DECLARE append_result text;
+DECLARE
+ existing faos.claim_cases%ROWTYPE;
+ created_session text;
+ append_result text;
 BEGIN
  IF faos.tenant_id() IS NULL OR p_tenant IS DISTINCT FROM faos.tenant_id() THEN
   RAISE EXCEPTION 'TENANT_CONTEXT_MISMATCH';
