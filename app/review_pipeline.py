@@ -15,7 +15,6 @@ capability.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,7 +29,7 @@ from app.artifact_storage import (
     OriginalByteStore,
 )
 from app.capture_workflow import ArtifactEntry, CaptureWorkflow, WorkflowError
-from app.domain_events import DomainEvent
+from app.domain_events import DomainEvent, canonical_event_payload
 from app.evidence_manifest import Manifest, ManifestEntry, build_manifest
 from app.telemetry import workflow_span
 from contracts.m1_state_machine import M1SessionMachine
@@ -90,16 +89,11 @@ class SealService:
             actor=actor,
             occurred_at=occurred_at,
             reason=reason,
-            payload_json=json.dumps(
-                {
-                    "schema_version": "0.1",
-                    "shot_list_version": manifest.shot_list_version,
-                    "manifest_digest": manifest.digest(),
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-                allow_nan=False,
-            ),
+            payload_json=canonical_event_payload({
+                "schema_version": "0.1",
+                "shot_list_version": manifest.shot_list_version,
+                "manifest_digest": manifest.digest(),
+            }),
         )
         with workflow_span("evidence.seal", session_id=workflow.session_id, manifest_digest=manifest.digest()):
             workflow.machine.apply(event)
@@ -274,11 +268,8 @@ class ReviewerQueue:
             actor=actor,
             occurred_at=occurred_at,
             reason=reason,
-            payload_json=json.dumps(
-                {"disposition": disposition, "artifact_ids": list(artifact_ids)},
-                sort_keys=True,
-                separators=(",", ":"),
-                allow_nan=False,
+            payload_json=canonical_event_payload(
+                {"disposition": disposition, "artifact_ids": list(artifact_ids)}
             ),
         )
         with workflow_span("review.decision", session_id=workflow.session_id, disposition=disposition, actor=actor):
