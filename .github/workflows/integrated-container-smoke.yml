@@ -15,6 +15,7 @@ on:
       - "contracts/**"
       - "migrations/**"
       - "authority_migrations/**"
+      - "frontend/**"
       - ".github/workflows/integrated-container-smoke.yml"
 
 permissions:
