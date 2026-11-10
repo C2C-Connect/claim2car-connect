@@ -107,6 +107,10 @@ def create_app(settings=None, runtime_mode=None):
         frontend_root = Path(__file__).resolve().parents[1] / 'frontend' / 'app'
         if not frontend_root.is_dir():
             raise ValueError('INTEGRATED_FRONTEND_ASSETS_REQUIRED')
+        source_root = Path(__file__).resolve().parents[1] / 'frontend' / 'src'
+        if not source_root.is_dir():
+            raise ValueError('INTEGRATED_FRONTEND_SOURCE_REQUIRED')
+        api.mount('/src', StaticFiles(directory=str(source_root), html=False), name='claim2car-frontend-source')
         api.mount('/', StaticFiles(directory=str(frontend_root), html=True), name='claim2car-workbench')
 
     return api

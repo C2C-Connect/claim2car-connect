@@ -77,6 +77,7 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert "Claim2Car Connect" in shell.text
                 assert client.get("/app.mjs").status_code == 200
                 assert client.get("/styles.css").status_code == 200
+                assert client.get("/src/modules/capture/vin.mjs").status_code == 200
 
                 # Capture and reviewer APIs are mounted under /api and retain
                 # their end-user credential boundary.
