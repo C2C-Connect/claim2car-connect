@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 from fastapi.testclient import TestClient
 from app.capture_api import CaptureRuntime, create_capture_app, load_runtime
+from database.claim_cases import ClaimCase, ClaimCaseStore
 from app.identity import ActorBinding, Credential, CredentialResolver
 from app.main import Settings
 from database.capture_sessions import CaptureAuthorizationError, CaptureSession, CaptureSessionConflict, CaptureSessionNotFound, CaptureSessionStore, CaptureStorageUnavailable
@@ -21,14 +22,45 @@ class CaptureRouteTests(unittest.TestCase):
         self.binding=ActorBinding('test-actor',UUID(int=1),'tenant_login_a')
         self.credential=Credential(hashlib.sha256(self.token.encode()).hexdigest(),self.binding,int(time.time())+3600)
         self.store=Mock(spec=CaptureSessionStore)
+        self.claim_store=Mock(spec=ClaimCaseStore)
         self.session=CaptureSession(str(UUID(int=2)),str(self.binding.tenant_id),'test-actor','2026-10-22T00:00:00+00:00',True)
         self.store.create.return_value=self.session
         self.store.get.return_value=replace(self.session,created=False)
-        self.runtime=CaptureRuntime(CredentialResolver([self.credential]),self.store,Settings())
+        self.runtime=CaptureRuntime(CredentialResolver([self.credential]),self.store,Settings(),self.claim_store)
         self.headers={'Authorization':'Bearer '+self.token}
 
     def client(self,runtime=None):
         return TestClient(create_capture_app(runtime if runtime is not None else self.runtime))
+
+    def test_claim_case_create_list_and_get_are_authenticated(self):
+        record = ClaimCase(str(UUID(int=3)), str(self.binding.tenant_id), 'test-actor',
+                           '2026-11-10T00:00:00+00:00', 'INTAKE_OPEN', True)
+        self.claim_store.create.return_value = record
+        self.claim_store.list_owned.return_value = [record]
+        self.claim_store.get.return_value = replace(record, created=False)
+        with self.client() as client:
+            created = client.post('/v1/claim-cases',
+                json={'claim_id':record.claim_id,'request_id':str(UUID(int=4))},headers=self.headers)
+            listed = client.get('/v1/claim-cases?limit=25',headers=self.headers)
+            opened = client.get('/v1/claim-cases/'+record.claim_id,headers=self.headers)
+            unauthorized = client.get('/v1/claim-cases')
+        self.assertEqual(created.status_code,201)
+        self.assertEqual(created.json()['scope'],'persistent-claim-case')
+        self.assertEqual(created.json()['state'],'INTAKE_OPEN')
+        self.assertEqual(listed.status_code,200)
+        self.assertEqual(listed.json()[0]['claim_id'],record.claim_id)
+        self.assertEqual(opened.status_code,200)
+        self.assertEqual(unauthorized.status_code,401)
+        self.assertEqual(created.headers['cache-control'],'no-store')
+        self.claim_store.create.assert_called_once()
+        self.claim_store.list_owned.assert_called_once_with('Bearer '+self.token,limit=25)
+        self.claim_store.get.assert_called_once_with('Bearer '+self.token,claim_id=record.claim_id)
+
+    def test_claim_case_list_rejects_invalid_limit(self):
+        with self.client() as client:
+            response=client.get('/v1/claim-cases?limit=0',headers=self.headers)
+        self.assertEqual(response.status_code,422)
+        self.claim_store.list_owned.assert_not_called()
 
     def test_create_returns_201_and_preserves_server_metadata(self):
         with self.client() as client:

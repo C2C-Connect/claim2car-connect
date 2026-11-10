@@ -22,6 +22,7 @@ from psycopg.conninfo import conninfo_to_dict
 
 from app.identity import ActorBinding, AuthenticationError, Credential, CredentialResolver
 from app.main import Settings, create_app
+from database.claim_cases import ClaimCaseConflict, ClaimCaseNotFound, ClaimCaseStore
 from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound,
     CaptureSessionStore, CaptureStorageUnavailable,
@@ -41,6 +42,13 @@ class CaptureRuntime:
     resolver: CredentialResolver = field(repr=False)
     store: CaptureSessionStore = field(repr=False)
     health_settings: Settings = field(repr=False)
+    claim_store: ClaimCaseStore | None = field(default=None, repr=False)
+
+class ClaimCaseRequest(BaseModel):
+    claim_id: UUID
+    request_id: UUID
+    class Config:
+        extra = 'forbid'
 
 class SessionRequest(BaseModel):
     session_id: UUID
@@ -169,6 +177,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
     # never recursively compose the integrated parent when C2C_RUNTIME_MODE is set.
     api = create_app(runtime.health_settings, runtime_mode='restricted_staging')
     api.state.health_settings = runtime.health_settings
+    claim_cases = runtime.claim_store or ClaimCaseStore(runtime.store)
     evidence = None
     if enable_evidence:
         root = os.environ.get('C2C_ARTIFACT_STORAGE_ROOT')
@@ -210,6 +219,54 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
         except Exception:
             _fail(500, 'CAPTURE_OPERATION_FAILED')
+
+    def invoke_claim(action, authorization, **kwargs):
+        try:
+            result = action(authorization, **kwargs)
+            payload = {**asdict(result), 'scope': 'persistent-claim-case'}
+            return JSONResponse(jsonable_encoder(payload), status_code=201 if result.created else 200,
+                                headers=dict(NO_STORE_HEADERS))
+        except AuthenticationError:
+            _fail(401, 'UNAUTHORIZED')
+        except CaptureAuthorizationError:
+            _fail(403, 'CLAIM_CASE_AUTHORITY_DENIED')
+        except ClaimCaseNotFound:
+            _fail(404, 'CLAIM_CASE_NOT_FOUND')
+        except ClaimCaseConflict:
+            _fail(409, 'CLAIM_CASE_CONFLICT')
+        except CaptureStorageUnavailable:
+            _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+        except ValueError:
+            _fail(422, 'INVALID_CLAIM_CASE_REQUEST')
+        except Exception:
+            _fail(500, 'CLAIM_CASE_OPERATION_FAILED')
+
+    @api.post('/v1/claim-cases')
+    def create_claim_case(body: ClaimCaseRequest, authorization: str = Depends(authorize)):
+        return invoke_claim(claim_cases.create, authorization,
+                            claim_id=str(body.claim_id), request_id=str(body.request_id))
+
+    @api.get('/v1/claim-cases')
+    def list_claim_cases(limit: int = Query(default=50, ge=1, le=100),
+                         authorization: str = Depends(authorize)):
+        try:
+            records = claim_cases.list_owned(authorization, limit=limit)
+            payload = [{**asdict(item), 'scope': 'persistent-claim-case'} for item in records]
+            return JSONResponse(jsonable_encoder(payload), headers=dict(NO_STORE_HEADERS))
+        except AuthenticationError:
+            _fail(401, 'UNAUTHORIZED')
+        except CaptureAuthorizationError:
+            _fail(403, 'CLAIM_CASE_AUTHORITY_DENIED')
+        except CaptureStorageUnavailable:
+            _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+        except ValueError:
+            _fail(422, 'INVALID_CLAIM_CASE_REQUEST')
+        except Exception:
+            _fail(500, 'CLAIM_CASE_OPERATION_FAILED')
+
+    @api.get('/v1/claim-cases/{claim_id}')
+    def get_claim_case(claim_id: UUID, authorization: str = Depends(authorize)):
+        return invoke_claim(claim_cases.get, authorization, claim_id=str(claim_id))
 
     @api.post('/v1/capture-sessions')
     def create_session(body: SessionRequest, authorization: str = Depends(authorize)):
