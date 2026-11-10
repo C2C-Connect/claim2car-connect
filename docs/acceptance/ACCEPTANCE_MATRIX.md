@@ -93,6 +93,6 @@ The current Railway configuration is a restricted synthetic containment service.
 - The operator shell can load the details after the owner separately consents. Withdrawal removes the row, so the read path no longer returns it.
 - The database authority diagnostic now verifies that the shared application role cannot directly select this table and must use the actor-filtered read function.
 
-**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** the complete database authority/cutover workflow and full repository suite passed, including the owner/creator readback and denial-to-other-operator integration test. API health, integrated-container smoke, controlled PostgreSQL intake, VIN, frontend, CodeQL, and restricted Railway verification also passed; the actual Railway deploy job remained skipped.
+**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** the complete database authority/cutover workflow and full repository suite passed (**693 passed, 23 warnings, 192 subtests**), including the owner/creator readback and denial-to-other-operator integration test. API health, integrated-container smoke, controlled PostgreSQL intake, VIN, frontend, CodeQL, and restricted Railway verification also passed; the actual Railway deploy job remained skipped.
 
 **Remaining boundary:** owner authentication is still based on a provisioned actor credential; this does not establish the real person's identity. The feature remains disabled by default and the disclosure remains pending legal review.
