@@ -165,6 +165,10 @@ class MigrationControlsIntegration(unittest.TestCase):
                         self.assertEqual(count, 1)
 
             valid_payload = '{"large":100000000000000000000,"label":"é","small":0.00001,"value":1.25}'
+            sql_canonical = app.execute(
+                'SELECT faos.canonical_event_jsonb(%s::jsonb)', (valid_payload,)
+            ).fetchone()[0]
+            self.assertEqual(sql_canonical, valid_payload, f'SQL_CANONICAL_PAYLOAD={sql_canonical!r}')
             with tenant_transaction(app, tenant):
                 self.assertEqual(append(
                     'event-2', 2, 'QUALITY_RECORDED', '2026-01-01T00:00:00+05:30', valid_payload
