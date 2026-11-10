@@ -96,6 +96,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0012_claim_case_retry_without_update_lock'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0013_claim_case_capture_session'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)

@@ -78,6 +78,10 @@ async function createClaimCase() {
     $("claim-case-created").textContent = result.created
       ? "Persistent claim record created: " + result.claim_id
       : "Existing claim record confirmed: " + result.claim_id;
+    if (result.capture_session_id) {
+      setCase(result.capture_session_id);
+      message("operator-message","Persistent claim capture session is ready. Owner consent is required before VIN or evidence entry.");
+    }
     pendingClaimCase = null;
     await refreshClaimCases();
   } catch(error) {
@@ -100,12 +104,16 @@ async function refreshClaimCases() {
       const date = document.createElement("p"); date.className = "fine";
       date.textContent = item.state + " · Created " + new Date(item.created_at).toLocaleString();
       details.append(heading,date);
-      const open = document.createElement("button"); open.className = "secondary"; open.textContent = "Reopen";
+      const open = document.createElement("button"); open.className = "secondary"; open.textContent = "Open capture";
       open.addEventListener("click", async () => {
         open.disabled = true;
         try {
-          await api("/api/v1/claim-cases/" + encodeURIComponent(item.claim_id));
-          $("claim-case-created").textContent = "Persistent claim record reopened.";
+          const record = await api("/api/v1/claim-cases/" + encodeURIComponent(item.claim_id));
+          if (!record.capture_session_id) throw new Error("CAPTURE_SESSION_NOT_LINKED");
+          await api("/api/v1/capture-sessions/" + encodeURIComponent(record.capture_session_id));
+          setCase(record.capture_session_id);
+          message("operator-message","Persistent claim capture session reopened.");
+          $("claim-case-created").textContent = "Persistent claim record reopened: " + record.claim_id;
         } catch(error) { $("claim-case-created").textContent = error.message; }
         finally { open.disabled = false; }
       });

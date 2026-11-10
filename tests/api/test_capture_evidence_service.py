@@ -35,8 +35,16 @@ class FakeConnection:
     def __init__(self):
         self.rows = [(1, "SESSION_CREATED", "operator-1", '{"synthetic":true}', "capture-created")]
         self.appended = []
+        self.owner_bindings = {}
 
     def execute(self, sql, args=()):
+        if "faos.bind_claim_case_owner" in sql:
+            _tenant, session, owner = args
+            current = self.owner_bindings.get(session)
+            if current is None:
+                self.owner_bindings[session] = owner
+                return Result(one=("BOUND",))
+            return Result(one=("BOUND" if current == owner else "CONFLICT",))
         if "SELECT s.session_id FROM faos.sessions" in sql:
             return Result(many=[(str(UUID(int=2)),)])
         if "SELECT sequence,kind,actor,payload_json,event_id" in sql:
@@ -54,6 +62,8 @@ class FakeSessions(CaptureSessionStore):
         self.conn = FakeConnection()
         self.creator = creator
         self.actors = {}
+        self.scope = 'controlled-test'
+        self.claim_id = None
 
     @contextmanager
     def _authorized(self, authorization):
@@ -61,7 +71,8 @@ class FakeSessions(CaptureSessionStore):
 
     def _read(self, conn, actor, session_id, created=False):
         return CaptureSession(session_id, str(actor.tenant_id), self.creator,
-                              "2026-11-08T00:00:00+00:00", created)
+                              "2026-11-08T00:00:00+00:00", created, self.scope,
+                              self.claim_id, self.conn.owner_bindings.get(session_id))
 
 
 class RecordingByteStore(OriginalByteStore):
@@ -118,6 +129,22 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertNotIn(vin, json.dumps(self.sessions.conn.appended))
         self.assertEqual([event[0] for event in self.sessions.conn.appended],
                          ["CONSENT_RECORDED", "VEHICLE_RECORDED"])
+
+    def test_persistent_claim_consent_binds_one_owner_identity(self):
+        self.sessions.scope = "persistent-claim-case"
+        self.sessions.claim_id = str(UUID(int=77))
+        self.sessions.actors["other-owner-token"] = Actor("owner-2", self.tenant, "owner")
+        self.service.record_consent(
+            "owner-token", self.session_id, request_id=UUID(int=78),
+            accepted=True, scope="capture_review",
+        )
+        self.assertEqual(self.sessions.conn.owner_bindings[self.session_id], "owner-1")
+        with self.assertRaisesRegex(CaptureAuthorizationError, "CLAIM_CASE_OWNER_BINDING_DENIED"):
+            self.service.record_consent(
+                "other-owner-token", self.session_id, request_id=UUID(int=79),
+                accepted=True, scope="capture_review",
+            )
+        self.assertEqual(len([event for event in self.sessions.conn.appended if event[0] == "CONSENT_RECORDED"]), 1)
 
     def test_declined_or_withdrawn_consent_blocks_vehicle_recording(self):
         self.service.record_consent(

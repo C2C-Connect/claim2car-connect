@@ -34,7 +34,7 @@ class CaptureRouteTests(unittest.TestCase):
 
     def test_claim_case_create_list_and_get_are_authenticated(self):
         record = ClaimCase(str(UUID(int=3)), str(self.binding.tenant_id), 'test-actor',
-                           '2026-11-10T00:00:00+00:00', 'INTAKE_OPEN', True)
+                           '2026-11-10T00:00:00+00:00', 'INTAKE_OPEN', True, str(UUID(int=5)))
         self.claim_store.create.return_value = record
         self.claim_store.list_owned.return_value = [record]
         self.claim_store.get.return_value = replace(record, created=False)
@@ -61,6 +61,17 @@ class CaptureRouteTests(unittest.TestCase):
             response=client.get('/v1/claim-cases?limit=0',headers=self.headers)
         self.assertEqual(response.status_code,422)
         self.claim_store.list_owned.assert_not_called()
+
+    def test_persistent_capture_session_scope_is_returned_without_owner_identity(self):
+        production = replace(self.session, scope='persistent-claim-case',
+                             claim_id=str(UUID(int=6)), owner_actor_id='private-owner-actor')
+        self.store.get.return_value = production
+        with self.client() as client:
+            response = client.get('/v1/capture-sessions/'+self.session.session_id,headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['scope'],'persistent-claim-case')
+        self.assertEqual(response.json()['claim_id'],str(UUID(int=6)))
+        self.assertNotIn('owner_actor_id',response.json())
 
     def test_create_returns_201_and_preserves_server_metadata(self):
         with self.client() as client:

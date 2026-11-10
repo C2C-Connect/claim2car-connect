@@ -2,6 +2,7 @@
 from dataclasses import replace
 import hashlib
 import time
+import tempfile
 import unittest
 from unittest.mock import patch
 import uuid
@@ -12,6 +13,8 @@ from database.capture_sessions import CaptureAuthorizationError, CaptureSessionC
 from database.claim_cases import ClaimCaseConflict, ClaimCaseNotFound, ClaimCaseStore
 from database.financial_ledger import PersistentFinancialLedger
 from backend.app.anchor.ledger import PartnerAcceptanceRecord
+from app.artifact_storage import OriginalByteStore
+from database.capture_evidence import CaptureEvidenceService
 
 class CaptureSessionIntegration(unittest.TestCase):
     def setUp(self):
@@ -28,12 +31,23 @@ class CaptureSessionIntegration(unittest.TestCase):
             self.dsns[role]=make_conninfo(self.f.admin.info.dsn,dbname=self.f.db,user=role,password=password)
             binding=ActorBinding('capture-actor-'+str(index),uuid.UUID(self.f.tenants[index]),role)
             self.credentials.append(Credential(hashlib.sha256(self.tokens[index].encode()).hexdigest(),binding,int(time.time())+3600))
+        self.owner_token='C'*43
+        self.other_owner_token='D'*43
+        self.credentials.extend([
+            Credential(hashlib.sha256(self.owner_token.encode()).hexdigest(),
+                ActorBinding('claim-owner-0',uuid.UUID(self.f.tenants[0]),self.f.roles[0],'owner'),int(time.time())+3600),
+            Credential(hashlib.sha256(self.other_owner_token.encode()).hexdigest(),
+                ActorBinding('claim-owner-1',uuid.UUID(self.f.tenants[0]),self.f.roles[0],'owner'),int(time.time())+3600),
+        ])
         self.store=CaptureSessionStore(CredentialResolver(self.credentials),self.dsns)
         self.claim_cases=ClaimCaseStore(self.store)
         self.key=str(uuid.uuid4())
 
     def auth(self,index=0):
         return 'Bearer '+self.tokens[index]
+
+    def owner_auth(self,other=False):
+        return 'Bearer '+(self.other_owner_token if other else self.owner_token)
 
     def test_claim_case_create_retry_and_owned_readback(self):
         claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -48,6 +62,29 @@ class CaptureSessionIntegration(unittest.TestCase):
         self.assertEqual(self.f.seed.execute(
             'SELECT count(*) FROM faos.claim_cases WHERE tenant_id=%s AND claim_id=%s',
             (self.f.tenants[0], claim_id)).fetchone()[0], 1)
+
+    def test_claim_case_provisions_capture_session_and_binds_owner_once(self):
+        claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
+        case = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
+        retry = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
+        self.assertEqual(case.capture_session_id, retry.capture_session_id)
+        session = self.store.get(self.auth(), case.capture_session_id)
+        self.assertEqual((session.scope, session.claim_id, session.created_by),
+                         ('persistent-claim-case', claim_id, 'capture-actor-0'))
+        self.assertNotIn(case.capture_session_id,
+                         {item.session_id for item in self.store.list_owned(self.auth())})
+        with tempfile.TemporaryDirectory() as root:
+            service = CaptureEvidenceService(self.store, OriginalByteStore(root), 'P'*43)
+            service.record_consent(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=True, scope='capture_review')
+            bound = self.store.get(self.auth(), case.capture_session_id)
+            self.assertEqual(bound.owner_actor_id, 'claim-owner-0')
+            with self.assertRaises(CaptureAuthorizationError):
+                service.record_consent(self.owner_auth(other=True), case.capture_session_id,
+                    request_id=uuid.uuid4(), accepted=True, scope='capture_review')
+        self.assertEqual(self.f.seed.execute(
+            "SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s AND kind='CONSENT_RECORDED'",
+            (self.f.tenants[0],case.capture_session_id)).fetchone()[0], 1)
 
     def test_claim_case_idempotency_conflict_is_rejected(self):
         request_id = str(uuid.uuid4())
