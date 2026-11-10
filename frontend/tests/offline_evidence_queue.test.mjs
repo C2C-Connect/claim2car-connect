@@ -59,7 +59,7 @@ await test("queue_persists_original_bytes_and_server_digest", async () => {
   assert.equal(item.uploaded, false);
   assert.equal(item.byteLength, 14);
   assert.equal(item.bytes instanceof Uint8Array, true);
-  assert.equal(item.sha256, "b6a8b3e5d2c8f0b5a7c2a6a4a9e7e0d6b9c6e2e9e6e9a5e7e0f5b6a9c2d7e8f0".slice(0,64) === item.sha256 ? item.sha256 : item.sha256);
+  assert.equal(item.sha256, "27f0c6997c0fc4780eb0d9a0e8a1f5f02418196494e213a91911b54bea2816cb");
   assert.equal((await queue.status("session-a")).pending, 1);
 });
 
