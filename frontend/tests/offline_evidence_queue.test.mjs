@@ -24,9 +24,10 @@ function makeStore() {
       records.push(stored);
       return stored;
     },
-    async list(sessionId) {
-      return records.filter((record) => record.sessionId === sessionId)
+    async list(sessionId, { includeBytes = true } = {}) {
+      const matching = records.filter((record) => record.sessionId === sessionId)
         .sort((a, b) => a.queueId - b.queueId);
+      return includeBytes ? matching : matching.map(({ bytes, ...metadata }) => metadata);
     },
     async markUploaded(queueId, syncedAt) {
       const record = records.find((item) => item.queueId === queueId);
@@ -67,7 +68,9 @@ await test("queue_persists_original_bytes_and_server_digest", async () => {
   assert.equal(item.byteLength, 14);
   assert.equal(item.bytes instanceof Uint8Array, true);
   assert.equal(item.sha256, "27f0c6997c0fc4780eb0d9a0e8a1f5f02418196494e213a91911b54bea2816cb");
-  assert.equal((await queue.status("session-a")).pending, 1);
+  const status = await queue.status("session-a");
+  assert.equal(status.pending, 1);
+  assert.equal("bytes" in status.records[0], false);
 });
 
 await test("fifo_sync_stops_at_first_failure_and_retry_reuses_ids", async () => {
