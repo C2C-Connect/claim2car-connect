@@ -151,7 +151,11 @@ class IncidentIntakeService:
             self._require_owner_and_capture_consent(history, actor)
             self._bind_owner(conn, actor, session_id)
             consents = [item for item in history if item[0] == "INCIDENT_INTAKE_CONSENT_RECORDED"]
-            if not consents or cons[-1][2].get("accepted") is not True or cons[-1][1] != actor.actor_id:
+            if (not consents or type(consents[-1][2]) is not dict
+                    or consents[-1][2].get("accepted") is not True
+                    or consents[-1][2].get("disclosure_version") != DISCLOSURE_VERSION
+                    or consents[-1][2].get("scope") != "incident_details"
+                    or consents[-1][1] != actor.actor_id):
                 raise CaptureSessionConflict("ACTIVE_INCIDENT_INTAKE_CONSENT_REQUIRED")
             event_id = "incident-recorded:" + request_id
             result = conn.execute(
