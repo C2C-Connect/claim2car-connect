@@ -36,6 +36,13 @@ function makeStore() {
       delete record.bytes;
       return record;
     },
+    async deleteSession(sessionId) {
+      const before = records.length;
+      for (let index = records.length - 1; index >= 0; index -= 1) {
+        if (records[index].sessionId === sessionId) records.splice(index, 1);
+      }
+      return before - records.length;
+    },
   };
 }
 function makeFile(text) {
@@ -108,6 +115,15 @@ await test("session_queues_are_isolated", async () => {
   assert.equal(result.uploaded, 1);
   assert.deepEqual(uploaded, ["session-b"]);
   assert.equal((await queue.status("session-a")).pending, 1);
+});
+
+await test("consent_withdrawal_purges_local_originals", async () => {
+  const store = makeStore();
+  const queue = makeQueue(store);
+  await queue.queueFile({ sessionId: "session-a", slot: "front", file: makeFile("pending-original") });
+  const removed = await queue.deleteSession("session-a");
+  assert.equal(removed, 1);
+  assert.equal((await queue.status("session-a")).total, 0);
 });
 
 await test("missing_indexeddb_fails_closed", async () => {
