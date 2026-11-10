@@ -200,7 +200,7 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        expect(report['migration_inventory'][-1][0]=='0016_claim_case_incident_read_boundary.sql','INCIDENT_INTAKE_MIGRATION_REQUIRED')
+        expect(report['migration_inventory'][-1][0]=='0017_event_contract_parity.sql','EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:
@@ -237,7 +237,13 @@ def run(report):
                 except psycopg.errors.InsufficientPrivilege as error:
                     expect(error.sqlstate=='42501','WRONG_REGISTRY_REJECTION')
             report['checks'].append({'id':'PRIVATE-AUTHORITY-REGISTRY','status':'PASS'})
-            for name,timestamp,payload,constraint in [('timestamp','not-a-timestamp','{}','event_timestamp_input_valid'),('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact')]:
+            for name,timestamp,payload,constraint in [
+                ('timestamp','not-a-timestamp','{}','event_timestamp_input_valid'),
+                ('naive_timestamp','2026-01-01T00:00:00','{}','event_timestamp_rfc3339'),
+                ('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact'),
+                ('key_order','2026-01-01T00:00:00Z','{"z":1,"a":2}','event_payload_python_canonical'),
+                ('numeric_exponent','2026-01-01T00:00:00Z','{"value":1e0}','event_payload_python_canonical'),
+            ]:
                 try:
                     with tenant_transaction(connections[0],tenants[0]):
                         connections[0].execute(APPEND,(tenants[0],session,'invalid-'+name,2,'SESSION_CREATED','synthetic-test',timestamp,'validation diagnostic',payload,'0.1'))
@@ -265,7 +271,7 @@ def run(report):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
-    report['diagnostics_successful'] = len(report['checks'])==9 and all(row['status']=='PASS' for row in report['checks'])
+    report['diagnostics_successful'] = len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks'])
 
 if __name__ == '__main__':
     report = {'classification':'post-cutover-authority-diagnostics-not-gate-certification',
