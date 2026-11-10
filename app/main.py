@@ -106,6 +106,15 @@ def create_app(settings=None, runtime_mode=None):
                 headers={'Cache-Control': 'no-store'},
             )
 
+    @api.get('/health/build')
+    def build():
+        revision = 'unknown'
+        try:
+            revision = Path(__file__).with_name('_build_revision.txt').read_text(encoding='ascii').strip() or 'unknown'
+        except OSError:
+            pass
+        return JSONResponse({'revision':revision,'runtime_mode':mode},headers={'Cache-Control':'no-store'})
+
     @api.get('/health/live')
     def live():
         return JSONResponse({'status':'alive'},headers={'Cache-Control':'no-store'})

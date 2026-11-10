@@ -88,5 +88,14 @@ class HealthTests(unittest.TestCase):
         self.assertEqual(connect.call_args.kwargs,{'autocommit':True,'connect_timeout':3,'options':'-c statement_timeout=2000 -c default_transaction_read_only=on'})
         self.assertEqual(conn.__exit__.call_count,6)
 
+
+    def test_build_health_endpoint_reports_revision_and_runtime_mode(self):
+        app=create_app(runtime_mode='restricted_staging')
+        with TestClient(app) as client:
+            response=client.get('/health/build')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['runtime_mode'],'restricted_staging')
+        self.assertIn('revision',response.json())
+
 if __name__=='__main__':
     unittest.main()

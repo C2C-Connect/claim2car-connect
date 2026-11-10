@@ -137,10 +137,17 @@ def _target(dsn):
         raise ValueError('EXPLICIT_SINGLE_DATABASE_TARGET_REQUIRED')
     return tuple(info.get(key, '') for key in ('host', 'hostaddr', 'port', 'dbname'))
 
-def load_runtime(path):
+def load_runtime(path=None, *, configuration_json=None):
     try:
-        with Path(path).open('rb') as source:
-            raw = source.read(CONFIGURATION_SIZE_LIMIT + 1)
+        if configuration_json is not None:
+            if not isinstance(configuration_json, str):
+                raise ValueError('INVALID_CONFIGURATION_TYPES')
+            raw = configuration_json.encode('utf-8')
+        else:
+            if not path:
+                raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
+            with Path(path).open('rb') as source:
+                raw = source.read(CONFIGURATION_SIZE_LIMIT + 1)
         if len(raw) > CONFIGURATION_SIZE_LIMIT:
             raise ValueError('CONFIGURATION_TOO_LARGE')
         value = json.loads(raw.decode('utf-8'), object_pairs_hook=_unique, parse_constant=_reject_constant)
@@ -187,10 +194,14 @@ def _fail(status, detail) -> NoReturn:
 
 def create_capture_app(runtime=None, *, enable_evidence=False):
     if runtime is None:
-        path = os.environ.get('C2C_CAPTURE_CONFIG_FILE')
-        if not path:
-            raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
-        runtime = load_runtime(path)
+        configuration_json = os.environ.get('C2C_CAPTURE_CONFIG_JSON')
+        if configuration_json:
+            runtime = load_runtime(configuration_json=configuration_json)
+        else:
+            path = os.environ.get('C2C_CAPTURE_CONFIG_FILE')
+            if not path:
+                raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
+            runtime = load_runtime(path)
     # Child intake apps carry only the health handlers they have always owned;
     # never recursively compose the integrated parent when C2C_RUNTIME_MODE is set.
     api = create_app(runtime.health_settings, runtime_mode='restricted_staging')

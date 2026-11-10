@@ -163,6 +163,20 @@ class CaptureRouteTests(unittest.TestCase):
                 self.assertEqual(client.get('/health/live').status_code,200)
             connect.assert_not_called()
 
+
+    def test_capture_factory_accepts_sealed_environment_json_configuration(self):
+        value=self.config()
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ,{
+            'C2C_CAPTURE_CONFIG_JSON':json.dumps(value),
+            'C2C_ARTIFACT_STORAGE_ROOT':directory,
+            'C2C_VIN_HMAC_PEPPER':'P'*43,
+        },clear=True):
+            with patch('database.capture_sessions.psycopg.connect') as connect:
+                app=create_capture_app(enable_evidence=True)
+                with TestClient(app) as client:
+                    self.assertEqual(client.get('/health/live').status_code,200)
+                connect.assert_not_called()
+
     def test_runtime_role_is_server_configured_and_resolved_with_identity(self):
         value=self.config()
         value['credentials'][0]['actor_role']='owner'
