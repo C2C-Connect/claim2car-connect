@@ -100,7 +100,11 @@ class MigrationControlsIntegration(unittest.TestCase):
             os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test'),
             dbname=self.db,
         )
-        with psycopg.connect(app_url, autocommit=True) as app:
+        admin_url = make_conninfo(
+            os.getenv('MIGRATION_TEST_ADMIN_URL', 'postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test'),
+            dbname=self.db,
+        )
+        with psycopg.connect(admin_url, autocommit=True) as admin, psycopg.connect(app_url, autocommit=True) as app:
             tenant = str(uuid.uuid4())
             session = 'event-contract-' + uuid.uuid4().hex
             def append(event_id, sequence, kind, timestamp, payload):
@@ -111,15 +115,15 @@ class MigrationControlsIntegration(unittest.TestCase):
                      timestamp, 'event contract integration', payload, '0.1'),
                 ).fetchone()[0]
 
-            self.admin.execute(
+            admin.execute(
                 'INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
                 (tenant, 'synthetic event contract fixture'),
             )
-            self.admin.execute(
+            admin.execute(
                 'INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                 (tenant, session),
             )
-            self.admin.execute(
+            admin.execute(
                 'INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) '
                 'SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=%s',
                 (tenant, 'faos_app'),
