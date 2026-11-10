@@ -132,6 +132,10 @@ jobs:
           assert status == 200, body.decode("utf-8", errors="replace")
           assert b"e_k_j" in body
           assert request("/api/v1/review-queue")[0] == 401
+          assert request("/")[0] == 200
+          assert request("/app.mjs")[0] == 200
+          assert request("/styles.css")[0] == 200
+          assert request("/src/modules/capture/vin.mjs")[0] == 200
           assert request(
               "/api/v1/analysis/physics",
               method="POST",

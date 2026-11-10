@@ -411,6 +411,13 @@ class CaptureEvidenceService:
                     raise CaptureSessionConflict("UNSUPPORTED_SEAL_HISTORY")
                 # Verify the sealed originals before exposing reviewer-safe metadata.
                 manifest = self._verified_manifest(actor, session_id, history)
+                expected_artifact_ids = [entry.artifact_id for entry in manifest.entries]
+                if (
+                    manifest.digest() != seal_payload["manifest_digest"]
+                    or seal_payload["shot_list_version"] != manifest.shot_list_version
+                    or seal_payload["artifact_ids"] != expected_artifact_ids
+                ):
+                    raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
                 latest = self._artifact_set(history)
                 queued.append({
                     "session_id": session_id,
