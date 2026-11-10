@@ -1,6 +1,20 @@
 name: Integrated runtime container smoke
 
 on:
+  pull_request:
+    paths:
+      - "Dockerfile.integrated"
+      - ".dockerignore"
+      - "requirements-api.txt"
+      - "requirements-database.txt"
+      - "app/**"
+      - "backend/**"
+      - "config/**"
+      - "database/**"
+      - "contracts/**"
+      - "migrations/**"
+      - "authority_migrations/**"
+      - ".github/workflows/integrated-container-smoke.yml"
   push:
     branches: [main, "cto/**"]
     paths:
