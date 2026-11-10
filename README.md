@@ -59,7 +59,7 @@ python -m database.migrate  # identical rerun must have no pending migrations
 ```
 
 The default plan includes both migrations/ and authority_migrations/, ordered and
-validated together, currently through 0011_claim_case_idempotency_conflicts.sql. The 0010/0011 increments add the tenant-scoped claim-case register and controlled idempotency conflicts. Existing
+validated together, currently through 0012_claim_case_retry_without_update_lock.sql. The 0010–0012 increments add the tenant-scoped claim-case register and least-privilege idempotent creation. Existing
 ledger checksums, migration locking and transactional application remain in force.
 python -m database.authority_migrate is a compatibility alias for the same plan.
 No synthetic connection URL is used as a fallback by the normal migration command.
