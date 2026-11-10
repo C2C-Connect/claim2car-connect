@@ -71,10 +71,14 @@ authorization are independently established.
 
 ## Database-level enforcement (reference)
 
-RLS with FORCE ROW LEVEL SECURITY on all 10 tenant tables, role-based logins
+RLS with FORCE ROW LEVEL SECURITY on all 14 application tenant tables in the authority diagnostic inventory (including the two financial-ledger tables), role-based logins
 (`faos_app` non-superuser, no BYPASSRLS), security-definer `faos.tenant_id()` —
 proven by tests/database/* (tenant authority integration, tenant context
-regression, access hardening) and the authority-cutover CI workflow.
+regression, access hardening) and the authority-cutover CI workflow. The API
+startup readiness probe separately requires 12 core tenant tables; the two
+additional tenant-scoped financial-ledger tables are also RLS-forced and
+covered by the authority isolation matrix. The private tenant-login binding
+registry is not an application-readable tenant table.
 
 ## Client trust boundary (plan v1.3 §9)
 
