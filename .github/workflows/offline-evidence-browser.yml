@@ -28,5 +28,13 @@ jobs:
         run: |
           python -m http.server 4173 --bind 127.0.0.1 --directory . >/tmp/c2c-browser-test-http.log 2>&1 &
           echo $! >/tmp/c2c-browser-test-http.pid
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:4173/frontend/tests/browser/offline_evidence_queue.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/c2c-browser-test-http.log
+          exit 1
       - name: Verify actual IndexedDB offline queue persistence and recovery
         run: node frontend/tests/browser/offline_evidence_queue.browser.test.mjs
