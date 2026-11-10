@@ -63,7 +63,7 @@ byId("create-case").addEventListener("click",async()=>{
     await api("/v1/capture-sessions",state.token,{method:"POST",body:JSON.stringify({session_id:sessionId})});
     state.sessionId=sessionId;byId("case-id").textContent="CASE ID  "+sessionId;show("case-id");
     show("consent-panel");message("consent-status","Case created. Owner consent is required before vehicle identification or evidence capture.");
-  }catch(error){message("connect-message",error.message,true);}
+  }catch(error){message("case-status",error.message,true);}
   finally{byId("create-case").disabled=false;}
 });
 byId("record-consent").addEventListener("click",async()=>{
