@@ -115,7 +115,7 @@ The current Railway configuration is a restricted synthetic containment service.
 - Offline guided-capture workflow, queue behavior assertions, and integrated browser-module syntax checks passed — [run 42780067921](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780067921).
 - Full repository suite passed — [run 42780068007](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780068007).
 - Database authority/cutover verification passed — [run 42780067929](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780067929).
-- Integrated container smoke passed — [run 42780068135](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780068135).
+- Restricted intake container verification passed — [run 42780068135](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780068135). This is not an integrated Claim2Car deployment.
 - Restricted Railway smoke passed — [run 42780067923](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42780067923); its deploy job was skipped. No integrated staging deployment is claimed.
 
 **Important limits — not field acceptance:**
