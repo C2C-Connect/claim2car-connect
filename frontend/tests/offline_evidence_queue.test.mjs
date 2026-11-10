@@ -123,6 +123,18 @@ await test("session_queues_are_isolated", async () => {
   assert.equal((await queue.status("session-a",{tenantId:"tenant-a",actorId:"actor-a"})).pending, 1);
 });
 
+await test("tenant_and_actor_scopes_isolate_same_session", async () => {
+  const store = makeStore();
+  const queue = makeQueue(store, ["artifact-owner-a", "request-owner-a", "artifact-owner-b", "request-owner-b"]);
+  await queue.queueFile({ sessionId:"shared-session", tenantId:"tenant-a", actorId:"actor-a", slot:"front", file:makeFile("actor-a") });
+  await queue.queueFile({ sessionId:"shared-session", tenantId:"tenant-a", actorId:"actor-b", slot:"front", file:makeFile("actor-b") });
+  assert.equal((await queue.status("shared-session",{tenantId:"tenant-a",actorId:"actor-a"})).total, 1);
+  assert.equal((await queue.status("shared-session",{tenantId:"tenant-a",actorId:"actor-b"})).total, 1);
+  assert.equal((await queue.status("shared-session",{tenantId:"tenant-b",actorId:"actor-a"})).total, 0);
+  const removed = await queue.deleteSession("shared-session",{tenantId:"tenant-a"});
+  assert.equal(removed, 2);
+});
+
 await test("consent_withdrawal_purges_local_originals", async () => {
   const store = makeStore();
   const queue = makeQueue(store);
