@@ -12,13 +12,6 @@ const DATABASE_VERSION = 2;
 const STORE_NAME = "originals";
 const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
 
-function requestValue(request) {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("INDEXEDDB_REQUEST_FAILED"));
-  });
-}
-
 function transactionDone(transaction) {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
