@@ -210,7 +210,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             result = action(authorization, str(session_id))
             payload_data = asdict(result)
             payload_data.pop('owner_actor_id', None)
-            payload_data['scope'] = result.scope
+            payload_data['scope'] = getattr(result, 'scope', 'controlled-test')
             payload = jsonable_encoder(payload_data)
             return JSONResponse(payload, status_code=201 if creating and result.created else 200, headers=dict(NO_STORE_HEADERS))
         except AuthenticationError:
