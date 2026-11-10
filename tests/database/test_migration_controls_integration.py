@@ -93,6 +93,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_full_migration_enforces_python_sql_event_contract_parity(self):
         from app.domain_events import DomainEvent, KINDS
+        from database.journal import tenant_transaction
         plan = self.authority_plan()
         apply(self.conn, plan)
         app_url = make_conninfo(
@@ -118,8 +119,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                 'INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                 (tenant, session),
             )
-            with app.transaction():
-                app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+            with tenant_transaction(app, tenant):
                 self.assertEqual(append(
                     'event-1', 1, 'SESSION_CREATED', '2026-01-01T00:00:00Z', '{}'
                 ), 'ACCEPTED')
@@ -145,8 +145,7 @@ class MigrationControlsIntegration(unittest.TestCase):
             for index, (event_id, _valid_placeholder, payload) in enumerate(probes):
                 timestamp = invalid_timestamps[index] if index < len(invalid_timestamps) else '2026-01-01T00:00:00Z'
                 with self.subTest(event_id=event_id):
-                    with app.transaction():
-                        app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+                    with tenant_transaction(app, tenant):
                         with self.assertRaises(psycopg.errors.CheckViolation):
                             with app.transaction():
                                 append(event_id, 2, 'SESSION_CREATED', timestamp, payload)
@@ -157,8 +156,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                         self.assertEqual(count, 1)
 
             valid_payload = '{"large":100000000000000000000,"label":"é","small":0.00001,"value":1.25}'
-            with app.transaction():
-                app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+            with tenant_transaction(app, tenant):
                 self.assertEqual(append(
                     'event-2', 2, 'QUALITY_RECORDED', '2026-01-01T00:00:00+05:30', valid_payload
                 ), 'ACCEPTED')
@@ -170,8 +168,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                 self.assertEqual(DomainEvent(*row).validate().payload['value'], 1.25)
 
             sequence = 3
-            with app.transaction():
-                app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+            with tenant_transaction(app, tenant):
                 for kind in sorted(KINDS - {'SESSION_CREATED', 'QUALITY_RECORDED'}):
                     self.assertEqual(append(
                         'kind-' + str(sequence), sequence, kind, '2026-01-01T00:00:00Z', '{}'
