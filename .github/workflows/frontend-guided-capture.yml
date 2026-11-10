@@ -29,6 +29,8 @@ jobs:
         run: node frontend/tests/slice2_workbench.test.mjs > output/guided-capture/slice2-workbench-tests.json
       - name: Browser-persistent original evidence queue assertions
         run: node frontend/tests/offline_evidence_queue.test.mjs > output/guided-capture/offline-evidence-queue-tests.json
+      - name: Integrated browser module syntax checks
+        run: node --check app/web/assets/app.js && node --check app/web/assets/offline_evidence_queue.mjs
       - name: Verify candidate and guided-capture sources unchanged
         if: always()
         run: |
