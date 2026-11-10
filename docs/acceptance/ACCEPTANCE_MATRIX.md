@@ -67,3 +67,16 @@ The current Railway configuration is a restricted synthetic containment service.
 - Railway restricted staging verification passed — run [42755641253](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387517). The actual deploy job was skipped; this is not deployment of the integrated Claim2Car application.
 
 **Next implementation slice:** reconcile the 12-versus-16 capture-slot contract; establish the incident intake data contract and consent/disclosure scope; replace static owner actor credentials with the approved owner authentication/invitation path; then deploy the integrated app to restricted staging and validate with approved test participants before any production release.
+
+
+## Structured incident intake and supplemental owner consent — 2026-11-10
+
+**Implementation:** PR #29 candidate branch, migration `0014_claim_case_incident_intake.sql`; synthetic PostgreSQL integration coverage added.
+
+- Added a separate owner consent event with disclosure version `incident-intake-v1` and scope `incident_details`. It is distinct from the existing `disclosure-v1` capture/evidence consent.
+- Added a tenant-scoped, RLS-forced `faos.claim_case_incident_intake` table. The first version collects only incident timestamp, category, city, two-letter state/territory code, and ZIP code.
+- Explicitly excluded street address/GPS, free-text narrative, claimant contact information, date of birth, policy number, and payment information.
+- Incident details are stored outside the append-only event journal so the structured row can be deleted on supplemental withdrawal or withdrawal of the underlying capture consent. The journal records consent and request references, not the incident fields.
+- Owner identity must be the already-bound owner actor for the persistent claim case. Operator credentials cannot submit owner consent or incident details.
+- API exposure is gated by `C2C_INCIDENT_INTAKE_ENABLED=true`; the default is disabled. The disclosure contract is marked `draft_pending_legal_review`. No real participant data use is authorized by this code increment.
+- This is a first structured intake slice, not the complete incident/claimant/policy intake contract. Owner access still relies on a server-provisioned owner actor credential; end-user authentication, identity proofing, and claimant invitation remain outstanding.

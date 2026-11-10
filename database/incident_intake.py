@@ -3,7 +3,7 @@
 Only coarse incident facts are collected. Street addresses, free-text narratives,
 claimant contact details, policy numbers, and financial data are intentionally
 outside this v1 contract. The payload lives in a separately deletable table;
-the append-only journal stores consent and a digest, not the incident details.
+the append-only journal stores consent and request references, not the incident details.
 """
 from __future__ import annotations
 from datetime import datetime, timezone

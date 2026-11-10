@@ -29,7 +29,7 @@ def denied(conn,tenant,event):
     else:
         raise AssertionError('UNAUTHORIZED_APPEND_ALLOWED')
 
-TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases')
+TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases','claim_case_incident_intake')
 CHECKS = ('rls_flags','own_read','cross_read','cross_insert','cross_update','cross_delete','tenant_reassignment','spoofed_context','missing_context','malformed_context')
 
 def reject_mutation(conn,tenant,statement,parameters):
@@ -55,7 +55,8 @@ def verify(report,admin,connections,tenants,session):
         for brand in ('brand','extra_brand'):
             admin.execute('INSERT INTO faos.brands VALUES (%s,%s)',(ids[brand],'matrix-'+ids[brand]))
         for tenant in tenants:
-            admin.execute('INSERT INTO faos.claim_cases(tenant_id,claim_id,request_id,created_by) VALUES (%s,%s,%s,%s)',(tenant,ids['claim'],ids['request'],'synthetic-matrix'))
+            admin.execute('INSERT INTO faos.claim_cases(tenant_id,claim_id,request_id,created_by,owner_actor_id) VALUES (%s,%s,%s,%s,%s)',(tenant,ids['claim'],ids['request'],'synthetic-matrix','synthetic-matrix'))
+            admin.execute('INSERT INTO faos.claim_case_incident_intake(tenant_id,claim_id,owner_actor_id,request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,ids['claim'],'synthetic-matrix',ids['request'],'2026-01-01T00:00:00Z','collision','San Antonio','TX','78201'))
             admin.execute('INSERT INTO faos.users VALUES (%s,%s,%s)',(tenant,ids['user'],'matrix-subject'))
             admin.execute('INSERT INTO faos.memberships VALUES (%s,%s,%s,%s)',(tenant,ids['user'],ids['membership'],'synthetic-matrix'))
             admin.execute('INSERT INTO faos.dealer_groups VALUES (%s,%s,%s)',(tenant,ids['group'],'synthetic matrix'))
@@ -93,9 +94,12 @@ def verify(report,admin,connections,tenants,session):
                 privileges = conn.execute("SELECT has_table_privilege(current_user,%s,'INSERT'),has_table_privilege(current_user,%s,'UPDATE'),has_table_privilege(current_user,%s,'DELETE')",('faos.'+table,)*3).fetchone()
                 cursor = admin.execute(sql.SQL('SELECT * FROM {} WHERE tenant_id=%s LIMIT 1').format(target),(other,))
                 values = dict(zip((column.name for column in cursor.description),cursor.fetchone()))
-                key = {'users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id'}.get(table)
+                key = {'users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id','claim_case_incident_intake':'request_id'}.get(table)
                 if key:
                     values[key] = str(uuid.uuid4())
+                if table=='claim_case_incident_intake':
+                    values['claim_id'] = ids['claim']
+                    values['owner_actor_id'] = 'synthetic-matrix'
                 if table=='users':
                     values['external_subject'] = 'new-'+uuid.uuid4().hex
                 if table=='location_brands':
@@ -140,7 +144,7 @@ def verify(report,admin,connections,tenants,session):
         for tenant in tenants:
             admin.execute('DELETE FROM faos.financial_ledger_postings WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
-            for table in ('claim_cases','completion_receipts','manifest_roots','location_brands'):
+            for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','location_brands'):
                 admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(tenant,session,seal))
         for brand in ('brand','extra_brand'):
@@ -158,7 +162,7 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        expect(report['migration_inventory'][-1][0]=='0013_claim_case_capture_session.sql','CLAIM_CASE_MIGRATION_REQUIRED')
+        expect(report['migration_inventory'][-1][0]=='0014_claim_case_incident_intake.sql','INCIDENT_INTAKE_MIGRATION_REQUIRED')
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:
@@ -219,7 +223,7 @@ def run(report):
             for conn in connections:
                 conn.close()
             for tenant in tenants:
-                for table in ('claim_cases','completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
+                for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
