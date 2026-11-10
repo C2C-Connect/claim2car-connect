@@ -211,7 +211,8 @@ export function createOfflineEvidenceQueue({
         || typeof upload !== "function") {
       throw new Error("INVALID_EVIDENCE_SYNC_INPUT");
     }
-    if (activeSyncs.has(sessionId)) return activeSyncs.get(sessionId);
+    const syncKey = `${tenantId}:${actorId}:${sessionId}`;
+    if (activeSyncs.has(syncKey)) return activeSyncs.get(syncKey);
 
     const task = (async () => {
       const records = (await store.list(sessionId, {tenantId,actorId,includeBytes:true})).filter((record) => !record.uploaded);
@@ -238,11 +239,11 @@ export function createOfflineEvidenceQueue({
       return { uploaded, blockedAtQueueId: null, error: null };
     })();
 
-    activeSyncs.set(sessionId, task);
+    activeSyncs.set(syncKey, task);
     try {
       return await task;
     } finally {
-      activeSyncs.delete(sessionId);
+      activeSyncs.delete(syncKey);
     }
   }
 
