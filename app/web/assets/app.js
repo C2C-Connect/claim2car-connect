@@ -106,6 +106,8 @@ function base64(bytes) {
 async function upload(slot, file, status) {
   const id = $("session-id").value.trim();
   if (!id || !file) return;
+  status.dataset.uploaded = "false";
+  status.classList.remove("error");
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256",bytes))].map(v=>v.toString(16).padStart(2,"0")).join("");
@@ -131,7 +133,10 @@ function buildSlots() {
 async function recordQuality() {
   const id = $("session-id").value.trim();
   const uploaded = [...$("capture-slots").querySelectorAll(".slot")];
-  const results = Object.fromEntries(SLOTS.map(([slot])=>[slot,uploaded.some(row=>row.querySelector("span").dataset.uploaded==="true" && row.querySelector("input").files?.length && row.querySelector("input").files[0] && row.querySelector("label").textContent===SLOTS.find(s=>s[0]===slot)[1])]));
+  if (uploaded.length !== SLOTS.length || uploaded.some(row => row.querySelector("span").dataset.uploaded !== "true")) {
+    return message("operator-message","Upload an original image for every required capture slot before recording quality.",true);
+  }
+  const results = Object.fromEntries(SLOTS.map(([slot], index) => [slot, uploaded[index].querySelector("span").dataset.uploaded === "true"]));
   try {
     await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/quality`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid(),results})

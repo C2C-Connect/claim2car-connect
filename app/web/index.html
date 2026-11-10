@@ -58,7 +58,16 @@
         <p class="muted">Consent is recorded under the authenticated owner identity. The operator cannot grant consent on the owner's behalf.</p>
         <label for="owner-session-id">Case / session ID supplied by the operator</label>
         <input id="owner-session-id" autocomplete="off" placeholder="Session UUID">
-        <label class="consent"><input id="consent-accepted" type="checkbox"> I have reviewed the disclosure and voluntarily consent to capture and human review for this case.</label>
+        <div class="disclosure" aria-label="Disclosure version disclosure-v1">
+          <p>This capture session records vehicle condition evidence for a claim file.</p>
+          <p>Participation is voluntary; you may pause or stop at any time without penalty.</p>
+          <p>The session captures vehicle photographs and a VIN plate image. It does not decode your VIN, authenticate the vehicle, or make ownership claims.</p>
+          <p>Captured originals are stored at full resolution and may be shared with your insurance carrier, a repair shop, or a dealership as part of claim handling.</p>
+          <p>No payment or compensation is offered or implied for participation in this capture session.</p>
+          <p>By proceeding you affirmatively consent to the capture described above.</p>
+          <span class="fine">Disclosure version: disclosure-v1</span>
+        </div>
+        <label class="consent"><input id="consent-accepted" type="checkbox"> I voluntarily consent to the capture and human review described above.</label>
         <button id="record-consent" class="primary">Record my consent</button>
         <p id="owner-message" class="message" role="status"></p>
       </section>
