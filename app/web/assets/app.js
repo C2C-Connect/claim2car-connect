@@ -226,7 +226,7 @@ async function withdrawCaptureConsent() {
     return message("owner-message",`Server withdrawal was not confirmed; local evidence was not purged. ${error.message}`,true);
   }
   try {
-    const localDeleted = evidenceQueue ? await evidenceQueue.deleteSession(id) : 0;
+    const localDeleted = evidenceQueue ? await evidenceQueue.deleteSession(id,{tenantId:identity.tenant_id}) : 0;
     if (activeSession === id) await refreshCaptureQueueStatus(id);
     message("owner-message",`Capture consent withdrawn. Server deleted ${result.deleted_original_artifacts ?? 0} original(s); local browser queue removed ${localDeleted} item(s).`);
   } catch (error) {
@@ -286,7 +286,7 @@ async function refreshCaptureQueueStatus(sessionId) {
     $("sync-pending-evidence").disabled = true;
     return;
   }
-  const state = await evidenceQueue.status(sessionId);
+  const state = await evidenceQueue.status(sessionId,{tenantId:identity.tenant_id,actorId:identity.actor_id});
   const latestBySlot = new Map();
   for (const record of state.records) latestBySlot.set(record.slot, record);
   for (const status of statuses) {
@@ -307,6 +307,8 @@ async function syncPendingUploads(sessionId) {
   if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
   const result = await evidenceQueue.syncSession({
     sessionId,
+    tenantId:identity.tenant_id,
+    actorId:identity.actor_id,
     upload: async (record) => {
       await api(`/api/v1/capture-sessions/${encodeURIComponent(sessionId)}/artifacts`, {
         method:"POST",
@@ -345,7 +347,7 @@ async function upload(slot, file, status) {
   status.classList.remove("error");
   try {
     if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
-    const queued = await evidenceQueue.queueFile({sessionId:id,slot,file});
+    const queued = await evidenceQueue.queueFile({sessionId:id,tenantId:identity.tenant_id,actorId:identity.actor_id,slot,file});
     status.textContent = `Saved on this device · queued #${queued.queueId} · waiting to sync`;
     await refreshCaptureQueueStatus(id);
     await syncPendingUploads(id);
