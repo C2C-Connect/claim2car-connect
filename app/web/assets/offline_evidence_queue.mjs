@@ -85,20 +85,52 @@ export function createIndexedDbEvidenceStore(indexedDb = globalThis.indexedDB) {
 
     async markUploaded(queueId, syncedAt) {
       const db = await database();
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const done = transactionDone(tx);
-      const store = tx.objectStore(STORE_NAME);
-      const record = await requestValue(store.get(queueId));
-      if (!record) {
-        await done;
-        throw new Error("EVIDENCE_QUEUE_RECORD_NOT_FOUND");
-      }
-      record.uploaded = true;
-      record.syncedAt = syncedAt;
-      delete record.bytes;
-      store.put(record);
-      await done;
-      return record;
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        let updated = null;
+        let missing = false;
+        const request = store.get(queueId);
+        request.onsuccess = () => {
+          const record = request.result;
+          if (!record) {
+            missing = true;
+            return;
+          }
+          record.uploaded = true;
+          record.syncedAt = syncedAt;
+          delete record.bytes;
+          updated = record;
+          store.put(record);
+        };
+        request.onerror = () => reject(request.error || new Error("EVIDENCE_QUEUE_READ_FAILED"));
+        tx.oncomplete = () => {
+          if (missing) reject(new Error("EVIDENCE_QUEUE_RECORD_NOT_FOUND"));
+          else resolve(updated);
+        };
+        tx.onabort = () => reject(tx.error || new Error("INDEXEDDB_TRANSACTION_ABORTED"));
+        tx.onerror = () => reject(tx.error || new Error("INDEXEDDB_TRANSACTION_FAILED"));
+      });
+    },
+
+    async deleteSession(sessionId) {
+      const db = await database();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        let deleted = 0;
+        const request = store.index("by_session").getAllKeys(sessionId);
+        request.onsuccess = () => {
+          for (const key of request.result) {
+            store.delete(key);
+            deleted += 1;
+          }
+        };
+        request.onerror = () => reject(request.error || new Error("EVIDENCE_QUEUE_READ_FAILED"));
+        tx.oncomplete = () => resolve(deleted);
+        tx.onabort = () => reject(tx.error || new Error("INDEXEDDB_TRANSACTION_ABORTED"));
+        tx.onerror = () => reject(tx.error || new Error("INDEXEDDB_TRANSACTION_FAILED"));
+      });
     },
   });
 }
@@ -114,7 +146,7 @@ export function createOfflineEvidenceQueue({
   now = () => new Date().toISOString(),
 } = {}) {
   if (!store || typeof store.enqueue !== "function" || typeof store.list !== "function"
-      || typeof store.markUploaded !== "function") {
+      || typeof store.markUploaded !== "function" || typeof store.deleteSession !== "function") {
     throw new Error("EVIDENCE_QUEUE_STORE_REQUIRED");
   }
   const activeSyncs = new Map();
@@ -187,6 +219,11 @@ export function createOfflineEvidenceQueue({
     }
   }
 
+  async function deleteSession(sessionId) {
+    if (typeof sessionId !== "string" || !sessionId.trim()) throw new Error("INVALID_EVIDENCE_SESSION_ID");
+    return store.deleteSession(sessionId);
+  }
+
   async function status(sessionId) {
     const records = await store.list(sessionId);
     return {
@@ -197,5 +234,5 @@ export function createOfflineEvidenceQueue({
     };
   }
 
-  return Object.freeze({ queueFile, syncSession, status });
+  return Object.freeze({ queueFile, syncSession, status, deleteSession });
 }
