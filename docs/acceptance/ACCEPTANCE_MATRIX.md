@@ -45,7 +45,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 ## Persistent claim-case register and owner-bound evidence journey — 2026-11-10
 
-**Candidate revision:** `7b1ea6e6d3f7dc586a6981123a4207078fff8064`  
+**Candidate revision:** `1c9a1b839f56396a758b1c0bc8837f8a5e5a2ea1`  
 **Implementation status:** Implemented and automated-test verified on PR #29 using synthetic test identities and synthetic image bytes; not field-validated or deployed.
 
 - Added authority migrations `0010_claim_case_registry.sql` through `0013_claim_case_capture_session.sql`.
@@ -56,12 +56,14 @@ The current Railway configuration is a restricted synthetic containment service.
 - Kept the standalone `POST /v1/capture-sessions` route explicitly controlled-test only.
 - Added PostgreSQL end-to-end coverage for the persistent claim session: owner consent, keyed VIN HMAC (raw VIN not journaled), original bytes for every canonical capture slot, advisory quality, manifest sealing, reviewer queue/details, integrity-checked original retrieval, and a supported human-review outcome.
 
-**Deliberate boundary:** the automated journey uses synthetic VIN and image bytes. The current case stores identity, creator/time/state, and capture-session association; it does not yet store incident details/location/narrative, claimant personal information, or policy details. Owner binding relies on a server-provisioned owner actor credential; this is not end-user login, identity proofing, or claimant invitation. The end-to-end test is not field acceptance, live participant-data approval, automated adjudication, or proof of a deployed customer-facing environment.
+**Deliberate boundary:** the complete automated journey uses synthetic VIN and synthetic image bytes. The case currently stores identity, creator/time/state, and capture-session association; incident details/location/narrative, claimant personal information, and policy details are not yet stored. Owner binding relies on a server-provisioned owner actor credential; this is not end-user login, identity proofing, or claimant invitation. The end-to-end test is not field acceptance, live participant-data approval, automated adjudication, or proof of a deployed customer-facing environment.
+
+**Open product-contract reconciliation:** `contracts/shot-list.json` and the current operator UI/tests define **12 canonical capture slots**, while the CTO master execution plan calls for **16 v1 slots**. This increment verifies the existing 12-slot contract. Do not silently add, remove, or rename slots before field acceptance; the product owner must confirm which count and slot definition is authoritative.
 
 **Verification evidence at the candidate revision:**
-- Full repository suite: **685 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42755387422](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387422).
-- Database authority cutover and post-cutover tenant-isolation diagnostics: passed — run [42755387498](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387498).
+- Full repository suite: **685 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42755651654](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387422).
+- Database authority cutover and post-cutover tenant-isolation diagnostics: passed — run [42755651694](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387498).
 - FastAPI foundation, restricted intake container, offline capture, frontend VIN/transport, controlled-test PostgreSQL, synthetic demonstration, Railway restricted smoke, and PR #29 checks: passed.
-- Railway restricted staging verification passed — run [42755387517](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387517). The actual deploy job was skipped; this is not deployment of the integrated Claim2Car application.
+- Railway restricted staging verification passed — run [42755641253](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387517). The actual deploy job was skipped; this is not deployment of the integrated Claim2Car application.
 
-**Next implementation slice:** establish the incident intake data contract and consent/disclosure scope; implement real owner login/invitation rather than static owner actor credentials; then deploy the integrated app to a restricted staging environment and validate the workflow with approved test participants before any production release.
+**Next implementation slice:** reconcile the 12-versus-16 capture-slot contract; establish the incident intake data contract and consent/disclosure scope; replace static owner actor credentials with the approved owner authentication/invitation path; then deploy the integrated app to restricted staging and validate with approved test participants before any production release.
