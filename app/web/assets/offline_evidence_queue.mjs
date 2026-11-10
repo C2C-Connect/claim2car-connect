@@ -190,7 +190,7 @@ export function createOfflineEvidenceQueue({
       requestId: makeUuid(),
       sha256: digest,
       byteLength: bytes.byteLength,
-      capturedAt: now(),
+      queuedAt: now(),
       uploaded: false,
       bytes,
     };
@@ -204,7 +204,7 @@ export function createOfflineEvidenceQueue({
         || typeof upload !== "function") {
       throw new Error("INVALID_EVIDENCE_SYNC_INPUT");
     }
-    const syncKey = `${tenantId}:${actorId}:${sessionId}`;
+    const syncKey = JSON.stringify([tenantId, actorId, sessionId]);
     if (activeSyncs.has(syncKey)) return activeSyncs.get(syncKey);
 
     const task = (async () => {
