@@ -2,9 +2,56 @@
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
 **Candidate branch:** `cto/spec-production-implementation` (PR #29)  
-**Last code validation revision:** `c6f36810affb72f61a4e4fb3e6d8345705cffb73`  
+**Latest code-bearing verification candidate:** `b537ec8d96eb74e9c1d54d5f1b52dd76423acb5f` (2026-11-10)  
 **Machine contract:** `m1-v1`  
 **Status rule:** code, CI, field validation, review, and release authorization are recorded separately. A passing synthetic test does not establish product acceptance or production readiness. The candidate revision is not merged and has no submitted independent review.
+
+## Current verification snapshot — 2026-11-10
+
+**Branch head at verification:** `b537ec8d96eb74e9c1d54d5f1b52dd76423acb5f`  
+**Main base:** `21bcd4e677d71cb985e83815d5b70b8d3504f471`  
+**Divergence:** 223 commits ahead, 0 behind.  
+**PR #29:** open and Draft; unmerged.  
+**GitHub PR test merge candidate:** `3313f3b30d094ff5aeb4168998ddfedeb62f9515`.
+
+### Current-head CI evidence
+
+All 13 workflow runs associated with the candidate completed successfully:
+
+- Full repository suite: **713 passed, 200 subtests passed, 23 warnings** — [run 42912960647](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960647).
+- Database authority/cutover: [run 42912961234](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912961234). Its counted database suite discovered and executed **281 tests, 0 failures, 0 errors, 0 skipped**. The authenticated HTTP test `test_authenticated_http_capture_survives_runtime_restart_and_fails_closed` passed. The synthetic HTTP journey covers claim creation, owner consent, VIN reference, all currently canonical 12 slots, quality attestations, manifest sealing, cross-tenant reviewer denial, runtime/service-object restart, independent reviewer retrieval, original-byte readback, tamper rejection, and consent withdrawal/deletion.
+- Integrated runtime container build/smoke: [run 42912960932](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960932) — passed. This now runs on pull requests. It verifies the integrated image, exact build revision, non-root UID, evidence-volume ownership/writeability, shell availability, and internal service-auth boundaries; it is not a persistent cloud deployment or full database-backed container journey.
+- Chromium/Playwright IndexedDB browser test: [run 42912960788](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960788) — passed with synthetic bytes and a mocked upload callback.
+- Offline guided-capture checks: [run 42912960961](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960961) — passed.
+- Legacy database component checks: [run 42912960755](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960755) — passed.
+- Controlled-test intake PostgreSQL: [run 42912960879](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960879) — passed.
+- FastAPI foundation: [run 42912960632](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960632) — passed.
+- Frontend VIN/decoder/transport: [run 42912961155](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912961155) — passed.
+- Controlled synthetic demonstration: [run 42912960996](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960996) — passed.
+- Offline VIN lookup: [run 42912960896](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960896) — passed.
+- Restricted intake container: [run 42912960800](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960800) — passed.
+- Restricted Railway staging verification: [run 42912961132](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912961132) — synthetic containment smoke passed; the deploy job was **skipped**.
+
+### Authority and acceptance interpretation
+
+The authority workflow applied and verified the migration plan through `0017_event_contract_parity.sql` on isolated PostgreSQL 16.4/PostGIS 3.4.3 test infrastructure. Its diagnostics report the 14 tenant-scoped application tables with RLS enabled and forced and exercise tenant-isolation/privilege checks.
+
+**This is not formal acceptance certification.** The structured diagnostic classifies itself as `post-cutover-authority-diagnostics-not-gate-certification`; `complete_gate_results` is `NOT RUN`, `gate_passes_awarded` is `0`, and `overall_acceptance` is `NOT ACCEPTED`. The authority workflow passing means its migration and diagnostic assertions succeeded; it does not mean the product acceptance gates passed.
+
+### Still not complete / not claimed
+
+- No integrated persistent staging or production deployment. The Railway restricted deployment job remains skipped.
+- No provisioned/verified integrated staging PostgreSQL service, durable evidence volume, sealed runtime secrets, TLS/private ingress, monitoring, or backup/restore evidence.
+- The integrated container CI smoke is a disposable local container test; it does not prove the container's full capture-to-review path against a persistent database and cloud object store.
+- The HTTP-to-PostgreSQL-to-original-bytes journey is synthetic CI evidence, not real participant evidence or field acceptance.
+- Current canonical contract remains `claims2car-12-v1`; CTO execution plan calls for 16-v1. The exact 16-slot definition and compatibility behavior must be reconciled before field acceptance.
+- Owner authentication/invitation and identity proofing remain unimplemented; owner actor credentials are provisioned out-of-band.
+- Supplemental incident disclosure remains `draft_pending_legal_review` and incident intake remains disabled by default.
+- Safari/iPad/physical-device qualification, roadside validation, field-calibrated quality thresholds, and real-world model accuracy remain unverified.
+- Production model weights and validated physics/AI accuracy are not established.
+- Live Square payment settlement, external carrier/partner delivery, and live dispatch remain disabled.
+
+This snapshot supersedes older verification counts and candidate SHAs below. Older entries remain for historical traceability and must not be interpreted as current-head evidence.
 
 ## Commercial and safety controls
 
