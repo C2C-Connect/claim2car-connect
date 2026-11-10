@@ -209,6 +209,15 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertEqual(len(sealed["manifest_digest"]), 64)
         queue = self.service.list_review_queue("reviewer-token")
         self.assertEqual(queue[0]["session_id"], self.session_id)
+        details = self.service.get_review_details("reviewer-token", self.session_id)
+        self.assertEqual(details["session_id"], self.session_id)
+        self.assertEqual(details["manifest_digest"], sealed["manifest_digest"])
+        self.assertEqual(len(details["artifacts"]), len(CANONICAL_SLOTS))
+        self.assertEqual(
+            {item["slot"] for item in details["artifacts"]}, set(CANONICAL_SLOTS)
+        )
+        self.assertNotIn("vin", json.dumps(details))
+
         first_slot = CANONICAL_SLOTS[0]
         first_artifact = UUID(int=201)
         expected_bytes = ("synthetic-image:" + first_slot).encode("ascii")

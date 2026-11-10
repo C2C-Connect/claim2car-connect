@@ -85,6 +85,8 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert capture.status_code == 401
                 review_queue = client.get("/api/v1/review-queue")
                 assert review_queue.status_code == 401
+                review_details = client.get(f"/api/v1/review-sessions/{SESSION_ID}")
+                assert review_details.status_code == 401
 
                 # Identity discovery is authenticated and returns only the
                 # server-resolved actor/tenant/role, never client assertions.

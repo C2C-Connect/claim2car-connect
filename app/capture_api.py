@@ -282,6 +282,10 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 disposition=body.disposition, reason=body.reason,
             )
 
+        @api.get('/v1/review-sessions/{session_id}')
+        def review_session_details(session_id: UUID, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.get_review_details, authorization, session_id)
+
         @api.get('/v1/review-sessions/{session_id}/artifacts/{artifact_id}')
         def review_artifact(session_id: UUID, artifact_id: UUID, authorization: str = Depends(authorize)):
             try:

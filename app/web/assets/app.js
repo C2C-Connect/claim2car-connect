@@ -162,7 +162,60 @@ async function refreshQueue() {
       const card = document.createElement("article"); card.className = "queue-item";
       const h = document.createElement("strong"); h.textContent = item.session_id;
       const p = document.createElement("p"); p.textContent = `${item.artifact_count} artifacts · ${item.shot_list_version} · ${item.manifest_digest}`;
-      card.append(h,p); root.append(card);
+      const open = document.createElement("button"); open.className = "secondary"; open.textContent = "Open verified evidence";
+      const detail = document.createElement("div"); detail.className = "review-detail";
+      open.addEventListener("click", async () => {
+        open.disabled = true; detail.textContent = "Verifying sealed manifest and loading originals…";
+        try {
+          const record = await api(`/api/v1/review-sessions/${encodeURIComponent(item.session_id)}`);
+          detail.replaceChildren();
+          const digest = document.createElement("p"); digest.className = "fine"; digest.textContent = `Verified manifest ${record.manifest_digest}`;
+          detail.append(digest);
+          for (const artifact of record.artifacts) {
+            const row = document.createElement("div"); row.className = "review-artifact";
+            const heading = document.createElement("strong"); heading.textContent = artifact.slot;
+            const meta = document.createElement("p"); meta.className = "fine"; meta.textContent = `${artifact.byte_length.toLocaleString()} bytes · SHA-256 ${artifact.sha256}`;
+            row.append(heading,meta);
+            try {
+              const response = await fetch(`/api/v1/review-sessions/${encodeURIComponent(item.session_id)}/artifacts/${encodeURIComponent(artifact.artifact_id)}`,{headers:authHeaders(),cache:"no-store"});
+              if (!response.ok) throw new Error(`ARTIFACT_RETRIEVAL_FAILED_${response.status}`);
+              const bytes = await response.arrayBuffer();
+              const data = new Uint8Array(bytes);
+              let mime = "application/octet-stream";
+              if (data[0]===0xff && data[1]===0xd8 && data[2]===0xff) mime="image/jpeg";
+              else if (data[0]===0x89 && data[1]===0x50 && data[2]===0x4e && data[3]===0x47) mime="image/png";
+              else if (data[0]===0x52 && data[1]===0x49 && data[2]===0x46 && data[3]===0x46 && data[8]===0x57) mime="image/webp";
+              const url = URL.createObjectURL(new Blob([bytes],{type:mime}));
+              const link = document.createElement("a"); link.href=url; link.download=`claim2car-${artifact.slot}`; link.textContent="Open / download original";
+              row.append(link);
+              if (mime.startsWith("image/")) { const img=document.createElement("img"); img.src=url; img.alt=`Original evidence: ${artifact.slot}`; img.loading="lazy"; row.append(img); }
+            } catch (error) {
+              const failure=document.createElement("p"); failure.className="error fine"; failure.textContent=error.message; row.append(failure);
+            }
+            detail.append(row);
+          }
+          const decision = document.createElement("div"); decision.className = "review-decision";
+          const disposition = document.createElement("select");
+          for (const [value,label] of [["NOTE_ONLY","Note only"],["HUMAN_QC_REQUIRED","Human QC required"]]) { const option=document.createElement("option"); option.value=value; option.textContent=label; disposition.append(option); }
+          const reason = document.createElement("textarea"); reason.placeholder="Required review rationale"; reason.maxLength=1000;
+          const submit = document.createElement("button"); submit.className="primary"; submit.textContent="Record review decision";
+          const outcome = document.createElement("p"); outcome.className="fine";
+          submit.addEventListener("click",async()=>{
+            if (!reason.value.trim()) { outcome.textContent="A review rationale is required."; return; }
+            submit.disabled=true;
+            try {
+              const result=await api(`/api/v1/capture-sessions/${encodeURIComponent(item.session_id)}/review`,{
+                method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({request_id:uuid(),disposition:disposition.value,reason:reason.value.trim()})
+              });
+              outcome.textContent=`Review recorded: ${result.disposition} · ${result.manifest_digest}`;
+              await refreshQueue();
+            } catch(error) { outcome.textContent=error.message; submit.disabled=false; }
+          });
+          decision.append(disposition,reason,submit,outcome); detail.append(decision);
+        } catch(error) { detail.textContent=error.message; open.disabled=false; }
+      });
+      card.append(h,p,open,detail); root.append(card);
     }
   } catch (error) { $("review-queue").textContent = error.message; }
 }

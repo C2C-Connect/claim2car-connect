@@ -420,6 +420,37 @@ class CaptureEvidenceService:
                     break
         return queued
 
+    def get_review_details(self, authorization, session_id):
+        """Return a verified sealed manifest to an independent reviewer."""
+        session_id = self._session_id(session_id)
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            session, history = self._history(conn, actor, session_id, creator_required=False)
+            if actor.actor_id == session.created_by:
+                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+            if self._consent_state(history) is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            if not history or history[-1][0] != "MANIFEST_SEALED":
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            manifest = self._verified_manifest(actor, session_id, history)
+            latest = self._artifact_set(history)
+            return {
+                "session_id": session_id,
+                "manifest_digest": manifest.digest(),
+                "shot_list_version": manifest.shot_list_version,
+                "consent_recorded": True,
+                "artifacts": [
+                    {
+                        "artifact_id": entry.artifact_id,
+                        "slot": entry.slot,
+                        "sha256": entry.sha256_hex,
+                        "byte_length": latest[entry.slot][1]["byte_length"],
+                    }
+                    for entry in manifest.entries
+                ],
+            }
+
     def retrieve_for_review(self, authorization, session_id, artifact_id):
         session_id = self._session_id(session_id)
         artifact_id = self._request_id(artifact_id)
