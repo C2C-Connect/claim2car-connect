@@ -359,6 +359,9 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             except Exception:
                 _fail(500, 'CAPTURE_EVIDENCE_OPERATION_FAILED')
 
+        @api.get('/v1/capture-sessions/{session_id}/evidence-readiness')
+        def evidence_readiness(session_id: UUID, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.evidence_readiness, authorization, session_id)
         @api.post('/v1/capture-sessions/{session_id}/consent')
         def record_consent(session_id: UUID, body: ConsentRequest, authorization: str = Depends(authorize)):
             return invoke_evidence(evidence.record_consent, authorization, session_id,
