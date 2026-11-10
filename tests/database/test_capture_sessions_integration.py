@@ -9,6 +9,7 @@ from psycopg import sql
 from psycopg.conninfo import make_conninfo
 from app.identity import ActorBinding, AuthenticationError, Credential, CredentialResolver
 from database.capture_sessions import CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound, CaptureSessionStore, CaptureStorageUnavailable
+from database.claim_cases import ClaimCaseConflict, ClaimCaseNotFound, ClaimCaseStore
 from database.financial_ledger import PersistentFinancialLedger
 from backend.app.anchor.ledger import PartnerAcceptanceRecord
 
@@ -28,10 +29,38 @@ class CaptureSessionIntegration(unittest.TestCase):
             binding=ActorBinding('capture-actor-'+str(index),uuid.UUID(self.f.tenants[index]),role)
             self.credentials.append(Credential(hashlib.sha256(self.tokens[index].encode()).hexdigest(),binding,int(time.time())+3600))
         self.store=CaptureSessionStore(CredentialResolver(self.credentials),self.dsns)
+        self.claim_cases=ClaimCaseStore(self.store)
         self.key=str(uuid.uuid4())
 
     def auth(self,index=0):
         return 'Bearer '+self.tokens[index]
+
+    def test_claim_case_create_retry_and_owned_readback(self):
+        claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
+        first = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
+        retry = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
+        self.assertTrue(first.created)
+        self.assertFalse(retry.created)
+        self.assertEqual((first.claim_id, first.tenant_id, first.created_by, first.state),
+                         (claim_id, self.f.tenants[0], 'capture-actor-0', 'INTAKE_OPEN'))
+        self.assertEqual(self.claim_cases.get(self.auth(), claim_id).claim_id, claim_id)
+        self.assertEqual([item.claim_id for item in self.claim_cases.list_owned(self.auth())], [claim_id])
+        self.assertEqual(self.f.seed.execute(
+            'SELECT count(*) FROM faos.claim_cases WHERE tenant_id=%s AND claim_id=%s',
+            (self.f.tenants[0], claim_id)).fetchone()[0], 1)
+
+    def test_claim_case_idempotency_conflict_is_rejected(self):
+        request_id = str(uuid.uuid4())
+        self.claim_cases.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=request_id)
+        with self.assertRaises(ClaimCaseConflict):
+            self.claim_cases.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=request_id)
+
+    def test_claim_case_reads_are_tenant_and_creator_scoped(self):
+        claim_id = str(uuid.uuid4())
+        self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()))
+        with self.assertRaises(ClaimCaseNotFound):
+            self.claim_cases.get(self.auth(1), claim_id)
+        self.assertEqual(self.claim_cases.list_owned(self.auth(1)), [])
 
     def test_create_retry_and_fresh_connection_readback(self):
         first=self.store.create(self.auth(),self.key)
