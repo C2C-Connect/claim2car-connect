@@ -36,33 +36,6 @@ BEGIN
 END
 $function$;
 
-CREATE FUNCTION faos.event_jsonb_uses_integer_numbers(p_value jsonb)
-RETURNS boolean
-LANGUAGE plpgsql
-IMMUTABLE
-STRICT
-PARALLEL SAFE
-SET search_path=pg_catalog,faos
-AS $function$
-DECLARE
-  value_kind text := jsonb_typeof(p_value);
-  valid boolean;
-BEGIN
-  IF value_kind = 'number' THEN
-    RETURN (p_value::text ~ '^-?(0|[1-9][0-9]*)$');
-  ELSIF value_kind = 'object' THEN
-    SELECT COALESCE(bool_and(faos.event_jsonb_uses_integer_numbers(entry.value)),true)
-      INTO valid FROM jsonb_each(p_value) AS entry(key,value);
-    RETURN valid;
-  ELSIF value_kind = 'array' THEN
-    SELECT COALESCE(bool_and(faos.event_jsonb_uses_integer_numbers(entry.value)),true)
-      INTO valid FROM jsonb_array_elements(p_value) AS entry(value);
-    RETURN valid;
-  END IF;
-  RETURN true;
-END
-$function$;
-
 CREATE FUNCTION faos.event_payload_is_canonical(p_value text)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -76,9 +49,6 @@ DECLARE
 BEGIN
   parsed := p_value::jsonb;
   IF jsonb_typeof(parsed) IS DISTINCT FROM 'object' THEN
-    RETURN false;
-  END IF;
-  IF NOT faos.event_jsonb_uses_integer_numbers(parsed) THEN
     RETURN false;
   END IF;
   RETURN p_value = faos.canonical_event_jsonb(parsed);
