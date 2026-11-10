@@ -96,3 +96,31 @@ The current Railway configuration is a restricted synthetic containment service.
 **Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** the complete database authority/cutover workflow and full repository suite passed (**693 passed, 23 warnings, 192 subtests**), including the owner/creator readback and denial-to-other-operator integration test. API health, integrated-container smoke, controlled PostgreSQL intake, VIN, frontend, CodeQL, and restricted Railway verification also passed; the actual Railway deploy job remained skipped.
 
 **Remaining boundary:** owner authentication is still based on a provisioned actor credential; this does not establish the real person's identity. The feature remains disabled by default and the disclosure remains pending legal review.
+
+
+## Browser-persistent original evidence queue — 2026-11-10
+
+**Candidate revision:** `ff9b3f744d706fd95f33ee952efb16fc3ce94d21` (implementation and verification revision; subsequent documentation and readiness-gate commits follow it).
+
+**Implemented on PR #29:**
+- The integrated operator shell stores selected original image bytes in IndexedDB before attempting upload. It does not transform or recompress the bytes.
+- Queue records are scoped to the authenticated tenant, actor, and capture session. A separate tenant/session index supports local cleanup after consent withdrawal.
+- Each queued original receives stable request and artifact UUIDs plus a browser-computed SHA-256 digest. Retries reuse those identifiers so the existing server idempotency behavior can recognize an accepted request whose response was lost.
+- Upload is serial in queue order and stops at the first failure. The operator can retry manually, on the browser's `online` event, or when reopening a session.
+- After server acceptance, the browser removes the local binary payload and retains only receipt metadata. Status refreshes do not load queued image bytes into the UI.
+- A server-authoritative evidence-readiness route reports whether the case creator has active owner consent and a valid vehicle reference. The operator UI checks this before queueing while online and again before synchronization. During a connectivity interruption, the current page may rely on the last server-verified readiness result held in memory.
+- The owner can withdraw capture consent. After server confirmation, the same browser purges all local queue entries for that tenant/session. If withdrawal occurs on another device, the operator device can purge its pending queue when it next reconnects and checks server readiness.
+
+**Verification at the implementation revision:**
+- Offline guided-capture workflow, queue behavior assertions, and integrated browser-module syntax checks passed — [run 42779319560](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319560).
+- Full repository suite passed — [run 42779319532](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319532).
+- Database authority/cutover verification passed — [run 42779319539](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319539).
+- Integrated container smoke passed — [run 42779319245](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319245).
+- Restricted Railway smoke passed — [run 42779319299](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42779319299); its deploy job was skipped. No integrated staging deployment is claimed.
+
+**Important limits — not field acceptance:**
+- Queue behavior assertions use an injected in-memory store; CI syntax-checks the IndexedDB adapter but does not execute it in a real browser.
+- Safari/iPad storage behavior, browser eviction, device restart recovery, quota exhaustion, and real-world connectivity interruption have not been field-tested.
+- IndexedDB is not an encrypted vault, WORM store, or production durability guarantee. This feature remains a controlled-test aid and is not authorized for real participant evidence.
+- The last verified readiness result is held in page memory, not a signed offline consent permit. After a page restart while offline, new evidence cannot be queued until the server can revalidate readiness. If consent is withdrawn elsewhere while the operator device remains offline, already queued local bytes cannot be remotely erased until that device reconnects.
+- No claim is made that this completes the offline-first field-capture requirement. Native/device-qualified storage, explicit local retention controls, browser integration tests, and iPad field validation remain open.
