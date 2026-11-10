@@ -117,8 +117,11 @@ class DomainEvent:
                 parse_float=Decimal,
                 parse_constant=_reject_nonfinite,
             )
-            if type(payload) is not dict:
-                raise ValueError('NONCANONICAL_PAYLOAD')
+        except (ValueError, TypeError, RecursionError):
+            raise ValueError('INVALID_PAYLOAD') from None
+        if type(payload) is not dict:
+            raise ValueError('NONCANONICAL_PAYLOAD')
+        try:
             canonical = canonical_event_payload(payload)
         except (ValueError, TypeError, RecursionError):
             raise ValueError('INVALID_PAYLOAD') from None
