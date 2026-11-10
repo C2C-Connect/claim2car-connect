@@ -12,4 +12,4 @@ fi
 mkdir -p "$storage_root"
 chown 10001:10001 "$storage_root"
 chmod 0700 "$storage_root"
-exec setpriv --reuid=10001 --regid=10001 --init-groups --no-new-privs --bounding-set=-all "$@"
+exec setpriv --reuid=10001 --regid=10001 --init-groups --no-new-privs "$@"
