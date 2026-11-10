@@ -27,6 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Stamp exact source revision
+        run: printf '%s\\n' "$GITHUB_SHA" > app/_build_revision.txt
+
       - name: Build integrated application image
         run: docker build --file Dockerfile.integrated --tag claim2car-integrated:ci .
 
@@ -65,6 +68,8 @@ jobs:
           Path(os.environ["RUNNER_TEMP"], "claim2car-runtime.json").write_text(
               json.dumps(value), encoding="utf-8"
           )
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              output.write("C2C_CAPTURE_CONFIG_JSON=" + json.dumps(value) + "\\n")
           PY
 
       - name: Start integrated container
@@ -74,11 +79,17 @@ jobs:
         run: |
           docker run --detach --name claim2car-integrated-ci \
             --publish 127.0.0.1:18080:8000 \
-            --mount "type=bind,src=$RUNNER_TEMP/claim2car-runtime.json,dst=/run/secrets/claim2car-runtime.json,readonly" \
-            --mount "type=bind,src=$RUNNER_TEMP/claim2car-evidence,dst=/var/lib/claim2car/evidence" \
+                        --mount "type=bind,src=$RUNNER_TEMP/claim2car-evidence,dst=/var/lib/claim2car/evidence" \
             --env C2C_INTERNAL_SERVICE_TOKEN="$C2C_INTERNAL_SERVICE_TOKEN" \
             --env C2C_VIN_HMAC_PEPPER="$C2C_VIN_HMAC_PEPPER" \
+            --env C2C_CAPTURE_CONFIG_JSON="$C2C_CAPTURE_CONFIG_JSON" \
             claim2car-integrated:ci
+
+      - name: Verify non-root process and persistent evidence volume permissions
+        run: |
+          test "$(docker exec claim2car-integrated-ci awk '/^Uid:/ {print $2}' /proc/1/status)" = "10001"
+          test "$(docker exec claim2car-integrated-ci stat -c %u /var/lib/claim2car/evidence)" = "10001"
+          docker exec --user 10001:10001 claim2car-integrated-ci sh -c 'touch /var/lib/claim2car/evidence/.write-test'
 
       - name: Verify integrated routes and security boundaries
         env:
@@ -120,6 +131,12 @@ jobs:
           else:
               raise RuntimeError("INTEGRATED_CONTAINER_DID_NOT_BECOME_LIVE")
 
+          build_status, build_body = request("/health/build")
+          build = json.loads(build_body)
+          assert build_status == 200
+          assert build["revision"] == os.environ["GITHUB_SHA"]
+          assert build["runtime_mode"] == "integrated"
+          assert request("/")[0] == 200
           assert request("/internal/v1/analysis/health")[0] == 401
           assert request("/internal/v1/analysis/health", bearer=token)[0] == 200
           status, body = request(
