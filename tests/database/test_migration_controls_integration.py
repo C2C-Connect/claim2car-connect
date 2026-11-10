@@ -164,7 +164,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                         ).fetchone()[0]
                         self.assertEqual(count, 1)
 
-            valid_payload = '{"large":100000000000000000000,"label":"é","small":0.00001,"value":1.25}'
+            valid_payload = '{"label":"é","large":100000000000000000000,"small":0.00001,"value":1.25}'
             sql_canonical = app.execute(
                 'SELECT faos.canonical_event_jsonb(%s::jsonb)', (valid_payload,)
             ).fetchone()[0]
