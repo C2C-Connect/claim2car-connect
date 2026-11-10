@@ -21,10 +21,14 @@ class DraftRequest(BaseModel):
 
 def create_intake_app(runtime=None, *, enable_evidence=False):
     if runtime is None:
-        path = os.environ.get('C2C_CAPTURE_CONFIG_FILE')
-        if not path:
-            raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
-        runtime = load_runtime(path)
+        configuration_json = os.environ.get('C2C_CAPTURE_CONFIG_JSON')
+        if configuration_json:
+            runtime = load_runtime(configuration_json=configuration_json)
+        else:
+            path = os.environ.get('C2C_CAPTURE_CONFIG_FILE')
+            if not path:
+                raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
+            runtime = load_runtime(path)
     # Preserve the original factory call contract for the restricted test and
     # intake surfaces; only integrated callers opt into persistent evidence.
     api = create_capture_app(runtime, enable_evidence=True) if enable_evidence else create_capture_app(runtime)
