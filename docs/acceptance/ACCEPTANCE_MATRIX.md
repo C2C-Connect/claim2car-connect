@@ -82,3 +82,15 @@ The current Railway configuration is a restricted synthetic containment service.
 - Owner identity must be the already-bound owner actor for the persistent claim case. Operator credentials cannot submit owner consent or incident details.
 - API exposure is gated by `C2C_INCIDENT_INTAKE_ENABLED=true`; the default is disabled. The disclosure contract is marked `draft_pending_legal_review`. No real participant data use is authorized by this code increment.
 - This is a first structured intake slice, not the complete incident/claimant/policy intake contract. Owner access still relies on a server-provisioned owner actor credential; end-user authentication, identity proofing, and claimant invitation remain outstanding.
+
+
+## Actor-scoped incident detail read path — 2026-11-10
+
+- Migration `0016_claim_case_incident_read_boundary.sql` revokes direct `SELECT` on incident details from the shared application database role.
+- The application reads incident details through a restricted database function that filters by the server-resolved actor ID against the case creator or bound owner. The API additionally enforces the actor role and case-creator/owner rules before invoking it.
+- Added owner and case-creating-operator read paths; other same-tenant operators and reviewers are denied. Reviewer access is not included in this supplemental disclosure scope.
+- The owner-facing disclosure now states who can view these details and that they are not automatically sent to insurers, repair shops, or dealerships.
+- The operator shell can load the details after the owner separately consents. Withdrawal removes the row, so the read path no longer returns it.
+- The database authority diagnostic now verifies that the shared application role cannot directly select this table and must use the actor-filtered read function.
+
+**Remaining boundary:** owner authentication is still based on a provisioned actor credential; this does not establish the real person's identity. The feature remains disabled by default and the disclosure remains pending legal review.
