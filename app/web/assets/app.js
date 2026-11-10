@@ -1,3 +1,4 @@
+import { createIndexedDbEvidenceStore, createOfflineEvidenceQueue } from "./offline_evidence_queue.mjs";
 // Keep this list byte-for-byte aligned with app/evidence_manifest.py and
 // contracts/shot-list.json (claims2car-12-v1).
 const SLOTS = [
@@ -12,6 +13,10 @@ let identity = null;
 let activeSession = null;
 let pendingClaimCase = null;
 let claimCaseRequestInFlight = false;
+let evidenceQueue = null;
+let evidenceQueueError = null;
+try { evidenceQueue = createOfflineEvidenceQueue({store:createIndexedDbEvidenceStore()}); }
+catch (error) { evidenceQueueError = error; }
 const $ = (id) => document.getElementById(id);
 const uuid = () => crypto.randomUUID();
 const authHeaders = () => ({Authorization: `Bearer ${token}`});
@@ -34,6 +39,7 @@ function setCase(id) {
   activeSession = id;
   $("session-id").value = id;
   $("owner-session-id").value = id;
+  void restoreEvidenceQueue(id);
 }
 async function connect() {
   token = $("access-token").value.trim();
@@ -250,21 +256,83 @@ function base64(bytes) {
   for (let i=0;i<bytes.length;i+=chunk) binary += String.fromCharCode(...bytes.subarray(i,i+chunk));
   return btoa(binary);
 }
+async function refreshCaptureQueueStatus(sessionId) {
+  const statuses = [...$("capture-slots").querySelectorAll(".slot-status")];
+  if (!evidenceQueue) {
+    for (const status of statuses) {
+      status.dataset.uploaded = "false";
+      if (evidenceQueueError) status.textContent = "Local evidence queue unavailable";
+    }
+    $("sync-pending-evidence").disabled = true;
+    return;
+  }
+  const state = await evidenceQueue.status(sessionId);
+  const latestBySlot = new Map();
+  for (const record of state.records) latestBySlot.set(record.slot, record);
+  for (const status of statuses) {
+    const record = latestBySlot.get(status.dataset.slot);
+    status.dataset.uploaded = record?.uploaded ? "true" : "false";
+    status.classList.toggle("error", false);
+    if (!record) status.textContent = "Not captured";
+    else if (record.uploaded) status.textContent = `Uploaded · ${record.byteLength.toLocaleString()} bytes · SHA-256 verified`;
+    else status.textContent = `Saved on this device · waiting to sync · ${record.byteLength.toLocaleString()} bytes`;
+  }
+  $("sync-pending-evidence").disabled = state.pending === 0;
+  $("sync-pending-evidence").textContent = state.pending
+    ? `Sync pending originals (${state.pending})`
+    : "All originals synced";
+}
+async function syncPendingUploads(sessionId) {
+  if (!token || !sessionId) return null;
+  if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
+  const result = await evidenceQueue.syncSession({
+    sessionId,
+    upload: async (record) => {
+      await api(`/api/v1/capture-sessions/${encodeURIComponent(sessionId)}/artifacts`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          request_id:record.requestId,
+          artifact_id:record.artifactId,
+          slot:record.slot,
+          payload_base64:base64(record.bytes),
+          sha256:record.sha256
+        })
+      });
+      return {ok:true};
+    }
+  });
+  await refreshCaptureQueueStatus(sessionId);
+  if (result.blockedAtQueueId !== null) {
+    message("operator-message", `Sync paused at queued original #${result.blockedAtQueueId}: ${result.error}. Earlier items remain recorded; later items were not sent.`, true);
+  } else if (result.uploaded > 0) {
+    message("operator-message", `Synced ${result.uploaded} original evidence item(s) in FIFO order. Server-side SHA-256 verification completed.`);
+  }
+  return result;
+}
+async function restoreEvidenceQueue(sessionId) {
+  try {
+    await refreshCaptureQueueStatus(sessionId);
+    if (navigator.onLine && token) await syncPendingUploads(sessionId);
+  } catch (error) {
+    message("operator-message", `Local evidence recovery unavailable: ${error.message}`, true);
+  }
+}
 async function upload(slot, file, status) {
   const id = $("session-id").value.trim();
   if (!id || !file) return;
   status.dataset.uploaded = "false";
   status.classList.remove("error");
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256",bytes))].map(v=>v.toString(16).padStart(2,"0")).join("");
-    await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/artifacts`,{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({request_id:uuid(),artifact_id:uuid(),slot,payload_base64:base64(bytes),sha256:digest})
-    });
-    status.textContent = `Uploaded · ${file.name} · ${bytes.length.toLocaleString()} bytes · SHA-256 verified`;
-    status.dataset.uploaded = "true";
-  } catch (error) { status.textContent = error.message; status.classList.add("error"); }
+    if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
+    const queued = await evidenceQueue.queueFile({sessionId:id,slot,file});
+    status.textContent = `Saved on this device · queued #${queued.queueId} · waiting to sync`;
+    await refreshCaptureQueueStatus(id);
+    await syncPendingUploads(id);
+  } catch (error) {
+    status.textContent = error.message;
+    status.classList.add("error");
+  }
 }
 function buildSlots() {
   const root = $("capture-slots");
@@ -272,7 +340,7 @@ function buildSlots() {
     const row = document.createElement("div"); row.className = "slot";
     const title = document.createElement("label"); title.textContent = label;
     const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.setAttribute("capture","environment");
-    const status = document.createElement("span"); status.className = "fine"; status.textContent = "Not uploaded";
+    const status = document.createElement("span"); status.className = "fine slot-status"; status.dataset.slot = slot; status.dataset.uploaded = "false"; status.textContent = "Not captured";
     const qualityLabel = document.createElement("label"); qualityLabel.className = "quality-check";
     const quality = document.createElement("input"); quality.type = "checkbox";
     const qualityText = document.createElement("span"); qualityText.textContent = "I checked this original: correct view, readable, and usable.";
@@ -387,6 +455,8 @@ $("submit-incident-intake").addEventListener("click",submitIncidentIntake);
 $("save-vin").addEventListener("click",recordVin);
 $("record-quality").addEventListener("click",recordQuality);
 $("seal-case").addEventListener("click",sealCase);
+$("sync-pending-evidence").addEventListener("click",()=>{ if(activeSession) void syncPendingUploads(activeSession); });
+window.addEventListener("online",()=>{ if(activeSession && token) void syncPendingUploads(activeSession); });
 $("refresh-queue").addEventListener("click",refreshQueue);
 $("access-token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
 buildSlots();
