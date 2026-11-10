@@ -8,7 +8,7 @@
  * WORM store, encrypted vault, or field-qualified device-storage guarantee.
  */
 const DATABASE_NAME = "claim2car-evidence";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const STORE_NAME = "originals";
 const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
 
@@ -39,9 +39,17 @@ export function createIndexedDbEvidenceStore(indexedDb = globalThis.indexedDB) {
         const request = indexedDb.open(DATABASE_NAME, DATABASE_VERSION);
         request.onupgradeneeded = () => {
           const db = request.result;
+          let store;
           if (!db.objectStoreNames.contains(STORE_NAME)) {
-            const store = db.createObjectStore(STORE_NAME, { keyPath: "queueId", autoIncrement: true });
-            store.createIndex("by_session", "sessionId", { unique: false });
+            store = db.createObjectStore(STORE_NAME, { keyPath: "queueId", autoIncrement: true });
+          } else {
+            store = request.transaction.objectStore(STORE_NAME);
+          }
+          if (!store.indexNames.contains("by_scope")) {
+            store.createIndex("by_scope", ["tenantId", "actorId", "sessionId"], { unique: false });
+          }
+          if (!store.indexNames.contains("by_tenant_session")) {
+            store.createIndex("by_tenant_session", ["tenantId", "sessionId"], { unique: false });
           }
         };
         request.onsuccess = () => {
@@ -73,11 +81,12 @@ export function createIndexedDbEvidenceStore(indexedDb = globalThis.indexedDB) {
       });
     },
 
-    async list(sessionId, { includeBytes = true } = {}) {
+    async list(sessionId, { tenantId, actorId, includeBytes = true } = {}) {
+      if (!tenantId || !actorId) throw new Error("EVIDENCE_QUEUE_IDENTITY_SCOPE_REQUIRED");
       const db = await database();
       const tx = db.transaction(STORE_NAME, "readonly");
       const done = transactionDone(tx);
-      const request = tx.objectStore(STORE_NAME).index("by_session").openCursor(sessionId);
+      const request = tx.objectStore(STORE_NAME).index("by_scope").openCursor([tenantId, actorId, sessionId]);
       const records = [];
       request.onsuccess = () => {
         const cursor = request.result;
@@ -124,13 +133,14 @@ export function createIndexedDbEvidenceStore(indexedDb = globalThis.indexedDB) {
       });
     },
 
-    async deleteSession(sessionId) {
+    async deleteSession(sessionId, { tenantId } = {}) {
+      if (!tenantId) throw new Error("EVIDENCE_QUEUE_TENANT_SCOPE_REQUIRED");
       const db = await database();
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
         const store = tx.objectStore(STORE_NAME);
         let deleted = 0;
-        const request = store.index("by_session").getAllKeys(sessionId);
+        const request = store.index("by_tenant_session").getAllKeys([tenantId, sessionId]);
         request.onsuccess = () => {
           for (const key of request.result) {
             store.delete(key);
@@ -162,8 +172,10 @@ export function createOfflineEvidenceQueue({
   }
   const activeSyncs = new Map();
 
-  async function queueFile({ sessionId, slot, file }) {
+  async function queueFile({ sessionId, tenantId, actorId, slot, file }) {
     if (typeof sessionId !== "string" || !sessionId.trim()
+        || typeof tenantId !== "string" || !tenantId.trim()
+        || typeof actorId !== "string" || !actorId.trim()
         || typeof slot !== "string" || !slot.trim()
         || !file || typeof file.arrayBuffer !== "function") {
       throw new Error("INVALID_EVIDENCE_QUEUE_INPUT");
@@ -178,6 +190,8 @@ export function createOfflineEvidenceQueue({
     const digest = toHex(await cryptoProvider.subtle.digest("SHA-256", bytes));
     const record = {
       sessionId,
+      tenantId,
+      actorId,
       slot,
       artifactId: makeUuid(),
       requestId: makeUuid(),
@@ -190,15 +204,17 @@ export function createOfflineEvidenceQueue({
     return store.enqueue(record);
   }
 
-  async function syncSession({ sessionId, upload }) {
+  async function syncSession({ sessionId, tenantId, actorId, upload }) {
     if (typeof sessionId !== "string" || !sessionId.trim()
+        || typeof tenantId !== "string" || !tenantId.trim()
+        || typeof actorId !== "string" || !actorId.trim()
         || typeof upload !== "function") {
       throw new Error("INVALID_EVIDENCE_SYNC_INPUT");
     }
     if (activeSyncs.has(sessionId)) return activeSyncs.get(sessionId);
 
     const task = (async () => {
-      const records = (await store.list(sessionId, {includeBytes:true})).filter((record) => !record.uploaded);
+      const records = (await store.list(sessionId, {tenantId,actorId,includeBytes:true})).filter((record) => !record.uploaded);
       let uploaded = 0;
       for (const record of records) {
         if (!(record.bytes instanceof Uint8Array) || record.bytes.byteLength !== record.byteLength) {
@@ -230,13 +246,16 @@ export function createOfflineEvidenceQueue({
     }
   }
 
-  async function deleteSession(sessionId) {
-    if (typeof sessionId !== "string" || !sessionId.trim()) throw new Error("INVALID_EVIDENCE_SESSION_ID");
-    return store.deleteSession(sessionId);
+  async function deleteSession(sessionId, {tenantId} = {}) {
+    if (typeof sessionId !== "string" || !sessionId.trim() || !tenantId) {
+      throw new Error("INVALID_EVIDENCE_SESSION_ID");
+    }
+    return store.deleteSession(sessionId, {tenantId});
   }
 
-  async function status(sessionId) {
-    const records = await store.list(sessionId, {includeBytes:false});
+  async function status(sessionId, {tenantId,actorId} = {}) {
+    if (!tenantId || !actorId) throw new Error("EVIDENCE_QUEUE_IDENTITY_SCOPE_REQUIRED");
+    const records = await store.list(sessionId, {tenantId,actorId,includeBytes:false});
     return {
       total: records.length,
       uploaded: records.filter((record) => record.uploaded).length,
