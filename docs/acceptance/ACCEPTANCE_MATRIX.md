@@ -2,7 +2,7 @@
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
 **Candidate branch:** `cto/spec-production-implementation` (PR #29)  
-**Last code validation revision:** `0a0ddd7e0f37b8b5e24616d2ad98e7cb44c28ac9`  
+**Last code validation revision:** `ef829f0fd2a3c0c6664f441d4461fd76fde78298`  
 **Machine contract:** `m1-v1`  
 **Status rule:** code, CI, field validation, review, and release authorization are recorded separately. A passing synthetic test does not establish product acceptance or production readiness. The candidate revision is not merged and has no submitted independent review.
 
