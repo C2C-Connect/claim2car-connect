@@ -86,11 +86,26 @@ def verify(report,admin,connections,tenants,session):
                 results['rls_flags'] = {'status':'PASS','enabled':True,'forced':True,'policies':policies}
                 expected = admin.execute(sql.SQL('SELECT count(*) FROM {} WHERE tenant_id=%s').format(target),(own,)).fetchone()[0]
                 with tenant_transaction(conn,own):
-                    visible = conn.execute(select,tenants).fetchall()
-                    expect(expected>0 and len(visible)==expected and all(value[0]==own for value in visible),'AUTHORIZED_READ_CONTROL_FAILED')
-                    results['own_read'] = {'status':'PASS','rows':len(visible)}
-                    expect(conn.execute(sql.SQL('SELECT 1 FROM {} WHERE tenant_id=%s').format(target),(other,)).fetchall()==[],'CROSS_TENANT_ROWS_VISIBLE')
-                    results['cross_read'] = {'status':'PASS'}
+                    if table=='claim_case_incident_intake':
+                        try:
+                            conn.execute('SELECT * FROM faos.claim_case_incident_intake').fetchall()
+                            raise AssertionError('DIRECT_INCIDENT_TABLE_READ_ALLOWED')
+                        except psycopg.errors.InsufficientPrivilege as error:
+                            expect(error.sqlstate=='42501','WRONG_DIRECT_READ_DENIAL')
+                        visible = conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                            (own,ids['claim'],'synthetic-matrix')).fetchall()
+                        expect(expected>0 and len(visible)==expected,'AUTHORIZED_READ_CONTROL_FAILED')
+                        results['own_read'] = {'status':'PASS','rows':len(visible),'path':'actor-filtered-function','direct_table_select':'DENIED'}
+                        hidden = conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                            (own,ids['claim'],'unrelated-actor')).fetchall()
+                        expect(hidden==[],'UNAUTHORIZED_ACTOR_READ_ALLOWED')
+                        results['cross_read'] = {'status':'PASS','path':'actor-filtered-function'}
+                    else:
+                        visible = conn.execute(select,tenants).fetchall()
+                        expect(expected>0 and len(visible)==expected and all(value[0]==own for value in visible),'AUTHORIZED_READ_CONTROL_FAILED')
+                        results['own_read'] = {'status':'PASS','rows':len(visible)}
+                        expect(conn.execute(sql.SQL('SELECT 1 FROM {} WHERE tenant_id=%s').format(target),(other,)).fetchall()==[],'CROSS_TENANT_ROWS_VISIBLE')
+                        results['cross_read'] = {'status':'PASS'}
                 privileges = conn.execute("SELECT has_table_privilege(current_user,%s,'INSERT'),has_table_privilege(current_user,%s,'UPDATE'),has_table_privilege(current_user,%s,'DELETE')",('faos.'+table,)*3).fetchone()
                 cursor = admin.execute(sql.SQL('SELECT * FROM {} WHERE tenant_id=%s LIMIT 1').format(target),(other,))
                 values = dict(zip((column.name for column in cursor.description),cursor.fetchone()))
@@ -123,16 +138,36 @@ def verify(report,admin,connections,tenants,session):
                 results['tenant_reassignment'] = reject_mutation(conn,own,move,(other,own))
                 results['tenant_reassignment']['layer'] = 'rls' if privileges[1] else 'table_privilege'
                 with tenant_transaction(conn,other):
-                    expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None and conn.execute(select,tenants).fetchall()==[],'SPOOFED_CONTEXT_ALLOWED')
+                    if table=='claim_case_incident_intake':
+                        try:
+                            conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                                (own,ids['claim'],'synthetic-matrix')).fetchall()
+                            raise AssertionError('SPOOFED_CONTEXT_ALLOWED')
+                        except psycopg.errors.RaiseException as error:
+                            expect(error.diag.message_primary=='TENANT_CONTEXT_MISMATCH','WRONG_SPOOFED_CONTEXT_REJECTION')
+                    else:
+                        expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None and conn.execute(select,tenants).fetchall()==[],'SPOOFED_CONTEXT_ALLOWED')
                 results['spoofed_context'] = {'status':'PASS'}
                 with conn.transaction():
                     conn.execute("SELECT set_config('faos.tenant_id','',true)")
-                    expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None and conn.execute(select,tenants).fetchall()==[],'MISSING_CONTEXT_ALLOWED')
+                    if table=='claim_case_incident_intake':
+                        try:
+                            conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                                (own,ids['claim'],'synthetic-matrix')).fetchall()
+                            raise AssertionError('MISSING_CONTEXT_ALLOWED')
+                        except psycopg.errors.RaiseException as error:
+                            expect(error.diag.message_primary=='TENANT_CONTEXT_MISMATCH','WRONG_MISSING_CONTEXT_REJECTION')
+                    else:
+                        expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None and conn.execute(select,tenants).fetchall()==[],'MISSING_CONTEXT_ALLOWED')
                 results['missing_context'] = {'status':'PASS'}
                 try:
                     with conn.transaction():
                         conn.execute("SELECT set_config('faos.tenant_id','not-a-uuid',true)")
-                        conn.execute(select,tenants).fetchall()
+                        if table=='claim_case_incident_intake':
+                            conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                                (own,ids['claim'],'synthetic-matrix')).fetchall()
+                        else:
+                            conn.execute(select,tenants).fetchall()
                         raise AssertionError('MALFORMED_CONTEXT_NOT_REJECTED')
                 except psycopg.errors.InvalidTextRepresentation as error:
                     expect(error.sqlstate=='22P02','WRONG_MALFORMED_CONTEXT_SQLSTATE')

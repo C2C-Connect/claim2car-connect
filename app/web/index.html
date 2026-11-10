@@ -37,18 +37,23 @@
       <section id="operator-view" class="panel" hidden>
         <h3>Operator workspace</h3>
         <h4>Persistent claim-case register</h4>
-        <p class="muted">Create and reopen tenant-scoped claim-case records. This first register stores case identity and ownership only; incident details, claimant information, and evidence association are not yet part of this record.</p>
+        <p class="muted">Create and reopen tenant-scoped claim-case records. The register stores case identity, creator/owner binding, and capture-session association. Optional structured incident details are separately consent-gated; claimant and policy details are not collected by this v1 intake.</p>
         <div class="actions"><button id="create-claim-case" class="primary">Create claim record</button><span id="claim-case-created" class="fine"></span></div>
         <div id="claim-cases" class="owned-sessions" aria-live="polite"></div>
         <div class="rule"></div>
         <h4>Controlled-test evidence capture</h4>
-        <p class="fine">The following capture-session workflow remains explicitly controlled-test only. It is not a production claim record. Owner consent must be recorded by the provisioned owner actor credential. This workspace does not provide end-user login or identity proofing.</p>
+        <p class="fine">Capture and evidence workflows have passed synthetic/controlled CI verification, not field acceptance. Persistent claim-case sessions can be opened here, but do not use this surface with real participants until owner authentication, legal review, field validation, and deployment gates are complete. Owner consent still requires a provisioned owner actor credential; this workspace does not provide end-user login or identity proofing.</p>
         <div class="actions"><button id="new-case" class="secondary">Create controlled-test capture draft</button><span id="case-created" class="fine"></span></div>
         <label for="session-id">Capture session ID</label>
         <input id="session-id" autocomplete="off" placeholder="Session UUID">
         <button id="resume-case" class="secondary">Resume case</button>
         <div class="session-list-head"><h4>Your recent capture drafts</h4><button id="refresh-sessions" class="quiet">Refresh</button></div>
         <div id="owned-sessions" class="owned-sessions" aria-live="polite"></div>
+        <div class="rule"></div>
+        <h4>Owner-consented incident details</h4>
+        <p class="fine">Only the operator who created this case can load the structured incident details after the owner separately consents. These details are not automatically sent to an insurer, repair shop, or dealership.</p>
+        <button id="load-incident-details" class="secondary">Load owner-submitted incident details</button>
+        <div id="incident-details" class="owned-sessions" aria-live="polite"></div>
         <div class="rule"></div>
         <h4>Vehicle reference</h4>
         <label for="vin">VIN</label><input id="vin" maxlength="17" autocomplete="off" placeholder="17-character VIN">
@@ -82,7 +87,7 @@
         <p class="fine">Separate optional consent. This draft collects only incident date/time, category, city, state, and ZIP code. It does not collect a street address, narrative, claimant contact details, or policy number. The supplemental notice is pending counsel review; this feature remains disabled unless explicitly enabled for an authorized test environment.</p>
         <div class="disclosure" aria-label="Supplemental incident intake notice incident-intake-v1">
           <p>Claim2Car will associate the incident date and time, incident category, city, state, and ZIP code you provide with this claim-case record.</p>
-          <p>This information is used only to organize the incident record for the capture and human-review workflow. It does not determine fault, coverage, liability, or claim eligibility.</p>
+          <p>The case-creating Claim2Car operator and you can view these details in the application to support case intake. This supplemental information is not automatically sent to an insurer, repair shop, or dealership. It does not determine fault, coverage, liability, or claim eligibility.</p>
           <p>This supplemental intake does not request a street address, GPS location, free-text narrative, claimant contact details, or insurance policy number.</p>
           <p>You may decline or withdraw this supplemental consent. Withdrawal deletes the separately stored structured incident details.</p>
           <span class="fine">Disclosure version: incident-intake-v1 · Draft pending legal review</span>

@@ -222,7 +222,9 @@ class CaptureRouteTests(unittest.TestCase):
             with TestClient(app) as client:
                 response = client.post('/v1/capture-sessions/'+str(UUID(int=2))+'/incident-consent',
                     json={'request_id':str(UUID(int=7)),'accepted':True},headers=self.headers)
+                read = client.get('/v1/capture-sessions/'+str(UUID(int=2))+'/incident-intake',headers=self.headers)
         self.assertEqual(response.status_code,503)
+        self.assertEqual(read.status_code,503)
         self.assertEqual(response.json(),{'detail':'INCIDENT_INTAKE_NOT_ENABLED'})
 
     def test_incident_intake_routes_validate_payload_when_enabled(self):
@@ -232,15 +234,20 @@ class CaptureRouteTests(unittest.TestCase):
         }), patch('app.capture_api.IncidentIntakeService') as service_type:
             app = create_capture_app(self.runtime, enable_evidence=True)
             with TestClient(app) as client:
+                service_type.return_value.get_incident.return_value = {'incident_type':'collision','incident_city':'San Antonio'}
                 response = client.post('/v1/capture-sessions/'+str(UUID(int=2))+'/incident-consent',
                     json={'request_id':str(UUID(int=7)),'accepted':True},headers=self.headers)
+                read = client.get('/v1/capture-sessions/'+str(UUID(int=2))+'/incident-intake',headers=self.headers)
                 invalid = client.post('/v1/capture-sessions/'+str(UUID(int=2))+'/incident-intake',
                     json={'request_id':str(UUID(int=8)),'occurred_at':'2026-11-10T10:00:00Z','incident_type':'collision',
                           'city':'San Antonio','region':'Texas','postal_code':'78201'},headers=self.headers)
         self.assertEqual(response.status_code,200)
+        self.assertEqual(read.status_code,200)
+        self.assertEqual(read.json()['incident_city'],'San Antonio')
         self.assertEqual(invalid.status_code,422)
         service_type.return_value.record_consent.assert_called_once()
         service_type.return_value.record_incident.assert_not_called()
+        service_type.return_value.get_incident.assert_called_once()
 
 if __name__=='__main__':
     unittest.main()

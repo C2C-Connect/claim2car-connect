@@ -165,6 +165,37 @@ async function resumeCase() {
     await refreshOwnedSessions();
   } catch (error) { message("operator-message",error.message,true); }
 }
+
+async function refreshIncidentDetails() {
+  const id = $("session-id").value.trim();
+  const root = $("incident-details");
+  root.replaceChildren();
+  if (!id) return message("operator-message","Open a persistent claim-case session first.",true);
+  try {
+    const item = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/incident-intake`);
+    const values = [
+      ["Incident time", new Date(item.incident_occurred_at).toLocaleString()],
+      ["Category", item.incident_type],
+      ["City", item.incident_city],
+      ["State", item.incident_region],
+      ["ZIP code", item.incident_postal_code]
+    ];
+    for (const [label,value] of values) {
+      const row = document.createElement("p");
+      const strong = document.createElement("strong");
+      strong.textContent = label + ": ";
+      const text = document.createElement("span");
+      text.textContent = value;
+      row.append(strong,text);
+      root.append(row);
+    }
+    message("operator-message","Owner-consented incident details loaded.");
+  } catch(error) {
+    root.textContent = error.message;
+    message("operator-message",error.message,true);
+  }
+}
+
 async function recordConsent() {
   const id = $("owner-session-id").value.trim();
   if (!id || !$("consent-accepted").checked) return message("owner-message","Enter the case ID and explicitly accept the disclosure.",true);
@@ -349,6 +380,7 @@ $("create-claim-case").addEventListener("click",createClaimCase);
 $("resume-case").addEventListener("click",resumeCase);
 $("refresh-sessions").addEventListener("click",refreshOwnedSessions);
 $("record-consent").addEventListener("click",recordConsent);
+$("load-incident-details").addEventListener("click",refreshIncidentDetails);
 $("record-incident-consent").addEventListener("click",()=>recordIncidentConsent(true));
 $("withdraw-incident-consent").addEventListener("click",()=>recordIncidentConsent(false));
 $("submit-incident-intake").addEventListener("click",submitIncidentIntake);

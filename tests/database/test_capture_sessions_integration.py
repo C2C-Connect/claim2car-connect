@@ -36,6 +36,7 @@ class CaptureSessionIntegration(unittest.TestCase):
         self.owner_token='C'*43
         self.other_owner_token='D'*43
         self.reviewer_token='E'*43
+        self.other_operator_token='F'*43
         self.credentials.extend([
             Credential(hashlib.sha256(self.owner_token.encode()).hexdigest(),
                 ActorBinding('claim-owner-0',uuid.UUID(self.f.tenants[0]),self.f.roles[0],'owner'),int(time.time())+3600),
@@ -44,6 +45,8 @@ class CaptureSessionIntegration(unittest.TestCase):
             Credential(hashlib.sha256(self.reviewer_token.encode()).hexdigest(),
                 ActorBinding('claim-reviewer-0',uuid.UUID(self.f.tenants[0]),self.f.roles[0],'reviewer'),int(time.time())+3600),
         ])
+        self.credentials.append(Credential(hashlib.sha256(self.other_operator_token.encode()).hexdigest(),
+            ActorBinding('other-operator-0',uuid.UUID(self.f.tenants[0]),self.f.roles[0],'operator'),int(time.time())+3600))
         self.store=CaptureSessionStore(CredentialResolver(self.credentials),self.dsns)
         self.claim_cases=ClaimCaseStore(self.store)
         self.key=str(uuid.uuid4())
@@ -56,6 +59,9 @@ class CaptureSessionIntegration(unittest.TestCase):
 
     def reviewer_auth(self):
         return 'Bearer '+self.reviewer_token
+
+    def other_operator_auth(self):
+        return 'Bearer '+self.other_operator_token
 
     def test_claim_case_create_retry_and_owned_readback(self):
         claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -297,6 +303,12 @@ class CaptureSessionIntegration(unittest.TestCase):
                 'SELECT incident_city,incident_region,incident_postal_code FROM faos.claim_case_incident_intake WHERE tenant_id=%s AND claim_id=%s',
                 (self.f.tenants[0],claim_id)).fetchone()
             self.assertEqual(persisted,('San Antonio','TX','78201'))
+            operator_view = incident.get_incident(self.auth(), case.capture_session_id)
+            owner_view = incident.get_incident(self.owner_auth(), case.capture_session_id)
+            self.assertEqual(operator_view['incident_city'],'San Antonio')
+            self.assertEqual(owner_view['incident_region'],'TX')
+            with self.assertRaises(CaptureAuthorizationError):
+                incident.get_incident(self.other_operator_auth(), case.capture_session_id)
             journal = self.f.seed.execute(
                 "SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s AND kind='INCIDENT_INTAKE_RECORDED'",
                 (self.f.tenants[0],case.capture_session_id)).fetchone()[0]
@@ -304,6 +316,8 @@ class CaptureSessionIntegration(unittest.TestCase):
             withdrawn = incident.record_consent(self.owner_auth(), case.capture_session_id,
                 request_id=uuid.uuid4(), accepted=False)
             self.assertTrue(withdrawn['incident_details_deleted'])
+            with self.assertRaises(CaptureSessionNotFound):
+                incident.get_incident(self.auth(), case.capture_session_id)
             self.assertIsNone(self.f.seed.execute(
                 'SELECT 1 FROM faos.claim_case_incident_intake WHERE tenant_id=%s AND claim_id=%s',
                 (self.f.tenants[0],claim_id)).fetchone())

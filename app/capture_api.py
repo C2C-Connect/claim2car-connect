@@ -353,6 +353,12 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             return invoke_evidence(evidence.record_consent, authorization, session_id,
                                    request_id=body.request_id, accepted=body.accepted, scope=body.scope)
 
+        @api.get('/v1/capture-sessions/{session_id}/incident-intake')
+        def get_incident_intake(session_id: UUID, authorization: str = Depends(authorize)):
+            if os.environ.get('C2C_INCIDENT_INTAKE_ENABLED', '').lower() != 'true':
+                _fail(503, 'INCIDENT_INTAKE_NOT_ENABLED')
+            return invoke_evidence(incident_intake.get_incident, authorization, session_id)
+
         @api.post('/v1/capture-sessions/{session_id}/incident-consent')
         def record_incident_consent(session_id: UUID, body: IncidentConsentRequest, authorization: str = Depends(authorize)):
             if os.environ.get('C2C_INCIDENT_INTAKE_ENABLED', '').lower() != 'true':
