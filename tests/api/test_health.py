@@ -70,6 +70,12 @@ class HealthTests(unittest.TestCase):
                 pass
         connect.assert_not_called()
 
+    def test_readiness_requires_persistent_claim_case_register_with_forced_rls(self):
+        from app.main import READINESS_SQL
+        self.assertIn('count(*)=11',READINESS_SQL)
+        self.assertIn("'claim_cases'",READINESS_SQL)
+        self.assertIn('c.relrowsecurity AND c.relforcerowsecurity',READINESS_SQL)
+
     def test_probe_checks_all_prerequisites_with_read_only_timeouts(self):
         conn=MagicMock()
         conn.__enter__.return_value=conn
