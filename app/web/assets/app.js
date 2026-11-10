@@ -11,6 +11,7 @@ const SLOTS = [
 let token = null;
 let identity = null;
 let activeSession = null;
+let activeReadiness = null;
 let pendingClaimCase = null;
 let claimCaseRequestInFlight = false;
 let evidenceQueue = null;
@@ -37,6 +38,7 @@ function message(id, text, bad = false) {
 }
 function setCase(id) {
   activeSession = id;
+  activeReadiness = null;
   $("session-id").value = id;
   $("owner-session-id").value = id;
   void restoreEvidenceQueue(id);
@@ -227,7 +229,7 @@ async function withdrawCaptureConsent() {
   }
   try {
     const localDeleted = evidenceQueue ? await evidenceQueue.deleteSession(id,{tenantId:identity.tenant_id}) : 0;
-    if (activeSession === id) await refreshCaptureQueueStatus(id);
+    if (activeSession === id) { activeReadiness = {...result,session_id:id,consent_active:false,vehicle_reference_present:false,capture_allowed:false}; await refreshCaptureQueueStatus(id); }
     message("owner-message",`Capture consent withdrawn. Server deleted ${result.deleted_original_artifacts ?? 0} original(s); local browser queue removed ${localDeleted} item(s).`);
   } catch (error) {
     message("owner-message",`Capture consent was withdrawn and the server deleted ${result.deleted_original_artifacts ?? 0} original(s), but local browser deletion failed: ${error.message}. Do not reuse this device until its pending evidence storage is cleared.`,true);
@@ -302,9 +304,30 @@ async function refreshCaptureQueueStatus(sessionId) {
     ? `Sync pending originals (${state.pending})`
     : "All originals synced";
 }
+async function refreshEvidenceReadiness(sessionId) {
+  const readiness = await api(`/api/v1/capture-sessions/${encodeURIComponent(sessionId)}/evidence-readiness`);
+  activeReadiness = readiness;
+  return readiness;
+}
 async function syncPendingUploads(sessionId) {
   if (!token || !sessionId) return null;
+  if (!navigator.onLine) {
+    await refreshCaptureQueueStatus(sessionId);
+    message("operator-message","Offline: original evidence remains saved on this device and will sync when connectivity returns.");
+    return {uploaded:0,blockedAtQueueId:null,error:"OFFLINE"};
+  }
   if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
+  const readiness = await refreshEvidenceReadiness(sessionId);
+  if (!readiness.consent_active) {
+    const deleted = await evidenceQueue.deleteSession(sessionId,{tenantId:identity.tenant_id});
+    await refreshCaptureQueueStatus(sessionId);
+    message("operator-message",`Owner consent is no longer active. Purged ${deleted} locally queued original(s); no further evidence was uploaded.`,true);
+    return {uploaded:0,blockedAtQueueId:null,error:"OWNER_CONSENT_INACTIVE",purged:deleted};
+  }
+  if (!readiness.vehicle_reference_present) {
+    message("operator-message","A valid vehicle reference is required before evidence can be synchronized.",true);
+    return {uploaded:0,blockedAtQueueId:null,error:"VEHICLE_REFERENCE_REQUIRED"};
+  }
   const result = await evidenceQueue.syncSession({
     sessionId,
     tenantId:identity.tenant_id,
@@ -355,6 +378,11 @@ async function upload(slot, file, status) {
   status.classList.remove("error");
   try {
     if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
+    let readiness = activeReadiness?.session_id === id ? activeReadiness : null;
+    if (navigator.onLine) readiness = await refreshEvidenceReadiness(id);
+    if (!readiness?.capture_allowed) {
+      throw new Error("OWNER_CONSENT_AND_VALID_VEHICLE_REFERENCE_REQUIRED_BEFORE_LOCAL_CAPTURE");
+    }
     const queued = await evidenceQueue.queueFile({sessionId:id,tenantId:identity.tenant_id,actorId:identity.actor_id,slot,file});
     status.textContent = `Saved on this device · queued #${queued.queueId} · waiting to sync`;
     await refreshCaptureQueueStatus(id);
