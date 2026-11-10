@@ -8,6 +8,7 @@ import base64
 import hashlib
 import os
 import tempfile
+import time
 import unittest
 import uuid
 from pathlib import Path
@@ -26,7 +27,7 @@ class CaptureHttpIntegration(unittest.TestCase):
         try:
             from fastapi.testclient import TestClient
             from app.capture_api import CaptureRuntime, create_capture_app
-            from app.identity import CredentialResolver
+            from app.identity import ActorBinding, Credential, CredentialResolver
             from app.main import Settings
             from app.artifact_storage import ArtifactKey
             from database.capture_sessions import CaptureSessionStore
@@ -35,6 +36,24 @@ class CaptureHttpIntegration(unittest.TestCase):
         except ModuleNotFoundError as error:
             self.skipTest(f"HTTP integration dependencies unavailable in this test lane: {error.name}")
 
+        cross_tenant_reviewer_token = "G" * 43
+        credentials = [
+            *self.db.credentials,
+            Credential(
+                hashlib.sha256(cross_tenant_reviewer_token.encode()).hexdigest(),
+                ActorBinding(
+                    "cross-tenant-reviewer",
+                    uuid.UUID(self.db.f.tenants[1]),
+                    self.db.f.roles[1],
+                    "reviewer",
+                ),
+                int(time.time()) + 3600,
+            ),
+        ]
+        resolver = CredentialResolver(credentials)
+        store = CaptureSessionStore(resolver, self.db.dsns)
+        claim_cases = ClaimCaseStore(store)
+
         with tempfile.TemporaryDirectory() as directory:
             storage_root = Path(directory) / "original-evidence"
             storage_root.mkdir(mode=0o700)
@@ -42,12 +61,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                 "C2C_ARTIFACT_STORAGE_ROOT": str(storage_root),
                 "C2C_VIN_HMAC_PEPPER": "P" * 43,
             }
-            runtime = CaptureRuntime(
-                CredentialResolver(self.db.credentials),
-                self.db.store,
-                Settings(),
-                self.db.claim_cases,
-            )
+            runtime = CaptureRuntime(resolver, store, Settings(), claim_cases)
             with patch.dict(os.environ, environment, clear=False):
                 with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                     claim_id = str(uuid.uuid4())
@@ -110,15 +124,15 @@ class CaptureHttpIntegration(unittest.TestCase):
 
                     cross_tenant = client.get(
                         f"/v1/review-sessions/{session_id}",
-                        headers={"Authorization": self.db.auth(1)},
+                        headers={"Authorization": f"Bearer {cross_tenant_reviewer_token}"},
                     )
                     self.assertEqual(cross_tenant.status_code, 404)
 
                 # Rebuild runtime and database service objects, retaining only
                 # PostgreSQL rows and the provisioned evidence directory.
-                restarted_store = CaptureSessionStore(CredentialResolver(self.db.credentials), self.db.dsns)
+                restarted_store = CaptureSessionStore(resolver, self.db.dsns)
                 restarted_runtime = CaptureRuntime(
-                    CredentialResolver(self.db.credentials),
+                    resolver,
                     restarted_store,
                     Settings(),
                     ClaimCaseStore(restarted_store),
