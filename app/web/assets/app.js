@@ -216,16 +216,21 @@ async function recordConsent() {
 async function withdrawCaptureConsent() {
   const id = $("owner-session-id").value.trim();
   if (!id) return message("owner-message","Enter the case ID before withdrawing consent.",true);
+  let result;
   try {
-    const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/consent`,{
+    result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/consent`,{
       method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({request_id:uuid(),accepted:false,scope:"capture_review"})
     });
+  } catch (error) {
+    return message("owner-message",`Server withdrawal was not confirmed; local evidence was not purged. ${error.message}`,true);
+  }
+  try {
     const localDeleted = evidenceQueue ? await evidenceQueue.deleteSession(id) : 0;
     if (activeSession === id) await refreshCaptureQueueStatus(id);
     message("owner-message",`Capture consent withdrawn. Server deleted ${result.deleted_original_artifacts ?? 0} original(s); local browser queue removed ${localDeleted} item(s).`);
   } catch (error) {
-    message("owner-message",`Withdrawal was not confirmed by the server; local evidence was not purged. ${error.message}`,true);
+    message("owner-message",`Capture consent was withdrawn and the server deleted ${result.deleted_original_artifacts ?? 0} original(s), but local browser deletion failed: ${error.message}. Do not reuse this device until its pending evidence storage is cleared.`,true);
   }
 }
 async function recordIncidentConsent(accepted = true) {
