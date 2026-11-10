@@ -2,12 +2,34 @@
 from dataclasses import dataclass
 from datetime import datetime
 import json
+import re
 
 VERSION = '0.1'
-KINDS = frozenset({'SESSION_CREATED', 'CONSENT_RECORDED', 'VEHICLE_RECORDED', 'ARTIFACT_REGISTERED', 'QUALITY_RECORDED', 'MANIFEST_SEALED', 'REVIEW_RECORDED', 'SESSION_ABORTED'})
+KINDS = frozenset({
+    'SESSION_CREATED',
+    'CONSENT_RECORDED',
+    'VEHICLE_RECORDED',
+    'ARTIFACT_REGISTERED',
+    'QUALITY_RECORDED',
+    'MANIFEST_SEALED',
+    'REVIEW_RECORDED',
+    'SESSION_ABORTED',
+    'INCIDENT_INTAKE_CONSENT_RECORDED',
+    'INCIDENT_INTAKE_RECORDED',
+})
+RFC3339_TIMESTAMP = re.compile(
+    r'^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-5][0-9]:[0-5][0-9]'
+    r'(?:\.[0-9]{1,6})?(?:Z|[+-](?:0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])$'
+)
+
 
 def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
+
+
+def _reject_non_integer_number(_value):
+    raise ValueError('NON_INTEGER_EVENT_NUMBER')
+
 
 @dataclass(frozen=True)
 class DomainEvent:
@@ -30,7 +52,7 @@ class DomainEvent:
             raise ValueError('INVALID_SEQUENCE')
         if not isinstance(self.kind, str) or self.kind not in KINDS:
             raise ValueError('INVALID_EVENT_KIND')
-        if not isinstance(self.occurred_at, str) or not self.occurred_at:
+        if not isinstance(self.occurred_at, str) or not RFC3339_TIMESTAMP.fullmatch(self.occurred_at):
             raise ValueError('INVALID_TIMESTAMP')
         try:
             timestamp = self.occurred_at
@@ -44,8 +66,18 @@ class DomainEvent:
         if not isinstance(self.payload_json, str):
             raise ValueError('INVALID_PAYLOAD')
         try:
-            payload = json.loads(self.payload_json)
-            canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'), allow_nan=False)
+            payload = json.loads(
+                self.payload_json,
+                parse_float=_reject_non_integer_number,
+                parse_constant=_reject_non_integer_number,
+            )
+            canonical = json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(',', ':'),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
         except (ValueError, TypeError, RecursionError):
             raise ValueError('INVALID_PAYLOAD') from None
         if type(payload) is not dict or canonical != self.payload_json:
@@ -55,6 +87,7 @@ class DomainEvent:
     @property
     def payload(self):
         return json.loads(self.payload_json)
+
 
 class EventJournal:
     """In-memory journal for validating synthetic event histories."""
