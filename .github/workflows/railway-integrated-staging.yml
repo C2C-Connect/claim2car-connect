@@ -49,6 +49,7 @@ jobs:
         run: npm install --global @railway/cli
 
       - name: Deploy integrated staging after authority migrations
+        id: deploy
         run: bash scripts/railway_integrated_deploy.sh
 
       - name: Verify deployed revision and authentication boundaries
