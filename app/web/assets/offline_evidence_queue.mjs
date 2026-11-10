@@ -89,7 +89,7 @@ export function createIndexedDbEvidenceStore(indexedDb = globalThis.indexedDB) {
         }
         cursor.continue();
       };
-      request.onerror = () => { throw request.error || new Error("EVIDENCE_QUEUE_READ_FAILED"); };
+      request.onerror = () => {}; // Transaction error/abort is propagated by transactionDone.
       await done;
       return records.sort((a, b) => a.queueId - b.queueId);
     },
