@@ -38,7 +38,10 @@ class CaptureSessionIntegration(unittest.TestCase):
     def test_claim_case_create_retry_and_owned_readback(self):
         claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
         first = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
-        retry = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
+        try:
+            retry = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
+        except CaptureStorageUnavailable as exc:
+            self.fail(f"claim-case retry database cause: {exc.__cause__!r}")
         self.assertTrue(first.created)
         self.assertFalse(retry.created)
         self.assertEqual((first.claim_id, first.tenant_id, first.created_by, first.state),
@@ -53,7 +56,10 @@ class CaptureSessionIntegration(unittest.TestCase):
         request_id = str(uuid.uuid4())
         self.claim_cases.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=request_id)
         with self.assertRaises(ClaimCaseConflict):
-            self.claim_cases.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=request_id)
+            try:
+                self.claim_cases.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=request_id)
+            except CaptureStorageUnavailable as exc:
+                self.fail(f"claim-case idempotency database cause: {exc.__cause__!r}")
 
     def test_claim_case_reads_are_tenant_and_creator_scoped(self):
         claim_id = str(uuid.uuid4())
