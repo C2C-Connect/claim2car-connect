@@ -71,7 +71,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 ## Structured incident intake and supplemental owner consent — 2026-11-10
 
-**Implementation:** PR #29 candidate branch, migration `0014_claim_case_incident_intake.sql`; synthetic PostgreSQL integration coverage added.
+**Implementation:** PR #29 candidate branch, migrations `0014_claim_case_incident_intake.sql` and `0015_incident_event_kinds.sql`; synthetic PostgreSQL integration coverage added.
 
 - Added a separate owner consent event with disclosure version `incident-intake-v1` and scope `incident_details`. It is distinct from the existing `disclosure-v1` capture/evidence consent.
 - Added a tenant-scoped, RLS-forced `faos.claim_case_incident_intake` table. The first version collects only incident timestamp, category, city, two-letter state/territory code, and ZIP code.
