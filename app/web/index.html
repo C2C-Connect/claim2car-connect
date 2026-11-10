@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101b2b">
+  <title>Claim2Car Connect</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Claim2Car home"><span class="brand-mark">C2C</span><span>Claim2Car <small>CONNECT</small></span></a>
+    <span id="connection-state" class="status">Not connected</span>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <p class="eyebrow">FIELD OPERATIONS</p>
+      <h1>One case. A clear chain of evidence.</h1>
+      <p class="muted">Capture and review tools connected to the authenticated Claim2Car service.</p>
+    </section>
+    <section id="sign-in" class="panel">
+      <h2>Connect securely</h2>
+      <p class="muted">Use the access token provisioned for your assigned role. Tokens are held in memory only and are not saved in browser storage.</p>
+      <label for="access-token">Access token</label>
+      <input id="access-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your provisioned token">
+      <button id="connect" class="primary">Connect</button>
+      <p id="sign-in-error" class="error" role="alert"></p>
+      <p class="fine">This is a controlled integrated application surface. Access is enforced by the server; selecting a role in the browser does not grant permissions.</p>
+    </section>
+    <section id="workspace" hidden>
+      <div class="workspace-head">
+        <div><p class="eyebrow">AUTHENTICATED WORKSPACE</p><h2 id="actor-label">Workspace</h2><p id="actor-meta" class="muted"></p></div>
+        <button id="disconnect" class="quiet">Disconnect</button>
+      </div>
+      <nav id="role-nav" class="tabs" aria-label="Workspace sections"></nav>
+      <section id="operator-view" class="panel" hidden>
+        <h3>Operator capture</h3>
+        <p class="muted">Create or resume a case. Owner consent must be recorded by an authenticated owner identity before vehicle details or evidence can be added.</p>
+        <div class="actions"><button id="new-case" class="primary">Create case</button><span id="case-created" class="fine"></span></div>
+        <label for="session-id">Case / session ID</label>
+        <input id="session-id" autocomplete="off" placeholder="Session UUID">
+        <button id="resume-case" class="secondary">Resume case</button>
+        <div class="rule"></div>
+        <h4>Vehicle reference</h4>
+        <label for="vin">VIN</label><input id="vin" maxlength="17" autocomplete="off" placeholder="17-character VIN">
+        <button id="save-vin" class="secondary">Validate and record VIN</button>
+        <div class="rule"></div>
+        <h4>Original evidence capture</h4>
+        <p class="fine">Choose a photo for each slot. On supported mobile devices, the file picker can open the camera. Original file bytes are hashed in the browser and uploaded unchanged.</p>
+        <div id="capture-slots" class="slot-list"></div>
+        <button id="record-quality" class="secondary">Record advisory quality checks</button>
+        <button id="seal-case" class="primary">Seal verified evidence manifest</button>
+        <p id="operator-message" class="message" role="status"></p>
+      </section>
+      <section id="owner-view" class="panel" hidden>
+        <h3>Owner consent</h3>
+        <p class="muted">Consent is recorded under the authenticated owner identity. The operator cannot grant consent on the owner's behalf.</p>
+        <label for="owner-session-id">Case / session ID supplied by the operator</label>
+        <input id="owner-session-id" autocomplete="off" placeholder="Session UUID">
+        <label class="consent"><input id="consent-accepted" type="checkbox"> I have reviewed the disclosure and voluntarily consent to capture and human review for this case.</label>
+        <button id="record-consent" class="primary">Record my consent</button>
+        <p id="owner-message" class="message" role="status"></p>
+      </section>
+      <section id="reviewer-view" class="panel" hidden>
+        <h3>Reviewer queue</h3>
+        <p class="muted">The queue is tenant-scoped and server-authorized. A final review decision requires an independent reviewer. Evidence preview and artifact-level review controls are not yet exposed in this shell; this view is read-only until that interface is completed.</p>
+        <button id="refresh-queue" class="secondary">Refresh queue</button>
+        <div id="review-queue" class="queue"></div>
+      </section>
+    </section>
+  </main>
+  <footer>Claim2Car Connect · Controlled application runtime</footer>
+</body>
+</html>

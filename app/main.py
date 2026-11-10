@@ -4,7 +4,9 @@ import os
 import re
 import psycopg
 from fastapi import Depends, FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 @dataclass(frozen=True)
 class Settings:
@@ -87,6 +89,22 @@ def create_app(settings=None, runtime_mode=None):
         _mount_internal_router(api, analysis_router, '/api/v1/analysis', '/internal/v1/analysis')
         _mount_internal_router(api, triage_router, '/api/v1/triage', '/internal/v1/triage')
         _mount_internal_router(api, dispatch_router, '/api/v1/dispatch', '/internal/v1/dispatch')
+
+        # The operator/owner/reviewer shell is served only by the integrated
+        # runtime. Restricted staging remains health-only and exposes no UI.
+        web_root = Path(__file__).with_name('web')
+        api.mount(
+            '/assets',
+            StaticFiles(directory=web_root / 'assets'),
+            name='claim2car-web-assets',
+        )
+
+        @api.get('/', include_in_schema=False)
+        def application_shell():
+            return FileResponse(
+                web_root / 'index.html',
+                headers={'Cache-Control': 'no-store'},
+            )
 
     @api.get('/health/live')
     def live():
