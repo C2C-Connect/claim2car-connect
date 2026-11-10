@@ -10,6 +10,8 @@ const SLOTS = [
 let token = null;
 let identity = null;
 let activeSession = null;
+let pendingClaimCase = null;
+let claimCaseRequestInFlight = false;
 const $ = (id) => document.getElementById(id);
 const uuid = () => crypto.randomUUID();
 const authHeaders = () => ({Authorization: `Bearer ${token}`});
@@ -62,16 +64,28 @@ function disconnect() {
   $("connection-state").textContent = "Not connected";
 }
 async function createClaimCase() {
-  const claimId = uuid();
+  if (claimCaseRequestInFlight) return;
+  claimCaseRequestInFlight = true;
+  const button = $("create-claim-case");
+  button.disabled = true;
+  if (!pendingClaimCase) pendingClaimCase = {claimId:uuid(),requestId:uuid()};
   try {
     const result = await api("/api/v1/claim-cases", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({claim_id:claimId,request_id:uuid()})
+      body:JSON.stringify({claim_id:pendingClaimCase.claimId,request_id:pendingClaimCase.requestId})
     });
-    $("claim-case-created").textContent = result.created ? "Persistent claim record created." : "Existing claim record confirmed.";
+    $("claim-case-created").textContent = result.created
+      ? "Persistent claim record created: " + result.claim_id
+      : "Existing claim record confirmed: " + result.claim_id;
+    pendingClaimCase = null;
     await refreshClaimCases();
-  } catch(error) { $("claim-case-created").textContent = error.message; }
+  } catch(error) {
+    $("claim-case-created").textContent = error.message + " · Retry will reuse the same request ID.";
+  } finally {
+    claimCaseRequestInFlight = false;
+    button.disabled = false;
+  }
 }
 async function refreshClaimCases() {
   const root = $("claim-cases");
