@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install Python dependencies
-        run: pip install 'psycopg[binary,pool]>=3.1.18'
+        run: pip install -r requirements.txt -r requirements-api.txt
       - name: Start ephemeral PostGIS container
         run: docker compose -p faos-active-run -f compose.database-tests.yml up -d --wait
       - name: Apply bootstrap and configure synthetic roles
