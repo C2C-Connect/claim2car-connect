@@ -66,7 +66,7 @@ async function connect() {
   }
 }
 function disconnect() {
-  token = null; identity = null; activeSession = null;
+  token = null; identity = null; activeSession = null; activeReadiness = null;
   $("access-token").value = "";
   $("workspace").hidden = true; $("sign-in").hidden = false;
   $("connection-state").textContent = "Not connected";
