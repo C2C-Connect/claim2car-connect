@@ -153,9 +153,6 @@ class IncidentIntakeService:
             consents = [item for item in history if item[0] == "INCIDENT_INTAKE_CONSENT_RECORDED"]
             if not consents or cons[-1][2].get("accepted") is not True or cons[-1][1] != actor.actor_id:
                 raise CaptureSessionConflict("ACTIVE_INCIDENT_INTAKE_CONSENT_REQUIRED")
-            payload = {"request_id": request_id, "disclosure_version": DISCLOSURE_VERSION, **details}
-            canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
-            digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
             event_id = "incident-recorded:" + request_id
             result = conn.execute(
                 "SELECT faos.save_claim_case_incident(%s::uuid,%s::uuid,%s::text,%s::uuid,%s::timestamptz,%s::text,%s::text,%s::text,%s::text)",
@@ -164,6 +161,16 @@ class IncidentIntakeService:
                  details["incident_region"], details["incident_postal_code"]),
             ).fetchone()[0]
             if result not in ("ACCEPTED", "DUPLICATE"):
+                raise CaptureSessionConflict("INCIDENT_INTAKE_CONFLICT")
+            stored = conn.execute(
+                "SELECT request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code "
+                "FROM faos.claim_case_incident_intake WHERE tenant_id=%s AND claim_id=%s",
+                (actor.tenant_id, session.claim_id),
+            ).fetchone()
+            if (stored is None or str(stored[0]) != request_id
+                    or stored[1].astimezone(timezone.utc).isoformat() != details["incident_occurred_at"]
+                    or tuple(stored[2:]) != (details["incident_type"], details["incident_city"],
+                                             details["incident_region"], details["incident_postal_code"])):
                 raise CaptureSessionConflict("INCIDENT_INTAKE_CONFLICT")
             expected_event = {"request_id": request_id, "disclosure_version": DISCLOSURE_VERSION}
             prior = next((item for item in history if item[3] == event_id), None)
