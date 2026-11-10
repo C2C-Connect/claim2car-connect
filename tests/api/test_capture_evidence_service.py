@@ -156,6 +156,35 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
                 "operator-token", self.session_id, request_id=UUID(int=6), vin="1HGCM82633A004352",
             )
 
+    def test_evidence_readiness_tracks_active_consent_and_vehicle_reference(self):
+        initial = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertFalse(initial["consent_active"])
+        self.assertFalse(initial["vehicle_reference_present"])
+        self.assertFalse(initial["capture_allowed"])
+
+        self.service.record_consent(
+            "owner-token", self.session_id, request_id=UUID(int=80),
+            accepted=True, scope="capture_review",
+        )
+        consented = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertTrue(consented["consent_active"])
+        self.assertFalse(consented["vehicle_reference_present"])
+        self.assertFalse(consented["capture_allowed"])
+
+        self.service.record_vehicle(
+            "operator-token", self.session_id, request_id=UUID(int=81), vin="1HGCM82633A004352",
+        )
+        ready = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertTrue(ready["capture_allowed"])
+
+        self.service.record_consent(
+            "owner-token", self.session_id, request_id=UUID(int=82),
+            accepted=False, scope="capture_review",
+        )
+        withdrawn = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertFalse(withdrawn["consent_active"])
+        self.assertFalse(withdrawn["capture_allowed"])
+
     def test_only_owner_role_can_record_consent_and_only_operator_can_record_vehicle(self):
         with self.assertRaisesRegex(CaptureAuthorizationError, "OWNER_IDENTITY_REQUIRED"):
             self.service.record_consent(
