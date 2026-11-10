@@ -202,7 +202,10 @@ class IncidentIntakeService:
             if (not consents or type(consents[-1][2]) is not dict
                     or consents[-1][2].get("accepted") is not True
                     or consents[-1][2].get("disclosure_version") != DISCLOSURE_VERSION
-                    or consents[-1][2].get("scope") != "incident_details"):
+                    or consents[-1][2].get("scope") != "incident_details"
+                    or not session.owner_actor_id
+                    or consents[-1][2].get("owner_actor_id") != session.owner_actor_id
+                    or consents[-1][1] != session.owner_actor_id):
                 raise CaptureSessionNotFound("INCIDENT_INTAKE_NOT_FOUND")
             row = conn.execute(
                 "SELECT request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code "

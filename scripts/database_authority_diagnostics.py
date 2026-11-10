@@ -88,8 +88,9 @@ def verify(report,admin,connections,tenants,session):
                 with tenant_transaction(conn,own):
                     if table=='claim_case_incident_intake':
                         try:
-                            conn.execute('SELECT * FROM faos.claim_case_incident_intake').fetchall()
-                            raise AssertionError('DIRECT_INCIDENT_TABLE_READ_ALLOWED')
+                            with conn.transaction():
+                                conn.execute('SELECT * FROM faos.claim_case_incident_intake').fetchall()
+                                raise AssertionError('DIRECT_INCIDENT_TABLE_READ_ALLOWED')
                         except psycopg.errors.InsufficientPrivilege as error:
                             expect(error.sqlstate=='42501','WRONG_DIRECT_READ_DENIAL')
                         visible = conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
@@ -140,9 +141,10 @@ def verify(report,admin,connections,tenants,session):
                 with tenant_transaction(conn,other):
                     if table=='claim_case_incident_intake':
                         try:
-                            conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
-                                (own,ids['claim'],'synthetic-matrix')).fetchall()
-                            raise AssertionError('SPOOFED_CONTEXT_ALLOWED')
+                            with conn.transaction():
+                                conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                                    (own,ids['claim'],'synthetic-matrix')).fetchall()
+                                raise AssertionError('SPOOFED_CONTEXT_ALLOWED')
                         except psycopg.errors.RaiseException as error:
                             expect(error.diag.message_primary=='TENANT_CONTEXT_MISMATCH','WRONG_SPOOFED_CONTEXT_REJECTION')
                     else:
@@ -152,9 +154,10 @@ def verify(report,admin,connections,tenants,session):
                     conn.execute("SELECT set_config('faos.tenant_id','',true)")
                     if table=='claim_case_incident_intake':
                         try:
-                            conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
-                                (own,ids['claim'],'synthetic-matrix')).fetchall()
-                            raise AssertionError('MISSING_CONTEXT_ALLOWED')
+                            with conn.transaction():
+                                conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                                    (own,ids['claim'],'synthetic-matrix')).fetchall()
+                                raise AssertionError('MISSING_CONTEXT_ALLOWED')
                         except psycopg.errors.RaiseException as error:
                             expect(error.diag.message_primary=='TENANT_CONTEXT_MISMATCH','WRONG_MISSING_CONTEXT_REJECTION')
                     else:
