@@ -168,8 +168,8 @@ class IncidentIntakeService:
                 raise CaptureSessionConflict("INCIDENT_INTAKE_CONFLICT")
             stored = conn.execute(
                 "SELECT request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code "
-                "FROM faos.claim_case_incident_intake WHERE tenant_id=%s AND claim_id=%s",
-                (actor.tenant_id, session.claim_id),
+                "FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)",
+                (actor.tenant_id, session.claim_id, actor.actor_id),
             ).fetchone()
             if (stored is None or str(stored[0]) != request_id
                     or stored[1].astimezone(timezone.utc).isoformat() != details["incident_occurred_at"]
