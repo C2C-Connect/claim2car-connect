@@ -1,10 +1,12 @@
 """Health-only FastAPI foundation; no authenticated business API is exposed."""
 from dataclasses import dataclass, field
+from pathlib import Path
 import os
 import re
 import psycopg
 from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 @dataclass(frozen=True)
 class Settings:
@@ -100,5 +102,11 @@ def create_app(settings=None, runtime_mode=None):
             healthy = False
         return JSONResponse({'status':'ready' if healthy else 'not_ready','scope':'infrastructure-only'},
                             status_code=200 if healthy else 503,headers={'Cache-Control':'no-store'})
+
+    if mode == 'integrated':
+        frontend_root = Path(__file__).resolve().parents[1] / 'frontend' / 'app'
+        if not frontend_root.is_dir():
+            raise ValueError('INTEGRATED_FRONTEND_ASSETS_REQUIRED')
+        api.mount('/', StaticFiles(directory=str(frontend_root), html=True), name='claim2car-workbench')
 
     return api

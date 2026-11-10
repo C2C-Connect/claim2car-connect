@@ -409,11 +409,23 @@ class CaptureEvidenceService:
                         or set(seal_payload) != {"schema_version", "request_id", "manifest_digest", "shot_list_version", "artifact_ids"}
                         or not isinstance(seal_payload.get("manifest_digest"), str)):
                     raise CaptureSessionConflict("UNSUPPORTED_SEAL_HISTORY")
+                # Verify the sealed originals before exposing reviewer-safe metadata.
+                manifest = self._verified_manifest(actor, session_id, history)
+                latest = self._artifact_set(history)
                 queued.append({
                     "session_id": session_id,
                     "manifest_digest": seal_payload["manifest_digest"],
                     "shot_list_version": seal_payload["shot_list_version"],
                     "artifact_count": len(seal_payload["artifact_ids"]),
+                    "artifacts": [
+                        {
+                            "artifact_id": entry.artifact_id,
+                            "slot": entry.slot,
+                            "sha256": entry.sha256_hex,
+                            "byte_length": latest[entry.slot][1]["byte_length"],
+                        }
+                        for entry in manifest.entries
+                    ],
                     "reviewer_must_decide": True,
                 })
                 if len(queued) == limit:

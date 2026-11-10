@@ -71,6 +71,12 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
             app = create_app(runtime_mode="integrated")
             with TestClient(app) as client:
                 assert client.get("/health/live").status_code == 200
+                # The integrated runtime serves the real operator/reviewer shell.
+                shell = client.get("/")
+                assert shell.status_code == 200
+                assert "Claim2Car Connect" in shell.text
+                assert client.get("/app.mjs").status_code == 200
+                assert client.get("/styles.css").status_code == 200
 
                 # Capture and reviewer APIs are mounted under /api and retain
                 # their end-user credential boundary.

@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements-api.txt \
     && chown -R 10001:10001 /var/lib/claim2car
 
 COPY app/ ./app/
+COPY frontend/app/ ./frontend/app/
 COPY backend/ ./backend/
 COPY config/ ./config/
 COPY database/ ./database/

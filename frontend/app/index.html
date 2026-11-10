@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a2b">
+  <title>Claim2Car Connect</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Claim2Car Connect home">
+      <span class="brand-mark">C2</span>
+      <span><strong>Claim2Car</strong><small>CONNECT</small></span>
+    </a>
+    <div class="topbar-right"><span class="environment-tag">INTEGRATED WORKBENCH</span><span id="connection-indicator" class="connection-indicator">Not connected</span></div>
+  </header>
+  <main class="page-shell">
+    <section class="hero">
+      <div class="eyebrow">FIELD OPERATIONS · EVIDENCE REVIEW</div>
+      <h1>One clear record.<br><span>Every step accountable.</span></h1>
+      <p class="hero-copy">Capture original vehicle evidence with owner consent, then hand a sealed record to an independent human reviewer.</p>
+    </section>
+    <section id="connect-panel" class="panel connect-panel">
+      <div class="panel-heading"><div><div class="eyebrow">SECURE ACCESS</div><h2>Connect to your workspace</h2></div><span class="step-index">01</span></div>
+      <p class="muted">Use the access token provisioned for your role. Tokens are held in memory only and are not saved in browser storage.</p>
+      <form id="connect-form" class="stack">
+        <label for="role">Workspace role</label>
+        <select id="role" required><option value="operator">Operator · capture cases</option><option value="reviewer">Reviewer · inspect sealed cases</option></select>
+        <label for="access-token">Access token</label>
+        <input id="access-token" type="password" autocomplete="off" spellcheck="false" required minlength="43" placeholder="Paste your provisioned access token">
+        <button class="button primary" type="submit">Connect securely <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="fine-print">There is no self-service account creation in this build. Access is controlled by server-provisioned credentials and tenant permissions.</p>
+      <div id="connect-message" class="message" role="status" aria-live="polite"></div>
+    </section>
+    <section id="workspace" hidden>
+      <div class="workspace-bar"><div><div class="eyebrow">ACTIVE WORKSPACE</div><strong id="workspace-role">Operator</strong></div><button id="disconnect-button" class="button quiet" type="button">Disconnect</button></div>
+      <section id="operator-view" hidden>
+        <div class="section-heading"><div><div class="eyebrow">OPERATOR WORKFLOW</div><h2>New evidence case</h2><p class="muted">Create a case, record owner consent, identify the vehicle, and capture the required original images.</p></div><span class="step-index">02</span></div>
+        <article class="panel workflow-panel">
+          <div class="step-title"><span class="step-dot">1</span><div><h3>Create a case</h3><p class="muted">The server assigns the authenticated operator and tenant.</p></div></div>
+          <button id="create-case" class="button primary" type="button">Create new case</button><div id="case-id" class="case-id" hidden></div>
+        </article>
+        <article id="consent-panel" class="panel workflow-panel" hidden>
+          <div class="step-title"><span class="step-dot">2</span><div><h3>Owner consent</h3><p class="muted">The vehicle owner must authorize capture and human review using their own provisioned identity.</p></div></div>
+          <label for="owner-token">Owner authorization token</label><input id="owner-token" type="password" autocomplete="off" spellcheck="false" placeholder="Owner-present authorization token">
+          <label class="check-row"><input id="consent-check" type="checkbox"><span>I confirm the owner has reviewed disclosure version <strong>disclosure-v1</strong> and expressly consents to capture and human review.</span></label>
+          <button id="record-consent" class="button primary" type="button">Record owner consent</button><div id="consent-status" class="inline-status"></div>
+        </article>
+        <article id="vin-panel" class="panel workflow-panel" hidden>
+          <div class="step-title"><span class="step-dot">3</span><div><h3>Identify the vehicle</h3><p class="muted">VIN format and check digit are validated. The server stores a keyed reference, not the raw VIN.</p></div></div>
+          <label for="vin-input">17-character VIN</label><input id="vin-input" type="text" maxlength="17" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Enter VIN from the vehicle">
+          <button id="record-vin" class="button primary" type="button">Validate and record VIN</button><div id="vin-status" class="inline-status"></div>
+        </article>
+        <article id="capture-panel" class="panel workflow-panel" hidden>
+          <div class="step-title"><span class="step-dot">4</span><div><h3>Capture original evidence</h3><p class="muted">Use the device camera or choose an image. Original bytes are uploaded without resizing or recompression. Retaking a slot supersedes its prior artifact.</p></div></div>
+          <div class="capture-warning"><strong>Roadside safety comes first.</strong> Never enter traffic or delay emergency response, police direction, stabilization, loading, or scene clearance to complete a capture. Skip unsafe work and stop when necessary.</div>
+          <div id="slot-grid" class="slot-grid"></div>
+          <div class="quality-block"><div><h3>Operator image check</h3><p class="muted">This is a manual advisory check, not an AI verdict or an acceptance decision.</p></div><div id="quality-grid" class="quality-grid"></div><button id="seal-case" class="button primary" type="button" disabled>Record checks and seal evidence</button><div id="seal-status" class="inline-status"></div></div>
+        </article>
+      </section>
+      <section id="reviewer-view" hidden>
+        <div class="section-heading"><div><div class="eyebrow">INDEPENDENT REVIEW</div><h2>Sealed evidence queue</h2><p class="muted">Reviewers can retrieve verified originals and record an attributable human disposition.</p></div><span class="step-index">03</span></div>
+        <div class="queue-toolbar"><span class="muted">Cases are tenant-scoped by the server.</span><button id="refresh-queue" class="button secondary" type="button">Refresh queue ↻</button></div><div id="review-queue" class="review-queue"></div>
+      </section>
+      <div class="workspace-footnote">This workbench is an initial connected application increment. Offline capture, resumable upload queues, assignment/locking, and device qualification are not yet implemented. Human review remains authoritative; no automated decision, payment, dispatch, or external distribution is enabled.</div>
+    </section>
+  </main>
+  <footer><span>CLAIM2CAR CONNECT</span><span>Evidence integrity · Tenant authority · Human review</span></footer>
+</body>
+</html>

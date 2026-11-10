@@ -209,8 +209,12 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertEqual(len(sealed["manifest_digest"]), 64)
         queue = self.service.list_review_queue("reviewer-token")
         self.assertEqual(queue[0]["session_id"], self.session_id)
+        self.assertEqual(len(queue[0]["artifacts"]), len(CANONICAL_SLOTS))
         first_slot = CANONICAL_SLOTS[0]
         first_artifact = UUID(int=201)
+        self.assertEqual(queue[0]["artifacts"][0]["artifact_id"], str(first_artifact))
+        self.assertEqual(queue[0]["artifacts"][0]["slot"], first_slot)
+        self.assertEqual(queue[0]["artifacts"][0]["byte_length"], len(("synthetic-image:" + first_slot).encode("ascii")))
         expected_bytes = ("synthetic-image:" + first_slot).encode("ascii")
         self.assertEqual(
             self.service.retrieve_for_review("reviewer-token", self.session_id, first_artifact),
