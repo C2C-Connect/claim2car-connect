@@ -73,7 +73,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 **Implementation:** PR #29 candidate branch, migrations `0014_claim_case_incident_intake.sql` and `0015_incident_event_kinds.sql`; synthetic PostgreSQL integration coverage added and verified.
 
-**Verification at candidate `4d4701ae086b663a69ab28e6636b05004cb68cbd`:** full repository suite passed (runs 42759291300 and 42759307211); database authority migration/cutover and tenant-isolation diagnostics passed (run 42759291084); API health, controlled intake PostgreSQL, integrated-container smoke, frontend, VIN, and CodeQL checks passed. The restricted Railway smoke also passed, but its deployment job remained skipped. These are CI/synthetic results, not field acceptance or a live deployment.
+**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** full repository suite passed; database authority migration/cutover and tenant-isolation diagnostics passed, including direct-table-read denial and actor-filtered read verification; API health, controlled intake PostgreSQL, integrated-container smoke, frontend, VIN, CodeQL, and restricted Railway smoke checks passed. The Railway deploy job remained skipped. These are CI/synthetic results, not field acceptance or a live deployment.
 
 - Added a separate owner consent event with disclosure version `incident-intake-v1` and scope `incident_details`. It is distinct from the existing `disclosure-v1` capture/evidence consent.
 - Added a tenant-scoped, RLS-forced `faos.claim_case_incident_intake` table. The first version collects only incident timestamp, category, city, two-letter state/territory code, and ZIP code.
@@ -92,5 +92,7 @@ The current Railway configuration is a restricted synthetic containment service.
 - The owner-facing disclosure now states who can view these details and that they are not automatically sent to insurers, repair shops, or dealerships.
 - The operator shell can load the details after the owner separately consents. Withdrawal removes the row, so the read path no longer returns it.
 - The database authority diagnostic now verifies that the shared application role cannot directly select this table and must use the actor-filtered read function.
+
+**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** the complete database authority/cutover workflow and full repository suite passed, including the owner/creator readback and denial-to-other-operator integration test.
 
 **Remaining boundary:** owner authentication is still based on a provisioned actor credential; this does not establish the real person's identity. The feature remains disabled by default and the disclosure remains pending legal review.
