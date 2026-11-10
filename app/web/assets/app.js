@@ -128,8 +128,12 @@ function buildSlots() {
     const title = document.createElement("label"); title.textContent = label;
     const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.setAttribute("capture","environment");
     const status = document.createElement("span"); status.className = "fine"; status.textContent = "Not uploaded";
-    input.addEventListener("change",()=>upload(slot,input.files?.[0],status));
-    row.append(title,input,status); root.append(row);
+    const qualityLabel = document.createElement("label"); qualityLabel.className = "quality-check";
+    const quality = document.createElement("input"); quality.type = "checkbox";
+    const qualityText = document.createElement("span"); qualityText.textContent = "I checked this original: correct view, readable, and usable.";
+    qualityLabel.append(quality,qualityText);
+    input.addEventListener("change",()=>{ quality.checked=false; upload(slot,input.files?.[0],status); });
+    row.append(title,input,status,qualityLabel); root.append(row);
   }
 }
 async function recordQuality() {
@@ -138,7 +142,10 @@ async function recordQuality() {
   if (uploaded.length !== SLOTS.length || uploaded.some(row => row.querySelector("span").dataset.uploaded !== "true")) {
     return message("operator-message","Upload an original image for every required capture slot before recording quality.",true);
   }
-  const results = Object.fromEntries(SLOTS.map(([slot], index) => [slot, uploaded[index].querySelector("span").dataset.uploaded === "true"]));
+  if (uploaded.some(row => !row.querySelector(".quality-check input").checked)) {
+    return message("operator-message","Review every original. If any image is unclear or incorrect, upload a replacement before recording quality.",true);
+  }
+  const results = Object.fromEntries(SLOTS.map(([slot], index) => [slot, uploaded[index].querySelector(".quality-check input").checked]));
   try {
     await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/quality`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid(),results})
