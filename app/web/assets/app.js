@@ -49,7 +49,7 @@ async function connect() {
     for (const id of ["operator-view","owner-view","reviewer-view"]) $(id).hidden = id !== target;
     $("role-nav").textContent = identity.actor_role === "supervisor" ? "Supervisor · Reviewer queue" : identity.actor_role;
     if (target === "reviewer-view") await refreshQueue();
-    if (target === "operator-view") await refreshOwnedSessions();
+    if (target === "operator-view") { await refreshClaimCases(); await refreshOwnedSessions(); }
   } catch (error) {
     token = null; identity = null;
     $("sign-in-error").textContent = error.message === "UNAUTHORIZED" ? "Access token was rejected." : error.message;
@@ -60,6 +60,44 @@ function disconnect() {
   $("access-token").value = "";
   $("workspace").hidden = true; $("sign-in").hidden = false;
   $("connection-state").textContent = "Not connected";
+}
+async function createClaimCase() {
+  const claimId = uuid();
+  try {
+    const result = await api("/api/v1/claim-cases", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({claim_id:claimId,request_id:uuid()})
+    });
+    $("claim-case-created").textContent = result.created ? "Persistent claim record created." : "Existing claim record confirmed.";
+    await refreshClaimCases();
+  } catch(error) { $("claim-case-created").textContent = error.message; }
+}
+async function refreshClaimCases() {
+  const root = $("claim-cases");
+  root.replaceChildren();
+  try {
+    const items = await api("/api/v1/claim-cases?limit=50");
+    if (!items.length) { root.textContent = "No persistent claim records have been created by this operator."; return; }
+    for (const item of items) {
+      const row = document.createElement("article"); row.className = "owned-session";
+      const details = document.createElement("div");
+      const heading = document.createElement("strong"); heading.textContent = item.claim_id;
+      const date = document.createElement("p"); date.className = "fine";
+      date.textContent = item.state + " · Created " + new Date(item.created_at).toLocaleString();
+      details.append(heading,date);
+      const open = document.createElement("button"); open.className = "secondary"; open.textContent = "Reopen";
+      open.addEventListener("click", async () => {
+        open.disabled = true;
+        try {
+          await api("/api/v1/claim-cases/" + encodeURIComponent(item.claim_id));
+          $("claim-case-created").textContent = "Persistent claim record reopened.";
+        } catch(error) { $("claim-case-created").textContent = error.message; }
+        finally { open.disabled = false; }
+      });
+      row.append(details,open); root.append(row);
+    }
+  } catch(error) { root.textContent = error.message; }
 }
 async function createCase() {
   try {
@@ -259,6 +297,7 @@ async function refreshQueue() {
 $("connect").addEventListener("click",connect);
 $("disconnect").addEventListener("click",disconnect);
 $("new-case").addEventListener("click",createCase);
+$("create-claim-case").addEventListener("click",createClaimCase);
 $("resume-case").addEventListener("click",resumeCase);
 $("refresh-sessions").addEventListener("click",refreshOwnedSessions);
 $("record-consent").addEventListener("click",recordConsent);
