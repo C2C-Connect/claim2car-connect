@@ -29,7 +29,7 @@ def denied(conn,tenant,event):
     else:
         raise AssertionError('UNAUTHORIZED_APPEND_ALLOWED')
 
-TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings')
+TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases')
 CHECKS = ('rls_flags','own_read','cross_read','cross_insert','cross_update','cross_delete','tenant_reassignment','spoofed_context','missing_context','malformed_context')
 
 def reject_mutation(conn,tenant,statement,parameters):
@@ -48,13 +48,14 @@ def verify(report,admin,connections,tenants,session):
     report['checks'].append(matrix)
     actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings'").fetchall()
     expect({row[0] for row in actual}==set(TABLES),'TENANT_TABLE_SCOPE_CHANGED')
-    ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request')}
+    ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim')}
     seal = 'matrix-seal-'+uuid.uuid4().hex
     digest = '0'*64
     try:
         for brand in ('brand','extra_brand'):
             admin.execute('INSERT INTO faos.brands VALUES (%s,%s)',(ids[brand],'matrix-'+ids[brand]))
         for tenant in tenants:
+            admin.execute('INSERT INTO faos.claim_cases(tenant_id,claim_id,request_id,created_by) VALUES (%s,%s,%s,%s)',(tenant,ids['claim'],ids['request'],'synthetic-matrix'))
             admin.execute('INSERT INTO faos.users VALUES (%s,%s,%s)',(tenant,ids['user'],'matrix-subject'))
             admin.execute('INSERT INTO faos.memberships VALUES (%s,%s,%s,%s)',(tenant,ids['user'],ids['membership'],'synthetic-matrix'))
             admin.execute('INSERT INTO faos.dealer_groups VALUES (%s,%s,%s)',(tenant,ids['group'],'synthetic matrix'))
@@ -92,7 +93,7 @@ def verify(report,admin,connections,tenants,session):
                 privileges = conn.execute("SELECT has_table_privilege(current_user,%s,'INSERT'),has_table_privilege(current_user,%s,'UPDATE'),has_table_privilege(current_user,%s,'DELETE')",('faos.'+table,)*3).fetchone()
                 cursor = admin.execute(sql.SQL('SELECT * FROM {} WHERE tenant_id=%s LIMIT 1').format(target),(other,))
                 values = dict(zip((column.name for column in cursor.description),cursor.fetchone()))
-                key = {'users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id'}.get(table)
+                key = {'users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id'}.get(table)
                 if key:
                     values[key] = str(uuid.uuid4())
                 if table=='users':
@@ -139,7 +140,7 @@ def verify(report,admin,connections,tenants,session):
         for tenant in tenants:
             admin.execute('DELETE FROM faos.financial_ledger_postings WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
-            for table in ('completion_receipts','manifest_roots','location_brands'):
+            for table in ('claim_cases','completion_receipts','manifest_roots','location_brands'):
                 admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(tenant,session,seal))
         for brand in ('brand','extra_brand'):
@@ -157,7 +158,7 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        expect(report['migration_inventory'][-1][0]=='0009_integer_financial_ledger.sql','FINANCIAL_LEDGER_MIGRATION_REQUIRED')
+        expect(report['migration_inventory'][-1][0]=='0012_claim_case_retry_without_update_lock.sql','CLAIM_CASE_MIGRATION_REQUIRED')
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:
@@ -218,7 +219,7 @@ def run(report):
             for conn in connections:
                 conn.close()
             for tenant in tenants:
-                for table in ('completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
+                for table in ('claim_cases','completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
