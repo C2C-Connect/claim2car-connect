@@ -56,7 +56,7 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
     def _authorize_dependencies(self, app):
         required = []
         for route in app.routes:
-            if isinstance(route, APIRoute) and "capture-sessions" in route.path:
+            if isinstance(route, APIRoute) and any(resource in route.path for resource in ("capture-sessions", "claim-cases")):
                 assert route.dependant.dependencies, f"{route.path} has no authorize dependency"
                 required.append((route.path, tuple(sorted(route.methods))))
         return required
