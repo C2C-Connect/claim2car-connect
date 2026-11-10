@@ -73,12 +73,23 @@ export function createIndexedDbEvidenceStore(indexedDb = globalThis.indexedDB) {
       });
     },
 
-    async list(sessionId) {
+    async list(sessionId, { includeBytes = true } = {}) {
       const db = await database();
       const tx = db.transaction(STORE_NAME, "readonly");
       const done = transactionDone(tx);
-      const request = tx.objectStore(STORE_NAME).index("by_session").getAll(sessionId);
-      const records = await requestValue(request);
+      const request = tx.objectStore(STORE_NAME).index("by_session").openCursor(sessionId);
+      const records = [];
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        if (includeBytes) records.push(cursor.value);
+        else {
+          const { bytes, ...metadata } = cursor.value;
+          records.push(metadata);
+        }
+        cursor.continue();
+      };
+      request.onerror = () => { throw request.error || new Error("EVIDENCE_QUEUE_READ_FAILED"); };
       await done;
       return records.sort((a, b) => a.queueId - b.queueId);
     },
@@ -187,7 +198,7 @@ export function createOfflineEvidenceQueue({
     if (activeSyncs.has(sessionId)) return activeSyncs.get(sessionId);
 
     const task = (async () => {
-      const records = (await store.list(sessionId)).filter((record) => !record.uploaded);
+      const records = (await store.list(sessionId, {includeBytes:true})).filter((record) => !record.uploaded);
       let uploaded = 0;
       for (const record of records) {
         if (!(record.bytes instanceof Uint8Array) || record.bytes.byteLength !== record.byteLength) {
@@ -225,7 +236,7 @@ export function createOfflineEvidenceQueue({
   }
 
   async function status(sessionId) {
-    const records = await store.list(sessionId);
+    const records = await store.list(sessionId, {includeBytes:false});
     return {
       total: records.length,
       uploaded: records.filter((record) => record.uploaded).length,
