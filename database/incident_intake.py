@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import json
 import re
 from uuid import UUID
-from database.capture_sessions import CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionStore
+from database.capture_sessions import CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound, CaptureSessionStore
 
 DISCLOSURE_VERSION = "incident-intake-v1"
 INCIDENT_TYPES = frozenset({"collision", "theft", "weather", "vandalism", "other", "unknown"})
@@ -186,3 +186,35 @@ class IncidentIntakeService:
                          kind="INCIDENT_INTAKE_RECORDED", reason="owner submitted structured incident intake",
                          payload=expected_event)
             return {"session_id": session_id, **details, "replayed": result == "DUPLICATE"}
+
+    def get_incident(self, authorization, session_id):
+        session_id = self._uuid(session_id, "INVALID_CAPTURE_SESSION_ID")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            session, history = self._history(conn, actor, session_id)
+            if actor.actor_role == "owner":
+                self._require_owner_and_capture_consent(history, actor)
+            elif actor.actor_role == "operator":
+                if session.created_by != actor.actor_id:
+                    raise CaptureAuthorizationError("CLAIM_CASE_CREATOR_REQUIRED")
+            else:
+                raise CaptureAuthorizationError("INCIDENT_INTAKE_READ_DENIED")
+            consents = [item for item in history if item[0] == "INCIDENT_INTAKE_CONSENT_RECORDED"]
+            if (not consents or type(consents[-1][2]) is not dict
+                    or consents[-1][2].get("accepted") is not True
+                    or consents[-1][2].get("disclosure_version") != DISCLOSURE_VERSION
+                    or consents[-1][2].get("scope") != "incident_details"):
+                raise CaptureSessionNotFound("INCIDENT_INTAKE_NOT_FOUND")
+            row = conn.execute(
+                "SELECT request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code "
+                "FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)",
+                (actor.tenant_id, session.claim_id, actor.actor_id),
+            ).fetchone()
+            if row is None:
+                raise CaptureSessionNotFound("INCIDENT_INTAKE_NOT_FOUND")
+            return {
+                "session_id": session_id, "request_id": str(row[0]),
+                "disclosure_version": DISCLOSURE_VERSION,
+                "incident_occurred_at": row[1].astimezone(timezone.utc).isoformat(),
+                "incident_type": row[2], "incident_city": row[3],
+                "incident_region": row[4], "incident_postal_code": row[5],
+            }
