@@ -176,6 +176,32 @@ async function recordConsent() {
     message("owner-message",result.replayed ? "Consent record confirmed." : "Consent recorded for this case.");
   } catch (error) { message("owner-message",error.message,true); }
 }
+async function recordIncidentConsent(accepted = true) {
+  const id = $("owner-session-id").value.trim();
+  if (!id || (accepted && !$("incident-consent-accepted").checked)) return message("incident-message","Enter the case ID and explicitly accept the supplemental notice.",true);
+  try {
+    const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/incident-consent`,{
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid(),accepted})
+    });
+    message("incident-message",accepted ? "Supplemental incident consent recorded." : (result.incident_details_deleted ? "Consent withdrawn; structured incident details deleted." : "Supplemental consent withdrawn."));
+  } catch(error) { message("incident-message",error.message,true); }
+}
+async function submitIncidentIntake() {
+  const id = $("owner-session-id").value.trim();
+  const local = $("incident-occurred-at").value;
+  const occurred = local ? new Date(local).toISOString() : "";
+  const city = $("incident-city").value.trim();
+  const region = $("incident-region").value.trim().toUpperCase();
+  const postal = $("incident-postal-code").value.trim();
+  if (!id || !occurred || !city || !region || !postal) return message("incident-message","Complete the date/time, category, city, state, and ZIP fields.",true);
+  try {
+    const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/incident-intake`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({request_id:uuid(),occurred_at:occurred,incident_type:$("incident-type").value,city,region,postal_code:postal})
+    });
+    message("incident-message",result.replayed ? "Existing incident details confirmed." : "Structured incident details saved.");
+  } catch(error) { message("incident-message",error.message,true); }
+}
 async function recordVin() {
   const id = $("session-id").value.trim(), vin = $("vin").value.trim().toUpperCase();
   if (!id || vin.length !== 17) return message("operator-message","Enter a case ID and a 17-character VIN.",true);
@@ -323,6 +349,9 @@ $("create-claim-case").addEventListener("click",createClaimCase);
 $("resume-case").addEventListener("click",resumeCase);
 $("refresh-sessions").addEventListener("click",refreshOwnedSessions);
 $("record-consent").addEventListener("click",recordConsent);
+$("record-incident-consent").addEventListener("click",()=>recordIncidentConsent(true));
+$("withdraw-incident-consent").addEventListener("click",()=>recordIncidentConsent(false));
+$("submit-incident-intake").addEventListener("click",submitIncidentIntake);
 $("save-vin").addEventListener("click",recordVin);
 $("record-quality").addEventListener("click",recordQuality);
 $("seal-case").addEventListener("click",sealCase);

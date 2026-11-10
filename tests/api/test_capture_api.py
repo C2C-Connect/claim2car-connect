@@ -213,5 +213,34 @@ class CaptureRouteTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'^INVALID_CAPTURE_RUNTIME_CONFIGURATION$'):
                 load_runtime(path)
 
+
+    def test_incident_intake_routes_are_disabled_until_explicit_feature_enablement(self):
+        with tempfile.TemporaryDirectory() as root, patch.dict(os.environ, {
+            'C2C_ARTIFACT_STORAGE_ROOT': root, 'C2C_VIN_HMAC_PEPPER': 'P'*43,
+        }):
+            app = create_capture_app(self.runtime, enable_evidence=True)
+            with TestClient(app) as client:
+                response = client.post('/v1/capture-sessions/'+str(UUID(int=2))+'/incident-consent',
+                    json={'request_id':str(UUID(int=7)),'accepted':True},headers=self.headers)
+        self.assertEqual(response.status_code,503)
+        self.assertEqual(response.json(),{'detail':'INCIDENT_INTAKE_NOT_ENABLED'})
+
+    def test_incident_intake_routes_validate_payload_when_enabled(self):
+        with tempfile.TemporaryDirectory() as root, patch.dict(os.environ, {
+            'C2C_ARTIFACT_STORAGE_ROOT': root, 'C2C_VIN_HMAC_PEPPER': 'P'*43,
+            'C2C_INCIDENT_INTAKE_ENABLED': 'true',
+        }), patch('app.capture_api.IncidentIntakeService') as service_type:
+            app = create_capture_app(self.runtime, enable_evidence=True)
+            with TestClient(app) as client:
+                response = client.post('/v1/capture-sessions/'+str(UUID(int=2))+'/incident-consent',
+                    json={'request_id':str(UUID(int=7)),'accepted':True},headers=self.headers)
+                invalid = client.post('/v1/capture-sessions/'+str(UUID(int=2))+'/incident-intake',
+                    json={'request_id':str(UUID(int=8)),'occurred_at':'2026-11-10T10:00:00Z','incident_type':'collision',
+                          'city':'San Antonio','region':'Texas','postal_code':'78201'},headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(invalid.status_code,422)
+        service_type.return_value.record_consent.assert_called_once()
+        service_type.return_value.record_incident.assert_not_called()
+
 if __name__=='__main__':
     unittest.main()

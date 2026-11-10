@@ -272,5 +272,55 @@ class CaptureSessionIntegration(unittest.TestCase):
             ledger.record_partner_acceptance_obligation(self.auth(),acceptance,
                 idempotency_key='ledger-cross-tenant',actor_id='capture-actor-0')
 
+
+    def test_incident_intake_requires_separate_owner_consent_and_withdrawal_deletes_details(self):
+        from database.incident_intake import IncidentIntakeService
+        claim_id = str(uuid.uuid4())
+        case = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()))
+        with tempfile.TemporaryDirectory() as root:
+            evidence = CaptureEvidenceService(self.store, OriginalByteStore(root), 'P'*43)
+            incident = IncidentIntakeService(self.store)
+            evidence.record_consent(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=True, scope='capture_review')
+            with self.assertRaises(CaptureSessionConflict):
+                incident.record_incident(self.owner_auth(), case.capture_session_id,
+                    request_id=uuid.uuid4(), occurred_at='2026-11-08T09:30:00-06:00',
+                    incident_type='collision', city='San Antonio', region='TX', postal_code='78201')
+            incident.record_consent(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=True)
+            result = incident.record_incident(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), occurred_at='2026-11-08T09:30:00-06:00',
+                incident_type='collision', city='San Antonio', region='TX', postal_code='78201')
+            self.assertEqual((result['incident_type'],result['incident_city'],result['incident_region']),
+                             ('collision','San Antonio','TX'))
+            persisted = self.f.seed.execute(
+                'SELECT incident_city,incident_region,incident_postal_code FROM faos.claim_case_incident_intake WHERE tenant_id=%s AND claim_id=%s',
+                (self.f.tenants[0],claim_id)).fetchone()
+            self.assertEqual(persisted,('San Antonio','TX','78201'))
+            journal = self.f.seed.execute(
+                "SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s AND kind='INCIDENT_INTAKE_RECORDED'",
+                (self.f.tenants[0],case.capture_session_id)).fetchone()[0]
+            self.assertNotIn('San Antonio',journal)
+            withdrawn = incident.record_consent(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=False)
+            self.assertTrue(withdrawn['incident_details_deleted'])
+            self.assertIsNone(self.f.seed.execute(
+                'SELECT 1 FROM faos.claim_case_incident_intake WHERE tenant_id=%s AND claim_id=%s',
+                (self.f.tenants[0],claim_id)).fetchone())
+            with self.assertRaises(CaptureSessionConflict):
+                incident.record_incident(self.owner_auth(), case.capture_session_id,
+                    request_id=uuid.uuid4(), occurred_at='2026-11-08T09:30:00-06:00',
+                    incident_type='collision', city='San Antonio', region='TX', postal_code='78201')
+            incident.record_consent(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=True)
+            incident.record_incident(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), occurred_at='2026-11-08T09:30:00-06:00',
+                incident_type='collision', city='San Antonio', region='TX', postal_code='78201')
+            evidence.record_consent(self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=False, scope='capture_review')
+            self.assertIsNone(self.f.seed.execute(
+                'SELECT 1 FROM faos.claim_case_incident_intake WHERE tenant_id=%s AND claim_id=%s',
+                (self.f.tenants[0],claim_id)).fetchone())
+
 if __name__=='__main__':
     unittest.main()

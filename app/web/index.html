@@ -77,6 +77,30 @@
         </div>
         <label class="consent"><input id="consent-accepted" type="checkbox"> I voluntarily consent to the capture and human review described above.</label>
         <button id="record-consent" class="primary">Record my consent</button>
+        <div class="rule"></div>
+        <h4>Supplemental incident details</h4>
+        <p class="fine">Separate optional consent. This draft collects only incident date/time, category, city, state, and ZIP code. It does not collect a street address, narrative, claimant contact details, or policy number. The supplemental notice is pending counsel review; this feature remains disabled unless explicitly enabled for an authorized test environment.</p>
+        <div class="disclosure" aria-label="Supplemental incident intake notice incident-intake-v1">
+          <p>Claim2Car will associate the incident date and time, incident category, city, state, and ZIP code you provide with this claim-case record.</p>
+          <p>This information is used only to organize the incident record for the capture and human-review workflow. It does not determine fault, coverage, liability, or claim eligibility.</p>
+          <p>This supplemental intake does not request a street address, GPS location, free-text narrative, claimant contact details, or insurance policy number.</p>
+          <p>You may decline or withdraw this supplemental consent. Withdrawal deletes the separately stored structured incident details.</p>
+          <span class="fine">Disclosure version: incident-intake-v1 · Draft pending legal review</span>
+        </div>
+        <label class="consent"><input id="incident-consent-accepted" type="checkbox"> I separately consent to the structured incident details described above.</label>
+        <button id="record-incident-consent" class="secondary">Record supplemental consent</button>
+        <div class="incident-fields">
+          <label for="incident-occurred-at">Incident date and time (local device time)</label>
+          <input id="incident-occurred-at" type="datetime-local">
+          <label for="incident-type">Incident category</label>
+          <select id="incident-type"><option value="collision">Collision</option><option value="theft">Theft</option><option value="weather">Weather</option><option value="vandalism">Vandalism</option><option value="other">Other</option><option value="unknown">Unknown</option></select>
+          <label for="incident-city">City</label><input id="incident-city" maxlength="80">
+          <label for="incident-region">State / territory code</label><input id="incident-region" maxlength="2" placeholder="TX">
+          <label for="incident-postal-code">ZIP code</label><input id="incident-postal-code" maxlength="10" inputmode="numeric" placeholder="78201">
+        </div>
+        <button id="submit-incident-intake" class="primary">Save incident details</button>
+        <button id="withdraw-incident-consent" class="quiet">Withdraw supplemental consent and delete incident details</button>
+        <p id="incident-message" class="message" role="status"></p>
         <p id="owner-message" class="message" role="status"></p>
       </section>
       <section id="reviewer-view" class="panel" hidden>

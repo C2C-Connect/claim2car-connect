@@ -24,6 +24,7 @@ from psycopg.conninfo import conninfo_to_dict
 from app.identity import ActorBinding, AuthenticationError, Credential, CredentialResolver
 from app.main import Settings, create_app
 from database.claim_cases import ClaimCaseConflict, ClaimCaseNotFound, ClaimCaseStore
+from database.incident_intake import IncidentIntakeService
 from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound,
     CaptureSessionStore, CaptureStorageUnavailable,
@@ -48,6 +49,22 @@ class CaptureRuntime:
 class ClaimCaseRequest(BaseModel):
     claim_id: UUID
     request_id: UUID
+    class Config:
+        extra = 'forbid'
+
+class IncidentConsentRequest(BaseModel):
+    request_id: UUID
+    accepted: StrictBool
+    class Config:
+        extra = 'forbid'
+
+class IncidentIntakeRequest(BaseModel):
+    request_id: UUID
+    occurred_at: StrictStr = Field(min_length=20, max_length=40)
+    incident_type: StrictStr = Field(min_length=1, max_length=16)
+    city: StrictStr = Field(min_length=2, max_length=80)
+    region: StrictStr = Field(min_length=2, max_length=2)
+    postal_code: StrictStr = Field(min_length=5, max_length=10)
     class Config:
         extra = 'forbid'
 
@@ -182,6 +199,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
     if claim_cases is None and isinstance(runtime.store, CaptureSessionStore):
         claim_cases = ClaimCaseStore(runtime.store)
     evidence = None
+    incident_intake = None
     if enable_evidence:
         root = os.environ.get('C2C_ARTIFACT_STORAGE_ROOT')
         pepper = os.environ.get('C2C_VIN_HMAC_PEPPER')
@@ -190,6 +208,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         evidence = CaptureEvidenceService(
             runtime.store, OriginalByteStore(root, max_bytes=MAX_EVIDENCE_BYTES), pepper
         )
+        incident_intake = IncidentIntakeService(runtime.store)
 
     @api.exception_handler(RequestValidationError)
     async def invalid_capture_request(request, error):
@@ -333,6 +352,24 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         def record_consent(session_id: UUID, body: ConsentRequest, authorization: str = Depends(authorize)):
             return invoke_evidence(evidence.record_consent, authorization, session_id,
                                    request_id=body.request_id, accepted=body.accepted, scope=body.scope)
+
+        @api.post('/v1/capture-sessions/{session_id}/incident-consent')
+        def record_incident_consent(session_id: UUID, body: IncidentConsentRequest, authorization: str = Depends(authorize)):
+            if os.environ.get('C2C_INCIDENT_INTAKE_ENABLED', '').lower() != 'true':
+                _fail(503, 'INCIDENT_INTAKE_NOT_ENABLED')
+            return invoke_evidence(incident_intake.record_consent, authorization, session_id,
+                                   request_id=body.request_id, accepted=body.accepted)
+
+        @api.post('/v1/capture-sessions/{session_id}/incident-intake')
+        def record_incident_intake(session_id: UUID, body: IncidentIntakeRequest, authorization: str = Depends(authorize)):
+            if os.environ.get('C2C_INCIDENT_INTAKE_ENABLED', '').lower() != 'true':
+                _fail(503, 'INCIDENT_INTAKE_NOT_ENABLED')
+            return invoke_evidence(
+                incident_intake.record_incident, authorization, session_id,
+                request_id=body.request_id, occurred_at=body.occurred_at,
+                incident_type=body.incident_type, city=body.city,
+                region=body.region, postal_code=body.postal_code,
+            )
 
         @api.post('/v1/capture-sessions/{session_id}/vehicle-reference')
         def record_vehicle(session_id: UUID, body: VehicleReferenceRequest, authorization: str = Depends(authorize)):

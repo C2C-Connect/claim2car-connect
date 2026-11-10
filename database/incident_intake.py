@@ -7,7 +7,6 @@ the append-only journal stores consent and a digest, not the incident details.
 """
 from __future__ import annotations
 from datetime import datetime, timezone
-import hashlib
 import json
 import re
 from uuid import UUID
@@ -158,13 +157,6 @@ class IncidentIntakeService:
             canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
             digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
             event_id = "incident-recorded:" + request_id
-            for kind, event_actor, old, old_id in history:
-                if old_id == event_id:
-                    expected = {"request_id": request_id, "disclosure_version": DISCLOSURE_VERSION,
-                                "record_sha256": digest}
-                    if kind == "INCIDENT_INTAKE_RECORDED" and event_actor == actor.actor_id and old == expected:
-                        return {"session_id": session_id, **details, "replayed": True}
-                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             result = conn.execute(
                 "SELECT faos.save_claim_case_incident(%s::uuid,%s::uuid,%s::text,%s::uuid,%s::timestamptz,%s::text,%s::text,%s::text,%s::text)",
                 (actor.tenant_id, session.claim_id, actor.actor_id, request_id,
@@ -173,8 +165,13 @@ class IncidentIntakeService:
             ).fetchone()[0]
             if result not in ("ACCEPTED", "DUPLICATE"):
                 raise CaptureSessionConflict("INCIDENT_INTAKE_CONFLICT")
+            expected_event = {"request_id": request_id, "disclosure_version": DISCLOSURE_VERSION}
+            prior = next((item for item in history if item[3] == event_id), None)
+            if prior is not None:
+                if prior[0] != "INCIDENT_INTAKE_RECORDED" or prior[1] != actor.actor_id or prior[2] != expected_event:
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+                return {"session_id": session_id, **details, "replayed": True}
             self._append(conn, actor, session_id, history, event_id=event_id,
                          kind="INCIDENT_INTAKE_RECORDED", reason="owner submitted structured incident intake",
-                         payload={"request_id": request_id, "disclosure_version": DISCLOSURE_VERSION,
-                                  "record_sha256": digest})
+                         payload=expected_event)
             return {"session_id": session_id, **details, "replayed": result == "DUPLICATE"}
