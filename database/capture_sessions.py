@@ -73,8 +73,8 @@ class CaptureSessionStore:
                     if conn.execute('SELECT faos.tenant_id()').fetchone()[0]!=actor.tenant_id:
                         raise CaptureAuthorizationError('CAPTURE_AUTHORITY_DENIED')
                     yield conn,actor
-        except psycopg.Error:
-            raise CaptureStorageUnavailable('CAPTURE_STORAGE_UNAVAILABLE') from None
+        except psycopg.Error as exc:
+            raise CaptureStorageUnavailable('CAPTURE_STORAGE_UNAVAILABLE') from exc
 
     @staticmethod
     def _identifier(value):
