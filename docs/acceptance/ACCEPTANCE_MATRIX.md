@@ -43,24 +43,26 @@
 
 The current Railway configuration is a restricted synthetic containment service. It is not the integrated product. Live dispatch, payments, partner/carrier delivery, production publication, and real participant data remain disabled until their legal, security, partner, operational, and deployment gates have actual evidence.
 
-## Persistent claim-case register increment — 2026-11-10
+## Persistent claim-case register and capture-session association — 2026-11-10
 
-**Candidate revision:** `9c2aaac8d68a0b7a8593305c78a94265339cc2a4`  
+**Candidate revision:** `233739cba238e847c673159ded6123378e85ae6e`  
 **Implementation status:** Implemented and automated-test verified on PR #29; not field-validated or deployed.
 
-- Added authority migrations `0010_claim_case_registry.sql` through `0012_claim_case_retry_without_update_lock.sql`.
+- Added authority migrations `0010_claim_case_registry.sql` through `0013_claim_case_capture_session.sql`.
 - Added `faos.claim_cases` with tenant-scoped identifiers, immutable creator/time/state metadata, row-level security, and a server-owned idempotent creation function.
-- Application identities receive read-only table access; inserts occur through the narrowly granted database function. The table has no application update/delete grant.
-- Added authenticated `POST /v1/claim-cases`, `GET /v1/claim-cases`, and `GET /v1/claim-cases/{claim_id}` routes, with creator scoping and bounded listing.
-- Added the operator claim register with create, list, and reopen behavior. Client retries reuse the same idempotency request ID while the page remains active.
-- The UI explicitly labels the older evidence-capture session workflow as controlled-test only.
+- Application identities receive read-only table access; creation occurs through a narrowly granted database function. Application identities have no table update/delete grant.
+- Each newly created persistent claim record now provisions a distinct capture session whose first journal event explicitly identifies it as a persistent claim session, not a synthetic controlled-test session.
+- Added an owner-binding function: the first configured owner actor to record consent is bound to that claim. A different owner actor in the same tenant cannot take over or consent to that case.
+- Added authenticated create/list/reopen APIs with creator scoping, bounded listing, and session-scope disclosure. Owner actor IDs are not returned by the session API.
+- Added the operator-facing persistent claim register; creating/reopening a claim opens its associated capture session. The standalone `POST /v1/capture-sessions` workflow remains explicitly controlled-test only.
 
-**Deliberate boundary:** this increment persists claim-case identity and ownership metadata only. It does not yet store claimant personal information, incident narrative/location, policy details, or VIN; it does not yet associate a production claim record with an evidence-capture session. It is not complete claim intake, an adjudication workflow, or permission to process real participant data.
+**Deliberate boundary:** the persistent case currently stores identity, creator/time/state, and a linked capture-session identifier. It does not yet store incident details/location/narrative, claimant personal information, policy details, or VIN. The owner binding currently uses a server-provisioned owner actor credential; that is not a real end-user login, identity proofing, or claimant invitation flow. The PostgreSQL integration test verifies case/session creation and first-owner binding, but a full production-scoped VIN/original-byte/manifest/reviewer journey still requires dedicated end-to-end verification. This is not complete claim intake, adjudication, field acceptance, or permission to process real participant data.
 
 **Verification evidence at the candidate revision:**
-- Full repository suite: **677 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42754108832](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42754108832).
-- Database authority cutover and post-cutover tenant-isolation diagnostics: passed — run [42754108748](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42754108748).
-- FastAPI foundation, controlled-test PostgreSQL, restricted-container, frontend VIN/transport, offline capture, and synthetic demonstration workflows: passed on this revision.
-- Railway verification remains the restricted synthetic containment smoke test. It is not deployment of the integrated Claim2Car application.
+- Full repository suite: **682 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42755062529](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755062529).
+- Database authority cutover and post-cutover tenant-isolation diagnostics: passed — run [42755062520](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755062520).
+- FastAPI foundation: passed — run [42755062645](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755062645).
+- Restricted intake container, offline capture, frontend VIN/transport, controlled-test PostgreSQL, synthetic demonstration, and PR #29 checks: passed.
+- Railway restricted staging verification: passed — run [42755062755](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755062755). The actual deploy job was skipped; this is a restricted synthetic smoke test, not deployment of the integrated Claim2Car application.
 
-**Next implementation slice:** define and persist the incident intake fields under the approved data-minimization and consent boundaries; associate the claim record with a production-scoped capture session; then connect owner consent, keyed VIN, original evidence, and reviewer access to that case without allowing controlled-test sessions to masquerade as production claims.
+**Next implementation slice:** add the approved incident intake schema and UI; replace static owner actor credentials with a real authenticated owner invitation/consent flow; then run the full persistent-claim evidence path (keyed VIN, original bytes, manifest sealing, reviewer retrieval and outcomes) against the production-scoped session before staging deployment.
