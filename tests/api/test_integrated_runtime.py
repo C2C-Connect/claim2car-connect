@@ -79,6 +79,21 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 review_queue = client.get("/api/v1/review-queue")
                 assert review_queue.status_code == 401
 
+                # Identity discovery is authenticated and returns only the
+                # server-resolved actor/tenant/role, never client assertions.
+                identity_denied = client.get("/api/v1/identity")
+                assert identity_denied.status_code == 401
+                identity = client.get(
+                    "/api/v1/identity",
+                    headers={"Authorization": f"Bearer {OPERATOR_TOKEN}"},
+                )
+                assert identity.status_code == 200
+                assert identity.json() == {
+                    "actor_id": "operator-1",
+                    "tenant_id": str(UUID(int=1)),
+                    "actor_role": "operator",
+                }
+
                 # Analytical APIs are not exposed on their legacy public path.
                 assert client.post(
                     "/api/v1/analysis/physics",

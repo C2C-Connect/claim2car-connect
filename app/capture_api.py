@@ -308,4 +308,18 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             except Exception:
                 _fail(500, 'REVIEW_ARTIFACT_OPERATION_FAILED')
 
+    @api.get('/v1/identity')
+    def current_identity(authorization: str = Depends(authorize)):
+        # Expose only the authenticated actor context needed by the application
+        # shell. Never return credential material or database connection data.
+        actor = runtime.resolver.resolve(authorization)
+        return JSONResponse(
+            {
+                'actor_id': actor.actor_id,
+                'tenant_id': str(actor.tenant_id),
+                'actor_role': actor.actor_role,
+            },
+            headers=dict(NO_STORE_HEADERS),
+        )
+
     return api
