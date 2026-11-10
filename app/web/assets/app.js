@@ -332,6 +332,14 @@ async function syncPendingUploads(sessionId) {
   }
   return result;
 }
+async function retryPendingEvidence() {
+  if (!activeSession) return;
+  try {
+    await syncPendingUploads(activeSession);
+  } catch (error) {
+    message("operator-message",`Evidence sync could not start: ${error.message}`,true);
+  }
+}
 async function restoreEvidenceQueue(sessionId) {
   try {
     await refreshCaptureQueueStatus(sessionId);
@@ -478,8 +486,8 @@ $("submit-incident-intake").addEventListener("click",submitIncidentIntake);
 $("save-vin").addEventListener("click",recordVin);
 $("record-quality").addEventListener("click",recordQuality);
 $("seal-case").addEventListener("click",sealCase);
-$("sync-pending-evidence").addEventListener("click",()=>{ if(activeSession) void syncPendingUploads(activeSession); });
-window.addEventListener("online",()=>{ if(activeSession && token) void syncPendingUploads(activeSession); });
+$("sync-pending-evidence").addEventListener("click",()=>{ void retryPendingEvidence(); });
+window.addEventListener("online",()=>{ if(activeSession && token) void retryPendingEvidence(); });
 $("refresh-queue").addEventListener("click",refreshQueue);
 $("access-token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
 buildSlots();
