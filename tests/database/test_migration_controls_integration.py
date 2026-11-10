@@ -91,6 +91,98 @@ class MigrationControlsIntegration(unittest.TestCase):
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
+    def test_full_migration_enforces_python_sql_event_contract_parity(self):
+        from app.domain_events import DomainEvent, KINDS
+        plan = self.authority_plan()
+        apply(self.conn, plan)
+        app_url = make_conninfo(
+            os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test'),
+            dbname=self.db,
+        )
+        with psycopg.connect(app_url, autocommit=True) as app:
+            tenant = str(uuid.uuid4())
+            session = 'event-contract-' + uuid.uuid4().hex
+            def append(event_id, sequence, kind, timestamp, payload):
+                return app.execute(
+                    'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,'
+                    '%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+                    (tenant, session, event_id, sequence, kind, 'synthetic-contract-test',
+                     timestamp, 'event contract integration', payload, '0.1'),
+                ).fetchone()[0]
+
+            with app.transaction():
+                app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+                app.execute(
+                    'INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                    (tenant, 'synthetic event contract fixture'),
+                )
+                app.execute(
+                    'INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                    (tenant, session),
+                )
+                self.assertEqual(append(
+                    'event-1', 1, 'SESSION_CREATED', '2026-01-01T00:00:00Z', '{}'
+                ), 'ACCEPTED')
+
+            invalid_timestamps = (
+                '2026-01-01T00:00:00',
+                '2026-01-01 00:00:00Z',
+                '2026-01-01T00:00:00.1234567Z',
+                '2026-02-30T00:00:00Z',
+            )
+            invalid_payloads = (
+                '{ "a":1}',
+                '{"z":1,"a":2}',
+                '{"value":1e0}',
+            )
+            probes = [
+                ('timestamp-' + str(i), '2026-01-01T00:00:00Z', '{}')
+                for i in range(len(invalid_timestamps))
+            ] + [
+                ('payload-' + str(i), '2026-01-01T00:00:00Z', payload)
+                for i, payload in enumerate(invalid_payloads)
+            ]
+            for index, (event_id, _valid_placeholder, payload) in enumerate(probes):
+                timestamp = invalid_timestamps[index] if index < len(invalid_timestamps) else '2026-01-01T00:00:00Z'
+                with self.subTest(event_id=event_id):
+                    with app.transaction():
+                        app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+                        with self.assertRaises(psycopg.errors.CheckViolation):
+                            with app.transaction():
+                                append(event_id, 2, 'SESSION_CREATED', timestamp, payload)
+                        count = app.execute(
+                            'SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+                            (tenant, session),
+                        ).fetchone()[0]
+                        self.assertEqual(count, 1)
+
+            valid_payload = '{"large":100000000000000000000,"label":"é","small":0.00001,"value":1.25}'
+            with app.transaction():
+                app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+                self.assertEqual(append(
+                    'event-2', 2, 'QUALITY_RECORDED', '2026-01-01T00:00:00+05:30', valid_payload
+                ), 'ACCEPTED')
+                row = app.execute(
+                    'SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version '
+                    'FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
+                    (tenant, session, 'event-2'),
+                ).fetchone()
+                self.assertEqual(DomainEvent(*row).validate().payload['value'], 1.25)
+
+            sequence = 3
+            with app.transaction():
+                app.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+                for kind in sorted(KINDS - {'SESSION_CREATED', 'QUALITY_RECORDED'}):
+                    self.assertEqual(append(
+                        'kind-' + str(sequence), sequence, kind, '2026-01-01T00:00:00Z', '{}'
+                    ), 'ACCEPTED')
+                    sequence += 1
+                kinds = app.execute(
+                    'SELECT kind FROM faos.events WHERE tenant_id=%s AND session_id=%s ORDER BY sequence',
+                    (tenant, session),
+                ).fetchall()
+                self.assertEqual({row[0] for row in kinds}, set(KINDS))
+
     def test_applied_authority_migration_checksum_change_is_rejected(self):
         plan = self.authority_plan()
         apply(self.conn,plan)
