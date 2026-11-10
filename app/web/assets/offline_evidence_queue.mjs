@@ -90,7 +90,7 @@ export function createIndexedDbEvidenceStore(indexedDb = globalThis.indexedDB) {
       const store = tx.objectStore(STORE_NAME);
       const record = await requestValue(store.get(queueId));
       if (!record) {
-        tx.abort();
+        await done;
         throw new Error("EVIDENCE_QUEUE_RECORD_NOT_FOUND");
       }
       record.uploaded = true;
