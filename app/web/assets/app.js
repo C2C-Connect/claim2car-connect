@@ -83,6 +83,7 @@ async function loadCaptureProtocols() {
 }
 function disconnect() {
   token = null; identity = null; activeSession = null; activeReadiness = null;
+  activeProtocolVersion = "claims2car-16-v1";
   $("access-token").value = "";
   $("workspace").hidden = true; $("sign-in").hidden = false;
   $("connection-state").textContent = "Not connected";
@@ -92,19 +93,21 @@ async function createClaimCase() {
   claimCaseRequestInFlight = true;
   const button = $("create-claim-case");
   button.disabled = true;
-  if (!pendingClaimCase) pendingClaimCase = {claimId:uuid(),requestId:uuid()};
+  if (!pendingClaimCase) pendingClaimCase = {claimId:uuid(),requestId:uuid(),protocolVersion:$("capture-protocol-version").value};
   try {
     const result = await api("/api/v1/claim-cases", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({claim_id:pendingClaimCase.claimId,request_id:pendingClaimCase.requestId,capture_protocol_version:$("capture-protocol-version").value})
+      body:JSON.stringify({claim_id:pendingClaimCase.claimId,request_id:pendingClaimCase.requestId,capture_protocol_version:pendingClaimCase.protocolVersion})
     });
     $("claim-case-created").textContent = result.created
       ? "Persistent claim record created: " + result.claim_id
       : "Existing claim record confirmed: " + result.claim_id;
     if (result.capture_session_id) {
       setCase(result.capture_session_id,result.capture_protocol_version);
-      message("operator-message","Persistent claim capture session is ready. Owner consent is required before VIN or evidence entry.");
+      message("operator-message",result.capture_protocol_version === "claims2car-16-v1"
+        ? "Persistent claim session created with the 16-v1 default. Its slot contract is pending approval; choose 12-v1 for the currently implemented capture workflow."
+        : "Persistent claim capture session is ready. Owner consent is required before VIN or evidence entry.");
     }
     pendingClaimCase = null;
     await refreshClaimCases();
