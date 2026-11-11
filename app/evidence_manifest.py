@@ -4,6 +4,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
+from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 VERSION = '0.1'
 CANONICAL_SLOTS = ('vin_ocr','doc_ocr','front','front_left','driver_side','rear_left','rear','rear_right','passenger_side','front_right','interior_front','undercarriage_engine')
