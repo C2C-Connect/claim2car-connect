@@ -50,6 +50,7 @@ class CaptureRuntime:
 class ClaimCaseRequest(BaseModel):
     claim_id: UUID
     request_id: UUID
+    capture_protocol_version: StrictStr = DEFAULT_CAPTURE_PROTOCOL
     class Config:
         extra = 'forbid'
 
@@ -71,6 +72,7 @@ class IncidentIntakeRequest(BaseModel):
 
 class SessionRequest(BaseModel):
     session_id: UUID
+    capture_protocol_version: StrictStr = DEFAULT_CAPTURE_PROTOCOL
     class Config:
         extra = 'forbid'
 
@@ -283,7 +285,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         if claim_cases is None:
             _fail(503, 'CLAIM_CASE_STORAGE_UNAVAILABLE')
         return invoke_claim(claim_cases.create, authorization,
-                            claim_id=str(body.claim_id), request_id=str(body.request_id))
+                            claim_id=str(body.claim_id), request_id=str(body.request_id),
+                            capture_protocol_version=body.capture_protocol_version)
 
     @api.get('/v1/claim-cases')
     def list_claim_cases(limit: int = Query(default=50, ge=1, le=100),
@@ -313,7 +316,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
 
     @api.post('/v1/capture-sessions')
     def create_session(body: SessionRequest, authorization: str = Depends(authorize)):
-        return invoke(runtime.store.create, authorization, body.session_id, creating=True,\n                      protocol_version=body.capture_protocol_version)
+        return invoke(runtime.store.create, authorization, body.session_id, creating=True,
+                      protocol_version=body.capture_protocol_version)
 
     @api.get('/v1/capture-sessions')
     def list_sessions(limit: int = Query(default=100, ge=1, le=100), authorization: str = Depends(authorize)):
