@@ -7,7 +7,9 @@ import re
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 VERSION = '0.1'
-CANONICAL_SLOTS = ('vin_ocr','doc_ocr','front','front_left','driver_side','rear_left','rear','rear_right','passenger_side','front_right','interior_front','undercarriage_engine')
+DEFAULT_CANONICAL_SLOTS = require_implemented_protocol(DEFAULT_CAPTURE_PROTOCOL).slots
+LEGACY_CANONICAL_SLOTS = require_implemented_protocol(LEGACY_CAPTURE_PROTOCOL).slots
+CANONICAL_SLOTS = DEFAULT_CANONICAL_SLOTS
 
 @dataclass(frozen=True)
 class ManifestEntry:
