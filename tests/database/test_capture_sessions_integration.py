@@ -261,6 +261,13 @@ class CaptureSessionIntegration(unittest.TestCase):
         self.assertEqual((default.status, default.slots), ("definition_pending", ()))
         self.assertEqual((legacy.status, len(legacy.slots)), ("implemented", 12))
 
+    def test_claim_case_retry_cannot_change_protocol_version(self):
+        claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
+        self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id,
+                                capture_protocol_version=DEFAULT_CAPTURE_PROTOCOL)
+        with self.assertRaisesRegex(ClaimCaseConflict, "CAPTURE_PROTOCOL_VERSION_MISMATCH"):
+            self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id,
+                                    capture_protocol_version=LEGACY_CAPTURE_PROTOCOL)
     def test_capture_protocol_is_immutable_and_retry_must_match(self):
         created = self.store.create(self.auth(), self.key, protocol_version=DEFAULT_CAPTURE_PROTOCOL)
         self.assertEqual(created.capture_protocol_version, DEFAULT_CAPTURE_PROTOCOL)
