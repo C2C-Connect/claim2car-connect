@@ -162,9 +162,7 @@ async function createCase() {
     const result = await api("/api/v1/capture-sessions", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:id,capture_protocol_version:$("capture-protocol-version").value})});
     setCase(id,result.capture_protocol_version);
     $("case-created").textContent = result.created ? "Case created · " + result.capture_protocol_version : "Existing case resumed · " + result.capture_protocol_version;
-    message("operator-message", result.capture_protocol_version === "claims2car-16-v1"
-      ? "Case created with the 16-v1 default. Capture controls remain locked until its exact slot contract is approved; select 12-v1 for the implemented legacy workflow."
-      : "Case ready. Owner consent must be recorded with the provisioned owner actor credential; this workspace does not provide end-user login.");
+    message("operator-message","Case ready with " + result.capture_protocol_version + ". Owner consent must be recorded with the provisioned owner actor credential; this workspace does not provide end-user login.");
     await refreshOwnedSessions();
   } catch (error) { message("operator-message", error.message, true); }
 }
