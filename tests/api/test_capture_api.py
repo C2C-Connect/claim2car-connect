@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 from fastapi.testclient import TestClient
 from app.capture_api import CaptureRuntime, create_capture_app, load_runtime
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL
 from database.claim_cases import ClaimCase, ClaimCaseStore
 from app.identity import ActorBinding, Credential, CredentialResolver
 from app.main import Settings
@@ -82,7 +83,7 @@ class CaptureRouteTests(unittest.TestCase):
         self.assertEqual(response.json()['scope'],'controlled-test')
         self.assertEqual(response.headers['cache-control'],'no-store')
         self.store.create.assert_called_once_with('Bearer '+self.token,self.session.session_id,
-                                                   protocol_version='claims2car-16-v1')
+                                                   protocol_version=DEFAULT_CAPTURE_PROTOCOL)
 
     def test_idempotent_retry_returns_200(self):
         self.store.create.return_value=replace(self.session,created=False)
