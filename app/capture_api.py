@@ -34,6 +34,7 @@ from app.artifact_storage import (
     ArtifactStorageUnavailable, OriginalByteStore,
 )
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
 CONFIGURATION_SIZE_LIMIT = 65536
@@ -235,9 +236,9 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             _fail(401, 'UNAUTHORIZED')
         return authorization
 
-    def invoke(action, authorization, session_id, creating=False):
+    def invoke(action, authorization, session_id, creating=False, **kwargs):
         try:
-            result = action(authorization, str(session_id))
+            result = action(authorization, str(session_id), **kwargs)
             payload_data = asdict(result)
             payload_data.pop('owner_actor_id', None)
             payload_data['scope'] = getattr(result, 'scope', 'controlled-test')
@@ -312,7 +313,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
 
     @api.post('/v1/capture-sessions')
     def create_session(body: SessionRequest, authorization: str = Depends(authorize)):
-        return invoke(runtime.store.create, authorization, body.session_id, creating=True)
+        return invoke(runtime.store.create, authorization, body.session_id, creating=True,\n                      protocol_version=body.capture_protocol_version)
 
     @api.get('/v1/capture-sessions')
     def list_sessions(limit: int = Query(default=100, ge=1, le=100), authorization: str = Depends(authorize)):
