@@ -154,5 +154,7 @@ export function resumeGuidedCapture({ storage }) {
   let parsed;
   try { parsed = JSON.parse(raw); } catch { return null; }
   if (parsed === null || typeof parsed !== 'object') return null;
+  if (parsed.captureProtocolVersion === undefined) parsed.captureProtocolVersion = LEGACY_CAPTURE_PROTOCOL;
+  if (!CAPTURE_PROTOCOL_SLOTS[parsed.captureProtocolVersion]) return null;
   return parsed; // caller rehydrates controller state from this snapshot
 }
