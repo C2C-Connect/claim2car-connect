@@ -81,7 +81,8 @@ class CaptureRouteTests(unittest.TestCase):
         self.assertEqual(response.json()['tenant_id'],str(self.binding.tenant_id))
         self.assertEqual(response.json()['scope'],'controlled-test')
         self.assertEqual(response.headers['cache-control'],'no-store')
-        self.store.create.assert_called_once_with('Bearer '+self.token,self.session.session_id)
+        self.store.create.assert_called_once_with('Bearer '+self.token,self.session.session_id,
+                                                   protocol_version='claims2car-16-v1')
 
     def test_idempotent_retry_returns_200(self):
         self.store.create.return_value=replace(self.session,created=False)
