@@ -1,5 +1,6 @@
 """Real PostgreSQL-backed service tests; not HTTP or real-image intake proof."""
 from dataclasses import replace
+import json
 import hashlib
 import base64
 import time
@@ -78,6 +79,14 @@ class CaptureSessionIntegration(unittest.TestCase):
         self.assertEqual(self.f.seed.execute(
             'SELECT count(*) FROM faos.claim_cases WHERE tenant_id=%s AND claim_id=%s',
             (self.f.tenants[0], claim_id)).fetchone()[0], 1)
+        payload = self.f.seed.execute(
+            "SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id='claim-created'",
+            (self.f.tenants[0], first.capture_session_id)).fetchone()[0]
+        self.assertEqual(json.loads(payload), {
+            'capture_protocol_version': DEFAULT_CAPTURE_PROTOCOL,
+            'claim_id': claim_id,
+            'synthetic': False,
+        })
 
     def test_claim_case_provisions_capture_session_and_binds_owner_once(self):
         claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -165,6 +174,13 @@ class CaptureSessionIntegration(unittest.TestCase):
         reopened=self.store.get(self.auth(),self.key)
         self.assertEqual((reopened.session_id,reopened.tenant_id,reopened.created_by,reopened.created_at),(first.session_id,first.tenant_id,first.created_by,first.created_at))
         self.assertEqual(self.f.seed.execute('SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s',(self.f.tenants[0],self.key)).fetchone()[0],1)
+        payload = self.f.seed.execute(
+            "SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id='capture-created'",
+            (self.f.tenants[0],self.key)).fetchone()[0]
+        self.assertEqual(json.loads(payload), {
+            'capture_protocol_version': LEGACY_CAPTURE_PROTOCOL,
+            'synthetic': True,
+        })
 
     def test_operator_lists_only_own_sessions_within_tenant(self):
         own_ids=[str(uuid.uuid4()),str(uuid.uuid4())]
