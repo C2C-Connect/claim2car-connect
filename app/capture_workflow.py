@@ -24,13 +24,13 @@ from typing import Callable, Optional
 from uuid import uuid4
 
 from app.domain_events import DomainEvent, canonical_event_payload
-from app.evidence_manifest import CANONICAL_SLOTS
+from app.evidence_manifest import LEGACY_CANONICAL_SLOTS
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
 from app.telemetry import workflow_span
 from app.vin_guard import validate_vin
 from contracts.m1_state_machine import M1SessionMachine
 
-REQUIRED_SLOTS = tuple(CANONICAL_SLOTS)  # legacy 12-v1 compatibility alias
+REQUIRED_SLOTS = tuple(LEGACY_CANONICAL_SLOTS)  # legacy 12-v1 compatibility alias
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 DISCLOSURE_CONTRACT_PATH = Path(__file__).resolve().parents[1] / "contracts" / "disclosure-v1.json"
 DISCLOSURE_SCHEMA_VERSION = "0.1"
