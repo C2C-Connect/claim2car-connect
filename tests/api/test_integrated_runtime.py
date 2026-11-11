@@ -89,6 +89,9 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert workbench_script.status_code == 200
                 assert "createClaimCase" in workbench_script.text
                 assert "/api/v1/claim-cases" in workbench_script.text
+                assert "/api/v1/capture-protocols" in workbench_script.text
+                assert "capture_protocol_version" in workbench_script.text
+                assert 'id="capture-protocol-version"' in shell.text
                 assert "/api/v1/review-queue" in workbench_script.text
                 assert "createOfflineEvidenceQueue" in workbench_script.text
 
@@ -129,6 +132,23 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 review_details = client.get(f"/api/v1/review-sessions/{SESSION_ID}")
                 assert review_details.status_code == 401
 
+                # The protocol registry is authenticated and distinguishes
+                # the approved 16-v1 default from the executable 12-v1
+                # alternative without inventing the pending 16 slots.
+                registry_denied = client.get("/api/v1/capture-protocols")
+                assert registry_denied.status_code == 401
+                registry = client.get(
+                    "/api/v1/capture-protocols",
+                    headers={"Authorization": f"Bearer {OPERATOR_TOKEN}"},
+                )
+                assert registry.status_code == 200
+                assert registry.json()["default_protocol_version"] == "claims2car-16-v1"
+                by_version = {item["version"]: item for item in registry.json()["protocols"]}
+                assert by_version["claims2car-16-v1"]["status"] == "definition_pending"
+                assert by_version["claims2car-16-v1"]["required_slots"] == []
+                assert by_version["claims2car-16-v1"]["capture_enabled"] is False
+                assert by_version["claims2car-12-v1"]["status"] == "implemented"
+                assert len(by_version["claims2car-12-v1"]["required_slots"]) == 12
                 # Identity discovery is authenticated and returns only the
                 # server-resolved actor/tenant/role, never client assertions.
                 identity_denied = client.get("/api/v1/identity")
