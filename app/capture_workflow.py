@@ -306,7 +306,13 @@ class LocalDraftStore:
         self.protocol_version = self.protocol.version
 
     def _load(self):
-        return self.storage.get("draft", {"revision": 0, "entries": {}, "synced": []})
+        data = self.storage.get("draft", {"revision": 0, "entries": {}, "synced": []})
+        stored_version = data.get("capture_protocol_version")
+        if stored_version is None:
+            stored_version = LEGACY_CAPTURE_PROTOCOL if data.get("entries") else self.protocol_version
+        if stored_version != self.protocol_version:
+            raise WorkflowError("CAPTURE_PROTOCOL_VERSION_MISMATCH")
+        return data
 
     def _save(self, data):
         self.storage["draft"] = data
