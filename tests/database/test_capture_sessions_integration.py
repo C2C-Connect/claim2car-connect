@@ -182,6 +182,19 @@ class CaptureSessionIntegration(unittest.TestCase):
             'synthetic': True,
         })
 
+    def test_historical_12_v1_creation_event_remains_readable_without_relabeling(self):
+        self.f.seed.execute(
+            'INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
+            (self.f.tenants[0],self.key,LEGACY_CAPTURE_PROTOCOL))
+        self.f.seed.execute(
+            'INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) '
+            'VALUES (%s,%s,%s,1,%s,%s,%s,%s,%s,%s)',
+            (self.f.tenants[0],self.key,'capture-created','SESSION_CREATED','capture-actor-0',
+             '2026-01-01T00:00:00Z','historical controlled capture session','{"synthetic":true}','0.1'))
+        session = self.store.get(self.auth(),self.key)
+        self.assertEqual(session.capture_protocol_version,LEGACY_CAPTURE_PROTOCOL)
+        self.assertEqual(session.scope,'controlled-test')
+
     def test_operator_lists_only_own_sessions_within_tenant(self):
         own_ids=[str(uuid.uuid4()),str(uuid.uuid4())]
         other_id=str(uuid.uuid4())
