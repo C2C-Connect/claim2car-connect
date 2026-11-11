@@ -16,8 +16,8 @@ import re
 from uuid import UUID
 
 from app.artifact_storage import ArtifactKey, OriginalByteStore
-from app.evidence_manifest import CANONICAL_SLOTS, ManifestEntry, build_manifest
-from app.capture_protocols import require_implemented_protocol
+from app.evidence_manifest import ManifestEntry, build_manifest
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
 from app.vin_guard import validate_vin
 from database.capture_sessions import (
     CaptureAuthorizationError,
@@ -27,7 +27,6 @@ from database.capture_sessions import (
 
 MAX_EVIDENCE_BYTES = 25 * 1024 * 1024
 DISCLOSURE_VERSION = "disclosure-v1"
-_CANONICAL_SLOTS = frozenset(CANONICAL_SLOTS)
 
 
 class CaptureEvidenceService:
@@ -123,14 +122,14 @@ class CaptureEvidenceService:
             _session, history = self._history(conn, actor, session_id, creator_required=True)
             consent = self._consent_state(history)
             vehicle_present = self._has_valid_vehicle_reference(history, consent)
-            protocol = require_implemented_protocol(_session.capture_protocol_version) if _session.capture_protocol_version == "claims2car-12-v1" else None
+            protocol = require_implemented_protocol(_session.capture_protocol_version)
             return {
                 "session_id": session_id,
                 "capture_protocol_version": _session.capture_protocol_version,
-                "capture_protocol_status": "implemented" if protocol is not None else "definition_pending",
+                "capture_protocol_status": "implemented",
                 "consent_active": consent is not None,
                 "vehicle_reference_present": vehicle_present,
-                "capture_allowed": protocol is not None and consent is not None and vehicle_present,
+                "capture_allowed": consent is not None and vehicle_present,
             }
 
     def record_consent(self, authorization, session_id, *, request_id, accepted, scope):
@@ -231,7 +230,7 @@ class CaptureEvidenceService:
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
         artifact_id = self._request_id(artifact_id)
-        if not isinstance(slot, str) or slot not in _CANONICAL_SLOTS:
+        if not isinstance(slot, str) or not slot:
             raise ValueError("INVALID_CAPTURE_SLOT")
         if not isinstance(sha256_hex, str) or re.fullmatch("[0-9a-f]{64}", sha256_hex) is None:
             raise ValueError("INVALID_SHA256")
@@ -250,8 +249,9 @@ class CaptureEvidenceService:
             if actor.actor_role not in ("operator", "supervisor"):
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=True)
-            if _session.capture_protocol_version != "claims2car-12-v1":
-                raise CaptureSessionConflict("CAPTURE_PROTOCOL_DEFINITION_PENDING")
+            slots = frozenset(require_implemented_protocol(_session.capture_protocol_version).slots)
+            if slot not in slots:
+                raise ValueError("INVALID_CAPTURE_SLOT")
             consent = self._consent_state(history)
             if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
@@ -279,14 +279,15 @@ class CaptureEvidenceService:
         return {**payload, "replayed": False}
 
     @staticmethod
-    def _artifact_set(history):
+    def _artifact_set(history, protocol_version=DEFAULT_CAPTURE_PROTOCOL):
+        slots = frozenset(require_implemented_protocol(protocol_version).slots)
         latest = {}
         for kind, actor, payload, _event_id in history:
             if kind != "ARTIFACT_REGISTERED":
                 continue
             if (type(payload) is not dict
                     or set(payload) != {"request_id", "artifact_id", "slot", "sha256", "byte_length", "recorded_by_role"}
-                    or not isinstance(payload["slot"], str) or payload["slot"] not in _CANONICAL_SLOTS
+                    or not isinstance(payload["slot"], str) or payload["slot"] not in slots
                     or not isinstance(payload["sha256"], str) or re.fullmatch(r"[0-9a-f]{64}", payload["sha256"]) is None
                     or type(payload["byte_length"]) is not int or payload["byte_length"] <= 0
                     or payload["recorded_by_role"] not in ("operator", "supervisor")):
@@ -297,12 +298,12 @@ class CaptureEvidenceService:
             except (ValueError, TypeError, AttributeError):
                 raise CaptureSessionConflict("UNSUPPORTED_ARTIFACT_HISTORY") from None
             latest[payload["slot"]] = (actor, payload)
-        if set(latest) != _CANONICAL_SLOTS:
+        if set(latest) != slots:
             raise CaptureSessionConflict("CAPTURE_SET_INCOMPLETE")
         return latest
 
-    def _verified_manifest(self, actor, session_id, history, protocol_version="claims2car-12-v1"):
-        latest = self._artifact_set(history)
+    def _verified_manifest(self, actor, session_id, history, protocol_version=DEFAULT_CAPTURE_PROTOCOL):
+        latest = self._artifact_set(history, protocol_version)
         manifest = build_manifest(
             session_id,
             tuple(ManifestEntry(data["artifact_id"], slot, data["sha256"])
@@ -330,8 +331,9 @@ class CaptureEvidenceService:
             if actor.actor_role not in ("operator", "supervisor"):
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=True)
-            if _session.capture_protocol_version != "claims2car-12-v1":
-                raise CaptureSessionConflict("CAPTURE_PROTOCOL_DEFINITION_PENDING")
+            slots = frozenset(require_implemented_protocol(_session.capture_protocol_version).slots)
+            if set(results) != slots:
+                raise ValueError("INVALID_ADVISORY_QUALITY_RESULTS")
             consent = self._consent_state(history)
             if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
@@ -361,8 +363,6 @@ class CaptureEvidenceService:
             if actor.actor_role not in ("operator", "supervisor"):
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=True)
-            if _session.capture_protocol_version != "claims2car-12-v1":
-                raise CaptureSessionConflict("CAPTURE_PROTOCOL_DEFINITION_PENDING")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
             for kind, _who, old, old_id in history:
@@ -372,7 +372,7 @@ class CaptureEvidenceService:
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             if not history or history[-1][0] != "QUALITY_RECORDED":
                 raise CaptureSessionConflict("QUALITY_REVIEW_REQUIRED_BEFORE_SEAL")
-            manifest = self._verified_manifest(actor, session_id, history)
+            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
             payload = {
                 "schema_version": "0.1",
                 "request_id": request_id,
@@ -408,7 +408,7 @@ class CaptureEvidenceService:
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             if not history or history[-1][0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-            manifest = self._verified_manifest(actor, session_id, history)
+            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
             seal = history[-1][2]
             if seal.get("manifest_digest") != manifest.digest():
                 raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
@@ -457,7 +457,7 @@ class CaptureEvidenceService:
                     or seal_payload["artifact_ids"] != expected_artifact_ids
                 ):
                     raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
-                latest = self._artifact_set(history)
+                latest = self._artifact_set(history, _session.capture_protocol_version)
                 queued.append({
                     "session_id": session_id,
                     "manifest_digest": seal_payload["manifest_digest"],
