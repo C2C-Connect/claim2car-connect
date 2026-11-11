@@ -52,15 +52,16 @@ This is a dependency plan, not a claim that all listed slices are already implem
 ## Gate C — Operator and reviewer product experience
 
 - [ ] Canonical protocol registry defines `claims2car-16-v1` as the default and `claims2car-12-v1` as an explicit selectable alternative.
-- [ ] Exact 16-v1 slot IDs/order and capture semantics are approved from authoritative source material; do not infer the missing slot.
-- [ ] Protocol version is bound to each capture session and immutable manifest; historical 12-v1 sessions retain their original identity.
-- [ ] Browser/controller/API/backend contract parity is tested for each version.
+- [x] Exact 16-v1 slot IDs/order and descriptions are owner-approved in `contracts/shot-list-16-v1.json`.
+- [x] Protocol version is bound to each capture session and immutable manifest; historical 12-v1 sessions retain their original identity.
+- [x] Browser/controller/API/backend contract parity is covered by protocol-specific tests for both versions.
+- [ ] Real-device Safari/iPad qualification and roadside field validation remain outstanding.
 - [ ] Roadside pause, unsafe-slot skip, scene abort, interruption recovery and sync are validated on supported physical devices.
 - [ ] An authorized operator completes capture with consent and original-byte evidence; an independent reviewer retrieves it and records an attributable decision.
 
 **Implementation progress:** migration 0018 now persists an immutable protocol version per session, backfills historical sessions as 12-v1, defaults new sessions to 16-v1, and binds the version into new session-creation journal events. The authenticated registry API and operator selector expose 16-v1 as default and 12-v1 as an explicit alternative. 16-v1 evidence capture fails closed until its contract is approved.
 
-**Current known blocker:** exact 16-v1 slot IDs/order and cross-layer version compatibility are unresolved. Safari/iPad/physical-device and roadside validation are not complete.
+**Current status:** the software protocol contract and cross-layer version binding are implemented on the protocol feature branch, pending its CI and mainline merge. Safari/iPad/physical-device and roadside validation are not complete.
 
 ## Gate D — Persistent data, storage, retention and recovery
 
