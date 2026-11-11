@@ -18,6 +18,8 @@
 !migrations/**
 !authority_migrations/
 !authority_migrations/**
+!frontend/
+!frontend/**
 **/__pycache__
 **/*.pyc
 **/.env*

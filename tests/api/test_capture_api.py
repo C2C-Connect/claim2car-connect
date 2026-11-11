@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 from fastapi.testclient import TestClient
 from app.capture_api import CaptureRuntime, create_capture_app, load_runtime
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL
 from database.claim_cases import ClaimCase, ClaimCaseStore
 from app.identity import ActorBinding, Credential, CredentialResolver
 from app.main import Settings
@@ -23,7 +24,7 @@ class CaptureRouteTests(unittest.TestCase):
         self.credential=Credential(hashlib.sha256(self.token.encode()).hexdigest(),self.binding,int(time.time())+3600)
         self.store=Mock(spec=CaptureSessionStore)
         self.claim_store=Mock(spec=ClaimCaseStore)
-        self.session=CaptureSession(str(UUID(int=2)),str(self.binding.tenant_id),'test-actor','2026-10-22T00:00:00+00:00',True)
+        self.session=CaptureSession(str(UUID(int=2)),str(self.binding.tenant_id),'test-actor','2026-10-22T00:00:00+00:00',True,capture_protocol_version=DEFAULT_CAPTURE_PROTOCOL)
         self.store.create.return_value=self.session
         self.store.get.return_value=replace(self.session,created=False)
         self.runtime=CaptureRuntime(CredentialResolver([self.credential]),self.store,Settings(),self.claim_store)
@@ -56,6 +57,30 @@ class CaptureRouteTests(unittest.TestCase):
         self.claim_store.list_owned.assert_called_once_with('Bearer '+self.token,limit=25)
         self.claim_store.get.assert_called_once_with('Bearer '+self.token,claim_id=record.claim_id)
 
+    def test_protocol_registry_is_authenticated_and_marks_16_default_pending(self):
+        with self.client() as client:
+            registry = client.get('/v1/capture-protocols',headers=self.headers)
+            unauthorized = client.get('/v1/capture-protocols')
+        self.assertEqual(registry.status_code,200)
+        self.assertEqual(registry.json()['default_protocol_version'],DEFAULT_CAPTURE_PROTOCOL)
+        by_version = {item['version']:item for item in registry.json()['protocols']}
+        self.assertEqual(by_version['claims2car-16-v1']['status'],'definition_pending')
+        self.assertFalse(by_version['claims2car-16-v1']['capture_enabled'])
+        self.assertEqual(by_version['claims2car-12-v1']['status'],'implemented')
+        self.assertTrue(by_version['claims2car-12-v1']['capture_enabled'])
+        self.assertEqual(len(by_version['claims2car-12-v1']['required_slots']),12)
+        self.assertEqual(unauthorized.status_code,401)
+
+    def test_claim_case_request_defaults_to_16_v1_and_allows_explicit_12_v1(self):
+        record = ClaimCase(str(UUID(int=13)),str(self.binding.tenant_id),'test-actor',
+                           '2026-11-10T00:00:00+00:00','INTAKE_OPEN',True,str(UUID(int=14)))
+        self.claim_store.create.return_value = record
+        with self.client() as client:
+            client.post('/v1/claim-cases',json={'claim_id':record.claim_id,'request_id':str(UUID(int=15))},headers=self.headers)
+            client.post('/v1/claim-cases',json={'claim_id':record.claim_id,'request_id':str(UUID(int=16)),
+                        'capture_protocol_version':'claims2car-12-v1'},headers=self.headers)
+        self.assertEqual(self.claim_store.create.call_args_list[0].kwargs['capture_protocol_version'],DEFAULT_CAPTURE_PROTOCOL)
+        self.assertEqual(self.claim_store.create.call_args_list[1].kwargs['capture_protocol_version'],'claims2car-12-v1')
     def test_claim_case_list_rejects_invalid_limit(self):
         with self.client() as client:
             response=client.get('/v1/claim-cases?limit=0',headers=self.headers)
@@ -81,7 +106,8 @@ class CaptureRouteTests(unittest.TestCase):
         self.assertEqual(response.json()['tenant_id'],str(self.binding.tenant_id))
         self.assertEqual(response.json()['scope'],'controlled-test')
         self.assertEqual(response.headers['cache-control'],'no-store')
-        self.store.create.assert_called_once_with('Bearer '+self.token,self.session.session_id)
+        self.store.create.assert_called_once_with('Bearer '+self.token,self.session.session_id,
+                                                   protocol_version=DEFAULT_CAPTURE_PROTOCOL)
 
     def test_idempotent_retry_returns_200(self):
         self.store.create.return_value=replace(self.session,created=False)

@@ -44,7 +44,7 @@ The authority workflow applied and verified the migration plan through `0017_eve
 - No provisioned/verified integrated staging PostgreSQL service, durable evidence volume, sealed runtime secrets, TLS/private ingress, monitoring, or backup/restore evidence.
 - The integrated container CI smoke is a disposable local container test; it does not prove the container's full capture-to-review path against a persistent database and cloud object store.
 - The HTTP-to-PostgreSQL-to-original-bytes journey is synthetic CI evidence, not real participant evidence or field acceptance.
-- Current canonical contract remains `claims2car-12-v1`; CTO execution plan calls for 16-v1. The exact 16-slot definition and compatibility behavior must be reconciled before field acceptance.
+- The code snapshot at this revision still implements `claims2car-12-v1`. The founder-approved target is `claims2car-16-v1` as the default, with `claims2car-12-v1` retained as a selectable, versioned alternative and historical 12-v1 sessions preserved. Exact 16-v1 slot IDs/order and the cross-layer compatibility contract remain implementation blockers; no historical session may be silently reclassified.
 - Owner authentication/invitation and identity proofing remain unimplemented; owner actor credentials are provisioned out-of-band.
 - Supplemental incident disclosure remains `draft_pending_legal_review` and incident intake remains disabled by default.
 - Safari/iPad/physical-device qualification, roadside validation, field-calibrated quality thresholds, and real-world model accuracy remain unverified.
@@ -105,7 +105,9 @@ The current Railway configuration is a restricted synthetic containment service.
 
 **Deliberate boundary:** the complete automated journey uses synthetic VIN and synthetic image bytes. The case currently stores identity, creator/time/state, and capture-session association; incident details/location/narrative, claimant personal information, and policy details are not yet stored. Owner binding relies on a server-provisioned owner actor credential; this is not end-user login, identity proofing, or claimant invitation. The end-to-end test is not field acceptance, live participant-data approval, automated adjudication, or proof of a deployed customer-facing environment.
 
-**Open product-contract reconciliation:** `contracts/shot-list.json` and the current operator UI/tests define **12 canonical capture slots**, while the CTO master execution plan calls for **16 v1 slots**. This increment verifies the existing 12-slot contract. Do not silently add, remove, or rename slots before field acceptance; the product owner must confirm which count and slot definition is authoritative.
+**Founder-approved capture-protocol direction — 2026-11-10:** `claims2car-16-v1` is the default target; `claims2car-12-v1` remains a selectable, explicitly versioned alternative. Historical 12-v1 sessions and manifests must retain their original protocol identity and interpretation. This supersedes the earlier open question about which count is the target.
+
+**Remaining implementation blocker — exact 16-v1 contract:** The architecture source is internally inconsistent. One section describes 12 standard framing angles plus up to 4 specialized detail angles, while enumerating 8 exterior + 2 undercarriage + 2 interior + 2 legal/document views (14 before the optional details). Another mandatory-16 breakdown enumerates 8 exterior + 2 interior + 1 license-plate + 1 insurance-document + 3 damage close-ups (15). The Slice 2 controller also uses a third set of 12 slot identifiers that does not match `contracts/shot-list.json`. Reconcile one exact 16-slot ID/order and map it to API, manifest, controller, browser, and reviewer contracts before implementation. Do not guess, silently rename, or reclassify existing 12-v1 evidence.
 
 **Verification evidence at the candidate revision:**
 - Full repository suite: **685 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42755651654](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387422).
@@ -197,3 +199,18 @@ The current Railway configuration is a restricted synthetic containment service.
 **Boundary:** the successful database workflow uses isolated/disposable PostgreSQL test databases and synthetic records. It does not establish production database migration safety against unknown live historical rows, durable cloud storage, backup/restore, production deployment, Safari/iPad qualification, field validation, or legal admissibility. Hashes and canonical journal serialization establish consistency and replayability, not the truth of a claim or capture provenance.
 
 **Next P0 slice:** exercise the complete authenticated HTTP path against the full authority schema and durable artifact store, including process restart, manifest seal/readback, independent reviewer retrieval, cross-tenant denial, consent withdrawal, and tampered-byte rejection. Keep deployment disabled until that integrated path and the persistent storage/recovery controls have evidence.
+
+
+## Capture protocol version binding — 2026-11-11
+
+**Implementation candidate:** PR #31, Slice 2 workbench branch.
+
+- New sessions default to `claims2car-16-v1`; `claims2car-12-v1` is explicitly selectable.
+- Authority migration 0018 backfills existing sessions as 12-v1, adds a constrained protocol-version column, sets the default for new sessions to 16-v1, and makes the version immutable with a database trigger.
+- Claim-case creation, controlled-session creation, session readback, and claim-case readback carry the selected version. Idempotent retries cannot change it.
+- The authenticated protocol-registry API and operator workbench expose the default and the selectable legacy alternative.
+- The existing 12-v1 manifest/capture contract remains executable. Evidence registration, quality recording, and sealing reject a 16-v1 session until its exact slot contract is approved; 16-v1 never falls through to 12-v1.
+
+**Still open:** the exact authoritative 16 slot IDs/order/semantics remain unresolved because the source architecture contains conflicting enumerations. The separate Slice 2 browser controller's 12-slot list also differs from the API 12-v1 contract. These lists must be reconciled explicitly. No 16-v1 manifest or capture completion is claimed.
+
+See `docs/release/CAPTURE_PROTOCOL_VERSIONING.md` for the immutable-session rules and remaining work.

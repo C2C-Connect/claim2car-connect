@@ -71,13 +71,57 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
             app = create_app(runtime_mode="integrated")
             with TestClient(app) as client:
                 assert client.get("/health/live").status_code == 200
-
-                # The integrated product shell is mounted at the root and its
-                # static assets are served by the same runtime image.
+                # The integrated runtime serves the real operator/reviewer shell.
                 shell = client.get("/")
                 assert shell.status_code == 200
                 assert "Claim2Car Connect" in shell.text
-                assert client.get("/assets/app.js").status_code == 200
+
+                # Verify the document actually bootstraps the connected
+                # operator/reviewer workbench, rather than merely returning
+                # an unrelated HTML page while another frontend's assets
+                # happen to be mounted at the root.
+                assert '<link rel="stylesheet" href="/assets/app.css">' in shell.text
+                assert '<script type="module" src="/assets/app.js"></script>' in shell.text
+                assert "/app.mjs" not in shell.text
+                assert "/styles.css" not in shell.text
+
+                workbench_script = client.get("/assets/app.js")
+                assert workbench_script.status_code == 200
+                assert "createClaimCase" in workbench_script.text
+                assert "/api/v1/claim-cases" in workbench_script.text
+                assert "/api/v1/capture-protocols" in workbench_script.text
+                assert "capture_protocol_version" in workbench_script.text
+                assert 'id="capture-protocol-version"' in shell.text
+                assert "/api/v1/review-queue" in workbench_script.text
+                assert "createOfflineEvidenceQueue" in workbench_script.text
+
+                # Every fixed DOM lookup made by the shipped workbench must
+                # resolve against the actual root document. This catches
+                # partially wired shells before a browser user encounters
+                # null-element failures during connection or capture.
+                import re
+
+                script_ids = set(re.findall(r'\$\("([^"]+)"\)', workbench_script.text))
+                document_ids = set(re.findall(r'\bid="([^"]+)"', shell.text))
+                assert script_ids <= document_ids, (
+                    "Workbench references missing from root HTML: "
+                    + ", ".join(sorted(script_ids - document_ids))
+                )
+
+                assert client.get("/assets/app.css").status_code == 200
+                assert client.get("/assets/offline_evidence_queue.mjs").status_code == 200
+                # The newer controlled-test interface is deliberately
+                # isolated under /prototype. It must not shadow the persistent
+                # claim-case workbench at the product root.
+                prototype = client.get("/prototype/")
+                assert prototype.status_code == 200
+                assert '<link rel="stylesheet" href="/prototype/styles.css">' in prototype.text
+                assert '<script type="module" src="/prototype/app.mjs"></script>' in prototype.text
+                assert client.get("/prototype/app.mjs").status_code == 200
+                assert client.get("/prototype/styles.css").status_code == 200
+                assert client.get("/app.mjs").status_code == 404
+                assert client.get("/styles.css").status_code == 404
+                assert client.get("/src/modules/capture/vin.mjs").status_code == 200
 
                 # Capture and reviewer APIs are mounted under /api and retain
                 # their end-user credential boundary.
@@ -88,6 +132,27 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 review_details = client.get(f"/api/v1/review-sessions/{SESSION_ID}")
                 assert review_details.status_code == 401
 
+                # The protocol registry is authenticated and distinguishes
+                # the approved 16-v1 default from the executable 12-v1
+                # alternative without inventing the pending 16 slots.
+                registry_denied = client.get("/api/v1/capture-protocols")
+                assert registry_denied.status_code == 401
+                registry = client.get(
+                    "/api/v1/capture-protocols",
+                    headers={"Authorization": f"Bearer {OPERATOR_TOKEN}"},
+                )
+                assert registry.status_code == 200
+                assert registry.json()["default_protocol_version"] == "claims2car-16-v1"
+                by_version = {item["version"]: item for item in registry.json()["protocols"]}
+                assert by_version["claims2car-16-v1"]["status"] == "definition_pending"
+                assert by_version["claims2car-16-v1"]["required_slots"] == []
+                assert by_version["claims2car-16-v1"]["capture_enabled"] is False
+                assert by_version["claims2car-12-v1"]["status"] == "implemented"
+                assert len(by_version["claims2car-12-v1"]["required_slots"]) == 12
+                ui_slots_match = re.search(r"const SLOTS = \[(.*?)\];", workbench_script.text, re.S)
+                assert ui_slots_match is not None
+                ui_slots = re.findall(r'\["([^"]+)"', ui_slots_match.group(1))
+                assert ui_slots == by_version["claims2car-12-v1"]["required_slots"]
                 # Identity discovery is authenticated and returns only the
                 # server-resolved actor/tenant/role, never client assertions.
                 identity_denied = client.get("/api/v1/identity")

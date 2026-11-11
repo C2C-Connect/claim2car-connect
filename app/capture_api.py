@@ -34,6 +34,7 @@ from app.artifact_storage import (
     ArtifactStorageUnavailable, OriginalByteStore,
 )
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
 CONFIGURATION_SIZE_LIMIT = 65536
@@ -49,6 +50,7 @@ class CaptureRuntime:
 class ClaimCaseRequest(BaseModel):
     claim_id: UUID
     request_id: UUID
+    capture_protocol_version: StrictStr = DEFAULT_CAPTURE_PROTOCOL
     class Config:
         extra = 'forbid'
 
@@ -70,6 +72,7 @@ class IncidentIntakeRequest(BaseModel):
 
 class SessionRequest(BaseModel):
     session_id: UUID
+    capture_protocol_version: StrictStr = DEFAULT_CAPTURE_PROTOCOL
     class Config:
         extra = 'forbid'
 
@@ -235,9 +238,9 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             _fail(401, 'UNAUTHORIZED')
         return authorization
 
-    def invoke(action, authorization, session_id, creating=False):
+    def invoke(action, authorization, session_id, creating=False, **kwargs):
         try:
-            result = action(authorization, str(session_id))
+            result = action(authorization, str(session_id), **kwargs)
             payload_data = asdict(result)
             payload_data.pop('owner_actor_id', None)
             payload_data['scope'] = getattr(result, 'scope', 'controlled-test')
@@ -277,12 +280,29 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         except Exception:
             _fail(500, 'CLAIM_CASE_OPERATION_FAILED')
 
+    @api.get('/v1/capture-protocols')
+    def capture_protocol_registry(authorization: str = Depends(authorize)):
+        protocols = []
+        for version in (DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL):
+            definition = resolve_capture_protocol(version)
+            protocols.append({
+                "version": definition.version,
+                "status": definition.status,
+                "selectable_for_new_sessions": True,
+                "capture_enabled": definition.status == "implemented",
+                "required_slots": list(definition.slots),
+            })
+        return JSONResponse({
+            "default_protocol_version": DEFAULT_CAPTURE_PROTOCOL,
+            "protocols": protocols,
+        }, headers=dict(NO_STORE_HEADERS))
     @api.post('/v1/claim-cases')
     def create_claim_case(body: ClaimCaseRequest, authorization: str = Depends(authorize)):
         if claim_cases is None:
             _fail(503, 'CLAIM_CASE_STORAGE_UNAVAILABLE')
         return invoke_claim(claim_cases.create, authorization,
-                            claim_id=str(body.claim_id), request_id=str(body.request_id))
+                            claim_id=str(body.claim_id), request_id=str(body.request_id),
+                            capture_protocol_version=body.capture_protocol_version)
 
     @api.get('/v1/claim-cases')
     def list_claim_cases(limit: int = Query(default=50, ge=1, le=100),
@@ -312,7 +332,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
 
     @api.post('/v1/capture-sessions')
     def create_session(body: SessionRequest, authorization: str = Depends(authorize)):
-        return invoke(runtime.store.create, authorization, body.session_id, creating=True)
+        return invoke(runtime.store.create, authorization, body.session_id, creating=True,
+                      protocol_version=body.capture_protocol_version)
 
     @api.get('/v1/capture-sessions')
     def list_sessions(limit: int = Query(default=100, ge=1, le=100), authorization: str = Depends(authorize)):

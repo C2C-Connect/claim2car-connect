@@ -38,6 +38,9 @@
         <h3>Operator workspace</h3>
         <h4>Persistent claim-case register</h4>
         <p class="muted">Create and reopen tenant-scoped claim-case records. The register stores case identity, creator/owner binding, and capture-session association. Optional structured incident details are separately consent-gated; claimant and policy details are not collected by this v1 intake.</p>
+        <label for="capture-protocol-version">Capture protocol for new sessions</label>
+        <select id="capture-protocol-version"><option value="claims2car-16-v1" selected>claims2car-16-v1 · default</option><option value="claims2car-12-v1">claims2car-12-v1 · legacy alternative</option></select>
+        <p id="capture-protocol-help" class="fine">16-v1 is the default. Its exact slot contract is being finalized; evidence capture remains disabled for 16-v1 until that contract is approved. Select 12-v1 to use the currently implemented legacy capture contract.</p>
         <div class="actions"><button id="create-claim-case" class="primary">Create claim record</button><span id="claim-case-created" class="fine"></span></div>
         <div id="claim-cases" class="owned-sessions" aria-live="polite"></div>
         <div class="rule"></div>

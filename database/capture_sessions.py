@@ -13,6 +13,7 @@ import psycopg
 from psycopg.conninfo import conninfo_to_dict
 from app.identity import CredentialResolver
 from database.journal import tenant_transaction
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, validate_protocol_version
 
 class CaptureAuthorizationError(PermissionError):
     pass
@@ -33,6 +34,7 @@ class CaptureSession:
     scope: str = 'controlled-test'
     claim_id: str | None = None
     owner_actor_id: str | None = None
+    capture_protocol_version: str = LEGACY_CAPTURE_PROTOCOL
 
 PROFILE_SQL = """
 SELECT session_user::text,current_user::text,r.rolsuper,r.rolbypassrls,
@@ -90,7 +92,7 @@ class CaptureSessionStore:
     @staticmethod
     def _read(conn,actor,session_id,created=False):
         row=conn.execute('SELECT e.actor,e.occurred_at,e.event_id,e.kind,e.payload_json,e.schema_version,'
-                         'c.claim_id,c.owner_actor_id FROM faos.sessions s '
+                         'c.claim_id,c.owner_actor_id,s.capture_protocol_version FROM faos.sessions s '
                          'LEFT JOIN faos.events e ON e.tenant_id=s.tenant_id '
                          'AND e.session_id=s.session_id AND e.sequence=1 '
                          'LEFT JOIN faos.claim_cases c ON c.tenant_id=s.tenant_id '
@@ -98,32 +100,45 @@ class CaptureSessionStore:
                          'WHERE s.tenant_id=%s AND s.session_id=%s',(actor.tenant_id,session_id)).fetchone()
         if row is None:
             raise CaptureSessionNotFound('CAPTURE_SESSION_NOT_FOUND')
-        if row[2:6]==('capture-created','SESSION_CREATED','{"synthetic":true}','0.1'):
-            return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,'controlled-test',None,None)
         try:
             payload=json.loads(row[4])
         except (ValueError,TypeError):
             raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION') from None
+        controlled_payloads = (
+            {'synthetic':True} if row[8] == LEGACY_CAPTURE_PROTOCOL else None,
+            {'capture_protocol_version':row[8],'synthetic':True},
+        )
+        if (row[2]=='capture-created' and row[3]=='SESSION_CREATED' and row[5]=='0.1'
+                and payload in controlled_payloads):
+            return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,'controlled-test',None,None,row[8])
+        claim_payloads = (
+            {'claim_id':str(row[6]),'synthetic':False} if row[8] == LEGACY_CAPTURE_PROTOCOL and row[6] is not None else None,
+            {'capture_protocol_version':row[8],'claim_id':str(row[6]),'synthetic':False} if row[6] is not None else None,
+        )
         if (row[2]=='claim-created' and row[3]=='SESSION_CREATED' and row[5]=='0.1'
-                and row[6] is not None and payload=={'claim_id':str(row[6]),'synthetic':False}):
+                and row[6] is not None and payload in claim_payloads):
             return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,
-                                  'persistent-claim-case',str(row[6]),row[7])
+                                  'persistent-claim-case',str(row[6]),row[7],row[8])
         raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION')
 
-    def create(self,authorization,session_id):
+    def create(self,authorization,session_id,*,protocol_version=DEFAULT_CAPTURE_PROTOCOL):
         session_id=self._identifier(session_id)
+        protocol_version=validate_protocol_version(protocol_version)
         with self._authorized(authorization) as (conn,actor):
             if actor.actor_role not in ('operator','supervisor'):
                 raise CaptureAuthorizationError('OPERATOR_IDENTITY_REQUIRED')
-            inserted=conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s) '
-                                  'ON CONFLICT DO NOTHING RETURNING session_id',(actor.tenant_id,session_id)).fetchone() is not None
+            inserted=conn.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s) '
+                                  'ON CONFLICT DO NOTHING RETURNING session_id',(actor.tenant_id,session_id,protocol_version)).fetchone() is not None
             if inserted:
                 timestamp=datetime.now(timezone.utc).isoformat()
                 result=conn.execute('SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-                                    (actor.tenant_id,session_id,'capture-created',1,'SESSION_CREATED',actor.actor_id,timestamp,'controlled test capture session','{"synthetic":true}','0.1')).fetchone()[0]
+                                    (actor.tenant_id,session_id,'capture-created',1,'SESSION_CREATED',actor.actor_id,timestamp,'controlled test capture session','{"capture_protocol_version":"'+protocol_version+'","synthetic":true}','0.1')).fetchone()[0]
                 if result!='ACCEPTED':
                     raise RuntimeError('CAPTURE_CREATION_FAILED')
-            return self._read(conn,actor,session_id,created=inserted)
+            result=self._read(conn,actor,session_id,created=inserted)
+            if result.capture_protocol_version != protocol_version:
+                raise CaptureSessionConflict('CAPTURE_PROTOCOL_VERSION_MISMATCH')
+            return result
 
     def list_owned(self,authorization,*,limit=100):
         """List only the authenticated operator's own controlled capture drafts."""

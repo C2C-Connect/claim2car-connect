@@ -68,7 +68,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                     created = client.post(
                         "/v1/claim-cases",
                         headers={"Authorization": self.db.auth()},
-                        json={"claim_id": claim_id, "request_id": str(uuid.uuid4())},
+                        json={"claim_id": claim_id, "request_id": str(uuid.uuid4()), "capture_protocol_version": "claims2car-12-v1"},
                     )
                     self.assertEqual(created.status_code, 201, created.text)
                     session_id = created.json()["capture_session_id"]

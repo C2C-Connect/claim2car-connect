@@ -14,6 +14,7 @@ on:
       - "contracts/**"
       - "migrations/**"
       - "authority_migrations/**"
+      - "frontend/**"
       - ".github/workflows/integrated-container-smoke.yml"
   push:
     branches: [main, "cto/**"]
@@ -29,6 +30,7 @@ on:
       - "contracts/**"
       - "migrations/**"
       - "authority_migrations/**"
+      - "frontend/**"
       - ".github/workflows/integrated-container-smoke.yml"
 
 permissions:
@@ -162,6 +164,21 @@ jobs:
           assert status == 200, body.decode("utf-8", errors="replace")
           assert b"e_k_j" in body
           assert request("/api/v1/review-queue")[0] == 401
+          root_status, root_body = request("/")
+          assert root_status == 200
+          assert b'href="/assets/app.css"' in root_body
+          assert b'<script type="module" src="/assets/app.js"></script>' in root_body
+          assert b"/prototype/app.mjs" not in root_body
+
+          prototype_status, prototype_body = request("/prototype/")
+          assert prototype_status == 200
+          assert b'href="/prototype/styles.css"' in prototype_body
+          assert b'<script type="module" src="/prototype/app.mjs"></script>' in prototype_body
+          assert request("/prototype/app.mjs")[0] == 200
+          assert request("/prototype/styles.css")[0] == 200
+          assert request("/app.mjs")[0] == 404
+          assert request("/styles.css")[0] == 404
+          assert request("/src/modules/capture/vin.mjs")[0] == 200
           assert request(
               "/api/v1/analysis/physics",
               method="POST",

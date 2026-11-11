@@ -17,6 +17,7 @@ from uuid import UUID
 
 from app.artifact_storage import ArtifactKey, OriginalByteStore
 from app.evidence_manifest import CANONICAL_SLOTS, ManifestEntry, build_manifest
+from app.capture_protocols import require_implemented_protocol
 from app.vin_guard import validate_vin
 from database.capture_sessions import (
     CaptureAuthorizationError,
@@ -122,11 +123,14 @@ class CaptureEvidenceService:
             _session, history = self._history(conn, actor, session_id, creator_required=True)
             consent = self._consent_state(history)
             vehicle_present = self._has_valid_vehicle_reference(history, consent)
+            protocol = require_implemented_protocol(_session.capture_protocol_version) if _session.capture_protocol_version == "claims2car-12-v1" else None
             return {
                 "session_id": session_id,
+                "capture_protocol_version": _session.capture_protocol_version,
+                "capture_protocol_status": "implemented" if protocol is not None else "definition_pending",
                 "consent_active": consent is not None,
                 "vehicle_reference_present": vehicle_present,
-                "capture_allowed": consent is not None and vehicle_present,
+                "capture_allowed": protocol is not None and consent is not None and vehicle_present,
             }
 
     def record_consent(self, authorization, session_id, *, request_id, accepted, scope):
@@ -246,6 +250,8 @@ class CaptureEvidenceService:
             if actor.actor_role not in ("operator", "supervisor"):
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=True)
+            if _session.capture_protocol_version != "claims2car-12-v1":
+                raise CaptureSessionConflict("CAPTURE_PROTOCOL_DEFINITION_PENDING")
             consent = self._consent_state(history)
             if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
@@ -295,12 +301,13 @@ class CaptureEvidenceService:
             raise CaptureSessionConflict("CAPTURE_SET_INCOMPLETE")
         return latest
 
-    def _verified_manifest(self, actor, session_id, history):
+    def _verified_manifest(self, actor, session_id, history, protocol_version="claims2car-12-v1"):
         latest = self._artifact_set(history)
         manifest = build_manifest(
             session_id,
             tuple(ManifestEntry(data["artifact_id"], slot, data["sha256"])
                   for slot, (_actor, data) in latest.items()),
+            protocol_version=protocol_version,
         )
         for entry in manifest.entries:
             record = latest[entry.slot][1]
@@ -323,6 +330,8 @@ class CaptureEvidenceService:
             if actor.actor_role not in ("operator", "supervisor"):
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=True)
+            if _session.capture_protocol_version != "claims2car-12-v1":
+                raise CaptureSessionConflict("CAPTURE_PROTOCOL_DEFINITION_PENDING")
             consent = self._consent_state(history)
             if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
@@ -338,7 +347,7 @@ class CaptureEvidenceService:
             if any(kind in ("QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED")
                    for kind, *_ in history):
                 raise CaptureSessionConflict("QUALITY_ALREADY_RECORDED")
-            self._verified_manifest(actor, session_id, history)
+            self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
             payload = {"request_id": request_id, "results": results, "advisory_only": True}
             self._append(conn, actor, session_id, history, event_id=event_id,
                          kind="QUALITY_RECORDED", reason="advisory image quality recorded", payload=payload)
@@ -352,6 +361,8 @@ class CaptureEvidenceService:
             if actor.actor_role not in ("operator", "supervisor"):
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=True)
+            if _session.capture_protocol_version != "claims2car-12-v1":
+                raise CaptureSessionConflict("CAPTURE_PROTOCOL_DEFINITION_PENDING")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
             for kind, _who, old, old_id in history:
@@ -437,11 +448,30 @@ class CaptureEvidenceService:
                         or set(seal_payload) != {"schema_version", "request_id", "manifest_digest", "shot_list_version", "artifact_ids"}
                         or not isinstance(seal_payload.get("manifest_digest"), str)):
                     raise CaptureSessionConflict("UNSUPPORTED_SEAL_HISTORY")
+                # Verify the sealed originals before exposing reviewer-safe metadata.
+                manifest = self._verified_manifest(actor, session_id, history)
+                expected_artifact_ids = [entry.artifact_id for entry in manifest.entries]
+                if (
+                    manifest.digest() != seal_payload["manifest_digest"]
+                    or seal_payload["shot_list_version"] != manifest.shot_list_version
+                    or seal_payload["artifact_ids"] != expected_artifact_ids
+                ):
+                    raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
+                latest = self._artifact_set(history)
                 queued.append({
                     "session_id": session_id,
                     "manifest_digest": seal_payload["manifest_digest"],
                     "shot_list_version": seal_payload["shot_list_version"],
                     "artifact_count": len(seal_payload["artifact_ids"]),
+                    "artifacts": [
+                        {
+                            "artifact_id": entry.artifact_id,
+                            "slot": entry.slot,
+                            "sha256": entry.sha256_hex,
+                            "byte_length": latest[entry.slot][1]["byte_length"],
+                        }
+                        for entry in manifest.entries
+                    ],
                     "reviewer_must_decide": True,
                 })
                 if len(queued) == limit:

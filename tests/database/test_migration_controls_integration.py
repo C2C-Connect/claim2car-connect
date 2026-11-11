@@ -72,7 +72,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0017_event_contract_parity.sql')
+        self.assertEqual(plan[-1].name,'0018_capture_protocol_session_binding.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -87,9 +87,41 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql'))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
+
+    def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
+        plan = self.authority_plan()
+        apply(self.conn, plan[:-1])
+        tenant = str(uuid.uuid4())
+        legacy_session = 'legacy-' + uuid.uuid4().hex
+        new_session = 'new-' + uuid.uuid4().hex
+        admin_url = make_conninfo(
+            os.getenv('MIGRATION_TEST_ADMIN_URL', 'postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test'),
+            dbname=self.db,
+        )
+        with psycopg.connect(admin_url, autocommit=True) as admin:
+            admin.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                          (tenant,'protocol migration fixture'))
+            admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                          (tenant,legacy_session))
+            self.assertEqual(apply(self.conn,plan),(plan[-1].name,))
+            legacy_version = admin.execute(
+                'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
+                (tenant,legacy_session)).fetchone()[0]
+            self.assertEqual(legacy_version,'claims2car-12-v1')
+            admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                          (tenant,new_session))
+            new_version = admin.execute(
+                'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
+                (tenant,new_session)).fetchone()[0]
+            self.assertEqual(new_version,'claims2car-16-v1')
+            with self.assertRaises(psycopg.errors.RaiseException) as raised:
+                admin.execute(
+                    "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v1' WHERE tenant_id=%s AND session_id=%s",
+                    (tenant,legacy_session))
+            self.assertEqual(raised.exception.diag.message_primary,'CAPTURE_PROTOCOL_VERSION_IMMUTABLE')
 
     def test_full_migration_enforces_python_sql_event_contract_parity(self):
         from app.domain_events import DomainEvent, KINDS
@@ -198,6 +230,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0017_event_contract_parity'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0018_capture_protocol_session_binding.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
