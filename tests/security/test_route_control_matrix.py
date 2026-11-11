@@ -39,7 +39,7 @@ class M1PublicSurfaceTests(unittest.TestCase):
         table = route_table(create_app(Settings()))
         self.assertEqual(
             table,
-            {("/health/live", ("GET",)), ("/health/ready", ("GET",))},
+            {("/health/live", ("GET",)), ("/health/ready", ("GET",)), ("/health/build", ("GET",))},
             "The M1 public surface must expose only health routes — no business API.",
         )
 
@@ -56,7 +56,7 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
     def _authorize_dependencies(self, app):
         required = []
         for route in app.routes:
-            if isinstance(route, APIRoute) and "capture-sessions" in route.path:
+            if isinstance(route, APIRoute) and any(resource in route.path for resource in ("capture-sessions", "claim-cases")):
                 assert route.dependant.dependencies, f"{route.path} has no authorize dependency"
                 required.append((route.path, tuple(sorted(route.methods))))
         return required
@@ -67,10 +67,39 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
         self.assertEqual(
             set(secured),
             {
+                ("/v1/claim-cases", ("GET",)),
+                ("/v1/claim-cases", ("POST",)),
+                ("/v1/claim-cases/{claim_id}", ("GET",)),
+                ("/v1/capture-sessions", ("GET",)),
                 ("/v1/capture-sessions", ("POST",)),
                 ("/v1/capture-sessions/{session_id}", ("GET",)),
             },
         )
+
+    def test_evidence_readiness_route_is_authenticated(self):
+        import os
+        import tempfile
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
+            "C2C_ARTIFACT_STORAGE_ROOT": directory,
+            "C2C_VIN_HMAC_PEPPER": "P" * 43,
+        }):
+            app = create_capture_app(self._runtime(), enable_evidence=True)
+            readiness_route = next(
+                route for route in app.routes
+                if isinstance(route, APIRoute)
+                and route.path == "/v1/capture-sessions/{session_id}/evidence-readiness"
+                and "GET" in route.methods
+            )
+            self.assertTrue(readiness_route.dependant.dependencies)
+            with TestClient(app) as client:
+                response = client.get(
+                    "/v1/capture-sessions/00000000-0000-0000-0000-000000000002/evidence-readiness"
+                )
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(response.json(), {"detail": "UNAUTHORIZED"})
 
     def test_intake_routes_all_require_bearer(self):
         app = create_intake_app(self._runtime())
@@ -79,6 +108,10 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
         self.assertEqual(
             set(secured),
             {
+                ("/v1/claim-cases", ("GET",)),
+                ("/v1/claim-cases", ("POST",)),
+                ("/v1/claim-cases/{claim_id}", ("GET",)),
+                ("/v1/capture-sessions", ("GET",)),
                 ("/v1/capture-sessions", ("POST",)),
                 ("/v1/capture-sessions/{session_id}", ("GET",)),
                 ("/v1/capture-sessions/{session_id}/draft", ("GET",)),

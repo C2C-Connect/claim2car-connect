@@ -35,8 +35,16 @@ class FakeConnection:
     def __init__(self):
         self.rows = [(1, "SESSION_CREATED", "operator-1", '{"synthetic":true}', "capture-created")]
         self.appended = []
+        self.owner_bindings = {}
 
     def execute(self, sql, args=()):
+        if "faos.bind_claim_case_owner" in sql:
+            _tenant, session, owner = args
+            current = self.owner_bindings.get(session)
+            if current is None:
+                self.owner_bindings[session] = owner
+                return Result(one=("BOUND",))
+            return Result(one=("BOUND" if current == owner else "CONFLICT",))
         if "SELECT s.session_id FROM faos.sessions" in sql:
             return Result(many=[(str(UUID(int=2)),)])
         if "SELECT sequence,kind,actor,payload_json,event_id" in sql:
@@ -54,6 +62,8 @@ class FakeSessions(CaptureSessionStore):
         self.conn = FakeConnection()
         self.creator = creator
         self.actors = {}
+        self.scope = 'controlled-test'
+        self.claim_id = None
 
     @contextmanager
     def _authorized(self, authorization):
@@ -61,7 +71,8 @@ class FakeSessions(CaptureSessionStore):
 
     def _read(self, conn, actor, session_id, created=False):
         return CaptureSession(session_id, str(actor.tenant_id), self.creator,
-                              "2026-11-08T00:00:00+00:00", created)
+                              "2026-11-08T00:00:00+00:00", created, self.scope,
+                              self.claim_id, self.conn.owner_bindings.get(session_id))
 
 
 class RecordingByteStore(OriginalByteStore):
@@ -119,6 +130,22 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertEqual([event[0] for event in self.sessions.conn.appended],
                          ["CONSENT_RECORDED", "VEHICLE_RECORDED"])
 
+    def test_persistent_claim_consent_binds_one_owner_identity(self):
+        self.sessions.scope = "persistent-claim-case"
+        self.sessions.claim_id = str(UUID(int=77))
+        self.sessions.actors["other-owner-token"] = Actor("owner-2", self.tenant, "owner")
+        self.service.record_consent(
+            "owner-token", self.session_id, request_id=UUID(int=78),
+            accepted=True, scope="capture_review",
+        )
+        self.assertEqual(self.sessions.conn.owner_bindings[self.session_id], "owner-1")
+        with self.assertRaisesRegex(CaptureAuthorizationError, "CLAIM_CASE_OWNER_BINDING_DENIED"):
+            self.service.record_consent(
+                "other-owner-token", self.session_id, request_id=UUID(int=79),
+                accepted=True, scope="capture_review",
+            )
+        self.assertEqual(len([event for event in self.sessions.conn.appended if event[0] == "CONSENT_RECORDED"]), 1)
+
     def test_declined_or_withdrawn_consent_blocks_vehicle_recording(self):
         self.service.record_consent(
             "owner-token", self.session_id, request_id=UUID(int=5),
@@ -128,6 +155,42 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
             self.service.record_vehicle(
                 "operator-token", self.session_id, request_id=UUID(int=6), vin="1HGCM82633A004352",
             )
+
+    def test_evidence_readiness_tracks_active_consent_and_vehicle_reference(self):
+        initial = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertFalse(initial["consent_active"])
+        self.assertFalse(initial["vehicle_reference_present"])
+        self.assertFalse(initial["capture_allowed"])
+
+        self.service.record_consent(
+            "owner-token", self.session_id, request_id=UUID(int=80),
+            accepted=True, scope="capture_review",
+        )
+        consented = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertTrue(consented["consent_active"])
+        self.assertFalse(consented["vehicle_reference_present"])
+        self.assertFalse(consented["capture_allowed"])
+
+        self.service.record_vehicle(
+            "operator-token", self.session_id, request_id=UUID(int=81), vin="1HGCM82633A004352",
+        )
+        ready = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertTrue(ready["capture_allowed"])
+
+        self.service.record_consent(
+            "owner-token", self.session_id, request_id=UUID(int=82),
+            accepted=False, scope="capture_review",
+        )
+        withdrawn = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertFalse(withdrawn["consent_active"])
+        self.assertFalse(withdrawn["capture_allowed"])
+
+    def test_evidence_readiness_requires_creator_operator_or_supervisor(self):
+        self.sessions.actors["other-operator-token"] = Actor("operator-2", self.tenant, "operator")
+        with self.assertRaisesRegex(CaptureAuthorizationError, "CAPTURE_AUTHORITY_DENIED"):
+            self.service.evidence_readiness("other-operator-token", self.session_id)
+        with self.assertRaisesRegex(CaptureAuthorizationError, "OPERATOR_IDENTITY_REQUIRED"):
+            self.service.evidence_readiness("reviewer-token", self.session_id)
 
     def test_only_owner_role_can_record_consent_and_only_operator_can_record_vehicle(self):
         with self.assertRaisesRegex(CaptureAuthorizationError, "OWNER_IDENTITY_REQUIRED"):
@@ -210,6 +273,15 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         queue = self.service.list_review_queue("reviewer-token")
         self.assertEqual(queue[0]["session_id"], self.session_id)
         self.assertEqual(len(queue[0]["artifacts"]), len(CANONICAL_SLOTS))
+        details = self.service.get_review_details("reviewer-token", self.session_id)
+        self.assertEqual(details["session_id"], self.session_id)
+        self.assertEqual(details["manifest_digest"], sealed["manifest_digest"])
+        self.assertEqual(len(details["artifacts"]), len(CANONICAL_SLOTS))
+        self.assertEqual(
+            {item["slot"] for item in details["artifacts"]}, set(CANONICAL_SLOTS)
+        )
+        self.assertNotIn("1HGCM82633A004352", json.dumps(details))
+
         first_slot = CANONICAL_SLOTS[0]
         first_artifact = UUID(int=201)
         self.assertEqual(queue[0]["artifacts"][0]["artifact_id"], str(first_artifact))

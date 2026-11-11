@@ -1,0 +1,40 @@
+name: Browser IndexedDB evidence queue verification
+on:
+  pull_request:
+  push:
+    branches: [main, acceptance, 'acceptance/**', 'release/**', 'rc/**']
+  merge_group:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  indexeddb-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Playwright runner
+        run: |
+          npm init -y
+          npm install --no-save --no-package-lock playwright@1.56.1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Serve repository files to the browser
+        run: |
+          python -m http.server 4173 --bind 127.0.0.1 --directory . >/tmp/c2c-browser-test-http.log 2>&1 &
+          echo $! >/tmp/c2c-browser-test-http.pid
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:4173/frontend/tests/browser/offline_evidence_queue.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/c2c-browser-test-http.log
+          exit 1
+      - name: Verify actual IndexedDB offline queue persistence and recovery
+        run: node frontend/tests/browser/offline_evidence_queue.browser.test.mjs

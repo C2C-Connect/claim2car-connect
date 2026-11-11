@@ -113,6 +113,22 @@ class CaptureEvidenceService:
                 return True
         return False
 
+    def evidence_readiness(self, authorization, session_id):
+        """Return the server-authoritative consent/VIN gate before local evidence is queued."""
+        session_id = self._session_id(session_id)
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            consent = self._consent_state(history)
+            vehicle_present = self._has_valid_vehicle_reference(history, consent)
+            return {
+                "session_id": session_id,
+                "consent_active": consent is not None,
+                "vehicle_reference_present": vehicle_present,
+                "capture_allowed": consent is not None and vehicle_present,
+            }
+
     def record_consent(self, authorization, session_id, *, request_id, accepted, scope):
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
@@ -122,6 +138,13 @@ class CaptureEvidenceService:
             if actor.actor_role != "owner":
                 raise CaptureAuthorizationError("OWNER_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=False)
+            if _session.scope == "persistent-claim-case":
+                binding = conn.execute(
+                    "SELECT faos.bind_claim_case_owner(%s::uuid,%s::text,%s::text)",
+                    (actor.tenant_id, session_id, actor.actor_id),
+                ).fetchone()[0]
+                if binding != "BOUND":
+                    raise CaptureAuthorizationError("CLAIM_CASE_OWNER_BINDING_DENIED")
             previous = self._consent_state(history)
             event_id = "consent:" + request_id
             payload = {
@@ -155,6 +178,11 @@ class CaptureEvidenceService:
                     if kind == "ARTIFACT_REGISTERED" and type(data) is dict
                     and isinstance(data.get("artifact_id"), str)]
                 deletion_tenant = actor.tenant_id
+                if _session.scope == "persistent-claim-case" and _session.claim_id:
+                    conn.execute(
+                        "SELECT faos.withdraw_claim_case_incident(%s::uuid,%s::uuid,%s::text)",
+                        (actor.tenant_id, _session.claim_id, actor.actor_id),
+                    )
             else:
                 artifacts = []
                 deletion_tenant = actor.tenant_id
@@ -438,6 +466,37 @@ class CaptureEvidenceService:
                 if len(queued) == limit:
                     break
         return queued
+
+    def get_review_details(self, authorization, session_id):
+        """Return a verified sealed manifest to an independent reviewer."""
+        session_id = self._session_id(session_id)
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            session, history = self._history(conn, actor, session_id, creator_required=False)
+            if actor.actor_id == session.created_by:
+                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+            if self._consent_state(history) is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            if not history or history[-1][0] != "MANIFEST_SEALED":
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            manifest = self._verified_manifest(actor, session_id, history)
+            latest = self._artifact_set(history)
+            return {
+                "session_id": session_id,
+                "manifest_digest": manifest.digest(),
+                "shot_list_version": manifest.shot_list_version,
+                "consent_recorded": True,
+                "artifacts": [
+                    {
+                        "artifact_id": entry.artifact_id,
+                        "slot": entry.slot,
+                        "sha256": entry.sha256_hex,
+                        "byte_length": latest[entry.slot][1]["byte_length"],
+                    }
+                    for entry in manifest.entries
+                ],
+            }
 
     def retrieve_for_review(self, authorization, session_id, artifact_id):
         session_id = self._session_id(session_id)

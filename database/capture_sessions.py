@@ -7,6 +7,7 @@ is only a synthetic draft; consent and evidence methods live in
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
 from uuid import UUID
 import psycopg
 from psycopg.conninfo import conninfo_to_dict
@@ -29,6 +30,9 @@ class CaptureSession:
     created_by: str
     created_at: str
     created: bool
+    scope: str = 'controlled-test'
+    claim_id: str | None = None
+    owner_actor_id: str | None = None
 
 PROFILE_SQL = """
 SELECT session_user::text,current_user::text,r.rolsuper,r.rolbypassrls,
@@ -85,15 +89,26 @@ class CaptureSessionStore:
 
     @staticmethod
     def _read(conn,actor,session_id,created=False):
-        row=conn.execute('SELECT e.actor,e.occurred_at,e.event_id,e.kind,e.payload_json,e.schema_version '
-                         'FROM faos.sessions s LEFT JOIN faos.events e ON e.tenant_id=s.tenant_id '
+        row=conn.execute('SELECT e.actor,e.occurred_at,e.event_id,e.kind,e.payload_json,e.schema_version,'
+                         'c.claim_id,c.owner_actor_id FROM faos.sessions s '
+                         'LEFT JOIN faos.events e ON e.tenant_id=s.tenant_id '
                          'AND e.session_id=s.session_id AND e.sequence=1 '
+                         'LEFT JOIN faos.claim_cases c ON c.tenant_id=s.tenant_id '
+                         'AND c.capture_session_id=s.session_id '
                          'WHERE s.tenant_id=%s AND s.session_id=%s',(actor.tenant_id,session_id)).fetchone()
         if row is None:
             raise CaptureSessionNotFound('CAPTURE_SESSION_NOT_FOUND')
-        if row[2:]!=('capture-created','SESSION_CREATED','{"synthetic":true}','0.1'):
-            raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION')
-        return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created)
+        if row[2:6]==('capture-created','SESSION_CREATED','{"synthetic":true}','0.1'):
+            return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,'controlled-test',None,None)
+        try:
+            payload=json.loads(row[4])
+        except (ValueError,TypeError):
+            raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION') from None
+        if (row[2]=='claim-created' and row[3]=='SESSION_CREATED' and row[5]=='0.1'
+                and row[6] is not None and payload=={'claim_id':str(row[6]),'synthetic':False}):
+            return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,
+                                  'persistent-claim-case',str(row[6]),row[7])
+        raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION')
 
     def create(self,authorization,session_id):
         session_id=self._identifier(session_id)
@@ -109,6 +124,24 @@ class CaptureSessionStore:
                 if result!='ACCEPTED':
                     raise RuntimeError('CAPTURE_CREATION_FAILED')
             return self._read(conn,actor,session_id,created=inserted)
+
+    def list_owned(self,authorization,*,limit=100):
+        """List only the authenticated operator's own controlled capture drafts."""
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError('INVALID_CAPTURE_SESSION_LIMIT')
+        with self._authorized(authorization) as (conn,actor):
+            if actor.actor_role not in ('operator','supervisor'):
+                raise CaptureAuthorizationError('OPERATOR_IDENTITY_REQUIRED')
+            rows=conn.execute(
+                'SELECT s.session_id FROM faos.sessions s '
+                'JOIN faos.events e ON e.tenant_id=s.tenant_id AND e.session_id=s.session_id '
+                'AND e.sequence=1 '
+                "WHERE s.tenant_id=%s AND e.actor=%s AND e.event_id='capture-created' "
+                "AND e.kind='SESSION_CREATED' "
+                'ORDER BY e.occurred_at DESC,s.session_id DESC LIMIT %s',
+                (actor.tenant_id,actor.actor_id,limit),
+            ).fetchall()
+            return [self._read(conn,actor,self._identifier(row[0])) for row in rows]
 
     def get(self,authorization,session_id):
         session_id=self._identifier(session_id)

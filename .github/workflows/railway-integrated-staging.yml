@@ -1,0 +1,58 @@
+name: Integrated Railway staging deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Confirm deployment to the separately provisioned integrated staging service"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claim2car-integrated-railway-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_deploy == true && vars.RAILWAY_INTEGRATED_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: integrated-staging
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_INTEGRATED_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_INTEGRATED_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_INTEGRATED_ENVIRONMENT_ID }}
+      RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_INTEGRATED_SERVICE_ID }}
+      RAILWAY_STAGING_URL: ${{ vars.RAILWAY_INTEGRATED_STAGING_URL }}
+      MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+      ROUTING_MIGRATION_DATABASE_URL: ${{ secrets.ROUTING_MIGRATION_DATABASE_URL }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-database.txt
+
+      - name: Install migration dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-database.txt
+
+      - name: Install Railway CLI
+        run: npm install --global @railway/cli
+
+      - name: Deploy integrated staging after authority migrations
+        id: deploy
+        run: bash scripts/railway_integrated_deploy.sh
+
+      - name: Verify deployed revision and authentication boundaries
+        if: success() && steps.deploy.outputs.deployed == 'true'
+        run: python scripts/railway_integrated_smoke.py "$RAILWAY_STAGING_URL" "$GITHUB_SHA"

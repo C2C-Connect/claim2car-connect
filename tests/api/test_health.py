@@ -70,6 +70,13 @@ class HealthTests(unittest.TestCase):
                 pass
         connect.assert_not_called()
 
+    def test_readiness_requires_persistent_claim_case_register_with_forced_rls(self):
+        from app.main import READINESS_SQL
+        self.assertIn('count(*)=12',READINESS_SQL)
+        self.assertIn("'claim_cases'",READINESS_SQL)
+        self.assertIn("'claim_case_incident_intake'",READINESS_SQL)
+        self.assertIn('c.relrowsecurity AND c.relforcerowsecurity',READINESS_SQL)
+
     def test_probe_checks_all_prerequisites_with_read_only_timeouts(self):
         conn=MagicMock()
         conn.__enter__.return_value=conn
@@ -80,6 +87,16 @@ class HealthTests(unittest.TestCase):
                     self.assertEqual(probe_database('configured-target'),row==(True,True,True,True))
         self.assertEqual(connect.call_args.kwargs,{'autocommit':True,'connect_timeout':3,'options':'-c statement_timeout=2000 -c default_transaction_read_only=on'})
         self.assertEqual(conn.__exit__.call_count,6)
+
+
+    def test_build_health_endpoint_reports_revision_and_runtime_mode(self):
+        app=create_app(runtime_mode='restricted_staging')
+        with TestClient(app) as client:
+            response=client.get('/health/build')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['runtime_mode'],'restricted_staging')
+        self.assertEqual(set(response.json()),{'revision','runtime_mode'})
+        self.assertIn('revision',response.json())
 
 if __name__=='__main__':
     unittest.main()

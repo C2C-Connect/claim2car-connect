@@ -79,12 +79,36 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert client.get("/styles.css").status_code == 200
                 assert client.get("/src/modules/capture/vin.mjs").status_code == 200
 
+                # The integrated product shell is mounted at the root and its
+                # static assets are served by the same runtime image.
+                shell = client.get("/")
+                assert shell.status_code == 200
+                assert "Claim2Car Connect" in shell.text
+                assert client.get("/assets/app.js").status_code == 200
+
                 # Capture and reviewer APIs are mounted under /api and retain
                 # their end-user credential boundary.
                 capture = client.get(f"/api/v1/capture-sessions/{SESSION_ID}")
                 assert capture.status_code == 401
                 review_queue = client.get("/api/v1/review-queue")
                 assert review_queue.status_code == 401
+                review_details = client.get(f"/api/v1/review-sessions/{SESSION_ID}")
+                assert review_details.status_code == 401
+
+                # Identity discovery is authenticated and returns only the
+                # server-resolved actor/tenant/role, never client assertions.
+                identity_denied = client.get("/api/v1/identity")
+                assert identity_denied.status_code == 401
+                identity = client.get(
+                    "/api/v1/identity",
+                    headers={"Authorization": f"Bearer {OPERATOR_TOKEN}"},
+                )
+                assert identity.status_code == 200
+                assert identity.json() == {
+                    "actor_id": "operator-1",
+                    "tenant_id": str(UUID(int=1)),
+                    "actor_role": "operator",
+                }
 
                 # Analytical APIs are not exposed on their legacy public path.
                 assert client.post(

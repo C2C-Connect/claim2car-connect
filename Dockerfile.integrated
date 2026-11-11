@@ -11,8 +11,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv/claim2car
 COPY requirements-api.txt requirements-database.txt ./
-RUN pip install --no-cache-dir -r requirements-api.txt \
-    && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin claim2car \
+RUN apt-get update && apt-get install -y --no-install-recommends util-linux \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir -r requirements-api.txt \
+    && groupadd --gid 10001 claim2car \
+    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin claim2car \
     && mkdir -p /var/lib/claim2car/evidence \
     && chown -R 10001:10001 /var/lib/claim2car
 
@@ -25,8 +28,9 @@ COPY database/ ./database/
 COPY contracts/ ./contracts/
 COPY migrations/ ./migrations/
 COPY authority_migrations/ ./authority_migrations/
+COPY config/claim2car-entrypoint.sh /usr/local/bin/claim2car-entrypoint
+RUN chmod 0755 /usr/local/bin/claim2car-entrypoint
 
-USER 10001:10001
 EXPOSE 8000
 VOLUME ["/var/lib/claim2car/evidence"]
 
@@ -35,4 +39,5 @@ VOLUME ["/var/lib/claim2car/evidence"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3).read()"
 
+ENTRYPOINT ["/usr/local/bin/claim2car-entrypoint"]
 CMD ["python", "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-proxy-headers"]

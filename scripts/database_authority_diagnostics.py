@@ -29,7 +29,7 @@ def denied(conn,tenant,event):
     else:
         raise AssertionError('UNAUTHORIZED_APPEND_ALLOWED')
 
-TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings')
+TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases','claim_case_incident_intake')
 CHECKS = ('rls_flags','own_read','cross_read','cross_insert','cross_update','cross_delete','tenant_reassignment','spoofed_context','missing_context','malformed_context')
 
 def reject_mutation(conn,tenant,statement,parameters):
@@ -48,13 +48,15 @@ def verify(report,admin,connections,tenants,session):
     report['checks'].append(matrix)
     actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings'").fetchall()
     expect({row[0] for row in actual}==set(TABLES),'TENANT_TABLE_SCOPE_CHANGED')
-    ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request')}
+    ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim')}
     seal = 'matrix-seal-'+uuid.uuid4().hex
     digest = '0'*64
     try:
         for brand in ('brand','extra_brand'):
             admin.execute('INSERT INTO faos.brands VALUES (%s,%s)',(ids[brand],'matrix-'+ids[brand]))
         for tenant in tenants:
+            admin.execute('INSERT INTO faos.claim_cases(tenant_id,claim_id,request_id,created_by,owner_actor_id) VALUES (%s,%s,%s,%s,%s)',(tenant,ids['claim'],ids['request'],'synthetic-matrix','synthetic-matrix'))
+            admin.execute('INSERT INTO faos.claim_case_incident_intake(tenant_id,claim_id,owner_actor_id,request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,ids['claim'],'synthetic-matrix',ids['request'],'2026-01-01T00:00:00Z','collision','San Antonio','TX','78201'))
             admin.execute('INSERT INTO faos.users VALUES (%s,%s,%s)',(tenant,ids['user'],'matrix-subject'))
             admin.execute('INSERT INTO faos.memberships VALUES (%s,%s,%s,%s)',(tenant,ids['user'],ids['membership'],'synthetic-matrix'))
             admin.execute('INSERT INTO faos.dealer_groups VALUES (%s,%s,%s)',(tenant,ids['group'],'synthetic matrix'))
@@ -84,17 +86,36 @@ def verify(report,admin,connections,tenants,session):
                 results['rls_flags'] = {'status':'PASS','enabled':True,'forced':True,'policies':policies}
                 expected = admin.execute(sql.SQL('SELECT count(*) FROM {} WHERE tenant_id=%s').format(target),(own,)).fetchone()[0]
                 with tenant_transaction(conn,own):
-                    visible = conn.execute(select,tenants).fetchall()
-                    expect(expected>0 and len(visible)==expected and all(value[0]==own for value in visible),'AUTHORIZED_READ_CONTROL_FAILED')
-                    results['own_read'] = {'status':'PASS','rows':len(visible)}
-                    expect(conn.execute(sql.SQL('SELECT 1 FROM {} WHERE tenant_id=%s').format(target),(other,)).fetchall()==[],'CROSS_TENANT_ROWS_VISIBLE')
-                    results['cross_read'] = {'status':'PASS'}
+                    if table=='claim_case_incident_intake':
+                        try:
+                            with conn.transaction():
+                                conn.execute('SELECT * FROM faos.claim_case_incident_intake').fetchall()
+                                raise AssertionError('DIRECT_INCIDENT_TABLE_READ_ALLOWED')
+                        except psycopg.errors.InsufficientPrivilege as error:
+                            expect(error.sqlstate=='42501','WRONG_DIRECT_READ_DENIAL')
+                        visible = conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                            (own,ids['claim'],'synthetic-matrix')).fetchall()
+                        expect(expected>0 and len(visible)==expected,'AUTHORIZED_READ_CONTROL_FAILED')
+                        results['own_read'] = {'status':'PASS','rows':len(visible),'path':'actor-filtered-function','direct_table_select':'DENIED'}
+                        hidden = conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                            (own,ids['claim'],'unrelated-actor')).fetchall()
+                        expect(hidden==[],'UNAUTHORIZED_ACTOR_READ_ALLOWED')
+                        results['cross_read'] = {'status':'PASS','path':'actor-filtered-function'}
+                    else:
+                        visible = conn.execute(select,tenants).fetchall()
+                        expect(expected>0 and len(visible)==expected and all(value[0]==own for value in visible),'AUTHORIZED_READ_CONTROL_FAILED')
+                        results['own_read'] = {'status':'PASS','rows':len(visible)}
+                        expect(conn.execute(sql.SQL('SELECT 1 FROM {} WHERE tenant_id=%s').format(target),(other,)).fetchall()==[],'CROSS_TENANT_ROWS_VISIBLE')
+                        results['cross_read'] = {'status':'PASS'}
                 privileges = conn.execute("SELECT has_table_privilege(current_user,%s,'INSERT'),has_table_privilege(current_user,%s,'UPDATE'),has_table_privilege(current_user,%s,'DELETE')",('faos.'+table,)*3).fetchone()
                 cursor = admin.execute(sql.SQL('SELECT * FROM {} WHERE tenant_id=%s LIMIT 1').format(target),(other,))
                 values = dict(zip((column.name for column in cursor.description),cursor.fetchone()))
-                key = {'users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id'}.get(table)
+                key = {'users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id','claim_case_incident_intake':'request_id'}.get(table)
                 if key:
                     values[key] = str(uuid.uuid4())
+                if table=='claim_case_incident_intake':
+                    values['claim_id'] = ids['claim']
+                    values['owner_actor_id'] = 'synthetic-matrix'
                 if table=='users':
                     values['external_subject'] = 'new-'+uuid.uuid4().hex
                 if table=='location_brands':
@@ -118,16 +139,38 @@ def verify(report,admin,connections,tenants,session):
                 results['tenant_reassignment'] = reject_mutation(conn,own,move,(other,own))
                 results['tenant_reassignment']['layer'] = 'rls' if privileges[1] else 'table_privilege'
                 with tenant_transaction(conn,other):
-                    expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None and conn.execute(select,tenants).fetchall()==[],'SPOOFED_CONTEXT_ALLOWED')
+                    if table=='claim_case_incident_intake':
+                        try:
+                            with conn.transaction():
+                                conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                                    (own,ids['claim'],'synthetic-matrix')).fetchall()
+                                raise AssertionError('SPOOFED_CONTEXT_ALLOWED')
+                        except psycopg.errors.RaiseException as error:
+                            expect(error.diag.message_primary=='TENANT_CONTEXT_MISMATCH','WRONG_SPOOFED_CONTEXT_REJECTION')
+                    else:
+                        expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None and conn.execute(select,tenants).fetchall()==[],'SPOOFED_CONTEXT_ALLOWED')
                 results['spoofed_context'] = {'status':'PASS'}
                 with conn.transaction():
                     conn.execute("SELECT set_config('faos.tenant_id','',true)")
-                    expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None and conn.execute(select,tenants).fetchall()==[],'MISSING_CONTEXT_ALLOWED')
+                    if table=='claim_case_incident_intake':
+                        try:
+                            with conn.transaction():
+                                conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                                    (own,ids['claim'],'synthetic-matrix')).fetchall()
+                                raise AssertionError('MISSING_CONTEXT_ALLOWED')
+                        except psycopg.errors.RaiseException as error:
+                            expect(error.diag.message_primary=='TENANT_CONTEXT_MISMATCH','WRONG_MISSING_CONTEXT_REJECTION')
+                    else:
+                        expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None and conn.execute(select,tenants).fetchall()==[],'MISSING_CONTEXT_ALLOWED')
                 results['missing_context'] = {'status':'PASS'}
                 try:
                     with conn.transaction():
                         conn.execute("SELECT set_config('faos.tenant_id','not-a-uuid',true)")
-                        conn.execute(select,tenants).fetchall()
+                        if table=='claim_case_incident_intake':
+                            conn.execute('SELECT * FROM faos.read_claim_case_incident(%s::uuid,%s::uuid,%s::text)',
+                                (own,ids['claim'],'synthetic-matrix')).fetchall()
+                        else:
+                            conn.execute(select,tenants).fetchall()
                         raise AssertionError('MALFORMED_CONTEXT_NOT_REJECTED')
                 except psycopg.errors.InvalidTextRepresentation as error:
                     expect(error.sqlstate=='22P02','WRONG_MALFORMED_CONTEXT_SQLSTATE')
@@ -139,7 +182,7 @@ def verify(report,admin,connections,tenants,session):
         for tenant in tenants:
             admin.execute('DELETE FROM faos.financial_ledger_postings WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
-            for table in ('completion_receipts','manifest_roots','location_brands'):
+            for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','location_brands'):
                 admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(tenant,session,seal))
         for brand in ('brand','extra_brand'):
@@ -157,7 +200,7 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        expect(report['migration_inventory'][-1][0]=='0009_integer_financial_ledger.sql','FINANCIAL_LEDGER_MIGRATION_REQUIRED')
+        expect(report['migration_inventory'][-1][0]=='0017_event_contract_parity.sql','EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:
@@ -194,7 +237,13 @@ def run(report):
                 except psycopg.errors.InsufficientPrivilege as error:
                     expect(error.sqlstate=='42501','WRONG_REGISTRY_REJECTION')
             report['checks'].append({'id':'PRIVATE-AUTHORITY-REGISTRY','status':'PASS'})
-            for name,timestamp,payload,constraint in [('timestamp','not-a-timestamp','{}','event_timestamp_input_valid'),('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact')]:
+            for name,timestamp,payload,constraint in [
+                ('timestamp','not-a-timestamp','{}','event_timestamp_input_valid'),
+                ('naive_timestamp','2026-01-01T00:00:00','{}','event_timestamp_rfc3339'),
+                ('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact'),
+                ('key_order','2026-01-01T00:00:00Z','{"z":1,"a":2}','event_payload_python_canonical'),
+                ('numeric_exponent','2026-01-01T00:00:00Z','{"value":1e0}','event_payload_python_canonical'),
+            ]:
                 try:
                     with tenant_transaction(connections[0],tenants[0]):
                         connections[0].execute(APPEND,(tenants[0],session,'invalid-'+name,2,'SESSION_CREATED','synthetic-test',timestamp,'validation diagnostic',payload,'0.1'))
@@ -218,11 +267,11 @@ def run(report):
             for conn in connections:
                 conn.close()
             for tenant in tenants:
-                for table in ('completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
+                for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
-    report['diagnostics_successful'] = len(report['checks'])==9 and all(row['status']=='PASS' for row in report['checks'])
+    report['diagnostics_successful'] = len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks'])
 
 if __name__ == '__main__':
     report = {'classification':'post-cutover-authority-diagnostics-not-gate-certification',

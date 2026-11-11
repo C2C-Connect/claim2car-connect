@@ -22,12 +22,12 @@ SELECT NOT r.rolsuper AND NOT r.rolbypassrls
        to_regclass('faos.tenant_login_bindings') IS NOT NULL,
        EXISTS(SELECT 1 FROM pg_proc p WHERE p.oid=to_regprocedure('faos.tenant_id()')
               AND p.prosecdef AND pg_get_userbyid(p.proowner)='faos_writer'),
-       (SELECT count(*)=10 AND bool_and(c.relrowsecurity AND c.relforcerowsecurity)
+       (SELECT count(*)=12 AND bool_and(c.relrowsecurity AND c.relforcerowsecurity)
         FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname='faos' AND c.relkind='r'
         AND c.relname IN ('organizations','users','memberships','dealer_groups',
                          'dealer_locations','location_brands','sessions','events',
-                         'manifest_roots','completion_receipts'))
+                         'manifest_roots','completion_receipts','claim_cases','claim_case_incident_intake'))
 FROM pg_roles r WHERE r.rolname=current_user
 """
 
@@ -89,6 +89,31 @@ def create_app(settings=None, runtime_mode=None):
         _mount_internal_router(api, analysis_router, '/api/v1/analysis', '/internal/v1/analysis')
         _mount_internal_router(api, triage_router, '/api/v1/triage', '/internal/v1/triage')
         _mount_internal_router(api, dispatch_router, '/api/v1/dispatch', '/internal/v1/dispatch')
+
+        # The operator/owner/reviewer shell is served only by the integrated
+        # runtime. Restricted staging remains health-only and exposes no UI.
+        web_root = Path(__file__).with_name('web')
+        api.mount(
+            '/assets',
+            StaticFiles(directory=web_root / 'assets'),
+            name='claim2car-web-assets',
+        )
+
+        @api.get('/', include_in_schema=False)
+        def application_shell():
+            return FileResponse(
+                web_root / 'index.html',
+                headers={'Cache-Control': 'no-store'},
+            )
+
+    @api.get('/health/build')
+    def build():
+        revision = 'unknown'
+        try:
+            revision = Path(__file__).with_name('_build_revision.txt').read_text(encoding='ascii').strip() or 'unknown'
+        except OSError:
+            pass
+        return JSONResponse({'revision':revision,'runtime_mode':mode},headers={'Cache-Control':'no-store'})
 
     @api.get('/health/live')
     def live():

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101b2b">
+  <title>Claim2Car Connect</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Claim2Car home"><span class="brand-mark">C2C</span><span>Claim2Car <small>CONNECT</small></span></a>
+    <span id="connection-state" class="status">Not connected</span>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <p class="eyebrow">FIELD OPERATIONS</p>
+      <h1>One case. A clear chain of evidence.</h1>
+      <p class="muted">Capture and review tools connected to the authenticated Claim2Car service.</p>
+    </section>
+    <section id="sign-in" class="panel">
+      <h2>Connect securely</h2>
+      <p class="muted">Use the access token provisioned for your assigned role. Tokens are held in memory only and are not saved in browser storage.</p>
+      <label for="access-token">Access token</label>
+      <input id="access-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your provisioned token">
+      <button id="connect" class="primary">Connect</button>
+      <p id="sign-in-error" class="error" role="alert"></p>
+      <p class="fine">This is a controlled integrated application surface. Access is enforced by the server; selecting a role in the browser does not grant permissions.</p>
+    </section>
+    <section id="workspace" hidden>
+      <div class="workspace-head">
+        <div><p class="eyebrow">AUTHENTICATED WORKSPACE</p><h2 id="actor-label">Workspace</h2><p id="actor-meta" class="muted"></p></div>
+        <button id="disconnect" class="quiet">Disconnect</button>
+      </div>
+      <nav id="role-nav" class="tabs" aria-label="Workspace sections"></nav>
+      <section id="operator-view" class="panel" hidden>
+        <h3>Operator workspace</h3>
+        <h4>Persistent claim-case register</h4>
+        <p class="muted">Create and reopen tenant-scoped claim-case records. The register stores case identity, creator/owner binding, and capture-session association. Optional structured incident details are separately consent-gated; claimant and policy details are not collected by this v1 intake.</p>
+        <div class="actions"><button id="create-claim-case" class="primary">Create claim record</button><span id="claim-case-created" class="fine"></span></div>
+        <div id="claim-cases" class="owned-sessions" aria-live="polite"></div>
+        <div class="rule"></div>
+        <h4>Controlled-test evidence capture</h4>
+        <p class="fine">Capture and evidence workflows have passed synthetic/controlled CI verification, not field acceptance. Persistent claim-case sessions can be opened here, but do not use this surface with real participants until owner authentication, legal review, field validation, and deployment gates are complete. Owner consent still requires a provisioned owner actor credential; this workspace does not provide end-user login or identity proofing.</p>
+        <div class="actions"><button id="new-case" class="secondary">Create controlled-test capture draft</button><span id="case-created" class="fine"></span></div>
+        <label for="session-id">Capture session ID</label>
+        <input id="session-id" autocomplete="off" placeholder="Session UUID">
+        <button id="resume-case" class="secondary">Resume case</button>
+        <div class="session-list-head"><h4>Your recent capture drafts</h4><button id="refresh-sessions" class="quiet">Refresh</button></div>
+        <div id="owned-sessions" class="owned-sessions" aria-live="polite"></div>
+        <div class="rule"></div>
+        <h4>Owner-consented incident details</h4>
+        <p class="fine">Only the operator who created this case can load the structured incident details after the owner separately consents. These details are not automatically sent to an insurer, repair shop, or dealership.</p>
+        <button id="load-incident-details" class="secondary">Load owner-submitted incident details</button>
+        <div id="incident-details" class="owned-sessions" aria-live="polite"></div>
+        <div class="rule"></div>
+        <h4>Vehicle reference</h4>
+        <label for="vin">VIN</label><input id="vin" maxlength="17" autocomplete="off" placeholder="17-character VIN">
+        <button id="save-vin" class="secondary">Validate and record VIN</button>
+        <div class="rule"></div>
+        <h4>Original evidence capture</h4>
+        <p class="fine">Choose a photo for each slot. On supported mobile devices, the file picker can open the camera. Original file bytes are first saved in this browser's IndexedDB queue, then uploaded unchanged in FIFO order. Pending originals can be retried after connectivity returns or the page is reopened on a supported browser. Browser storage is not an encrypted vault, WORM store, or field-qualified durability guarantee; this remains a controlled test surface. Review each image yourself and check its quality box only when the required view is clear and usable; this is an advisory operator attestation, not an automated image-quality assessment.</p>
+        <div id="capture-slots" class="slot-list"></div>
+        <button id="sync-pending-evidence" class="secondary" disabled>All originals synced</button>
+        <button id="record-quality" class="secondary">Record advisory quality checks</button>
+        <button id="seal-case" class="primary">Seal verified evidence manifest</button>
+        <p id="operator-message" class="message" role="status"></p>
+      </section>
+      <section id="owner-view" class="panel" hidden>
+        <h3>Owner consent</h3>
+        <p class="muted">Consent is recorded under the provisioned owner actor credential. The operator cannot grant consent on the owner's behalf. This workspace does not provide end-user login or identity proofing.</p>
+        <label for="owner-session-id">Case / session ID supplied by the operator</label>
+        <input id="owner-session-id" autocomplete="off" placeholder="Session UUID">
+        <div class="disclosure" aria-label="Disclosure version disclosure-v1">
+          <p>This capture session records vehicle condition evidence for a claim file.</p>
+          <p>Participation is voluntary; you may pause or stop at any time without penalty.</p>
+          <p>The session captures vehicle photographs and a VIN plate image. It does not decode your VIN, authenticate the vehicle, or make ownership claims.</p>
+          <p>Captured originals are stored at full resolution and may be shared with your insurance carrier, a repair shop, or a dealership as part of claim handling.</p>
+          <p>No payment or compensation is offered or implied for participation in this capture session.</p>
+          <p>By proceeding you affirmatively consent to the capture described above.</p>
+          <span class="fine">Disclosure version: disclosure-v1</span>
+        </div>
+        <label class="consent"><input id="consent-accepted" type="checkbox"> I voluntarily consent to the capture and human review described above.</label>
+        <button id="record-consent" class="primary">Record my consent</button>
+        <button id="withdraw-capture-consent" class="quiet">Withdraw capture consent and delete originals on this device</button>
+        <div class="rule"></div>
+        <h4>Supplemental incident details</h4>
+        <p class="fine">Separate optional consent. This draft collects only incident date/time, category, city, state, and ZIP code. It does not collect a street address, narrative, claimant contact details, or policy number. The supplemental notice is pending counsel review; this feature remains disabled unless explicitly enabled for an authorized test environment.</p>
+        <div class="disclosure" aria-label="Supplemental incident intake notice incident-intake-v1">
+          <p>Claim2Car will associate the incident date and time, incident category, city, state, and ZIP code you provide with this claim-case record.</p>
+          <p>The case-creating Claim2Car operator and you can view these details in the application to support case intake. This supplemental information is not automatically sent to an insurer, repair shop, or dealership. It does not determine fault, coverage, liability, or claim eligibility.</p>
+          <p>This supplemental intake does not request a street address, GPS location, free-text narrative, claimant contact details, or insurance policy number.</p>
+          <p>You may decline or withdraw this supplemental consent. Withdrawal deletes the separately stored structured incident details.</p>
+          <span class="fine">Disclosure version: incident-intake-v1 · Draft pending legal review</span>
+        </div>
+        <label class="consent"><input id="incident-consent-accepted" type="checkbox"> I separately consent to the structured incident details described above.</label>
+        <button id="record-incident-consent" class="secondary">Record supplemental consent</button>
+        <div class="incident-fields">
+          <label for="incident-occurred-at">Incident date and time (local device time)</label>
+          <input id="incident-occurred-at" type="datetime-local">
+          <label for="incident-type">Incident category</label>
+          <select id="incident-type"><option value="collision">Collision</option><option value="theft">Theft</option><option value="weather">Weather</option><option value="vandalism">Vandalism</option><option value="other">Other</option><option value="unknown">Unknown</option></select>
+          <label for="incident-city">City</label><input id="incident-city" maxlength="80">
+          <label for="incident-region">State / territory code</label><input id="incident-region" maxlength="2" placeholder="TX">
+          <label for="incident-postal-code">ZIP code</label><input id="incident-postal-code" maxlength="10" inputmode="numeric" placeholder="78201">
+        </div>
+        <button id="submit-incident-intake" class="primary">Save incident details</button>
+        <button id="withdraw-incident-consent" class="quiet">Withdraw supplemental consent and delete incident details</button>
+        <p id="incident-message" class="message" role="status"></p>
+        <p id="owner-message" class="message" role="status"></p>
+      </section>
+      <section id="reviewer-view" class="panel" hidden>
+        <h3>Reviewer queue</h3>
+        <p class="muted">The queue is tenant-scoped and server-authorized. Open a sealed case to retrieve hash-verified originals and record one of the supported human-review outcomes. This is not an automated adjudication or final insurance determination.</p>
+        <button id="refresh-queue" class="secondary">Refresh queue</button>
+        <div id="review-queue" class="queue"></div>
+      </section>
+    </section>
+  </main>
+  <footer>Claim2Car Connect · Controlled application runtime</footer>
+</body>
+</html>
