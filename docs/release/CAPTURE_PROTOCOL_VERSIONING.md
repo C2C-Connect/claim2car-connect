@@ -10,6 +10,7 @@
 - The claim-case constructor accepts an explicit protocol ID; the default is 16-v1. Idempotent retries that attempt to change the protocol ID are rejected.
 - Controlled capture-session creation accepts a protocol ID and defaults to 16-v1. A retry with a different version is rejected.
 - Session and claim-case readback return the immutable protocol version.
+- New `SESSION_CREATED` journal payloads also record the protocol version; readback verifies the journal value matches the immutable session column. Historical pre-0018 creation payloads remain readable only as 12-v1 after the migration backfill.
 - Authenticated `GET /v1/capture-protocols` exposes the default and each protocol's status, slot contract, and capture-enabled state.
 - The operator workbench fetches that registry and lets operators choose the protocol for a new session. Existing sessions retain their own stored version regardless of the selector's current value.
 - Manifest construction requires an implemented protocol. The existing 12-v1 manifest remains supported without changing its slots or historical digest identity.
