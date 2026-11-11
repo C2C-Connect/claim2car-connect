@@ -15,6 +15,16 @@
 - Manifest construction requires an implemented protocol. The existing 12-v1 manifest remains supported without changing its slots or historical digest identity.
 - Evidence registration, quality recording, and sealing fail closed for a 16-v1 session while its exact slot definition is pending.
 
+## Source-document reconciliation findings
+
+The architecture source files do not yet define one internally consistent 16-slot contract:
+
+- The section titled **12-to-16 Angle Perspective Matrix** says 12 standard views plus up to four specialized details, but its own standard-view enumeration is 8 exterior + 2 undercarriage + 2 interior + 2 legal/document = **14 standard views**. Four additional details would make 18, not 16.
+- The section titled **Breakdown of the Mandatory 16-Point Shot Protocol** enumerates 8 exterior + 2 interior + 1 license plate + 1 insurance/document + 3 damage close-ups = **15 items**, not 16.
+- A separate **16-Point Perspective Matrix** repeats 8 exterior + 2 undercarriage + 2 interior + 2 legal/document = **14 items**.
+- The three close-ups are described as primary impact, structural frame-rail buckling, glass stress fractures, and ADAS sensor clusters at 0°, 45°, and 90°; the text does not establish whether these are three required slots, four semantic targets, or a conditional multi-angle set.
+
+These are source-level arithmetic and semantics conflicts, not merely inconsistent code identifiers. The implementation therefore keeps 16-v1 as the approved new-session default while refusing to fabricate a missing slot or reinterpret the historical 12-v1 list.
 ## Registry state
 
 | Protocol | New-session default | Contract state | Evidence capture |
