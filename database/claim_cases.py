@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from database.capture_sessions import CaptureAuthorizationError, CaptureSessionStore
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, validate_protocol_version
 
 
 class ClaimCaseNotFound(LookupError):
@@ -22,6 +23,7 @@ class ClaimCase:
     state: str
     created: bool
     capture_session_id: str | None
+    capture_protocol_version: str = DEFAULT_CAPTURE_PROTOCOL
 
 
 class ClaimCaseStore:
@@ -52,9 +54,10 @@ class ClaimCaseStore:
         if actor.actor_role not in ("operator", "supervisor"):
             raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
 
-    def create(self, authorization, *, claim_id, request_id):
+    def create(self, authorization, *, claim_id, request_id, capture_protocol_version=DEFAULT_CAPTURE_PROTOCOL):
         claim_id = self._identifier(claim_id, "INVALID_CLAIM_CASE_ID")
         request_id = self._identifier(request_id, "INVALID_CLAIM_CASE_REQUEST_ID")
+        capture_protocol_version = validate_protocol_version(capture_protocol_version)
         session_id = str(uuid4())
         with self.sessions._authorized(authorization) as (conn, actor):
             self._require_operator(actor)
@@ -65,8 +68,8 @@ class ClaimCaseStore:
             if outcome not in ("ACCEPTED", "DUPLICATE"):
                 raise ClaimCaseConflict("CLAIM_CASE_CREATE_NOT_ACCEPTED")
             row = conn.execute(
-                "SELECT claim_id,tenant_id,created_by,created_at,state,capture_session_id "
-                "FROM faos.claim_cases WHERE tenant_id=%s AND request_id=%s",
+                "SELECT c.claim_id,c.tenant_id,c.created_by,c.created_at,c.state,c.capture_session_id,s.capture_protocol_version "
+                "FROM faos.claim_cases c JOIN faos.sessions s ON s.tenant_id=c.tenant_id AND s.session_id=c.capture_session_id WHERE c.tenant_id=%s AND c.request_id=%s",
                 (actor.tenant_id, request_id),
             ).fetchone()
             return self._record(row, created=(outcome == "ACCEPTED"))
