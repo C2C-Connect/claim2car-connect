@@ -149,6 +149,10 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert by_version["claims2car-16-v1"]["capture_enabled"] is False
                 assert by_version["claims2car-12-v1"]["status"] == "implemented"
                 assert len(by_version["claims2car-12-v1"]["required_slots"]) == 12
+                ui_slots_match = re.search(r"const SLOTS = \\[(.*?)\\];", workbench_script.text, re.S)
+                assert ui_slots_match is not None
+                ui_slots = re.findall(r'\\["([^"]+)"', ui_slots_match.group(1))
+                assert ui_slots == by_version["claims2car-12-v1"]["required_slots"]
                 # Identity discovery is authenticated and returns only the
                 # server-resolved actor/tenant/role, never client assertions.
                 identity_denied = client.get("/api/v1/identity")
