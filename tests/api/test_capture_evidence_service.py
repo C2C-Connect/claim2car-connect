@@ -11,6 +11,7 @@ from uuid import UUID
 
 from app.artifact_storage import OriginalByteStore
 from app.evidence_manifest import CANONICAL_SLOTS
+from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL
 from database.capture_evidence import CaptureEvidenceService
 from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSession, CaptureSessionConflict, CaptureSessionStore,
@@ -72,7 +73,7 @@ class FakeSessions(CaptureSessionStore):
     def _read(self, conn, actor, session_id, created=False):
         return CaptureSession(session_id, str(actor.tenant_id), self.creator,
                               "2026-11-08T00:00:00+00:00", created, self.scope,
-                              self.claim_id, self.conn.owner_bindings.get(session_id))
+                              self.claim_id, self.conn.owner_bindings.get(session_id), LEGACY_CAPTURE_PROTOCOL)
 
 
 class RecordingByteStore(OriginalByteStore):
