@@ -72,3 +72,18 @@ GRANT EXECUTE ON FUNCTION faos.create_claim_case(uuid,uuid,uuid,text,text,text) 
 GRANT CREATE ON SCHEMA faos TO faos_writer;
 ALTER FUNCTION faos.create_claim_case(uuid,uuid,uuid,text,text,text) OWNER TO faos_writer;
 REVOKE CREATE ON SCHEMA faos FROM faos_writer;
+
+-- Protocol identity is immutable once a session exists.
+CREATE FUNCTION faos.reject_capture_protocol_version_change()
+RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog,faos,pg_temp
+AS $$
+BEGIN
+ IF NEW.capture_protocol_version IS DISTINCT FROM OLD.capture_protocol_version THEN
+  RAISE EXCEPTION 'CAPTURE_PROTOCOL_VERSION_IMMUTABLE';
+ END IF;
+ RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION faos.reject_capture_protocol_version_change() FROM PUBLIC;
+CREATE TRIGGER sessions_capture_protocol_version_immutable
+ BEFORE UPDATE OF capture_protocol_version ON faos.sessions
+ FOR EACH ROW EXECUTE FUNCTION faos.reject_capture_protocol_version_change();
