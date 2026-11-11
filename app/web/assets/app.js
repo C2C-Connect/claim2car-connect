@@ -36,16 +36,17 @@ function applyProtocolCaptureState() {
   $("record-quality").disabled = !enabled;
   $("seal-case").disabled = !enabled;
   if (!enabled) {
-    for (const status of $("capture-slots").querySelectorAll(".slot-status")) status.textContent = "Capture disabled · 16-v1 slot contract pending approval";
+    for (const status of $("capture-slots").querySelectorAll(".slot-status")) status.textContent = "Capture protocol unavailable";
     $("sync-pending-evidence").disabled = true;
-    $("sync-pending-evidence").textContent = "16-v1 capture contract pending";
+    $("sync-pending-evidence").textContent = "Capture protocol unavailable";
   }
 }
 function setCase(id, protocolVersion = activeProtocolVersion) {
   activeSession = id;
   activeProtocolVersion = protocolVersion;
+  SLOTS = PROTOCOL_SLOTS[protocolVersion] || [];
   activeReadiness = null;
-  applyProtocolCaptureState();
+    applyProtocolCaptureState();
   $("session-id").value = id;
   $("owner-session-id").value = id;
   void restoreEvidenceQueue(id);
@@ -80,10 +81,12 @@ async function loadCaptureProtocols() {
   for (const protocol of registry.protocols) {
     const option = document.createElement("option");
     option.value = protocol.version;
-    option.textContent = protocol.version + (protocol.capture_enabled ? " · capture enabled" : " · slot definition pending");
+    option.textContent = protocol.version + (protocol.capture_enabled ? " · " + protocol.required_slots.length + " slots" : " · unavailable");
+    PROTOCOL_SLOTS[protocol.version] = protocol.required_slots.map(slot => [slot, protocol.slot_descriptions?.[slot] || slot.replaceAll("_", " ")]);
     select.append(option);
   }
   select.value = registry.default_protocol_version;
+  SLOTS = PROTOCOL_SLOTS[registry.default_protocol_version] || [];
   $("capture-protocol-help").textContent = "New sessions default to the owner-approved 16-slot protocol. Historical 12-v1 sessions retain their original slot contract and remain selectable for new sessions.";
 }
 function disconnect() {
@@ -111,9 +114,7 @@ async function createClaimCase() {
       : "Existing claim record confirmed: " + result.claim_id;
     if (result.capture_session_id) {
       setCase(result.capture_session_id,result.capture_protocol_version);
-      message("operator-message",result.capture_protocol_version === "claims2car-16-v1"
-        ? "Persistent claim session created with the 16-v1 default. Its slot contract is pending approval; choose 12-v1 for the currently implemented capture workflow."
-        : "Persistent claim capture session is ready. Owner consent is required before VIN or evidence entry.");
+      message("operator-message","Persistent claim session created with " + result.capture_protocol_version + ". Owner consent is required before VIN or evidence entry.");
     }
     pendingClaimCase = null;
     await refreshClaimCases();
@@ -332,7 +333,7 @@ async function refreshCaptureQueueStatus(sessionId) {
     : "All originals synced";
   if (!SLOTS.length) {
     $("sync-pending-evidence").disabled = true;
-    $("sync-pending-evidence").textContent = "16-v1 capture contract pending";
+    $("sync-pending-evidence").textContent = "Capture protocol unavailable";
   }
 }
 async function refreshEvidenceReadiness(sessionId) {
@@ -350,8 +351,8 @@ async function syncPendingUploads(sessionId) {
   if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
   const readiness = await refreshEvidenceReadiness(sessionId);
   if (readiness.capture_protocol_status !== "implemented") {
-    message("operator-message","Capture protocol " + readiness.capture_protocol_version + " is registered as the default, but its slot definition is not yet approved. Select claims2car-12-v1 for the implemented legacy capture contract.",true);
-    return {uploaded:0,blockedAtQueueId:null,error:"CAPTURE_PROTOCOL_DEFINITION_PENDING"};
+    message("operator-message","Capture protocol " + readiness.capture_protocol_version + " is not available for evidence capture.",true);
+    return {uploaded:0,blockedAtQueueId:null,error:"CAPTURE_PROTOCOL_UNAVAILABLE"};
   }
   if (!readiness.consent_active) {
     const deleted = await evidenceQueue.deleteSession(sessionId,{tenantId:identity.tenant_id});
@@ -432,6 +433,7 @@ async function upload(slot, file, status) {
 }
 function buildSlots() {
   const root = $("capture-slots");
+  root.replaceChildren();
   for (const [slot,label] of SLOTS) {
     const row = document.createElement("div"); row.className = "slot";
     const title = document.createElement("label"); title.textContent = label;
