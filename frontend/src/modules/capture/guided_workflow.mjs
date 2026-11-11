@@ -28,12 +28,15 @@ export const CAPTURE_PROTOCOL_SLOTS = Object.freeze({
 });
 
 export function createGuidedCapture({ shotList, storage, sessionId, now = () => new Date().toISOString(), protocolVersion }) {
-  const selectedProtocol = protocolVersion ?? (shotList ? LEGACY_CAPTURE_PROTOCOL : DEFAULT_CAPTURE_PROTOCOL);
+  const sameSlots = (left, right) => Array.isArray(left) && left.length === right.length
+    && left.every((slot, index) => slot === right[index]);
+  const inferredProtocol = shotList === undefined ? DEFAULT_CAPTURE_PROTOCOL
+    : Object.entries(CAPTURE_PROTOCOL_SLOTS).find(([, slots]) => sameSlots(shotList, slots))?.[0];
+  const selectedProtocol = protocolVersion ?? inferredProtocol;
   const canonicalSlots = CAPTURE_PROTOCOL_SLOTS[selectedProtocol];
-  if (!canonicalSlots) throw new Error('UNSUPPORTED_CAPTURE_PROTOCOL');
+  if (!canonicalSlots) throw new Error(protocolVersion ? 'UNSUPPORTED_CAPTURE_PROTOCOL' : 'INVALID_SHOT_LIST');
   if (shotList === undefined) shotList = canonicalSlots;
-  if (!Array.isArray(shotList) || shotList.length === 0 || shotList.length !== canonicalSlots.length
-      || shotList.some((slot, index) => slot !== canonicalSlots[index])) throw new Error('INVALID_SHOT_LIST');
+  if (!sameSlots(shotList, canonicalSlots)) throw new Error('INVALID_SHOT_LIST');
   if (storage === null || storage === undefined) throw new Error('STORAGE_REQUIRED');
   if (typeof sessionId !== 'string' || !sessionId.trim()) throw new Error('INVALID_SESSION');
 
