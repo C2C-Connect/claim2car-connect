@@ -11,6 +11,7 @@ const SLOTS = [
 let token = null;
 let identity = null;
 let activeSession = null;
+let activeProtocolVersion = "claims2car-16-v1";
 let activeReadiness = null;
 let pendingClaimCase = null;
 let claimCaseRequestInFlight = false;
@@ -36,8 +37,9 @@ function message(id, text, bad = false) {
   $(id).textContent = text;
   $(id).className = bad ? "message error" : "message";
 }
-function setCase(id) {
+function setCase(id, protocolVersion = activeProtocolVersion) {
   activeSession = id;
+  activeProtocolVersion = protocolVersion;
   activeReadiness = null;
   $("session-id").value = id;
   $("owner-session-id").value = id;
@@ -49,6 +51,7 @@ async function connect() {
   if (!token) { $("sign-in-error").textContent = "An access token is required."; return; }
   try {
     identity = await api("/api/v1/identity");
+    await loadCaptureProtocols();
     $("sign-in").hidden = true;
     $("workspace").hidden = false;
     $("connection-state").textContent = "Connected · " + identity.actor_role;
@@ -64,6 +67,19 @@ async function connect() {
     token = null; identity = null;
     $("sign-in-error").textContent = error.message === "UNAUTHORIZED" ? "Access token was rejected." : error.message;
   }
+}
+async function loadCaptureProtocols() {
+  const registry = await api("/api/v1/capture-protocols");
+  const select = $("capture-protocol-version");
+  select.replaceChildren();
+  for (const protocol of registry.protocols) {
+    const option = document.createElement("option");
+    option.value = protocol.version;
+    option.textContent = protocol.version + (protocol.capture_enabled ? " · capture enabled" : " · slot definition pending");
+    select.append(option);
+  }
+  select.value = registry.default_protocol_version;
+  $("capture-protocol-help").textContent = "16-v1 is the default. Its exact slot contract is being finalized; evidence capture remains disabled until approved. Select 12-v1 to use the currently implemented legacy contract.";
 }
 function disconnect() {
   token = null; identity = null; activeSession = null; activeReadiness = null;
@@ -81,13 +97,13 @@ async function createClaimCase() {
     const result = await api("/api/v1/claim-cases", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({claim_id:pendingClaimCase.claimId,request_id:pendingClaimCase.requestId})
+      body:JSON.stringify({claim_id:pendingClaimCase.claimId,request_id:pendingClaimCase.requestId,capture_protocol_version:$("capture-protocol-version").value})
     });
     $("claim-case-created").textContent = result.created
       ? "Persistent claim record created: " + result.claim_id
       : "Existing claim record confirmed: " + result.claim_id;
     if (result.capture_session_id) {
-      setCase(result.capture_session_id);
+      setCase(result.capture_session_id,result.capture_protocol_version);
       message("operator-message","Persistent claim capture session is ready. Owner consent is required before VIN or evidence entry.");
     }
     pendingClaimCase = null;
@@ -110,7 +126,7 @@ async function refreshClaimCases() {
       const details = document.createElement("div");
       const heading = document.createElement("strong"); heading.textContent = item.claim_id;
       const date = document.createElement("p"); date.className = "fine";
-      date.textContent = item.state + " · Created " + new Date(item.created_at).toLocaleString();
+      date.textContent = item.state + " · " + item.capture_protocol_version + " · Created " + new Date(item.created_at).toLocaleString();
       details.append(heading,date);
       const open = document.createElement("button"); open.className = "secondary"; open.textContent = "Open capture";
       open.addEventListener("click", async () => {
@@ -119,7 +135,7 @@ async function refreshClaimCases() {
           const record = await api("/api/v1/claim-cases/" + encodeURIComponent(item.claim_id));
           if (!record.capture_session_id) throw new Error("CAPTURE_SESSION_NOT_LINKED");
           await api("/api/v1/capture-sessions/" + encodeURIComponent(record.capture_session_id));
-          setCase(record.capture_session_id);
+          setCase(record.capture_session_id,record.capture_protocol_version);
           message("operator-message","Persistent claim capture session reopened.");
           $("claim-case-created").textContent = "Persistent claim record reopened: " + record.claim_id;
         } catch(error) { $("claim-case-created").textContent = error.message; }
@@ -132,9 +148,9 @@ async function refreshClaimCases() {
 async function createCase() {
   try {
     const id = uuid();
-    const result = await api("/api/v1/capture-sessions", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:id})});
-    setCase(id);
-    $("case-created").textContent = result.created ? "Case created." : "Existing case resumed.";
+    const result = await api("/api/v1/capture-sessions", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:id,capture_protocol_version:$("capture-protocol-version").value})});
+    setCase(id,result.capture_protocol_version);
+    $("case-created").textContent = result.created ? "Case created · " + result.capture_protocol_version : "Existing case resumed · " + result.capture_protocol_version;
     message("operator-message", "Case ready. Owner consent must be recorded with the provisioned owner actor credential; this workspace does not provide end-user login.");
     await refreshOwnedSessions();
   } catch (error) { message("operator-message", error.message, true); }
@@ -150,13 +166,13 @@ async function refreshOwnedSessions() {
       const details=document.createElement("div");
       const heading=document.createElement("strong"); heading.textContent=item.session_id;
       const date=document.createElement("p"); date.className="fine";
-      date.textContent="Created "+new Date(item.created_at).toLocaleString();
+      date.textContent=item.capture_protocol_version+" · Created "+new Date(item.created_at).toLocaleString();
       details.append(heading,date);
       const open=document.createElement("button"); open.className="secondary"; open.textContent="Open";
       open.addEventListener("click",async()=>{
         try {
           await api("/api/v1/capture-sessions/"+encodeURIComponent(item.session_id));
-          setCase(item.session_id);
+          setCase(item.session_id,item.capture_protocol_version);
           message("operator-message","Capture draft reopened from the server.");
         } catch(error) { message("operator-message",error.message,true); }
       });
@@ -168,8 +184,8 @@ async function resumeCase() {
   const id = $("session-id").value.trim();
   if (!id) return message("operator-message","Enter a case UUID.",true);
   try {
-    await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}`);
-    setCase(id); message("operator-message","Case access verified.");
+    const record = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}`);
+    setCase(id,record.capture_protocol_version); message("operator-message","Case access verified · " + record.capture_protocol_version);
     await refreshOwnedSessions();
   } catch (error) { message("operator-message",error.message,true); }
 }
@@ -318,6 +334,10 @@ async function syncPendingUploads(sessionId) {
   }
   if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
   const readiness = await refreshEvidenceReadiness(sessionId);
+  if (readiness.capture_protocol_status !== "implemented") {
+    message("operator-message","Capture protocol " + readiness.capture_protocol_version + " is registered as the default, but its slot definition is not yet approved. Select claims2car-12-v1 for the implemented legacy capture contract.",true);
+    return {uploaded:0,blockedAtQueueId:null,error:"CAPTURE_PROTOCOL_DEFINITION_PENDING"};
+  }
   if (!readiness.consent_active) {
     const deleted = await evidenceQueue.deleteSession(sessionId,{tenantId:identity.tenant_id});
     await refreshCaptureQueueStatus(sessionId);
@@ -380,6 +400,9 @@ async function upload(slot, file, status) {
     if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
     let readiness = activeReadiness?.session_id === id ? activeReadiness : null;
     if (navigator.onLine) readiness = await refreshEvidenceReadiness(id);
+    if (readiness?.capture_protocol_status !== "implemented") {
+      throw new Error("CAPTURE_PROTOCOL_DEFINITION_PENDING: select claims2car-12-v1 or wait for the approved 16-v1 slot contract.");
+    }
     if (!readiness?.capture_allowed) {
       throw new Error("OWNER_CONSENT_AND_VALID_VEHICLE_REFERENCE_REQUIRED_BEFORE_LOCAL_CAPTURE");
     }
@@ -409,6 +432,7 @@ function buildSlots() {
 }
 async function recordQuality() {
   const id = $("session-id").value.trim();
+  if (activeProtocolVersion !== "claims2car-12-v1") return message("operator-message","The 16-v1 slot contract is pending; quality recording is enabled only for an explicitly selected 12-v1 session.",true);
   const uploaded = [...$("capture-slots").querySelectorAll(".slot")];
   if (uploaded.length !== SLOTS.length || uploaded.some(row => row.querySelector("span").dataset.uploaded !== "true")) {
     return message("operator-message","Upload an original image for every required capture slot before recording quality.",true);
@@ -426,6 +450,7 @@ async function recordQuality() {
 }
 async function sealCase() {
   const id = $("session-id").value.trim();
+  if (activeProtocolVersion !== "claims2car-12-v1") return message("operator-message","The 16-v1 slot contract is pending; manifest sealing is enabled only for an explicitly selected 12-v1 session.",true);
   try {
     const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/seal`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid()})
