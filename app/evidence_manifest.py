@@ -4,7 +4,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
-from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 VERSION = '0.1'
 CANONICAL_SLOTS = ('vin_ocr','doc_ocr','front','front_left','driver_side','rear_left','rear','rear_right','passenger_side','front_right','interior_front','undercarriage_engine')
@@ -29,22 +29,14 @@ class Manifest:
         encoded = json.dumps(content,sort_keys=True,separators=(',',':'),allow_nan=False).encode('utf-8')
         return sha256(b'Claims2Car:manifest:0.1\0'+encoded).hexdigest()
 
-def load_shot_contract():
-    path=Path(__file__).resolve().parents[1]/'contracts'/'shot-list.json'
-    value=json.loads(path.read_text(encoding='utf-8'))
-    if (type(value) is not dict or set(value)!={'schema_version','shot_list_version','required_angles'}
-            or value['schema_version']!=VERSION or value['shot_list_version']!='claims2car-12-v1'
-            or value['required_angles']!=list(CANONICAL_SLOTS)):
-        raise ValueError('INVALID_SHOT_CONTRACT')
-    return value['shot_list_version'],CANONICAL_SLOTS
+def load_shot_contract(protocol_version=DEFAULT_CAPTURE_PROTOCOL):
+    protocol=require_implemented_protocol(protocol_version)
+    return protocol.version,protocol.slots
 
-def build_manifest(session_id,entries,protocol_version=LEGACY_CAPTURE_PROTOCOL):
+def build_manifest(session_id,entries,protocol_version=DEFAULT_CAPTURE_PROTOCOL):
     if not isinstance(session_id,str) or not session_id.strip():
         raise ValueError('INVALID_SESSION')
-    protocol=require_implemented_protocol(protocol_version)
-    if protocol.version != LEGACY_CAPTURE_PROTOCOL:
-        raise ValueError('CAPTURE_PROTOCOL_DEFINITION_PENDING')
-    version,slots=load_shot_contract()
+    version,slots=load_shot_contract(protocol_version)
     records=tuple(entries)
     for e in records:
         if (not isinstance(e,ManifestEntry) or not isinstance(e.artifact_id,str) or not e.artifact_id.strip()
@@ -61,7 +53,7 @@ def verify_manifest(session_id,manifest,trusted_digest,supplied_bytes):
     if not isinstance(manifest,Manifest) or manifest.schema_version!=VERSION or manifest.session_id!=session_id:
         return False
     try:
-        canonical=build_manifest(session_id,manifest.entries)
+        canonical=build_manifest(session_id,manifest.entries,manifest.shot_list_version)
     except (ValueError,TypeError):
         return False
     if manifest!=canonical or not isinstance(trusted_digest,str) or manifest.digest()!=trusted_digest:
