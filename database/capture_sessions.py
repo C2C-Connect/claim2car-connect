@@ -34,7 +34,7 @@ class CaptureSession:
     scope: str = 'controlled-test'
     claim_id: str | None = None
     owner_actor_id: str | None = None
-    capture_protocol_version: str = DEFAULT_CAPTURE_PROTOCOL
+    capture_protocol_version: str = LEGACY_CAPTURE_PROTOCOL
 
 PROFILE_SQL = """
 SELECT session_user::text,current_user::text,r.rolsuper,r.rolbypassrls,
