@@ -17,6 +17,7 @@ from backend.app.anchor.ledger import PartnerAcceptanceRecord
 from app.artifact_storage import OriginalByteStore
 from database.capture_evidence import CaptureEvidenceService
 from app.evidence_manifest import CANONICAL_SLOTS
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 
 class CaptureSessionIntegration(unittest.TestCase):
     def setUp(self):
@@ -69,8 +70,9 @@ class CaptureSessionIntegration(unittest.TestCase):
         retry = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
         self.assertTrue(first.created)
         self.assertFalse(retry.created)
-        self.assertEqual((first.claim_id, first.tenant_id, first.created_by, first.state),
-                         (claim_id, self.f.tenants[0], 'capture-actor-0', 'INTAKE_OPEN'))
+        self.assertEqual((first.claim_id, first.tenant_id, first.created_by, first.state,
+                          first.capture_protocol_version),
+                         (claim_id, self.f.tenants[0], 'capture-actor-0', 'INTAKE_OPEN', DEFAULT_CAPTURE_PROTOCOL))
         self.assertEqual(self.claim_cases.get(self.auth(), claim_id).claim_id, claim_id)
         self.assertEqual([item.claim_id for item in self.claim_cases.list_owned(self.auth())], [claim_id])
         self.assertEqual(self.f.seed.execute(
@@ -83,8 +85,8 @@ class CaptureSessionIntegration(unittest.TestCase):
         retry = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=request_id)
         self.assertEqual(case.capture_session_id, retry.capture_session_id)
         session = self.store.get(self.auth(), case.capture_session_id)
-        self.assertEqual((session.scope, session.claim_id, session.created_by),
-                         ('persistent-claim-case', claim_id, 'capture-actor-0'))
+        self.assertEqual((session.scope, session.claim_id, session.created_by, session.capture_protocol_version),
+                         ('persistent-claim-case', claim_id, 'capture-actor-0', DEFAULT_CAPTURE_PROTOCOL))
         self.assertNotIn(case.capture_session_id,
                          {item.session_id for item in self.store.list_owned(self.auth())})
         with tempfile.TemporaryDirectory() as root:
@@ -102,7 +104,8 @@ class CaptureSessionIntegration(unittest.TestCase):
 
     def test_persistent_claim_capture_completes_original_evidence_and_review_path(self):
         claim_id = str(uuid.uuid4())
-        case = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()))
+        case = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()),
+                                       capture_protocol_version=LEGACY_CAPTURE_PROTOCOL)
         with tempfile.TemporaryDirectory() as root:
             byte_store = OriginalByteStore(root)
             service = CaptureEvidenceService(self.store, byte_store, 'P'*43)
@@ -154,10 +157,10 @@ class CaptureSessionIntegration(unittest.TestCase):
         self.assertEqual(self.claim_cases.list_owned(self.auth(1)), [])
 
     def test_create_retry_and_fresh_connection_readback(self):
-        first=self.store.create(self.auth(),self.key)
+        first=self.store.create(self.auth(),self.key,protocol_version=LEGACY_CAPTURE_PROTOCOL)
         self.assertTrue(first.created)
         self.assertEqual((first.tenant_id,first.created_by),(self.f.tenants[0],'capture-actor-0'))
-        retry=self.store.create(self.auth(),self.key)
+        retry=self.store.create(self.auth(),self.key,protocol_version=LEGACY_CAPTURE_PROTOCOL)
         self.assertFalse(retry.created)
         reopened=self.store.get(self.auth(),self.key)
         self.assertEqual((reopened.session_id,reopened.tenant_id,reopened.created_by,reopened.created_at),(first.session_id,first.tenant_id,first.created_by,first.created_at))
@@ -251,6 +254,41 @@ class CaptureSessionIntegration(unittest.TestCase):
         store=CaptureSessionStore(CredentialResolver(self.credentials),bad)
         with self.assertRaisesRegex(CaptureStorageUnavailable,'^CAPTURE_STORAGE_UNAVAILABLE$'):
             store.create(self.auth(),self.key)
+
+    def test_protocol_registry_keeps_16_default_pending_and_12_legacy_executable(self):
+        default = resolve_capture_protocol(DEFAULT_CAPTURE_PROTOCOL)
+        legacy = resolve_capture_protocol(LEGACY_CAPTURE_PROTOCOL)
+        self.assertEqual((default.status, default.slots), ("definition_pending", ()))
+        self.assertEqual((legacy.status, len(legacy.slots)), ("implemented", 12))
+
+    def test_capture_protocol_is_immutable_and_retry_must_match(self):
+        created = self.store.create(self.auth(), self.key, protocol_version=DEFAULT_CAPTURE_PROTOCOL)
+        self.assertEqual(created.capture_protocol_version, DEFAULT_CAPTURE_PROTOCOL)
+        with self.assertRaisesRegex(CaptureSessionConflict, "CAPTURE_PROTOCOL_VERSION_MISMATCH"):
+            self.store.create(self.auth(), self.key, protocol_version=LEGACY_CAPTURE_PROTOCOL)
+        self.assertEqual(self.store.get(self.auth(), self.key).capture_protocol_version, DEFAULT_CAPTURE_PROTOCOL)
+        self.assertEqual(self.f.seed.execute(
+            "SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s",
+            (self.f.tenants[0], self.key)).fetchone()[0], DEFAULT_CAPTURE_PROTOCOL)
+
+    def test_default_16_protocol_cannot_accept_12_slot_evidence(self):
+        claim = self.claim_cases.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()))
+        with tempfile.TemporaryDirectory() as root:
+            service = CaptureEvidenceService(self.store, OriginalByteStore(root), 'P'*43)
+            service.record_consent(self.owner_auth(), claim.capture_session_id,
+                request_id=uuid.uuid4(), accepted=True, scope='capture_review')
+            service.record_vehicle(self.auth(), claim.capture_session_id,
+                request_id=uuid.uuid4(), vin='1HGCM82633A004352')
+            readiness = service.evidence_readiness(self.auth(), claim.capture_session_id)
+            self.assertEqual(readiness["capture_protocol_version"], DEFAULT_CAPTURE_PROTOCOL)
+            self.assertEqual(readiness["capture_protocol_status"], "definition_pending")
+            self.assertFalse(readiness["capture_allowed"])
+            raw = b"must-not-be-registered"
+            with self.assertRaisesRegex(CaptureSessionConflict, "CAPTURE_PROTOCOL_DEFINITION_PENDING"):
+                service.register_artifact(self.auth(), claim.capture_session_id,
+                    request_id=uuid.uuid4(), artifact_id=uuid.uuid4(), slot=CANONICAL_SLOTS[0],
+                    payload_base64=base64.b64encode(raw).decode("ascii"),
+                    sha256_hex=hashlib.sha256(raw).hexdigest())
 
     def test_financial_ledger_persists_retries_reversals_and_verified_export(self):
         self.store.create(self.auth(),self.key)
