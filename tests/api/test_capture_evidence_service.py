@@ -10,7 +10,7 @@ import unittest
 from uuid import UUID
 
 from app.artifact_storage import OriginalByteStore
-from app.evidence_manifest import CANONICAL_SLOTS
+from app.evidence_manifest import LEGACY_CANONICAL_SLOTS as CANONICAL_SLOTS
 from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL
 from database.capture_evidence import CaptureEvidenceService
 from database.capture_sessions import (
