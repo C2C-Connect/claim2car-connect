@@ -1,5 +1,7 @@
 # Claim2Car Connect — Project Governance and Decision Register
 
+The current requirement-to-evidence status is recorded in the [Acceptance & Release Gate Matrix](acceptance/ACCEPTANCE_MATRIX.md); it does not replace the decisions and release controls in this register.
+
 **Status:** Active  
 **Effective:** 2026-11-06 (aligned to Master Pilot Execution Plan v1.3)  
 **Supersedes:** All prior pilot, M0/M1, review-posture, and Full Build Directive (2026-11-02) governance documents
@@ -37,7 +39,7 @@ The 2026-11-02 Full Build Directive is superseded by the Master Pilot Execution 
 | Item | Rule |
 |------|------|
 | Operator (tow) payout | $110 amount carried forward (plan v1.3, D-04). Eligibility, trigger, split, reversals, disputes, and ledger treatment remain an open owner decision — no payout logic until approved. Separately confirmed: the shop's recorded acceptance of the vehicle authorizes tow dispatch/routing to that shop, with guided navigation for the delivery run. |
-| Owner / vehicle-owner cash incentive | **Permanently excluded.** No owner payout of any amount exists in product scope, data model, workflows, UI, reports, or documentation. Legal counsel directed removal for liability reasons; the historical dollar figure has been eradicated from all repositories and documents. |
+| Owner / vehicle-owner cash incentive | **Permanently excluded from product behavior.** No owner payout of any amount may be implemented or exposed through the data model, workflows, UI, APIs, reports, or settlement. Legal counsel directed removal for liability reasons. Historical references may remain in decision history, negative tests, denylist safeguards, and audit records solely to document the prohibition and prevent reintroduction; their presence is not active product support. The repository-wide and accessible-branch audit remains tracked in Slice 1 until its search scope and findings are recorded. |
 | Dealer acquisition fee | **Flat $375, due upon close of the qualified acquisition** (plan v1.3, D-01 — supersedes the $375–$425 range and the earlier $175 figure; not due merely for receiving a packet or expressing interest). |
 | Repair-shop fee | **Flat $275, due upon the shop's recorded acceptance of the vehicle** (plan v1.3, D-02 — supersedes the $250 auction floor). Acceptance precedes tow dispatch to that shop. |
 | Automatic distribution | On workflow completion, the system automatically distributes the dealer packet dossier, shop repair packet, owner PDF, and insurance-carrier 7-page document to the relevant authorized parties, per the plan v1.3 §3.2 delivery state machine. Versioned, consent-gated, auditable. Live sends remain disabled pending attorney review. |

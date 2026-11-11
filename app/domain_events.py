@@ -1,13 +1,81 @@
 """Synthetic event history validation; not persistence or evidence-state replay."""
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 import json
+import math
+import re
 
 VERSION = '0.1'
-KINDS = frozenset({'SESSION_CREATED', 'CONSENT_RECORDED', 'VEHICLE_RECORDED', 'ARTIFACT_REGISTERED', 'QUALITY_RECORDED', 'MANIFEST_SEALED', 'REVIEW_RECORDED', 'SESSION_ABORTED'})
+KINDS = frozenset({
+    'SESSION_CREATED',
+    'CONSENT_RECORDED',
+    'VEHICLE_RECORDED',
+    'ARTIFACT_REGISTERED',
+    'QUALITY_RECORDED',
+    'MANIFEST_SEALED',
+    'REVIEW_RECORDED',
+    'SESSION_ABORTED',
+    'INCIDENT_INTAKE_CONSENT_RECORDED',
+    'INCIDENT_INTAKE_RECORDED',
+})
+RFC3339_TIMESTAMP = re.compile(
+    r'^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-5][0-9]:[0-5][0-9]'
+    r'(?:\.[0-9]{1,6})?(?:Z|[+-](?:0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])$'
+)
+
 
 def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
+
+
+def _reject_nonfinite(_value):
+    raise ValueError('NONFINITE_EVENT_NUMBER')
+
+
+def _canonical_json(value):
+    """Serialize the shared event JSON dialect used by Python and PostgreSQL.
+
+    Object keys are sorted by Unicode code point (equivalent to UTF-8 byte
+    order for valid strings). Decimal values are emitted in fixed notation,
+    matching PostgreSQL jsonb numeric output rather than Python exponent form.
+    """
+    if value is None:
+        return 'null'
+    if value is True:
+        return 'true'
+    if value is False:
+        return 'false'
+    if type(value) is int:
+        return str(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError('NONFINITE_EVENT_NUMBER')
+        value = Decimal(str(value))
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise ValueError('NONFINITE_EVENT_NUMBER')
+        return format(value, 'f')
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    if isinstance(value, (list, tuple)):
+        return '[' + ','.join(_canonical_json(item) for item in value) + ']'
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise TypeError('EVENT_OBJECT_KEYS_MUST_BE_STRINGS')
+        return '{' + ','.join(
+            json.dumps(key, ensure_ascii=False, separators=(',', ':')) + ':' + _canonical_json(value[key])
+            for key in sorted(value)
+        ) + '}'
+    raise TypeError('UNSUPPORTED_EVENT_JSON_VALUE')
+
+
+def canonical_event_payload(payload):
+    """Return compact, deterministic JSON text for an event object."""
+    if type(payload) is not dict:
+        raise ValueError('EVENT_PAYLOAD_MUST_BE_OBJECT')
+    return _canonical_json(payload)
+
 
 @dataclass(frozen=True)
 class DomainEvent:
@@ -30,7 +98,7 @@ class DomainEvent:
             raise ValueError('INVALID_SEQUENCE')
         if not isinstance(self.kind, str) or self.kind not in KINDS:
             raise ValueError('INVALID_EVENT_KIND')
-        if not isinstance(self.occurred_at, str) or not self.occurred_at:
+        if not isinstance(self.occurred_at, str) or not RFC3339_TIMESTAMP.fullmatch(self.occurred_at):
             raise ValueError('INVALID_TIMESTAMP')
         try:
             timestamp = self.occurred_at
@@ -44,17 +112,27 @@ class DomainEvent:
         if not isinstance(self.payload_json, str):
             raise ValueError('INVALID_PAYLOAD')
         try:
-            payload = json.loads(self.payload_json)
-            canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'), allow_nan=False)
+            payload = json.loads(
+                self.payload_json,
+                parse_float=Decimal,
+                parse_constant=_reject_nonfinite,
+            )
         except (ValueError, TypeError, RecursionError):
             raise ValueError('INVALID_PAYLOAD') from None
-        if type(payload) is not dict or canonical != self.payload_json:
+        if type(payload) is not dict:
+            raise ValueError('NONCANONICAL_PAYLOAD')
+        try:
+            canonical = canonical_event_payload(payload)
+        except (ValueError, TypeError, RecursionError):
+            raise ValueError('INVALID_PAYLOAD') from None
+        if canonical != self.payload_json:
             raise ValueError('NONCANONICAL_PAYLOAD')
         return self
 
     @property
     def payload(self):
         return json.loads(self.payload_json)
+
 
 class EventJournal:
     """In-memory journal for validating synthetic event histories."""

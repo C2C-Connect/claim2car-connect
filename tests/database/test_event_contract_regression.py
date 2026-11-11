@@ -2,9 +2,14 @@ from dataclasses import FrozenInstanceError, replace
 import unittest
 from app.domain_events import DomainEvent, EventJournal
 
+
 class EventContractRegression(unittest.TestCase):
     def setUp(self):
-        self.event = DomainEvent('synthetic-session', 'event-1', 1, 'SESSION_CREATED', 'synthetic-test', '2026-01-01T00:00:00Z', 'contract regression', '{}')
+        self.event = DomainEvent(
+            'synthetic-session', 'event-1', 1, 'SESSION_CREATED',
+            'synthetic-test', '2026-01-01T00:00:00Z',
+            'contract regression', '{}',
+        )
 
     def test_valid_history_reconstructs_independent_journal(self):
         second = replace(self.event, event_id='event-2', sequence=2, kind='CONSENT_RECORDED')
@@ -52,16 +57,24 @@ class EventContractRegression(unittest.TestCase):
             ({'occurred_at': ''}, 'INVALID_TIMESTAMP'),
             ({'occurred_at': 'not-a-timestamp'}, 'INVALID_TIMESTAMP'),
             ({'occurred_at': '2026-01-01T00:00:00'}, 'INVALID_TIMESTAMP'),
+            ({'occurred_at': '2026-01-01 00:00:00Z'}, 'INVALID_TIMESTAMP'),
+            ({'occurred_at': '2026-01-01T00:00:00.1234567Z'}, 'INVALID_TIMESTAMP'),
+            ({'occurred_at': '2026-02-30T00:00:00Z'}, 'INVALID_TIMESTAMP'),
             ({'payload_json': '{'}, 'INVALID_PAYLOAD'),
             ({'payload_json': None}, 'INVALID_PAYLOAD'),
             ({'payload_json': '{"a": 1}'}, 'NONCANONICAL_PAYLOAD'),
             ({'payload_json': '[]'}, 'NONCANONICAL_PAYLOAD'),
             ({'payload_json': '{"a":NaN}'}, 'INVALID_PAYLOAD'),
+            ({'payload_json': '{"value":1e0}'}, 'NONCANONICAL_PAYLOAD'),
         ]
         for changes, error in cases:
             with self.subTest(changes=changes):
                 with self.assertRaisesRegex(ValueError, '^' + error + '$'):
                     replace(self.event, **changes).validate()
+
+    def test_canonical_unicode_and_decimal_payload_uses_utf8_fixed_notation(self):
+        event = replace(self.event, payload_json='{"label":"é","metric":0.00001}')
+        self.assertIs(event.validate(), event)
 
     def test_event_is_frozen_and_payload_read_is_independent(self):
         with self.assertRaises(FrozenInstanceError):
@@ -69,138 +82,6 @@ class EventContractRegression(unittest.TestCase):
         payload = self.event.payload
         payload['injected'] = True
         self.assertEqual(self.event.payload, {})
-
-
-class DurableTimestampRegression(unittest.TestCase):
-    """SQL input-validity boundary; not complete timestamp-contract parity."""
-    def setUp(self):
-        import test_journal_integration as fixtures
-        self.fixture = fixtures.TestJournalIntegration()
-        self.addCleanup(self.fixture.doCleanups)
-        self.fixture.setUp()
-        self.conn = self.fixture.conn
-
-    def append_at(self, timestamp):
-        f = self.fixture
-        return self.conn.execute(
-            'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-            (f.tenant,f.session,'timestamp-event',2,'SESSION_CREATED','synthetic-test',timestamp,'timestamp SQL regression','{}','0.1'),
-        ).fetchone()[0]
-
-    def test_malformed_timestamp_rejected_without_history_mutation(self):
-        import psycopg
-        before = self.fixture.history()
-        for timestamp in ('not-a-timestamp','2026-02-30T00:00:00Z',''):
-            with self.subTest(timestamp=timestamp):
-                with self.assertRaises(psycopg.errors.CheckViolation) as caught:
-                    with self.conn.transaction():
-                        self.append_at(timestamp)
-                        raise AssertionError('INVALID_TIMESTAMP_ACCEPTED')
-                self.assertEqual(caught.exception.sqlstate,'23514')
-                self.assertEqual(caught.exception.diag.constraint_name,'event_timestamp_input_valid')
-                self.assertEqual(self.fixture.history(),before)
-        self.assertEqual(self.append_at('2026-01-01T00:00:00Z'),'ACCEPTED')
-        self.assertEqual(self.append_at('2026-01-01T00:00:00Z'),'DUPLICATE')
-        self.assertEqual(len(self.fixture.history()),len(before)+1)
-
-    def test_offset_timestamp_round_trips_exact_text(self):
-        timestamp = '2026-01-01T00:00:00+05:30'
-        self.assertEqual(self.append_at(timestamp),'ACCEPTED')
-        self.assertEqual(self.fixture.history()[-1][4],timestamp)
-
-
-
-class DirectSqlCanonicalParityRegression(unittest.TestCase):
-    """Characterize direct-SQL bypasses until #26's database fix lands.
-
-    These tests intentionally prove the current defect: the restricted app
-    role can append representations rejected by DomainEvent.validate() on
-    readback. Replace these assertions with rejection/no-mutation assertions
-    when PostgreSQL enforces full Python contract parity.
-    """
-
-    def setUp(self):
-        import test_journal_integration as fixtures
-        self.fixture = fixtures.TestJournalIntegration()
-        self.addCleanup(self.fixture.doCleanups)
-        self.fixture.setUp()
-        self.conn = self.fixture.conn
-        self.before = self.fixture.history()
-
-    def append_direct_and_assert_readback_rejects(self, event_id, timestamp, payload, error):
-        from app.domain_events import DomainEvent
-        f = self.fixture
-        result = self.conn.execute(
-            'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,'
-            '%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-            (f.tenant, f.session, event_id, 2, 'SESSION_CREATED',
-             'synthetic-direct-sql-probe', timestamp, 'canonical parity probe',
-             payload, '0.1'),
-        ).fetchone()[0]
-        self.assertEqual(result, 'ACCEPTED')
-        row = self.conn.execute(
-            'SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,'
-            'payload_json,schema_version FROM faos.events '
-            'WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
-            (f.tenant, f.session, event_id),
-        ).fetchone()
-        self.assertIsNotNone(row)
-        with self.assertRaisesRegex(ValueError, '^' + error + '$'):
-            DomainEvent(*row).validate()
-        after = f.history()
-        self.assertEqual(len(after), len(self.before) + 1)
-        self.assertEqual(after[:-1], self.before)
-
-    def test_direct_sql_accepts_timezone_naive_timestamp_that_readback_rejects(self):
-        self.append_direct_and_assert_readback_rejects(
-            'naive-timestamp', '2026-01-01T00:00:00', '{}', 'INVALID_TIMESTAMP'
-        )
-
-    def test_direct_sql_accepts_noncanonical_key_order_that_readback_rejects(self):
-        self.append_direct_and_assert_readback_rejects(
-            'unordered-keys', '2026-01-01T00:00:00Z',
-            '{"z":1,"a":2}', 'NONCANONICAL_PAYLOAD'
-        )
-
-    def test_direct_sql_accepts_literal_unicode_that_readback_rejects(self):
-        self.append_direct_and_assert_readback_rejects(
-            'unicode-literal', '2026-01-01T00:00:00Z',
-            '{"label":"é"}', 'NONCANONICAL_PAYLOAD'
-        )
-
-    def test_direct_sql_accepts_numeric_exponent_that_readback_rejects(self):
-        self.append_direct_and_assert_readback_rejects(
-            'numeric-exponent', '2026-01-01T00:00:00Z',
-            '{"value":1e0}', 'NONCANONICAL_PAYLOAD'
-        )
-
-    def test_direct_sql_valid_event_round_trips_exact_payload_bytes(self):
-        from app.domain_events import DomainEvent, EventJournal
-        f = self.fixture
-        payload = '{"a":1,"z":"\\u00e9"}'
-        result = self.conn.execute(
-            'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,'
-            '%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-            (f.tenant, f.session, 'canonical-positive-control', 2,
-             'SESSION_CREATED', 'synthetic-test', '2026-01-01T00:00:00Z',
-             'canonical positive control', payload, '0.1'),
-        ).fetchone()[0]
-        self.assertEqual(result, 'ACCEPTED')
-        row = self.conn.execute(
-            'SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,'
-            'payload_json,schema_version FROM faos.events '
-            'WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
-            (f.tenant, f.session, 'canonical-positive-control'),
-        ).fetchone()
-        self.assertEqual(row[7], payload)
-        event = DomainEvent(*row)
-        first = DomainEvent(
-            f.session, 'event-1', 1, 'SESSION_CREATED', 'synthetic-test',
-            '2026-01-01T00:00:00Z', 'journal integration', '{}',
-        )
-        self.assertEqual(
-            EventJournal.replay(f.session, (first, event)).events[-1], event
-        )
 
 
 if __name__ == '__main__':

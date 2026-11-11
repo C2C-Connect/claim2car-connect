@@ -1,7 +1,10 @@
-"""Controlled-test capture API. No images, consent or diagnosis endpoints.
+"""Tenant-bound capture APIs over server-owned credentials and PostgreSQL RLS.
 
-Run app.capture_api:create_capture_app --factory using a private server-owned
-C2C_CAPTURE_CONFIG_FILE. Service credentials are not end-user sign-in.
+The standalone session-create route remains controlled-test only. Persistent
+claim-case creation provisions its own production-scoped capture session; the
+integrated evidence routes then require consent, keyed VIN references, and
+separately provisioned original-byte storage. Service credentials are not
+end-user sign-in; actor roles come from private config.
 """
 from dataclasses import asdict, dataclass, field
 import json
@@ -10,20 +13,28 @@ from pathlib import Path
 from typing import NoReturn
 from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, Field, StrictBool, StrictStr
 from psycopg import ProgrammingError
 from psycopg.conninfo import conninfo_to_dict
 
 from app.identity import ActorBinding, AuthenticationError, Credential, CredentialResolver
 from app.main import Settings, create_app
+from database.claim_cases import ClaimCaseConflict, ClaimCaseNotFound, ClaimCaseStore
+from database.incident_intake import IncidentIntakeService
 from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound,
     CaptureSessionStore, CaptureStorageUnavailable,
 )
+from app.artifact_storage import (
+    ArtifactConflict, ArtifactIntegrityError, ArtifactNotFound,
+    ArtifactStorageUnavailable, OriginalByteStore,
+)
+from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
 CONFIGURATION_SIZE_LIMIT = 65536
@@ -34,9 +45,74 @@ class CaptureRuntime:
     resolver: CredentialResolver = field(repr=False)
     store: CaptureSessionStore = field(repr=False)
     health_settings: Settings = field(repr=False)
+    claim_store: ClaimCaseStore | None = field(default=None, repr=False)
+
+class ClaimCaseRequest(BaseModel):
+    claim_id: UUID
+    request_id: UUID
+    capture_protocol_version: StrictStr = DEFAULT_CAPTURE_PROTOCOL
+    class Config:
+        extra = 'forbid'
+
+class IncidentConsentRequest(BaseModel):
+    request_id: UUID
+    accepted: StrictBool
+    class Config:
+        extra = 'forbid'
+
+class IncidentIntakeRequest(BaseModel):
+    request_id: UUID
+    occurred_at: StrictStr = Field(min_length=20, max_length=40)
+    incident_type: StrictStr = Field(min_length=1, max_length=16)
+    city: StrictStr = Field(min_length=2, max_length=80)
+    region: StrictStr = Field(min_length=2, max_length=2)
+    postal_code: StrictStr = Field(min_length=5, max_length=10)
+    class Config:
+        extra = 'forbid'
 
 class SessionRequest(BaseModel):
     session_id: UUID
+    capture_protocol_version: StrictStr = DEFAULT_CAPTURE_PROTOCOL
+    class Config:
+        extra = 'forbid'
+
+class ConsentRequest(BaseModel):
+    request_id: UUID
+    accepted: StrictBool
+    scope: StrictStr = Field(min_length=1, max_length=128)
+    class Config:
+        extra = 'forbid'
+
+class VehicleReferenceRequest(BaseModel):
+    request_id: UUID
+    vin: StrictStr = Field(min_length=17, max_length=17)
+    class Config:
+        extra = 'forbid'
+
+class EvidenceArtifactRequest(BaseModel):
+    request_id: UUID
+    artifact_id: UUID
+    slot: StrictStr = Field(min_length=1, max_length=64)
+    payload_base64: StrictStr = Field(min_length=4, max_length=((MAX_EVIDENCE_BYTES + 2) // 3) * 4)
+    sha256: StrictStr = Field(min_length=64, max_length=64)
+    class Config:
+        extra = 'forbid'
+
+class AdvisoryQualityRequest(BaseModel):
+    request_id: UUID
+    results: dict[StrictStr, StrictBool]
+    class Config:
+        extra = 'forbid'
+
+class SealRequest(BaseModel):
+    request_id: UUID
+    class Config:
+        extra = 'forbid'
+
+class HumanReviewRequest(BaseModel):
+    request_id: UUID
+    disposition: StrictStr = Field(min_length=1, max_length=64)
+    reason: StrictStr = Field(min_length=1, max_length=1000)
     class Config:
         extra = 'forbid'
 
@@ -64,10 +140,17 @@ def _target(dsn):
         raise ValueError('EXPLICIT_SINGLE_DATABASE_TARGET_REQUIRED')
     return tuple(info.get(key, '') for key in ('host', 'hostaddr', 'port', 'dbname'))
 
-def load_runtime(path):
+def load_runtime(path=None, *, configuration_json=None):
     try:
-        with Path(path).open('rb') as source:
-            raw = source.read(CONFIGURATION_SIZE_LIMIT + 1)
+        if configuration_json is not None:
+            if not isinstance(configuration_json, str):
+                raise ValueError('INVALID_CONFIGURATION_TYPES')
+            raw = configuration_json.encode('utf-8')
+        else:
+            if not path:
+                raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
+            with Path(path).open('rb') as source:
+                raw = source.read(CONFIGURATION_SIZE_LIMIT + 1)
         if len(raw) > CONFIGURATION_SIZE_LIMIT:
             raise ValueError('CONFIGURATION_TOO_LARGE')
         value = json.loads(raw.decode('utf-8'), object_pairs_hook=_unique, parse_constant=_reject_constant)
@@ -86,11 +169,17 @@ def load_runtime(path):
                 raise ValueError('DATABASE_TARGET_OR_LOGIN_MISMATCH')
         credentials = []
         for record in records:
-            if type(record) is not dict or set(record) != {'actor_id', 'tenant_id', 'database_role', 'token_sha256', 'expires_at', 'enabled'}:
+            if type(record) is not dict or set(record) not in (
+                {'actor_id', 'tenant_id', 'database_role', 'token_sha256', 'expires_at', 'enabled'},
+                {'actor_id', 'tenant_id', 'database_role', 'token_sha256', 'expires_at', 'enabled', 'actor_role'},
+            ):
                 raise ValueError('INVALID_CREDENTIAL_FIELDS')
-            if not isinstance(record['tenant_id'], str) or not isinstance(record['database_role'], str) or not isinstance(record['token_sha256'], str) or type(record['enabled']) is not bool:
+            if (not isinstance(record['tenant_id'], str) or not isinstance(record['database_role'], str)
+                    or not isinstance(record['token_sha256'], str) or type(record['enabled']) is not bool
+                    or ('actor_role' in record and not isinstance(record['actor_role'], str))):
                 raise ValueError('INVALID_CREDENTIAL_TYPES')
-            binding = ActorBinding(record['actor_id'], UUID(record['tenant_id']), record['database_role'])
+            binding = ActorBinding(record['actor_id'], UUID(record['tenant_id']), record['database_role'],
+                                   record.get('actor_role', 'operator'))
             if binding.database_role not in dsns:
                 raise ValueError('MISSING_SERVER_LOGIN')
             credentials.append(Credential(record['token_sha256'], binding, record['expires_at'], record['enabled']))
@@ -106,13 +195,34 @@ def _fail(status, detail) -> NoReturn:
         headers['WWW-Authenticate'] = 'Bearer'
     raise HTTPException(status_code=status, detail=detail, headers=headers)
 
-def create_capture_app(runtime=None):
+def create_capture_app(runtime=None, *, enable_evidence=False):
     if runtime is None:
-        path = os.environ.get('C2C_CAPTURE_CONFIG_FILE')
-        if not path:
-            raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
-        runtime = load_runtime(path)
-    api = create_app(runtime.health_settings)
+        configuration_json = os.environ.get('C2C_CAPTURE_CONFIG_JSON')
+        if configuration_json:
+            runtime = load_runtime(configuration_json=configuration_json)
+        else:
+            path = os.environ.get('C2C_CAPTURE_CONFIG_FILE')
+            if not path:
+                raise ValueError('CAPTURE_RUNTIME_CONFIGURATION_REQUIRED')
+            runtime = load_runtime(path)
+    # Child intake apps carry only the health handlers they have always owned;
+    # never recursively compose the integrated parent when C2C_RUNTIME_MODE is set.
+    api = create_app(runtime.health_settings, runtime_mode='restricted_staging')
+    api.state.health_settings = runtime.health_settings
+    claim_cases = getattr(runtime, 'claim_store', None)
+    if claim_cases is None and isinstance(runtime.store, CaptureSessionStore):
+        claim_cases = ClaimCaseStore(runtime.store)
+    evidence = None
+    incident_intake = None
+    if enable_evidence:
+        root = os.environ.get('C2C_ARTIFACT_STORAGE_ROOT')
+        pepper = os.environ.get('C2C_VIN_HMAC_PEPPER')
+        if not root or not Path(root).is_absolute() or not pepper:
+            raise ValueError('PERSISTENT_EVIDENCE_CONFIGURATION_REQUIRED')
+        evidence = CaptureEvidenceService(
+            runtime.store, OriginalByteStore(root, max_bytes=MAX_EVIDENCE_BYTES), pepper
+        )
+        incident_intake = IncidentIntakeService(runtime.store)
 
     @api.exception_handler(RequestValidationError)
     async def invalid_capture_request(request, error):
@@ -128,10 +238,13 @@ def create_capture_app(runtime=None):
             _fail(401, 'UNAUTHORIZED')
         return authorization
 
-    def invoke(action, authorization, session_id, creating=False):
+    def invoke(action, authorization, session_id, creating=False, **kwargs):
         try:
-            result = action(authorization, str(session_id))
-            payload = jsonable_encoder({**asdict(result), 'scope': 'controlled-test'})
+            result = action(authorization, str(session_id), **kwargs)
+            payload_data = asdict(result)
+            payload_data.pop('owner_actor_id', None)
+            payload_data['scope'] = getattr(result, 'scope', 'controlled-test')
+            payload = jsonable_encoder(payload_data)
             return JSONResponse(payload, status_code=201 if creating and result.created else 200, headers=dict(NO_STORE_HEADERS))
         except AuthenticationError:
             _fail(401, 'UNAUTHORIZED')
@@ -146,12 +259,235 @@ def create_capture_app(runtime=None):
         except Exception:
             _fail(500, 'CAPTURE_OPERATION_FAILED')
 
+    def invoke_claim(action, authorization, **kwargs):
+        try:
+            result = action(authorization, **kwargs)
+            payload = {**asdict(result), 'scope': 'persistent-claim-case'}
+            return JSONResponse(jsonable_encoder(payload), status_code=201 if result.created else 200,
+                                headers=dict(NO_STORE_HEADERS))
+        except AuthenticationError:
+            _fail(401, 'UNAUTHORIZED')
+        except CaptureAuthorizationError:
+            _fail(403, 'CLAIM_CASE_AUTHORITY_DENIED')
+        except ClaimCaseNotFound:
+            _fail(404, 'CLAIM_CASE_NOT_FOUND')
+        except ClaimCaseConflict:
+            _fail(409, 'CLAIM_CASE_CONFLICT')
+        except CaptureStorageUnavailable:
+            _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+        except ValueError:
+            _fail(422, 'INVALID_CLAIM_CASE_REQUEST')
+        except Exception:
+            _fail(500, 'CLAIM_CASE_OPERATION_FAILED')
+
+    @api.get('/v1/capture-protocols')
+    def capture_protocol_registry(authorization: str = Depends(authorize)):
+        protocols = []
+        for version in (DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL):
+            definition = resolve_capture_protocol(version)
+            protocols.append({
+                "version": definition.version,
+                "status": definition.status,
+                "selectable_for_new_sessions": True,
+                "capture_enabled": definition.status == "implemented",
+                "required_slots": list(definition.slots),
+            })
+        return JSONResponse({
+            "default_protocol_version": DEFAULT_CAPTURE_PROTOCOL,
+            "protocols": protocols,
+        }, headers=dict(NO_STORE_HEADERS))
+    @api.post('/v1/claim-cases')
+    def create_claim_case(body: ClaimCaseRequest, authorization: str = Depends(authorize)):
+        if claim_cases is None:
+            _fail(503, 'CLAIM_CASE_STORAGE_UNAVAILABLE')
+        return invoke_claim(claim_cases.create, authorization,
+                            claim_id=str(body.claim_id), request_id=str(body.request_id),
+                            capture_protocol_version=body.capture_protocol_version)
+
+    @api.get('/v1/claim-cases')
+    def list_claim_cases(limit: int = Query(default=50, ge=1, le=100),
+                         authorization: str = Depends(authorize)):
+        if claim_cases is None:
+            _fail(503, 'CLAIM_CASE_STORAGE_UNAVAILABLE')
+        try:
+            records = claim_cases.list_owned(authorization, limit=limit)
+            payload = [{**asdict(item), 'scope': 'persistent-claim-case'} for item in records]
+            return JSONResponse(jsonable_encoder(payload), headers=dict(NO_STORE_HEADERS))
+        except AuthenticationError:
+            _fail(401, 'UNAUTHORIZED')
+        except CaptureAuthorizationError:
+            _fail(403, 'CLAIM_CASE_AUTHORITY_DENIED')
+        except CaptureStorageUnavailable:
+            _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+        except ValueError:
+            _fail(422, 'INVALID_CLAIM_CASE_REQUEST')
+        except Exception:
+            _fail(500, 'CLAIM_CASE_OPERATION_FAILED')
+
+    @api.get('/v1/claim-cases/{claim_id}')
+    def get_claim_case(claim_id: UUID, authorization: str = Depends(authorize)):
+        if claim_cases is None:
+            _fail(503, 'CLAIM_CASE_STORAGE_UNAVAILABLE')
+        return invoke_claim(claim_cases.get, authorization, claim_id=str(claim_id))
+
     @api.post('/v1/capture-sessions')
     def create_session(body: SessionRequest, authorization: str = Depends(authorize)):
-        return invoke(runtime.store.create, authorization, body.session_id, creating=True)
+        return invoke(runtime.store.create, authorization, body.session_id, creating=True,
+                      protocol_version=body.capture_protocol_version)
+
+    @api.get('/v1/capture-sessions')
+    def list_sessions(limit: int = Query(default=100, ge=1, le=100), authorization: str = Depends(authorize)):
+        try:
+            sessions=runtime.store.list_owned(authorization,limit=limit)
+            payload=[{**asdict(item),'scope':'controlled-test'} for item in sessions]
+            return JSONResponse(jsonable_encoder(payload),headers=dict(NO_STORE_HEADERS))
+        except AuthenticationError:
+            _fail(401,'UNAUTHORIZED')
+        except CaptureAuthorizationError:
+            _fail(403,'CAPTURE_AUTHORITY_DENIED')
+        except CaptureStorageUnavailable:
+            _fail(503,'CAPTURE_STORAGE_UNAVAILABLE')
+        except ValueError:
+            _fail(422,'INVALID_CAPTURE_SESSION_REQUEST')
+        except Exception:
+            _fail(500,'CAPTURE_OPERATION_FAILED')
 
     @api.get('/v1/capture-sessions/{session_id}')
     def get_session(session_id: UUID, authorization: str = Depends(authorize)):
         return invoke(runtime.store.get, authorization, session_id)
+
+    if evidence is not None:
+        def invoke_evidence(action, authorization, session_id=None, **kwargs):
+            try:
+                result = action(authorization, **kwargs) if session_id is None else action(
+                    authorization, str(session_id), **kwargs
+                )
+                return JSONResponse(jsonable_encoder(result), headers=dict(NO_STORE_HEADERS))
+            except AuthenticationError:
+                _fail(401, 'UNAUTHORIZED')
+            except CaptureAuthorizationError:
+                _fail(403, 'CAPTURE_AUTHORITY_DENIED')
+            except CaptureSessionConflict:
+                _fail(409, 'CAPTURE_SESSION_CONFLICT')
+            except CaptureSessionNotFound:
+                _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
+            except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
+                _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+            except (ArtifactConflict, ArtifactIntegrityError, ArtifactNotFound):
+                _fail(409, 'EVIDENCE_ARTIFACT_CONFLICT')
+            except ValueError:
+                _fail(422, 'INVALID_CAPTURE_EVIDENCE_REQUEST')
+            except Exception:
+                _fail(500, 'CAPTURE_EVIDENCE_OPERATION_FAILED')
+
+        @api.get('/v1/capture-sessions/{session_id}/evidence-readiness')
+        def evidence_readiness(session_id: UUID, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.evidence_readiness, authorization, session_id)
+        @api.post('/v1/capture-sessions/{session_id}/consent')
+        def record_consent(session_id: UUID, body: ConsentRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.record_consent, authorization, session_id,
+                                   request_id=body.request_id, accepted=body.accepted, scope=body.scope)
+
+        @api.get('/v1/capture-sessions/{session_id}/incident-intake')
+        def get_incident_intake(session_id: UUID, authorization: str = Depends(authorize)):
+            if os.environ.get('C2C_INCIDENT_INTAKE_ENABLED', '').lower() != 'true':
+                _fail(503, 'INCIDENT_INTAKE_NOT_ENABLED')
+            return invoke_evidence(incident_intake.get_incident, authorization, session_id)
+
+        @api.post('/v1/capture-sessions/{session_id}/incident-consent')
+        def record_incident_consent(session_id: UUID, body: IncidentConsentRequest, authorization: str = Depends(authorize)):
+            if os.environ.get('C2C_INCIDENT_INTAKE_ENABLED', '').lower() != 'true':
+                _fail(503, 'INCIDENT_INTAKE_NOT_ENABLED')
+            return invoke_evidence(incident_intake.record_consent, authorization, session_id,
+                                   request_id=body.request_id, accepted=body.accepted)
+
+        @api.post('/v1/capture-sessions/{session_id}/incident-intake')
+        def record_incident_intake(session_id: UUID, body: IncidentIntakeRequest, authorization: str = Depends(authorize)):
+            if os.environ.get('C2C_INCIDENT_INTAKE_ENABLED', '').lower() != 'true':
+                _fail(503, 'INCIDENT_INTAKE_NOT_ENABLED')
+            return invoke_evidence(
+                incident_intake.record_incident, authorization, session_id,
+                request_id=body.request_id, occurred_at=body.occurred_at,
+                incident_type=body.incident_type, city=body.city,
+                region=body.region, postal_code=body.postal_code,
+            )
+
+        @api.post('/v1/capture-sessions/{session_id}/vehicle-reference')
+        def record_vehicle(session_id: UUID, body: VehicleReferenceRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.record_vehicle, authorization, session_id,
+                                   request_id=body.request_id, vin=body.vin)
+
+        @api.post('/v1/capture-sessions/{session_id}/artifacts')
+        def register_artifact(session_id: UUID, body: EvidenceArtifactRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(
+                evidence.register_artifact, authorization, session_id, request_id=body.request_id,
+                artifact_id=body.artifact_id, slot=body.slot, payload_base64=body.payload_base64,
+                sha256_hex=body.sha256,
+            )
+
+        @api.post('/v1/capture-sessions/{session_id}/quality')
+        def record_quality(session_id: UUID, body: AdvisoryQualityRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.record_quality, authorization, session_id,
+                                   request_id=body.request_id, results=body.results)
+
+        @api.post('/v1/capture-sessions/{session_id}/seal')
+        def seal_capture(session_id: UUID, body: SealRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.seal_capture, authorization, session_id,
+                                   request_id=body.request_id)
+
+        @api.get('/v1/review-queue')
+        def review_queue(limit: int = Query(default=100, ge=1, le=200), authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.list_review_queue, authorization, limit=limit)
+
+        @api.post('/v1/capture-sessions/{session_id}/review')
+        def record_review(session_id: UUID, body: HumanReviewRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(
+                evidence.record_review, authorization, session_id, request_id=body.request_id,
+                disposition=body.disposition, reason=body.reason,
+            )
+
+        @api.get('/v1/review-sessions/{session_id}')
+        def review_session_details(session_id: UUID, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.get_review_details, authorization, session_id)
+
+        @api.get('/v1/review-sessions/{session_id}/artifacts/{artifact_id}')
+        def review_artifact(session_id: UUID, artifact_id: UUID, authorization: str = Depends(authorize)):
+            try:
+                raw = evidence.retrieve_for_review(authorization, str(session_id), str(artifact_id))
+                return Response(
+                    content=raw,
+                    media_type='application/octet-stream',
+                    headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'},
+                )
+            except AuthenticationError:
+                _fail(401, 'UNAUTHORIZED')
+            except CaptureAuthorizationError:
+                _fail(403, 'CAPTURE_AUTHORITY_DENIED')
+            except CaptureSessionNotFound:
+                _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
+            except CaptureSessionConflict:
+                _fail(409, 'CAPTURE_SESSION_CONFLICT')
+            except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
+                _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+            except (ArtifactIntegrityError, ArtifactNotFound):
+                _fail(409, 'EVIDENCE_INTEGRITY_FAILED')
+            except ValueError:
+                _fail(422, 'INVALID_REVIEW_ARTIFACT_REQUEST')
+            except Exception:
+                _fail(500, 'REVIEW_ARTIFACT_OPERATION_FAILED')
+
+    @api.get('/v1/identity')
+    def current_identity(authorization: str = Depends(authorize)):
+        # Expose only the authenticated actor context needed by the application
+        # shell. Never return credential material or database connection data.
+        actor = runtime.resolver.resolve(authorization)
+        return JSONResponse(
+            {
+                'actor_id': actor.actor_id,
+                'tenant_id': str(actor.tenant_id),
+                'actor_role': actor.actor_role,
+            },
+            headers=dict(NO_STORE_HEADERS),
+        )
 
     return api

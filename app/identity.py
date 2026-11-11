@@ -17,6 +17,7 @@ class ActorBinding:
     actor_id: str
     tenant_id: UUID
     database_role: str
+    actor_role: str = "operator"
 
 @dataclass(frozen=True)
 class Credential:
@@ -43,6 +44,8 @@ class CredentialResolver:
                 or not isinstance(binding.database_role,str) or re.fullmatch('[a-z][a-z0-9_]{0,62}',binding.database_role) is None
                 or binding.database_role in ('postgres','faos_app','faos_writer','faos_migrator','faos_fixture')
                 or binding.database_role.startswith(('pg_','rds_'))):
+                raise ValueError('INVALID_IDENTITY_CONFIGURATION')
+            if binding.actor_role not in ('owner', 'operator', 'reviewer', 'supervisor'):
                 raise ValueError('INVALID_IDENTITY_CONFIGURATION')
             if (record.token_sha256 in digests or (binding.actor_id in actors and actors[binding.actor_id]!=binding)
                 or (binding.database_role in roles and roles[binding.database_role]!=binding.tenant_id)):

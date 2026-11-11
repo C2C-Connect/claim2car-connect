@@ -72,7 +72,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0008_tenant_login_authority.sql')
+        self.assertEqual(plan[-1].name,'0018_capture_protocol_session_binding.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -87,15 +87,149 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql',))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
+
+    def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
+        plan = self.authority_plan()
+        apply(self.conn, plan[:-1])
+        tenant = str(uuid.uuid4())
+        legacy_session = 'legacy-' + uuid.uuid4().hex
+        new_session = 'new-' + uuid.uuid4().hex
+        admin_url = make_conninfo(
+            os.getenv('MIGRATION_TEST_ADMIN_URL', 'postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test'),
+            dbname=self.db,
+        )
+        with psycopg.connect(admin_url, autocommit=True) as admin:
+            admin.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                          (tenant,'protocol migration fixture'))
+            admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                          (tenant,legacy_session))
+            self.assertEqual(apply(self.conn,plan),(plan[-1].name,))
+            legacy_version = admin.execute(
+                'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
+                (tenant,legacy_session)).fetchone()[0]
+            self.assertEqual(legacy_version,'claims2car-12-v1')
+            admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                          (tenant,new_session))
+            new_version = admin.execute(
+                'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
+                (tenant,new_session)).fetchone()[0]
+            self.assertEqual(new_version,'claims2car-16-v1')
+            with self.assertRaises(psycopg.errors.RaiseException) as raised:
+                admin.execute(
+                    "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v1' WHERE tenant_id=%s AND session_id=%s",
+                    (tenant,legacy_session))
+            self.assertEqual(raised.exception.diag.message_primary,'CAPTURE_PROTOCOL_VERSION_IMMUTABLE')
+
+    def test_full_migration_enforces_python_sql_event_contract_parity(self):
+        from app.domain_events import DomainEvent, KINDS
+        from database.journal import tenant_transaction
+        plan = self.authority_plan()
+        apply(self.conn, plan)
+        app_url = make_conninfo(
+            os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test'),
+            dbname=self.db,
+        )
+        admin_url = make_conninfo(
+            os.getenv('MIGRATION_TEST_ADMIN_URL', 'postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test'),
+            dbname=self.db,
+        )
+        with psycopg.connect(admin_url, autocommit=True) as admin, psycopg.connect(app_url, autocommit=True) as app:
+            tenant = str(uuid.uuid4())
+            session = 'event-contract-' + uuid.uuid4().hex
+            def append(event_id, sequence, kind, timestamp, payload):
+                return app.execute(
+                    'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,'
+                    '%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+                    (tenant, session, event_id, sequence, kind, 'synthetic-contract-test',
+                     timestamp, 'event contract integration', payload, '0.1'),
+                ).fetchone()[0]
+
+            admin.execute(
+                'INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                (tenant, 'synthetic event contract fixture'),
+            )
+            admin.execute(
+                'INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                (tenant, session),
+            )
+            admin.execute(
+                'INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) '
+                'SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=%s',
+                (tenant, 'faos_app'),
+            )
+            with tenant_transaction(app, tenant):
+                self.assertEqual(append(
+                    'event-1', 1, 'SESSION_CREATED', '2026-01-01T00:00:00Z', '{}'
+                ), 'ACCEPTED')
+
+            invalid_timestamps = (
+                '2026-01-01T00:00:00',
+                '2026-01-01 00:00:00Z',
+                '2026-01-01T00:00:00.1234567Z',
+                '2026-02-30T00:00:00Z',
+            )
+            invalid_payloads = (
+                '{ "a":1}',
+                '{"z":1,"a":2}',
+                '{"value":1e0}',
+            )
+            probes = [
+                ('timestamp-' + str(i), '2026-01-01T00:00:00Z', '{}')
+                for i in range(len(invalid_timestamps))
+            ] + [
+                ('payload-' + str(i), '2026-01-01T00:00:00Z', payload)
+                for i, payload in enumerate(invalid_payloads)
+            ]
+            for index, (event_id, _valid_placeholder, payload) in enumerate(probes):
+                timestamp = invalid_timestamps[index] if index < len(invalid_timestamps) else '2026-01-01T00:00:00Z'
+                with self.subTest(event_id=event_id):
+                    with tenant_transaction(app, tenant):
+                        with self.assertRaises(psycopg.errors.CheckViolation):
+                            with app.transaction():
+                                append(event_id, 2, 'SESSION_CREATED', timestamp, payload)
+                        count = app.execute(
+                            'SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+                            (tenant, session),
+                        ).fetchone()[0]
+                        self.assertEqual(count, 1)
+
+            valid_payload = '{"label":"é","large":100000000000000000000,"small":0.00001,"value":1.25}'
+            sql_canonical = app.execute(
+                'SELECT faos.canonical_event_jsonb(%s::jsonb)', (valid_payload,)
+            ).fetchone()[0]
+            self.assertEqual(sql_canonical, valid_payload, f'SQL_CANONICAL_PAYLOAD={sql_canonical!r}')
+            with tenant_transaction(app, tenant):
+                self.assertEqual(append(
+                    'event-2', 2, 'QUALITY_RECORDED', '2026-01-01T00:00:00+05:30', valid_payload
+                ), 'ACCEPTED')
+                row = app.execute(
+                    'SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version '
+                    'FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
+                    (tenant, session, 'event-2'),
+                ).fetchone()
+                self.assertEqual(DomainEvent(*row).validate().payload['value'], 1.25)
+
+            sequence = 3
+            with tenant_transaction(app, tenant):
+                for kind in sorted(KINDS - {'SESSION_CREATED', 'QUALITY_RECORDED'}):
+                    self.assertEqual(append(
+                        'kind-' + str(sequence), sequence, kind, '2026-01-01T00:00:00Z', '{}'
+                    ), 'ACCEPTED')
+                    sequence += 1
+                kinds = app.execute(
+                    'SELECT kind FROM faos.events WHERE tenant_id=%s AND session_id=%s ORDER BY sequence',
+                    (tenant, session),
+                ).fetchall()
+                self.assertEqual({row[0] for row in kinds}, set(KINDS))
 
     def test_applied_authority_migration_checksum_change_is_rejected(self):
         plan = self.authority_plan()
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0008_tenant_login_authority'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0018_capture_protocol_session_binding.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)

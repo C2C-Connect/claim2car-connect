@@ -53,8 +53,6 @@ def ready():
         "environment": "development",
         "constants_version": C.VERSION,
         "scope": "milestone_5_dispatch",
-        "operator_payout_usd": C.OPERATOR_PAYOUT_USD,
-        "owner_payout": None,
     }
 
 
@@ -62,7 +60,6 @@ def ready():
 def constants():
     return {
         "version": C.VERSION,
-        "OPERATOR_PAYOUT_USD": C.OPERATOR_PAYOUT_USD,
         "ENSEMBLE_PHYSICS_WEIGHT": C.ENSEMBLE_PHYSICS_WEIGHT,
         "ENSEMBLE_AI_WEIGHT": C.ENSEMBLE_AI_WEIGHT,
         "S_I_PASS": C.S_I_PASS,

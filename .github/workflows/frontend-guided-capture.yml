@@ -22,14 +22,51 @@ jobs:
         run: |
           mkdir -p output/guided-capture
           python scripts/candidate_manifest.py capture output/guided-capture/before.json
-          sha256sum frontend/src/modules/capture/{vin,guided_workflow}.mjs frontend/tests/guided_workflow.test.mjs contracts/disclosure-v1.json .github/workflows/frontend-guided-capture.yml > output/guided-capture/sources.sha256
+          sha256sum frontend/src/modules/capture/{vin,guided_workflow,slice2_workbench_controller}.mjs frontend/app/app.mjs frontend/tests/{guided_workflow,slice2_workbench}.test.mjs contracts/disclosure-v1.json .github/workflows/frontend-guided-capture.yml > output/guided-capture/sources.sha256
+      - name: Check browser workbench JavaScript syntax
+        run: node --check frontend/app/app.mjs
       - name: Guided capture controller assertions
         run: node frontend/tests/guided_workflow.test.mjs > output/guided-capture/controller-tests.json
+      - name: Slice 2 operator and reviewer workbench assertions
+        run: node frontend/tests/slice2_workbench.test.mjs > output/guided-capture/slice2-workbench-tests.json
+      - name: Browser-persistent original evidence queue assertions
+        run: node frontend/tests/offline_evidence_queue.test.mjs > output/guided-capture/offline-evidence-queue-tests.json
+      - name: Integrated browser module syntax checks
+        run: node --check app/web/assets/app.js && node --check app/web/assets/offline_evidence_queue.mjs
       - name: Verify candidate and guided-capture sources unchanged
         if: always()
         run: |
           python scripts/candidate_manifest.py capture output/guided-capture/after.json
           python scripts/candidate_manifest.py compare output/guided-capture/before.json output/guided-capture/after.json
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path("output/guided-capture/sources.sha256")
+          if not manifest.is_file() or manifest.stat().st_size == 0:
+              raise SystemExit("CHECKSUM_MANIFEST_MISSING_OR_EMPTY")
+          lines = manifest.read_text(encoding="utf-8").splitlines()
+          expected = {
+              "frontend/src/modules/capture/vin.mjs",
+              "frontend/src/modules/capture/guided_workflow.mjs",
+              "frontend/src/modules/capture/slice2_workbench_controller.mjs",
+              "frontend/app/app.mjs",
+              "frontend/tests/guided_workflow.test.mjs",
+              "frontend/tests/slice2_workbench.test.mjs",
+              "contracts/disclosure-v1.json",
+              ".github/workflows/frontend-guided-capture.yml",
+          }
+          import re
+          if len(lines) != len(expected):
+              raise SystemExit(f"CHECKSUM_MANIFEST_ENTRY_COUNT_INVALID:{len(lines)}")
+          parsed = []
+          for line in lines:
+              match = re.fullmatch(r"([0-9a-f]{64})  (.+)", line)
+              if not match:
+                  raise SystemExit("CHECKSUM_MANIFEST_LINE_FORMAT_INVALID")
+              parsed.append(match.group(2))
+          if len(set(parsed)) != len(parsed) or set(parsed) != expected:
+              raise SystemExit("CHECKSUM_MANIFEST_PATH_SET_INVALID")
+          print(f"Validated {len(parsed)} SHA-256 manifest entries")
+          PY
           sha256sum --check output/guided-capture/sources.sha256
       - uses: actions/upload-artifact@v4
         if: always()

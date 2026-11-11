@@ -1,9 +1,12 @@
 """Health-only FastAPI foundation; no authenticated business API is exposed."""
 from dataclasses import dataclass, field
+from pathlib import Path
 import os
+import re
 import psycopg
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 @dataclass(frozen=True)
 class Settings:
@@ -19,12 +22,12 @@ SELECT NOT r.rolsuper AND NOT r.rolbypassrls
        to_regclass('faos.tenant_login_bindings') IS NOT NULL,
        EXISTS(SELECT 1 FROM pg_proc p WHERE p.oid=to_regprocedure('faos.tenant_id()')
               AND p.prosecdef AND pg_get_userbyid(p.proowner)='faos_writer'),
-       (SELECT count(*)=10 AND bool_and(c.relrowsecurity AND c.relforcerowsecurity)
+       (SELECT count(*)=12 AND bool_and(c.relrowsecurity AND c.relforcerowsecurity)
         FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname='faos' AND c.relkind='r'
         AND c.relname IN ('organizations','users','memberships','dealer_groups',
                          'dealer_locations','location_brands','sessions','events',
-                         'manifest_roots','completion_receipts'))
+                         'manifest_roots','completion_receipts','claim_cases','claim_case_incident_intake'))
 FROM pg_roles r WHERE r.rolname=current_user
 """
 
@@ -34,9 +37,83 @@ def probe_database(url):
         return conn.execute(READINESS_SQL).fetchone()==(True,True,True,True)
 
 
-def create_app(settings=None):
+def _mount_internal_router(api, source_router, public_prefix, internal_prefix):
+    """Expose an existing analytical router under its internal-only URL space."""
+    from fastapi.routing import APIRoute
+    from backend.app.security import require_internal_service
+
+    for route in source_router.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        if not route.path.startswith(public_prefix):
+            continue
+        path = internal_prefix + route.path[len(public_prefix):]
+        api.add_api_route(
+            path,
+            route.endpoint,
+            methods=route.methods,
+            response_model=route.response_model,
+            status_code=route.status_code,
+            response_class=route.response_class,
+            dependencies=[Depends(require_internal_service)],
+            tags=route.tags,
+            name=f"internal_{route.name}",
+            include_in_schema=False,
+        )
+
+
+def create_app(settings=None, runtime_mode=None):
     settings = settings if settings is not None else Settings.from_environment()
     api = FastAPI(title='Claim2Car Connect foundation',docs_url=None,redoc_url=None,openapi_url=None)
+
+    # Staging stays fail-closed by default. The integrated surface is explicit
+    # opt-in and composes the already tenant-authenticated intake app with
+    # service-authenticated analytical routes.
+    mode = (runtime_mode or os.environ.get('C2C_RUNTIME_MODE', 'restricted_staging')).strip().lower()
+    if mode not in {'restricted_staging', 'integrated'}:
+        raise ValueError('INVALID_C2C_RUNTIME_MODE')
+
+    if mode == 'integrated':
+        service_token = os.environ.get('C2C_INTERNAL_SERVICE_TOKEN', '')
+        if re.fullmatch(r'[A-Za-z0-9_-]{43,128}', service_token) is None:
+            raise ValueError('INTERNAL_SERVICE_AUTH_CONFIGURATION_REQUIRED')
+
+        from app.intake_api import create_intake_app
+        from backend.app.api.analysis import router as analysis_router
+        from backend.app.api.triage import router as triage_router
+        from backend.app.api.dispatch import router as dispatch_router
+
+        intake_app = create_intake_app(enable_evidence=True)
+        settings = getattr(intake_app.state, 'health_settings', settings)
+        api.mount('/api', intake_app)
+        _mount_internal_router(api, analysis_router, '/api/v1/analysis', '/internal/v1/analysis')
+        _mount_internal_router(api, triage_router, '/api/v1/triage', '/internal/v1/triage')
+        _mount_internal_router(api, dispatch_router, '/api/v1/dispatch', '/internal/v1/dispatch')
+
+        # The operator/owner/reviewer shell is served only by the integrated
+        # runtime. Restricted staging remains health-only and exposes no UI.
+        web_root = Path(__file__).with_name('web')
+        api.mount(
+            '/assets',
+            StaticFiles(directory=web_root / 'assets'),
+            name='claim2car-web-assets',
+        )
+
+        @api.get('/', include_in_schema=False)
+        def application_shell():
+            return FileResponse(
+                web_root / 'index.html',
+                headers={'Cache-Control': 'no-store'},
+            )
+
+    @api.get('/health/build')
+    def build():
+        revision = 'unknown'
+        try:
+            revision = Path(__file__).with_name('_build_revision.txt').read_text(encoding='ascii').strip() or 'unknown'
+        except OSError:
+            pass
+        return JSONResponse({'revision':revision,'runtime_mode':mode},headers={'Cache-Control':'no-store'})
 
     @api.get('/health/live')
     def live():
@@ -50,5 +127,15 @@ def create_app(settings=None):
             healthy = False
         return JSONResponse({'status':'ready' if healthy else 'not_ready','scope':'infrastructure-only'},
                             status_code=200 if healthy else 503,headers={'Cache-Control':'no-store'})
+
+    if mode == 'integrated':
+        frontend_root = Path(__file__).resolve().parents[1] / 'frontend' / 'app'
+        if not frontend_root.is_dir():
+            raise ValueError('INTEGRATED_FRONTEND_ASSETS_REQUIRED')
+        source_root = Path(__file__).resolve().parents[1] / 'frontend' / 'src'
+        if not source_root.is_dir():
+            raise ValueError('INTEGRATED_FRONTEND_SOURCE_REQUIRED')
+        api.mount('/src', StaticFiles(directory=str(source_root), html=False), name='claim2car-frontend-source')
+        api.mount('/prototype', StaticFiles(directory=str(frontend_root), html=True), name='claim2car-workbench-prototype')
 
     return api

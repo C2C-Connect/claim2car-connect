@@ -155,7 +155,6 @@ def test_full_run_produces_all_fields():
 
 
 def test_no_owner_payout_constant():
-    assert hasattr(C, "OPERATOR_PAYOUT_USD")
-    assert C.OPERATOR_PAYOUT_USD == 110.0
+    assert not hasattr(C, "OPERATOR_PAYOUT_USD")
     assert not hasattr(C, "OWNER_PAYOUT_USD")
     assert not hasattr(C, "OWNER_CONSENT_PAYOUT_USD")

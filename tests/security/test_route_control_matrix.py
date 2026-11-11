@@ -39,7 +39,7 @@ class M1PublicSurfaceTests(unittest.TestCase):
         table = route_table(create_app(Settings()))
         self.assertEqual(
             table,
-            {("/health/live", ("GET",)), ("/health/ready", ("GET",))},
+            {("/health/live", ("GET",)), ("/health/ready", ("GET",)), ("/health/build", ("GET",))},
             "The M1 public surface must expose only health routes — no business API.",
         )
 
@@ -56,7 +56,7 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
     def _authorize_dependencies(self, app):
         required = []
         for route in app.routes:
-            if isinstance(route, APIRoute) and "capture-sessions" in route.path:
+            if isinstance(route, APIRoute) and any(resource in route.path for resource in ("capture-sessions", "claim-cases")):
                 assert route.dependant.dependencies, f"{route.path} has no authorize dependency"
                 required.append((route.path, tuple(sorted(route.methods))))
         return required
@@ -67,10 +67,39 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
         self.assertEqual(
             set(secured),
             {
+                ("/v1/claim-cases", ("GET",)),
+                ("/v1/claim-cases", ("POST",)),
+                ("/v1/claim-cases/{claim_id}", ("GET",)),
+                ("/v1/capture-sessions", ("GET",)),
                 ("/v1/capture-sessions", ("POST",)),
                 ("/v1/capture-sessions/{session_id}", ("GET",)),
             },
         )
+
+    def test_evidence_readiness_route_is_authenticated(self):
+        import os
+        import tempfile
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
+            "C2C_ARTIFACT_STORAGE_ROOT": directory,
+            "C2C_VIN_HMAC_PEPPER": "P" * 43,
+        }):
+            app = create_capture_app(self._runtime(), enable_evidence=True)
+            readiness_route = next(
+                route for route in app.routes
+                if isinstance(route, APIRoute)
+                and route.path == "/v1/capture-sessions/{session_id}/evidence-readiness"
+                and "GET" in route.methods
+            )
+            self.assertTrue(readiness_route.dependant.dependencies)
+            with TestClient(app) as client:
+                response = client.get(
+                    "/v1/capture-sessions/00000000-0000-0000-0000-000000000002/evidence-readiness"
+                )
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(response.json(), {"detail": "UNAUTHORIZED"})
 
     def test_intake_routes_all_require_bearer(self):
         app = create_intake_app(self._runtime())
@@ -79,6 +108,10 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
         self.assertEqual(
             set(secured),
             {
+                ("/v1/claim-cases", ("GET",)),
+                ("/v1/claim-cases", ("POST",)),
+                ("/v1/claim-cases/{claim_id}", ("GET",)),
+                ("/v1/capture-sessions", ("GET",)),
                 ("/v1/capture-sessions", ("POST",)),
                 ("/v1/capture-sessions/{session_id}", ("GET",)),
                 ("/v1/capture-sessions/{session_id}/draft", ("GET",)),
@@ -111,6 +144,49 @@ class M1AuthenticatedRouteTests(unittest.TestCase):
 
 
 class AnalysisSurfaceIsolationTests(unittest.TestCase):
+    def test_integrated_runtime_rehomes_analysis_behind_internal_auth(self):
+        import os
+        from unittest.mock import patch
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        token = "t" * 43
+        intake = FastAPI()
+        intake.state.health_settings = Settings("integrated-health-dsn")
+        intake.get("/v1/capture-sessions")(
+            lambda: {"scope": "tenant-authenticated-intake"}
+        )
+        with patch("app.intake_api.create_intake_app", return_value=intake), patch.dict(
+            os.environ, {"C2C_INTERNAL_SERVICE_TOKEN": token}
+        ):
+            integrated = create_app(Settings(), runtime_mode="integrated")
+            table = route_table(integrated)
+            self.assertIn(("/internal/v1/analysis/health", ("GET",)), table)
+            self.assertIn(("/internal/v1/triage/health", ("GET",)), table)
+            self.assertIn(("/internal/v1/dispatch/health", ("GET",)), table)
+            self.assertNotIn(("/api/v1/analysis/health", ("GET",)), table)
+
+            with patch("app.main.probe_database", return_value=True) as probe:
+                with TestClient(integrated) as client:
+                    missing = client.get("/internal/v1/analysis/health")
+                    accepted = client.get(
+                        "/internal/v1/analysis/health",
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                    intake_route = client.get("/api/v1/capture-sessions")
+                    readiness = client.get("/health/ready")
+                probe.assert_called_once_with("integrated-health-dsn")
+            self.assertEqual(missing.status_code, 401)
+            self.assertEqual(accepted.status_code, 200)
+            self.assertEqual(
+                intake_route.json(), {"scope": "tenant-authenticated-intake"}
+            )
+            self.assertEqual(readiness.json()["status"], "ready")
+
+    def test_runtime_mode_rejects_unknown_values(self):
+        with self.assertRaisesRegex(ValueError, "INVALID_C2C_RUNTIME_MODE"):
+            create_app(Settings(), runtime_mode="anything_else")
+
     def test_analysis_app_is_separate_from_m1_surface(self):
         from backend.app.main import app as analysis_app
 

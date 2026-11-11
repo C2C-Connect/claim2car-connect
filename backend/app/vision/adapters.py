@@ -12,8 +12,17 @@ import hashlib
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from hashlib import sha256
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from app.damage_localization import (
+    DamageAnnotation,
+    DamageLocalizationBenchmark,
+    DamageRegion,
+    HeuristicDamageDetector,
+    PhysicsInputAdapter,
+)
 from config import forensic_constants as C
 
 
@@ -234,3 +243,243 @@ def nms_dedupe(dets: List[Detection], iou_thresh: float = 0.5) -> List[Detection
             continue
         kept.append(d)
     return kept
+
+
+# Sovereign in-house vision artifact from the approved production engineering spec.
+YOLO_CLASS_TO_CANONICAL_LABEL: dict[str, str] = {
+    "dent": "dent", "minor_dent": "dent",
+    "major_dent": "structural_deformation", "deformation": "structural_deformation",
+    "crumple": "structural_deformation", "crush": "structural_deformation",
+    "scratch": "scratch", "scuff": "scratch", "paint_damage": "scratch",
+    "crack": "glass_damage", "lamp_broken": "glass_damage",
+    "windshield_crack": "glass_damage", "shatter": "glass_damage",
+    "broken_glass": "glass_damage", "glass_shatter": "glass_damage",
+}
+
+
+class VisionAdapterError(ValueError):
+    def __init__(self, code: str, detail: str = "") -> None:
+        super().__init__(code if not detail else f"{code}: {detail}")
+        self.code = code
+        self.detail = detail
+
+
+@dataclass(frozen=True)
+class ModelWeightProvenance:
+    model_id: str
+    stage: str
+    weights_path: str
+    sha256_hex: str
+    framework: str
+
+
+@dataclass(frozen=True)
+class AdvisoryVisionAnalysis:
+    session_id: str
+    slot: str
+    model_version: str
+    weight_digests: tuple[str, ...]
+    regions: tuple[DamageRegion, ...]
+    darci_physics_inputs: tuple[dict, ...]
+    promoted_over_baseline: bool
+    advisory_only: bool = True
+
+    def assert_advisory_boundary(self, target_action: str) -> None:
+        forbidden_actions = {
+            "auto_approve_claim",
+            "trigger_live_dispatch",
+            "settle_payment_ledger",
+            "override_human_reviewer",
+        }
+        if target_action in forbidden_actions:
+            raise VisionAdapterError(
+                "CONSEQUENTIAL_ACTION_BLOCKED_BY_S4_4B_13",
+                f"Analytical output ({self.model_version}) is strictly advisory and cannot execute {target_action!r}",
+            )
+
+
+def compute_weight_provenance(
+    model_id: str, stage: str, weights_path: Path | str, framework: str = "pytorch-yolo"
+) -> ModelWeightProvenance:
+    path = Path(weights_path)
+    if not path.is_file():
+        raise VisionAdapterError("WEIGHTS_FILE_NOT_FOUND", str(path))
+    return ModelWeightProvenance(
+        model_id=model_id,
+        stage=stage,
+        weights_path=str(path.resolve()),
+        sha256_hex=sha256(path.read_bytes()).hexdigest(),
+        framework=framework,
+    )
+
+
+class LocalYoloTwoStageDetector:
+    def __init__(
+        self,
+        part_weights_path: Path | str | None = None,
+        damage_weights_path: Path | str | None = None,
+        inference_runner: Callable[[str, object], Sequence[dict]] | None = None,
+        conf_threshold: float = 0.25,
+    ) -> None:
+        if not 0.0 < conf_threshold <= 1.0:
+            raise VisionAdapterError("INVALID_CONFIDENCE_THRESHOLD")
+        self.conf_threshold = conf_threshold
+        self.part_weights_path = Path(part_weights_path) if part_weights_path else None
+        self.damage_weights_path = Path(damage_weights_path) if damage_weights_path else None
+        self._runner = inference_runner
+        self._provenance: list[ModelWeightProvenance] = []
+        if self.part_weights_path and self.part_weights_path.is_file():
+            self._provenance.append(
+                compute_weight_provenance("yolo-part-2_best", "part_localization", self.part_weights_path)
+            )
+        if self.damage_weights_path and self.damage_weights_path.is_file():
+            self._provenance.append(
+                compute_weight_provenance("yolo-damage-4_best", "damage_detection", self.damage_weights_path)
+            )
+
+    @property
+    def model_version(self) -> str:
+        if self._provenance:
+            return "inhouse-yolo-2stage-" + "-".join(p.sha256_hex[:8] for p in self._provenance)
+        return "inhouse-yolo-2stage-candidate-v1"
+
+    @property
+    def weight_digests(self) -> tuple[str, ...]:
+        return tuple(p.sha256_hex for p in self._provenance)
+
+    def load_ultralytics_runner_if_available(self) -> None:
+        if self._runner is not None:
+            return
+        if (not self.part_weights_path or not self.part_weights_path.is_file()
+                or not self.damage_weights_path or not self.damage_weights_path.is_file()):
+            raise VisionAdapterError(
+                "LOCAL_WEIGHTS_REQUIRED",
+                "Mount 2_best.pt and 4_best.pt locally or supply an inference_runner",
+            )
+        try:
+            from ultralytics import YOLO  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise VisionAdapterError(
+                "ULTRALYTICS_RUNTIME_NOT_INSTALLED",
+                "Install ultralytics/torch in the vision worker container",
+            ) from exc
+
+        part_model = YOLO(str(self.part_weights_path))
+        damage_model = YOLO(str(self.damage_weights_path))
+
+        def _local_pt_runner(slot: str, image_input: object) -> Sequence[dict]:
+            part_results = part_model.predict(source=image_input, conf=self.conf_threshold, verbose=False)
+            part_boxes: list[tuple[float, float, float, float]] = []
+            for result in part_results:
+                for box in result.boxes:
+                    x1, y1, x2, y2 = box.xyxyn[0].tolist()
+                    part_boxes.append((float(x1), float(y1), float(x2), float(y2)))
+            if not part_boxes:
+                return []
+
+            results = damage_model.predict(source=image_input, conf=self.conf_threshold, verbose=False)
+            out: list[dict] = []
+            for res in results:
+                names = res.names or {}
+                for box in res.boxes:
+                    x1, y1, x2, y2 = box.xyxyn[0].tolist()
+                    center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
+                    if not any(px1 <= center_x <= px2 and py1 <= center_y <= py2
+                               for px1, py1, px2, py2 in part_boxes):
+                        continue
+                    cls_id = int(box.cls[0].item())
+                    out.append({
+                        "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+                        "label": str(names.get(cls_id, "dent")).lower(),
+                        "confidence": float(box.conf[0].item()),
+                    })
+            return out
+
+        self._runner = _local_pt_runner
+
+    def detect(self, slot: str, image_or_grid: object) -> list[DamageRegion]:
+        if not isinstance(slot, str) or not slot.strip():
+            raise VisionAdapterError("INVALID_SLOT")
+        if self._runner is None:
+            self.load_ultralytics_runner_if_available()
+        assert self._runner is not None
+
+        regions: list[DamageRegion] = []
+        for pred in self._runner(slot, image_or_grid):
+            conf = float(pred.get("confidence", 0.0))
+            if conf < self.conf_threshold:
+                continue
+            x1 = max(0.0, min(1.0, float(pred["x1"])))
+            y1 = max(0.0, min(1.0, float(pred["y1"])))
+            x2 = max(0.0, min(1.0, float(pred["x2"])))
+            y2 = max(0.0, min(1.0, float(pred["y2"])))
+            if x2 <= x1 or y2 <= y1:
+                continue
+            raw_label = str(pred.get("label", "dent")).strip().lower()
+            regions.append(DamageRegion(
+                slot=slot, x0=round(x1, 4), y0=round(y1, 4),
+                x1=round(x2, 4), y1=round(y2, 4),
+                damage_class=YOLO_CLASS_TO_CANONICAL_LABEL.get(raw_label, "dent"),
+                confidence=round(conf, 4), model_version=self.model_version,
+            ))
+        return regions
+
+
+class GatedVisionPhysicsPipeline:
+    def __init__(
+        self,
+        baseline_detector: HeuristicDamageDetector | None = None,
+        candidate_detector: LocalYoloTwoStageDetector | None = None,
+        physics_adapter: PhysicsInputAdapter | None = None,
+        benchmark: DamageLocalizationBenchmark | None = None,
+    ) -> None:
+        self.baseline = baseline_detector or HeuristicDamageDetector()
+        self.candidate = candidate_detector
+        self.physics_adapter = physics_adapter or PhysicsInputAdapter()
+        self.benchmark = benchmark or DamageLocalizationBenchmark()
+
+    def evaluate_and_extract_physics(
+        self,
+        session_id: str,
+        slot: str,
+        grid_fixture: list[list[int]],
+        image_input: object = None,
+        ground_truth_annotations: Sequence[DamageAnnotation] | None = None,
+    ) -> AdvisoryVisionAnalysis:
+        baseline_regions = self.baseline.detect(slot, grid_fixture)
+        chosen_regions = list(baseline_regions)
+        chosen_version = self.baseline.model_version
+        weight_digests: tuple[str, ...] = ()
+        promoted = False
+
+        if self.candidate is not None:
+            candidate_regions = self.candidate.detect(
+                slot, image_input if image_input is not None else grid_fixture
+            )
+            if ground_truth_annotations:
+                anns = list(ground_truth_annotations)
+                base_report = self.benchmark.evaluate(baseline_regions, anns)
+                cand_report = self.benchmark.evaluate(candidate_regions, anns)
+                if self.benchmark.adoption_gate(base_report, cand_report).adopt:
+                    chosen_regions = list(candidate_regions)
+                    chosen_version = self.candidate.model_version
+                    weight_digests = self.candidate.weight_digests
+                    promoted = True
+
+        physics_inputs = []
+        for reg in chosen_regions:
+            geom = self.physics_adapter.to_impact_geometry(reg)
+            physics_inputs.append({
+                "zone": geom.zone,
+                "severity_tier": geom.severity_tier,
+                "area_fraction": geom.area_fraction,
+                "source_label": reg.label,
+                "source_confidence": reg.confidence,
+            })
+
+        return AdvisoryVisionAnalysis(
+            session_id=session_id, slot=slot, model_version=chosen_version,
+            weight_digests=weight_digests, regions=tuple(chosen_regions),
+            darci_physics_inputs=tuple(physics_inputs),
+            promoted_over_baseline=promoted, advisory_only=True,
+        )

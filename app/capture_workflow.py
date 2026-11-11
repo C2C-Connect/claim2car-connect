@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Callable, Optional
 from uuid import uuid4
 
-from app.domain_events import DomainEvent
+from app.domain_events import DomainEvent, canonical_event_payload
 from app.evidence_manifest import CANONICAL_SLOTS, load_shot_contract
 from app.telemetry import workflow_span
 from app.vin_guard import validate_vin
@@ -113,7 +113,7 @@ class CaptureWorkflow:
             actor=actor,
             occurred_at=self._now(),
             reason=reason,
-            payload_json=json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False),
+            payload_json=canonical_event_payload(payload),
         )
         with workflow_span("capture.emit", kind=kind, session_id=self.session_id):
             self.machine.apply(event)

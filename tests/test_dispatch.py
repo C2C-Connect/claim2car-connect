@@ -56,7 +56,6 @@ def _sample_adj():
         "detections": [{"class_name": "crush", "zone": "front", "confidence": 0.9}],
         "depths": [{"zone": "front", "mean_depth_cm": 20.0, "volume_cm3": 5000.0}],
         "formula_version": C.VERSION,
-        "operator_payout_usd": C.OPERATOR_PAYOUT_USD,
     }
 
 
@@ -120,6 +119,21 @@ def test_dossier_seven_pages():
     assert "Executive" in d.pages[0].title
     assert "Verification" in d.pages[6].title
     assert "Forensic Dossier" in d.html
+    rendered = d.html + d.plain_text
+    assert "operator_payout_usd" not in rendered
+    assert "owner_payout" not in rendered
+
+
+
+def test_dossier_suppresses_legacy_compensation_fields_from_input():
+    # Adversarial legacy input: these values must never become recipient-facing output.
+    payload = _sample_adj()
+    payload["operator_payout_usd"] = 110.0
+    payload["owner_payout"] = None
+    dossier = build_dossier(payload, role="carrier")
+    rendered = dossier.html + dossier.plain_text
+    assert "operator_payout_usd" not in rendered
+    assert "owner_payout" not in rendered
 
 
 def test_acord_xml_contains_extensions():
@@ -149,5 +163,8 @@ def test_build_dispatch_four_packages():
 
 
 def test_no_owner_payout():
-    assert C.OPERATOR_PAYOUT_USD == 110.0
+    # The unresolved operator policy is retained in governance only; no amount
+    # constant or payout field is exposed in generated output.
+    assert not hasattr(C, "OPERATOR_PAYOUT_USD")
     assert not hasattr(C, "OWNER_PAYOUT_USD")
+    assert not hasattr(C, "OWNER_CONSENT_PAYOUT_USD")

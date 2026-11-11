@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Claim2Car IndexedDB Queue Test</title>
+</head>
+<body>
+  <main>
+    <h1>Claim2Car IndexedDB queue integration harness</h1>
+    <p>This page uses synthetic byte fixtures only.</p>
+    <output id="status">Initializing</output>
+  </main>
+  <script type="module">
+    import {
+      createIndexedDbEvidenceStore,
+      createOfflineEvidenceQueue,
+    } from "../../../app/web/assets/offline_evidence_queue.mjs";
+
+    const sessionId = "browser-test-session";
+    const tenantId = "browser-test-tenant";
+    const actorId = "browser-test-actor";
+    const store = createIndexedDbEvidenceStore();
+    const queue = createOfflineEvidenceQueue({store});
+
+    window.c2cQueueHarness = Object.freeze({
+      async reset() {
+        const request = indexedDB.deleteDatabase("claim2car-evidence");
+        await new Promise((resolve, reject) => {
+          request.onsuccess = () => resolve();
+          request.onerror = () => reject(request.error || new Error("TEST_DATABASE_DELETE_FAILED"));
+          request.onblocked = () => reject(new Error("TEST_DATABASE_DELETE_BLOCKED"));
+        });
+        return true;
+      },
+      async seed() {
+        const first = await queue.queueFile({
+          sessionId, tenantId, actorId, slot:"front",
+          file:new File(["synthetic-original-front"],"front.jpg",{type:"image/jpeg"}),
+        });
+        const second = await queue.queueFile({
+          sessionId, tenantId, actorId, slot:"rear",
+          file:new File(["synthetic-original-rear"],"rear.jpg",{type:"image/jpeg"}),
+        });
+        return [first.queueId,second.queueId];
+      },
+      async status(forActor = actorId, forTenant = tenantId) {
+        return queue.status(sessionId,{tenantId:forTenant,actorId:forActor});
+      },
+      async sync(failFirst = false) {
+        const attempted = [];
+        const result = await queue.syncSession({
+          sessionId,tenantId,actorId,
+          upload:async (record) => {
+            attempted.push({
+              queueId:record.queueId,
+              artifactId:record.artifactId,
+              requestId:record.requestId,
+              byteLength:record.bytes.byteLength,
+            });
+            if (failFirst) throw new Error("SYNTHETIC_NETWORK_INTERRUPTION");
+            return {ok:true};
+          },
+        });
+        return {result,attempted};
+      },
+      async addOtherActor() {
+        return queue.queueFile({
+          sessionId,tenantId,actorId:"browser-test-other-actor",slot:"front",
+          file:new File(["other-actor-original"],"other.jpg",{type:"image/jpeg"}),
+        });
+      },
+      async purge() {
+        return queue.deleteSession(sessionId,{tenantId});
+      },
+    });
+    document.getElementById("status").textContent = "Ready";
+  </script>
+</body>
+</html>

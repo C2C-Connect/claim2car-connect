@@ -1,4 +1,4 @@
-# Health-only FastAPI foundation
+# FastAPI foundation and integrated runtime
 
 ## Run locally
 
@@ -9,21 +9,43 @@ securely for an approved restricted application login, then run:
 python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-No database URL fallback, migrations, seeds, cloud provisioning or business writes
-occur at application startup. Missing configuration still allows liveness but
-returns HTTP503 for readiness. The default bind in this command is loopback only.
+The default runtime mode is `restricted_staging`: no database URL fallback,
+migrations, seeds, cloud provisioning or business writes occur at startup.
+Missing configuration still allows liveness but returns HTTP503 for readiness.
+The default bind in this command is loopback only.
+
+The integrated runtime is an explicit opt-in for a separately provisioned
+environment. It requires `C2C_RUNTIME_MODE=integrated`, a private
+`C2C_CAPTURE_CONFIG_FILE`, `C2C_ARTIFACT_STORAGE_ROOT` on administrator-owned
+persistent POSIX storage, and a random ASCII `C2C_VIN_HMAC_PEPPER` with at least
+32 characters. The capture config contains the health DSN, one least-privilege
+tenant login DSN per credential, and server-owned actor/tenant/role bindings.
+Owner roles must be explicitly configured; omitted roles default to operator.
+Never place these values in source, image layers, or logs.
 
 ## Endpoint contract
 
 - GET /health/live: HTTP200, `{"status":"alive"}`; never opens a database connection.
 - GET /health/ready: HTTP200 only when the configured login is non-superuser,
   non-BYPASSRLS, a member of faos_app, the binding registry exists, tenant_id() is
-  security-definer-owned by faos_writer, and the ten expected tables have RLS and
+  security-definer-owned by faos_writer, and all twelve required tenant tables—including claim cases and separately consented incident-intake records—have RLS and
   FORCE RLS. The query reads catalogs only; it does not read tenant data or the
   private authority registry. Otherwise HTTP503; exception details/DSNs are not
   returned. Both outcomes carry `scope: infrastructure-only` and no-store headers.
-- No packet intake, authentication, dealer routing, payment or other business
-  mutation endpoint is exposed. OpenAPI/docs routes are disabled in this increment.
+- `restricted_staging` exposes only the liveness/readiness routes documented below.
+- `integrated` mounts tenant-authenticated intake at `/api/v1/*` and fail-closed,
+  service-authenticated analytical routes at `/internal/v1/{analysis,triage,dispatch}/*`.
+- Consent, HMAC VIN references, and immutable original-byte uploads require
+  the integrated mode and provisioned persistent storage/pepper settings.
+- GET /api/v1/capture-sessions/{session_id}/evidence-readiness is authenticated and creator-scoped; it reports whether active owner consent and a valid vehicle reference permit evidence capture, without returning evidence bytes or owner identity.
+- The integrated browser shell uses an IndexedDB original-byte queue with tenant/actor/session scoping, FIFO retry, stable idempotency identifiers, and local purge after confirmed consent withdrawal. This is a controlled-test recovery aid, not encrypted or field-qualified storage; see the acceptance matrix.
+- Integrated capture records advisory quality for all twelve frozen capture
+  slots, seals only after server-side hash verification, and exposes a
+  tenant-scoped reviewer queue and byte-preserving review-artifact endpoint. A separately configured reviewer or supervisor
+  records the final human decision; failed quality advisories do not block
+  roadside progression.
+- OpenAPI/docs routes remain disabled. Payments and external delivery are not
+  part of this runtime.
 
 Readiness is a bounded infrastructure prerequisite check, not migration checksum
 attestation, tenant enrollment/authorization, end-to-end business readiness or

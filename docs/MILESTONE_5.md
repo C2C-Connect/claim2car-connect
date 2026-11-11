@@ -1,5 +1,8 @@
 # Milestone 5 — Reports & Dispatch (Layers 6/7)
 
+> **Historical snapshot — 2026-11-03.** Status labels below describe the scope and branch/sandbox context recorded on that date. They are not current canonical release status, integrated-product acceptance, field validation, or deployment evidence. The Founder-approved five-slice execution plan and current Slice 1/architecture evidence supersede any broader interpretation of these milestone labels.
+
+
 **Status:** Complete  
 **Constants version:** 2026.11.03.6
 

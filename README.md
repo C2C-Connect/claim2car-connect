@@ -1,5 +1,7 @@
 # Claim2Car Connect / FAOS - San Antonio pilot
 
+Current implementation and release evidence are tracked in the [Acceptance & Release Gate Matrix](docs/acceptance/ACCEPTANCE_MATRIX.md). It distinguishes tested code from field validation and deployment authorization.
+
 ## Canonical product line
 
 C2C-Connect/claim2car-connect is the single canonical product repository.
@@ -57,7 +59,7 @@ python -m database.migrate  # identical rerun must have no pending migrations
 ```
 
 The default plan includes both migrations/ and authority_migrations/, ordered and
-validated together, currently through 0008_tenant_login_authority.sql. Existing
+validated together, currently through 0016_claim_case_incident_read_boundary.sql. The 0010–0013 increments add the tenant-scoped claim-case register, least-privilege idempotent creation, and owner-bound capture-session association; 0014 adds separately deletable, owner-consented structured incident details under RLS. Existing
 ledger checksums, migration locking and transactional application remain in force.
 python -m database.authority_migrate is a compatibility alias for the same plan.
 No synthetic connection URL is used as a fallback by the normal migration command.

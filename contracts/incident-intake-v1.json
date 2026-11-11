@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1",
+  "disclosure_version": "incident-intake-v1",
+  "status": "draft_pending_legal_review",
+  "requires_explicit_acceptance": true,
+  "scope": "incident_details",
+  "data_collected": [
+    "Incident date and time, including the supplied time zone",
+    "Incident category: collision, theft, weather, vandalism, other, or unknown",
+    "Incident city, two-letter state or territory code, and ZIP code"
+  ],
+  "purpose": "Associate a minimal structured incident description with the claim-case capture record.",
+  "authorized_readers": ["The consenting owner", "The Claim2Car operator who created the persistent claim case"],
+  "not_shared_automatically_with": ["Insurance carriers", "Repair shops", "Dealerships"],
+  "not_collected_by_this_contract": [
+    "Street address or GPS coordinates",
+    "Free-text incident narrative",
+    "Claimant name, contact details, or date of birth",
+    "Insurance policy number or payment information"
+  ],
+  "limitations": [
+    "This intake does not determine fault, coverage, liability, claim eligibility, or vehicle ownership.",
+    "Participation remains voluntary and may be withdrawn.",
+    "The disclosure text and data scope require counsel review before use with real participants."
+  ]
+}
