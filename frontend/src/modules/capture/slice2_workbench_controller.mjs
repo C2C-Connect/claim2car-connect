@@ -156,7 +156,7 @@ export class OperatorRoadsideController {
     if (this.state !== "capturing" && this.state !== "paused_unsafe") {
       throw new Error(`INVALID_STATE_FOR_SKIP:${this.state}`);
     }
-    if (!CANONICAL_SLOTS.includes(slot)) throw new Error(`INVALID_CANONICAL_SLOT:${slot}`);
+    if (!this.canonicalSlots.includes(slot)) throw new Error(`INVALID_CANONICAL_SLOT:${slot}`);
     const skipRecord = { slot, status: "skipped_unsafe", hazardReason, skippedAt: this.now() };
     this.slots.set(slot, skipRecord);
     this.safetyEvents.push({ action: "skip_slot", slot, reason: hazardReason, occurredAt: this.now() });
@@ -261,7 +261,7 @@ export class ReviewerWorkbenchController {
     }
     if (!reasonCode || !String(reasonCode).trim()) throw new Error("RETAKE_REASON_REQUIRED");
     for (const slot of slotsToRetake) {
-      if (!CANONICAL_SLOTS.includes(slot)) throw new Error(`INVALID_RETAKE_SLOT:${slot}`);
+      if (!item.canonicalSlots.includes(slot)) throw new Error(`INVALID_RETAKE_SLOT:${slot}`);
     }
     item.status = "retake_requested";
     item.retakeSlots = [...slotsToRetake];
