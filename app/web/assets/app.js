@@ -37,10 +37,22 @@ function message(id, text, bad = false) {
   $(id).textContent = text;
   $(id).className = bad ? "message error" : "message";
 }
+function applyProtocolCaptureState() {
+  const enabled = Boolean(activeSession) && activeProtocolVersion === "claims2car-12-v1";
+  for (const input of $("capture-slots").querySelectorAll('input[type="file"], .quality-check input')) input.disabled = !enabled;
+  $("record-quality").disabled = !enabled;
+  $("seal-case").disabled = !enabled;
+  if (!enabled) {
+    for (const status of $("capture-slots").querySelectorAll(".slot-status")) status.textContent = "Capture disabled · 16-v1 slot contract pending approval";
+    $("sync-pending-evidence").disabled = true;
+    $("sync-pending-evidence").textContent = "16-v1 capture contract pending";
+  }
+}
 function setCase(id, protocolVersion = activeProtocolVersion) {
   activeSession = id;
   activeProtocolVersion = protocolVersion;
   activeReadiness = null;
+  applyProtocolCaptureState();
   $("session-id").value = id;
   $("owner-session-id").value = id;
   void restoreEvidenceQueue(id);
@@ -84,6 +96,7 @@ async function loadCaptureProtocols() {
 function disconnect() {
   token = null; identity = null; activeSession = null; activeReadiness = null;
   activeProtocolVersion = "claims2car-16-v1";
+  applyProtocolCaptureState();
   $("access-token").value = "";
   $("workspace").hidden = true; $("sign-in").hidden = false;
   $("connection-state").textContent = "Not connected";
@@ -154,7 +167,9 @@ async function createCase() {
     const result = await api("/api/v1/capture-sessions", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:id,capture_protocol_version:$("capture-protocol-version").value})});
     setCase(id,result.capture_protocol_version);
     $("case-created").textContent = result.created ? "Case created · " + result.capture_protocol_version : "Existing case resumed · " + result.capture_protocol_version;
-    message("operator-message", "Case ready. Owner consent must be recorded with the provisioned owner actor credential; this workspace does not provide end-user login.");
+    message("operator-message", result.capture_protocol_version === "claims2car-16-v1"
+      ? "Case created with the 16-v1 default. Capture controls remain locked until its exact slot contract is approved; select 12-v1 for the implemented legacy workflow."
+      : "Case ready. Owner consent must be recorded with the provisioned owner actor credential; this workspace does not provide end-user login.");
     await refreshOwnedSessions();
   } catch (error) { message("operator-message", error.message, true); }
 }
@@ -322,6 +337,10 @@ async function refreshCaptureQueueStatus(sessionId) {
   $("sync-pending-evidence").textContent = state.pending
     ? `Sync pending originals (${state.pending})`
     : "All originals synced";
+  if (activeProtocolVersion !== "claims2car-12-v1") {
+    $("sync-pending-evidence").disabled = true;
+    $("sync-pending-evidence").textContent = "16-v1 capture contract pending";
+  }
 }
 async function refreshEvidenceReadiness(sessionId) {
   const readiness = await api(`/api/v1/capture-sessions/${encodeURIComponent(sessionId)}/evidence-readiness`);
