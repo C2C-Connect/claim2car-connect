@@ -47,6 +47,7 @@ class ClaimCaseStore:
             claim_id=str(row[0]), tenant_id=str(row[1]), created_by=row[2],
             created_at=row[3].isoformat(), state=row[4], created=created,
             capture_session_id=str(row[5]) if row[5] is not None else None,
+            capture_protocol_version=row[6],
         )
 
     @staticmethod
@@ -62,8 +63,8 @@ class ClaimCaseStore:
         with self.sessions._authorized(authorization) as (conn, actor):
             self._require_operator(actor)
             outcome = conn.execute(
-                "SELECT faos.create_claim_case(%s::uuid,%s::uuid,%s::uuid,%s::text,%s::text)",
-                (actor.tenant_id, claim_id, request_id, actor.actor_id, session_id),
+                "SELECT faos.create_claim_case(%s::uuid,%s::uuid,%s::uuid,%s::text,%s::text,%s::text)",
+                (actor.tenant_id, claim_id, request_id, actor.actor_id, session_id, capture_protocol_version),
             ).fetchone()[0]
             if outcome not in ("ACCEPTED", "DUPLICATE"):
                 raise ClaimCaseConflict("CLAIM_CASE_CREATE_NOT_ACCEPTED")
@@ -79,8 +80,8 @@ class ClaimCaseStore:
         with self.sessions._authorized(authorization) as (conn, actor):
             self._require_operator(actor)
             row = conn.execute(
-                "SELECT claim_id,tenant_id,created_by,created_at,state,capture_session_id "
-                "FROM faos.claim_cases WHERE tenant_id=%s AND claim_id=%s AND created_by=%s",
+                "SELECT c.claim_id,c.tenant_id,c.created_by,c.created_at,c.state,c.capture_session_id,s.capture_protocol_version "
+                "FROM faos.claim_cases c JOIN faos.sessions s ON s.tenant_id=c.tenant_id AND s.session_id=c.capture_session_id WHERE c.tenant_id=%s AND c.claim_id=%s AND c.created_by=%s",
                 (actor.tenant_id, claim_id, actor.actor_id),
             ).fetchone()
             return self._record(row)
@@ -91,8 +92,8 @@ class ClaimCaseStore:
         with self.sessions._authorized(authorization) as (conn, actor):
             self._require_operator(actor)
             rows = conn.execute(
-                "SELECT claim_id,tenant_id,created_by,created_at,state,capture_session_id "
-                "FROM faos.claim_cases WHERE tenant_id=%s AND created_by=%s "
+                "SELECT c.claim_id,c.tenant_id,c.created_by,c.created_at,c.state,c.capture_session_id,s.capture_protocol_version "
+                "FROM faos.claim_cases c JOIN faos.sessions s ON s.tenant_id=c.tenant_id AND s.session_id=c.capture_session_id WHERE c.tenant_id=%s AND c.created_by=%s "
                 "ORDER BY created_at DESC,claim_id DESC LIMIT %s",
                 (actor.tenant_id, actor.actor_id, limit),
             ).fetchall()
