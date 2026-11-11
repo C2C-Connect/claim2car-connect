@@ -28,7 +28,7 @@ from app.capture_workflow import (
     sha256_hex_of,
     sync_draft_to_server,
 )
-from app.evidence_manifest import CANONICAL_SLOTS
+from app.evidence_manifest import LEGACY_CANONICAL_SLOTS as CANONICAL_SLOTS
 from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL
 from app.vin_guard import VIN_WEIGHTS, validate_vin
 
