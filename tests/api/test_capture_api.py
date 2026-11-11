@@ -24,7 +24,7 @@ class CaptureRouteTests(unittest.TestCase):
         self.credential=Credential(hashlib.sha256(self.token.encode()).hexdigest(),self.binding,int(time.time())+3600)
         self.store=Mock(spec=CaptureSessionStore)
         self.claim_store=Mock(spec=ClaimCaseStore)
-        self.session=CaptureSession(str(UUID(int=2)),str(self.binding.tenant_id),'test-actor','2026-10-22T00:00:00+00:00',True)
+        self.session=CaptureSession(str(UUID(int=2)),str(self.binding.tenant_id),'test-actor','2026-10-22T00:00:00+00:00',True,capture_protocol_version=DEFAULT_CAPTURE_PROTOCOL)
         self.store.create.return_value=self.session
         self.store.get.return_value=replace(self.session,created=False)
         self.runtime=CaptureRuntime(CredentialResolver([self.credential]),self.store,Settings(),self.claim_store)
