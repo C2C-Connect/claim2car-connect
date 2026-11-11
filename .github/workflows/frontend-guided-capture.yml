@@ -39,6 +39,7 @@ jobs:
           python scripts/candidate_manifest.py capture output/guided-capture/after.json
           python scripts/candidate_manifest.py compare output/guided-capture/before.json output/guided-capture/after.json
           python - <<'PY'
+          from pathlib import Path
           manifest = Path("output/guided-capture/sources.sha256")
           if not manifest.is_file() or manifest.stat().st_size == 0:
               raise SystemExit("CHECKSUM_MANIFEST_MISSING_OR_EMPTY")
