@@ -25,7 +25,6 @@ jobs:
           sha256sum frontend/src/modules/capture/{vin,guided_workflow,slice2_workbench_controller}.mjs frontend/app/app.mjs frontend/tests/{guided_workflow,slice2_workbench}.test.mjs contracts/disclosure-v1.json .github/workflows/frontend-guided-capture.yml > output/guided-capture/sources.sha256
       - name: Check browser workbench JavaScript syntax
         run: node --check frontend/app/app.mjs
-          sha256sum frontend/src/modules/capture/{vin,guided_workflow,slice2_workbench_controller}.mjs app/web/assets/offline_evidence_queue.mjs frontend/tests/{guided_workflow,slice2_workbench,offline_evidence_queue}.test.mjs contracts/disclosure-v1.json .github/workflows/frontend-guided-capture.yml > output/guided-capture/sources.sha256
       - name: Guided capture controller assertions
         run: node frontend/tests/guided_workflow.test.mjs > output/guided-capture/controller-tests.json
       - name: Slice 2 operator and reviewer workbench assertions
