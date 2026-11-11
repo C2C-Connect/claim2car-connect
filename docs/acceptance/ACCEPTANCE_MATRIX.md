@@ -44,7 +44,7 @@ The authority workflow applied and verified the migration plan through `0017_eve
 - No provisioned/verified integrated staging PostgreSQL service, durable evidence volume, sealed runtime secrets, TLS/private ingress, monitoring, or backup/restore evidence.
 - The integrated container CI smoke is a disposable local container test; it does not prove the container's full capture-to-review path against a persistent database and cloud object store.
 - The HTTP-to-PostgreSQL-to-original-bytes journey is synthetic CI evidence, not real participant evidence or field acceptance.
-- The code snapshot at this revision still implements `claims2car-12-v1`. The founder-approved target is `claims2car-16-v1` as the default, with `claims2car-12-v1` retained as a selectable, versioned alternative and historical 12-v1 sessions preserved. Exact 16-v1 slot IDs/order and the cross-layer compatibility contract remain implementation blockers; no historical session may be silently reclassified.
+- The approved implementation now makes `claims2car-16-v1` the default for new sessions and retains `claims2car-12-v1` as an explicitly selectable, versioned alternative. The owner supplied the authoritative 16-slot IDs/order; the implementation and tests bind the protocol version across sessions, evidence manifests, API, browser capture, and review. Existing 12-v1 sessions remain 12-v1; no historical evidence is reclassified.
 - Owner authentication/invitation and identity proofing remain unimplemented; owner actor credentials are provisioned out-of-band.
 - Supplemental incident disclosure remains `draft_pending_legal_review` and incident intake remains disabled by default.
 - Safari/iPad/physical-device qualification, roadside validation, field-calibrated quality thresholds, and real-world model accuracy remain unverified.
@@ -107,7 +107,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 **Founder-approved capture-protocol direction — 2026-11-10:** `claims2car-16-v1` is the default target; `claims2car-12-v1` remains a selectable, explicitly versioned alternative. Historical 12-v1 sessions and manifests must retain their original protocol identity and interpretation. This supersedes the earlier open question about which count is the target.
 
-**Remaining implementation blocker — exact 16-v1 contract:** The architecture source is internally inconsistent. One section describes 12 standard framing angles plus up to 4 specialized detail angles, while enumerating 8 exterior + 2 undercarriage + 2 interior + 2 legal/document views (14 before the optional details). Another mandatory-16 breakdown enumerates 8 exterior + 2 interior + 1 license-plate + 1 insurance-document + 3 damage close-ups (15). The Slice 2 controller also uses a third set of 12 slot identifiers that does not match `contracts/shot-list.json`. Reconcile one exact 16-slot ID/order and map it to API, manifest, controller, browser, and reviewer contracts before implementation. Do not guess, silently rename, or reclassify existing 12-v1 evidence.
+**Resolved by Owner Executive Approval — canonical 16-v1 contract:** The binding 16 ordered slot IDs and descriptions are in `contracts/shot-list-16-v1.json`. The implementation maps those exact IDs through the API, evidence manifest, capture service, root workbench, guided workflow, and reviewer controller. The prior conflicting architecture enumerations are superseded for new sessions by this owner-supplied contract; the original 12-v1 contract remains unchanged for historical sessions and explicit selection.
 
 **Verification evidence at the candidate revision:**
 - Full repository suite: **685 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42755651654](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387422).
@@ -209,8 +209,8 @@ The current Railway configuration is a restricted synthetic containment service.
 - Authority migration 0018 backfills existing sessions as 12-v1, adds a constrained protocol-version column, sets the default for new sessions to 16-v1, and makes the version immutable with a database trigger.
 - Claim-case creation, controlled-session creation, session readback, and claim-case readback carry the selected version. Idempotent retries cannot change it.
 - The authenticated protocol-registry API and operator workbench expose the default and the selectable legacy alternative.
-- The existing 12-v1 manifest/capture contract remains executable. Evidence registration, quality recording, and sealing reject a 16-v1 session until its exact slot contract is approved; 16-v1 never falls through to 12-v1.
+- Both 16-v1 and 12-v1 contracts are executable. Evidence registration, quality recording, sealing, and reviewer retrieval resolve the exact immutable protocol stored on the session; neither version falls through to the other.
 
-**Still open:** the exact authoritative 16 slot IDs/order/semantics remain unresolved because the source architecture contains conflicting enumerations. The separate Slice 2 browser controller's 12-slot list also differs from the API 12-v1 contract. These lists must be reconciled explicitly. No 16-v1 manifest or capture completion is claimed.
+**Implementation status:** the owner-authorized 16-v1 slot list is now committed in `contracts/shot-list-16-v1.json`. New-session defaults, legacy selection, protocol-specific manifests, capture validation, reviewer verification, browser workbench rendering, and exterior-only crush-physics mapping have dedicated coverage. This establishes software-contract implementation, not real-device/field acceptance or persistent staging acceptance.
 
 See `docs/release/CAPTURE_PROTOCOL_VERSIONING.md` for the immutable-session rules and remaining work.
