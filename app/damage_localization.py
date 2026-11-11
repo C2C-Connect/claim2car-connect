@@ -210,7 +210,7 @@ class HeuristicDamageDetector:
     model_version = MODEL_VERSION + "/heuristic-baseline"
     contrast_threshold = 60.0  # pixel deviation from neighborhood mean
 
-    def detect(self, slot: str, pixels, cell: int = 6) -> tuple[DamageRegion, ...]:
+    def detect(self, slot: str, pixels, cell: int = 6, protocol_version: str = LEGACY_CAPTURE_PROTOCOL) -> tuple[DamageRegion, ...]:
         if not isinstance(pixels, (list, tuple)) or not pixels or not pixels[0]:
             raise DamageLocalizationError("INVALID_PIXELS")
         height, width = len(pixels), len(pixels[0])
@@ -234,6 +234,7 @@ class HeuristicDamageDetector:
             x1=round(min(x1, 1.0), 4), y1=round(min(y1, 1.0), 4),
             damage_class="dent", confidence=round(min(len(flagged) / 16.0, 1.0), 4),
             model_version=self.model_version,
+            protocol_version=protocol_version,
         ),)
 
 
