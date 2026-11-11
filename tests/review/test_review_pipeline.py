@@ -118,12 +118,13 @@ def test_clean_verification_passes(tmp_path):
 
 def test_replaced_media_rejected_not_repaired(tmp_path):
     w = quality_complete_workflow()
-    store, report, _ = store_and_verify(w, tmp_path, tamper_slot="front")
+    tamper_slot = CANONICAL_SLOTS[0]
+    store, report, _ = store_and_verify(w, tmp_path, tamper_slot=tamper_slot)
     assert not report.ok
     rejection = report.rejections[0]
     assert isinstance(rejection, IntegrityRejection)
     assert rejection.code == "CORRUPT_OR_REPLACED_MEDIA"
-    assert rejection.slot == "front"
+    assert rejection.slot == tamper_slot
     # All other slots still verify; nothing was repaired.
     assert len(report.verified_artifact_ids) == len(CANONICAL_SLOTS) - 1
 
