@@ -91,6 +91,33 @@ class MigrationControlsIntegration(unittest.TestCase):
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
+    def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
+        plan = self.authority_plan()
+        apply(self.conn, plan[:-1])
+        tenant = str(uuid.uuid4())
+        legacy_session = 'legacy-' + uuid.uuid4().hex
+        new_session = 'new-' + uuid.uuid4().hex
+        self.admin.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                           (tenant,'protocol migration fixture'))
+        self.admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                           (tenant,legacy_session))
+        self.assertEqual(apply(self.conn,(plan[-1],)),(plan[-1].name,))
+        legacy_version = self.admin.execute(
+            'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
+            (tenant,legacy_session)).fetchone()[0]
+        self.assertEqual(legacy_version,'claims2car-12-v1')
+        self.admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                           (tenant,new_session))
+        new_version = self.admin.execute(
+            'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
+            (tenant,new_session)).fetchone()[0]
+        self.assertEqual(new_version,'claims2car-16-v1')
+        with self.assertRaises(psycopg.errors.RaiseException) as raised:
+            self.admin.execute(
+                "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v1' WHERE tenant_id=%s AND session_id=%s",
+                (tenant,legacy_session))
+        self.assertEqual(raised.exception.diag.message_primary,'CAPTURE_PROTOCOL_VERSION_IMMUTABLE')
+
     def test_full_migration_enforces_python_sql_event_contract_parity(self):
         from app.domain_events import DomainEvent, KINDS
         from database.journal import tenant_transaction
