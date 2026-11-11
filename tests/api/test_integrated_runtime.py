@@ -98,8 +98,8 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 # null-element failures during connection or capture.
                 import re
 
-                script_ids = set(re.findall(r'\\$\\("([^"]+)"\\)', workbench_script.text))
-                document_ids = set(re.findall(r'\\bid="([^"]+)"', shell.text))
+                script_ids = set(re.findall(r'\$\("([^"]+)"\)', workbench_script.text))
+                document_ids = set(re.findall(r'\bid="([^"]+)"', shell.text))
                 assert script_ids <= document_ids, (
                     "Workbench references missing from root HTML: "
                     + ", ".join(sorted(script_ids - document_ids))
