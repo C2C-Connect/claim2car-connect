@@ -175,6 +175,8 @@ jobs:
           assert b'<script type="module" src="/prototype/app.mjs"></script>' in prototype_body
           assert request("/prototype/app.mjs")[0] == 200
           assert request("/prototype/styles.css")[0] == 200
+          assert request("/app.mjs")[0] == 404
+          assert request("/styles.css")[0] == 404
           assert request("/src/modules/capture/vin.mjs")[0] == 200
           assert request(
               "/api/v1/analysis/physics",
