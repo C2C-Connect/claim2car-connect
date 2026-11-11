@@ -37,9 +37,12 @@ def load_shot_contract():
         raise ValueError('INVALID_SHOT_CONTRACT')
     return value['shot_list_version'],CANONICAL_SLOTS
 
-def build_manifest(session_id,entries):
+def build_manifest(session_id,entries,protocol_version=LEGACY_CAPTURE_PROTOCOL):
     if not isinstance(session_id,str) or not session_id.strip():
         raise ValueError('INVALID_SESSION')
+    protocol=require_implemented_protocol(protocol_version)
+    if protocol.version != LEGACY_CAPTURE_PROTOCOL:
+        raise ValueError('CAPTURE_PROTOCOL_DEFINITION_PENDING')
     version,slots=load_shot_contract()
     records=tuple(entries)
     for e in records:
