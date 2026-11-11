@@ -52,7 +52,7 @@ BEGIN
   p_tenant,p_session,'claim-created',1,'SESSION_CREATED',p_actor,
   to_char(clock_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
   'persistent claim capture session created',
-  '{"claim_id":"' || p_claim::text || '","synthetic":false}','0.1'
+  '{"capture_protocol_version":"' || p_protocol_version || '","claim_id":"' || p_claim::text || '","synthetic":false}','0.1'
  ) INTO append_result;
  IF append_result IS DISTINCT FROM 'ACCEPTED' THEN
   RAISE EXCEPTION 'CLAIM_CAPTURE_SESSION_CREATION_FAILED';
