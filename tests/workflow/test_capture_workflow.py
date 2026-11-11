@@ -29,6 +29,7 @@ from app.capture_workflow import (
     sync_draft_to_server,
 )
 from app.evidence_manifest import CANONICAL_SLOTS
+from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL
 from app.vin_guard import VIN_WEIGHTS, validate_vin
 
 pytestmark = pytest.mark.subtests
@@ -115,7 +116,7 @@ def test_disclosure_contract_loads():
 
 
 def test_consent_requires_disclosure_presentation():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     with pytest.raises(WorkflowError) as e:
         w.record_consent("driver-1", True, "disclosure-v1")
     assert err_code(e) == "DISCLOSURE_NOT_PRESENTED"
@@ -289,7 +290,7 @@ def test_quality_pass_reaches_quality_verified():
 
 def test_local_draft_survives_restart_and_resumes():
     storage = {}
-    draft = LocalDraftStore(storage)
+    draft = LocalDraftStore(storage, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     draft.save_artifact("s1", *artifact(1, "vin_ocr"))
     draft.save_artifact("s1", *artifact(2, "front"))
     assert draft.revision() == 2
@@ -350,7 +351,7 @@ def test_sync_retake_allowed_before_quality_rejected_after():
 
 def test_synthetic_incident_capture_to_sync_end_to_end():
     session_id = str(uuid4())
-    w = CaptureWorkflow(session_id)
+    w = CaptureWorkflow(session_id, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     assert w.state == "initialized"
 
     # Disclosure gate then explicit consent.
