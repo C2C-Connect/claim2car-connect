@@ -107,8 +107,15 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
 
                 assert client.get("/assets/app.css").status_code == 200
                 assert client.get("/assets/offline_evidence_queue.mjs").status_code == 200
-                assert client.get("/app.mjs").status_code == 200
-                assert client.get("/styles.css").status_code == 200
+                # The newer controlled-test interface is deliberately
+                # isolated under /prototype. It must not shadow the persistent
+                # claim-case workbench at the product root.
+                prototype = client.get("/prototype/")
+                assert prototype.status_code == 200
+                assert '<link rel="stylesheet" href="/prototype/styles.css">' in prototype.text
+                assert '<script type="module" src="/prototype/app.mjs"></script>' in prototype.text
+                assert client.get("/prototype/app.mjs").status_code == 200
+                assert client.get("/prototype/styles.css").status_code == 200
                 assert client.get("/src/modules/capture/vin.mjs").status_code == 200
 
                 # Capture and reviewer APIs are mounted under /api and retain
