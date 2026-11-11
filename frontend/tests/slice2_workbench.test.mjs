@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
   CANONICAL_SLOTS,
+  LEGACY_CANONICAL_SLOTS,
+  LEGACY_CAPTURE_PROTOCOL,
   OperatorRoadsideController,
   ReviewerWorkbenchController,
 } from "../src/modules/capture/slice2_workbench_controller.mjs";
@@ -8,7 +10,7 @@ import {
 let tick = 0;
 const now = () => `2026-11-08T18:00:${String(tick++).padStart(2, "0")}Z`;
 const operator = new OperatorRoadsideController({
-  sessionId: "session-s2", tenantId: "tenant-a", operatorId: "operator-a", now,
+  sessionId: "session-s2", tenantId: "tenant-a", operatorId: "operator-a", protocolVersion: LEGACY_CAPTURE_PROTOCOL, now,
 });
 operator.presentDisclosure("disclosure-v1");
 assert.throws(() => operator.recordConsent({ ownerActorId: "owner-a", accepted: "false" }), /CONSENT_BOOLEAN/);
@@ -40,5 +42,6 @@ const decision = reviewer.recordDecision("priority", {
   verifiedArtifactIds: ["a2"],
 });
 assert.equal(decision.reviewerId, "reviewer-a");
-assert.equal(CANONICAL_SLOTS.length, 12);
+assert.equal(CANONICAL_SLOTS.length, 16);
+assert.equal(LEGACY_CANONICAL_SLOTS.length, 12);
 console.log(JSON.stringify({ suite: "slice2-workbench", assertions: 12, status: "passed" }));
