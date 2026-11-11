@@ -13,7 +13,7 @@ import psycopg
 from psycopg.conninfo import conninfo_to_dict
 from app.identity import CredentialResolver
 from database.journal import tenant_transaction
-from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL, validate_protocol_version
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, validate_protocol_version
 
 class CaptureAuthorizationError(PermissionError):
     pass
@@ -112,7 +112,7 @@ class CaptureSessionStore:
                                   'persistent-claim-case',str(row[6]),row[7],row[8])
         raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION')
 
-    def create(self,authorization,session_id,*,protocol_version=LEGACY_CAPTURE_PROTOCOL):
+    def create(self,authorization,session_id,*,protocol_version=DEFAULT_CAPTURE_PROTOCOL):
         session_id=self._identifier(session_id)
         protocol_version=validate_protocol_version(protocol_version)
         with self._authorized(authorization) as (conn,actor):
