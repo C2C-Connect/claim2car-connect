@@ -75,16 +75,41 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 shell = client.get("/")
                 assert shell.status_code == 200
                 assert "Claim2Car Connect" in shell.text
+
+                # Verify the document actually bootstraps the connected
+                # operator/reviewer workbench, rather than merely returning
+                # an unrelated HTML page while another frontend's assets
+                # happen to be mounted at the root.
+                assert '<link rel="stylesheet" href="/assets/app.css">' in shell.text
+                assert '<script type="module" src="/assets/app.js"></script>' in shell.text
+                assert "/app.mjs" not in shell.text
+                assert "/styles.css" not in shell.text
+
+                workbench_script = client.get("/assets/app.js")
+                assert workbench_script.status_code == 200
+                assert "createClaimCase" in workbench_script.text
+                assert "/api/v1/claim-cases" in workbench_script.text
+                assert "/api/v1/review-queue" in workbench_script.text
+                assert "createOfflineEvidenceQueue" in workbench_script.text
+
+                # Every fixed DOM lookup made by the shipped workbench must
+                # resolve against the actual root document. This catches
+                # partially wired shells before a browser user encounters
+                # null-element failures during connection or capture.
+                import re
+
+                script_ids = set(re.findall(r'\\$\\("([^"]+)"\\)', workbench_script.text))
+                document_ids = set(re.findall(r'\\bid="([^"]+)"', shell.text))
+                assert script_ids <= document_ids, (
+                    "Workbench references missing from root HTML: "
+                    + ", ".join(sorted(script_ids - document_ids))
+                )
+
+                assert client.get("/assets/app.css").status_code == 200
+                assert client.get("/assets/offline_evidence_queue.mjs").status_code == 200
                 assert client.get("/app.mjs").status_code == 200
                 assert client.get("/styles.css").status_code == 200
                 assert client.get("/src/modules/capture/vin.mjs").status_code == 200
-
-                # The integrated product shell is mounted at the root and its
-                # static assets are served by the same runtime image.
-                shell = client.get("/")
-                assert shell.status_code == 200
-                assert "Claim2Car Connect" in shell.text
-                assert client.get("/assets/app.js").status_code == 200
 
                 # Capture and reviewer APIs are mounted under /api and retain
                 # their end-user credential boundary.
