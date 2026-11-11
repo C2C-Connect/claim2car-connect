@@ -13,6 +13,7 @@ import psycopg
 from psycopg.conninfo import conninfo_to_dict
 from app.identity import CredentialResolver
 from database.journal import tenant_transaction
+from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL, validate_protocol_version
 
 class CaptureAuthorizationError(PermissionError):
     pass
@@ -33,6 +34,7 @@ class CaptureSession:
     scope: str = 'controlled-test'
     claim_id: str | None = None
     owner_actor_id: str | None = None
+    capture_protocol_version: str = LEGACY_CAPTURE_PROTOCOL
 
 PROFILE_SQL = """
 SELECT session_user::text,current_user::text,r.rolsuper,r.rolbypassrls,
@@ -90,7 +92,7 @@ class CaptureSessionStore:
     @staticmethod
     def _read(conn,actor,session_id,created=False):
         row=conn.execute('SELECT e.actor,e.occurred_at,e.event_id,e.kind,e.payload_json,e.schema_version,'
-                         'c.claim_id,c.owner_actor_id FROM faos.sessions s '
+                         'c.claim_id,c.owner_actor_id,s.capture_protocol_version FROM faos.sessions s '
                          'LEFT JOIN faos.events e ON e.tenant_id=s.tenant_id '
                          'AND e.session_id=s.session_id AND e.sequence=1 '
                          'LEFT JOIN faos.claim_cases c ON c.tenant_id=s.tenant_id '
@@ -99,7 +101,7 @@ class CaptureSessionStore:
         if row is None:
             raise CaptureSessionNotFound('CAPTURE_SESSION_NOT_FOUND')
         if row[2:6]==('capture-created','SESSION_CREATED','{"synthetic":true}','0.1'):
-            return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,'controlled-test',None,None)
+            return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,'controlled-test',None,None,row[8])
         try:
             payload=json.loads(row[4])
         except (ValueError,TypeError):
@@ -110,8 +112,9 @@ class CaptureSessionStore:
                                   'persistent-claim-case',str(row[6]),row[7])
         raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION')
 
-    def create(self,authorization,session_id):
+    def create(self,authorization,session_id,*,protocol_version=LEGACY_CAPTURE_PROTOCOL):
         session_id=self._identifier(session_id)
+        protocol_version=validate_protocol_version(protocol_version)
         with self._authorized(authorization) as (conn,actor):
             if actor.actor_role not in ('operator','supervisor'):
                 raise CaptureAuthorizationError('OPERATOR_IDENTITY_REQUIRED')
@@ -123,7 +126,10 @@ class CaptureSessionStore:
                                     (actor.tenant_id,session_id,'capture-created',1,'SESSION_CREATED',actor.actor_id,timestamp,'controlled test capture session','{"synthetic":true}','0.1')).fetchone()[0]
                 if result!='ACCEPTED':
                     raise RuntimeError('CAPTURE_CREATION_FAILED')
-            return self._read(conn,actor,session_id,created=inserted)
+            result=self._read(conn,actor,session_id,created=inserted)
+            if result.capture_protocol_version != protocol_version:
+                raise CaptureSessionConflict('CAPTURE_PROTOCOL_VERSION_MISMATCH')
+            return result
 
     def list_owned(self,authorization,*,limit=100):
         """List only the authenticated operator's own controlled capture drafts."""
