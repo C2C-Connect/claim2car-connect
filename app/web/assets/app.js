@@ -46,6 +46,7 @@ function setCase(id, protocolVersion = activeProtocolVersion) {
   activeProtocolVersion = protocolVersion;
   SLOTS = PROTOCOL_SLOTS[protocolVersion] || [];
   activeReadiness = null;
+  buildSlots();
     applyProtocolCaptureState();
   $("session-id").value = id;
   $("owner-session-id").value = id;
