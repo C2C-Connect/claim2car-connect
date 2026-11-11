@@ -218,7 +218,7 @@ export class ReviewerWorkbenchController {
       throw new Error("SESSION_ID_REQUIRED");
     }
     if (caseEnvelope.tenantId !== this.tenantId) throw new Error("CROSS_TENANT_ACCESS_DENIED");
-    const protocolVersion = caseEnvelope.captureProtocolVersion ?? LEGACY_CAPTURE_PROTOCOL;
+    const protocolVersion = caseEnvelope.captureProtocolVersion ?? caseEnvelope.shot_list_version ?? LEGACY_CAPTURE_PROTOCOL;
     if (!CAPTURE_PROTOCOL_SLOTS[protocolVersion]) throw new Error("UNSUPPORTED_CAPTURE_PROTOCOL");
     if (!caseEnvelope.integrityVerified) throw new Error("UNVERIFIED_MANIFEST_CANNOT_ENTER_QUEUE");
     if (!Number.isFinite(caseEnvelope.confidence) || caseEnvelope.confidence < 0 || caseEnvelope.confidence > 1) {
