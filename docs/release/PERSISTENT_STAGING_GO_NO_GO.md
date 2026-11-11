@@ -58,6 +58,8 @@ This is a dependency plan, not a claim that all listed slices are already implem
 - [ ] Roadside pause, unsafe-slot skip, scene abort, interruption recovery and sync are validated on supported physical devices.
 - [ ] An authorized operator completes capture with consent and original-byte evidence; an independent reviewer retrieves it and records an attributable decision.
 
+**Implementation progress:** migration 0018 now persists an immutable protocol version per session, backfills historical sessions as 12-v1, defaults new sessions to 16-v1, and binds the version into new session-creation journal events. The authenticated registry API and operator selector expose 16-v1 as default and 12-v1 as an explicit alternative. 16-v1 evidence capture fails closed until its contract is approved.
+
 **Current known blocker:** exact 16-v1 slot IDs/order and cross-layer version compatibility are unresolved. Safari/iPad/physical-device and roadside validation are not complete.
 
 ## Gate D — Persistent data, storage, retention and recovery
