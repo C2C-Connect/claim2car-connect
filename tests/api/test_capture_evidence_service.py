@@ -11,7 +11,7 @@ from uuid import UUID
 
 from app.artifact_storage import OriginalByteStore
 from app.evidence_manifest import LEGACY_CANONICAL_SLOTS as CANONICAL_SLOTS
-from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 from database.capture_evidence import CaptureEvidenceService
 from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSession, CaptureSessionConflict, CaptureSessionStore,
@@ -33,8 +33,11 @@ class Result:
 
 
 class FakeConnection:
-    def __init__(self):
-        self.rows = [(1, "SESSION_CREATED", "operator-1", '{"synthetic":true}', "capture-created")]
+    def __init__(self, protocol_version=LEGACY_CAPTURE_PROTOCOL):
+        payload = {"synthetic": True} if protocol_version == LEGACY_CAPTURE_PROTOCOL else {
+            "capture_protocol_version": protocol_version, "synthetic": True,
+        }
+        self.rows = [(1, "SESSION_CREATED", "operator-1", json.dumps(payload), "capture-created")]
         self.appended = []
         self.owner_bindings = {}
 
@@ -59,8 +62,9 @@ class FakeConnection:
 
 
 class FakeSessions(CaptureSessionStore):
-    def __init__(self, creator):
-        self.conn = FakeConnection()
+    def __init__(self, creator, protocol_version=LEGACY_CAPTURE_PROTOCOL):
+        self.protocol_version = protocol_version
+        self.conn = FakeConnection(protocol_version)
         self.creator = creator
         self.actors = {}
         self.scope = 'controlled-test'
@@ -73,7 +77,7 @@ class FakeSessions(CaptureSessionStore):
     def _read(self, conn, actor, session_id, created=False):
         return CaptureSession(session_id, str(actor.tenant_id), self.creator,
                               "2026-11-08T00:00:00+00:00", created, self.scope,
-                              self.claim_id, self.conn.owner_bindings.get(session_id), LEGACY_CAPTURE_PROTOCOL)
+                              self.claim_id, self.conn.owner_bindings.get(session_id), self.protocol_version)
 
 
 class RecordingByteStore(OriginalByteStore):
@@ -302,6 +306,42 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertEqual(review["manifest_digest"], sealed["manifest_digest"])
         self.assertEqual(self.sessions.conn.appended[-1][1], "reviewer-1")
 
+
+    def test_16_v1_persistent_evidence_lifecycle_uses_exact_session_slots(self):
+        sessions = FakeSessions(self.operator.actor_id, DEFAULT_CAPTURE_PROTOCOL)
+        sessions.actors = self.sessions.actors
+        service = CaptureEvidenceService(sessions, self.byte_store, "p" * 43)
+        readiness = service.evidence_readiness("operator-token", self.session_id)
+        self.assertEqual(readiness["capture_protocol_version"], DEFAULT_CAPTURE_PROTOCOL)
+        self.assertEqual(readiness["capture_protocol_status"], "implemented")
+        self.assertFalse(readiness["capture_allowed"])
+        service.record_consent("owner-token", self.session_id, request_id=UUID(int=430),
+                               accepted=True, scope="capture_review")
+        service.record_vehicle("operator-token", self.session_id, request_id=UUID(int=431),
+                               vin="1HGCM82633A004352")
+        slots = resolve_capture_protocol(DEFAULT_CAPTURE_PROTOCOL).slots
+        for index, slot in enumerate(slots, start=1):
+            original = ("synthetic-16-v1:" + slot).encode("ascii")
+            service.register_artifact(
+                "operator-token", self.session_id, request_id=UUID(int=500 + index),
+                artifact_id=UUID(int=600 + index), slot=slot,
+                payload_base64=base64.b64encode(original).decode("ascii"),
+                sha256_hex=hashlib.sha256(original).hexdigest(),
+            )
+        self.assertTrue(service.record_quality(
+            "operator-token", self.session_id, request_id=UUID(int=432),
+            results={slot: True for slot in slots},
+        )["advisory_only"])
+        sealed = service.seal_capture("operator-token", self.session_id, request_id=UUID(int=433))
+        self.assertEqual(sealed["shot_list_version"], DEFAULT_CAPTURE_PROTOCOL)
+        self.assertEqual(len(sealed["artifact_ids"]), 16)
+        queue = service.list_review_queue("reviewer-token")
+        self.assertEqual(queue[0]["shot_list_version"], DEFAULT_CAPTURE_PROTOCOL)
+        self.assertEqual(len(queue[0]["artifacts"]), 16)
+        details = service.get_review_details("reviewer-token", self.session_id)
+        self.assertEqual(details["shot_list_version"], DEFAULT_CAPTURE_PROTOCOL)
+        self.assertEqual(len(details["artifacts"]), 16)
+        self.assertEqual({item["slot"] for item in details["artifacts"]}, set(slots))
 
 if __name__ == "__main__":
     unittest.main()
