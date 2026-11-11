@@ -178,7 +178,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 ## Event-journal SQL/Python contract parity — 2026-11-10
 
-**Validated candidate code revision:** `c6f36810affb72f61a4e4fb3e6d8345705cffb73` (PR #29; still draft and unmerged).
+**Validated historical candidate code revision:** `c6f36810affb72f61a4e4fb3e6d8345705cffb73`. PR #29, PR #31, and wrapper PR #40 have since been consolidated and merged into `main` at `3aa87f9d1523a68a1df09c6930ab57efbd182ba4`. The verification below is historical evidence for the candidate revision, not a claim that its historical run proves the current database acceptance gates.
 
 - Added authority migration `0017_event_contract_parity.sql`. It requires RFC3339 timestamps with an explicit timezone, checks calendar validity, enforces compact canonical JSON with lexically ordered object keys and consistent UTF-8 string encoding, and aligns the SQL event-kind allowlist with Python.
 - The shared Python serializer now emits deterministic compact JSON, preserves legitimate decimal quality metrics using fixed decimal notation, and is used by capture, manifest-sealing, and review event producers.
@@ -203,7 +203,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 ## Capture protocol version binding — 2026-11-11
 
-**Implementation candidate:** PR #31, Slice 2 workbench branch.
+**Implementation history:** PR #31 was consolidated through PR #29 and merged to `main` via PR #40 at `3aa87f9d1523a68a1df09c6930ab57efbd182ba4`. The exact owner-approved 16-v1 contract and end-to-end version binding are implemented in the current PR #41 candidate; merge and acceptance remain gated on its current CI.
 
 - New sessions default to `claims2car-16-v1`; `claims2car-12-v1` is explicitly selectable.
 - Authority migration 0018 backfills existing sessions as 12-v1, adds a constrained protocol-version column, sets the default for new sessions to 16-v1, and makes the version immutable with a database trigger.
