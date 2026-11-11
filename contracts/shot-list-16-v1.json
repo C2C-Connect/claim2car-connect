@@ -1,0 +1,40 @@
+{
+  "schema_version": "0.1",
+  "shot_list_version": "claims2car-16-v1",
+  "required_angles": [
+    "00_front_exterior",
+    "01_front_right_exterior",
+    "02_right_side_exterior",
+    "03_rear_right_exterior",
+    "04_rear_exterior",
+    "05_rear_left_exterior",
+    "06_left_side_exterior",
+    "07_front_left_exterior",
+    "08_wheel_front_left",
+    "09_wheel_front_right",
+    "10_wheel_rear_right",
+    "11_wheel_rear_left",
+    "12_cabin_front_airbags",
+    "13_instrument_cluster_odometer",
+    "14_physical_vin",
+    "15_license_and_insurance_docs"
+  ],
+  "descriptions": {
+    "00_front_exterior": "Front-facing vehicle framing (exterior)",
+    "01_front_right_exterior": "Front-right 45° quarter view (exterior)",
+    "02_right_side_exterior": "Right profile (exterior)",
+    "03_rear_right_exterior": "Rear-right 45° quarter view (exterior)",
+    "04_rear_exterior": "Rear-facing vehicle framing (exterior)",
+    "05_rear_left_exterior": "Rear-left 45° quarter view (exterior)",
+    "06_left_side_exterior": "Left profile (exterior)",
+    "07_front_left_exterior": "Front-left 45° quarter view (exterior)",
+    "08_wheel_front_left": "Front-left wheel assembly detail",
+    "09_wheel_front_right": "Front-right wheel assembly detail",
+    "10_wheel_rear_right": "Rear-right wheel assembly detail",
+    "11_wheel_rear_left": "Rear-left wheel assembly detail",
+    "12_cabin_front_airbags": "Front cabin/dashboard & visible airbag indicators",
+    "13_instrument_cluster_odometer": "Instrument cluster, odometer reading, and warning lights",
+    "14_physical_vin": "Readable physical VIN plate/sticker close-up",
+    "15_license_and_insurance_docs": "Driver's license and insurance card documentation"
+  }
+}
