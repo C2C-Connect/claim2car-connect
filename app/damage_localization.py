@@ -167,6 +167,7 @@ class ImpactGeometry:
     depth_cm: float             # provisional estimate pending calibration
     material: str = BASE_MATERIAL
     model_version: str = MODEL_VERSION
+    protocol_version: str = LEGACY_CAPTURE_PROTOCOL
 
     def to_zone_input(self):
         """Backend physics seam: builds the engine's ZoneInput if importable."""
@@ -195,7 +196,7 @@ class PhysicsInputAdapter:
             tier, depth = "structural", STRUCTURAL_DEPTH_CM
         return ImpactGeometry(
             slot=region.slot, zone=zone, area_fraction=round(area, 6),
-            severity_tier=tier, depth_cm=depth,
+            severity_tier=tier, depth_cm=depth, protocol_version=region.protocol_version,
         )
 
 
