@@ -101,7 +101,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                            (tenant,'protocol migration fixture'))
         self.admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                            (tenant,legacy_session))
-        self.assertEqual(apply(self.conn,(plan[-1],)),(plan[-1].name,))
+        self.assertEqual(apply(self.conn,plan),(plan[-1].name,))
         legacy_version = self.admin.execute(
             'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
             (tenant,legacy_session)).fetchone()[0]
