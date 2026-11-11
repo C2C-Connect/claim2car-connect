@@ -199,3 +199,18 @@ The current Railway configuration is a restricted synthetic containment service.
 **Boundary:** the successful database workflow uses isolated/disposable PostgreSQL test databases and synthetic records. It does not establish production database migration safety against unknown live historical rows, durable cloud storage, backup/restore, production deployment, Safari/iPad qualification, field validation, or legal admissibility. Hashes and canonical journal serialization establish consistency and replayability, not the truth of a claim or capture provenance.
 
 **Next P0 slice:** exercise the complete authenticated HTTP path against the full authority schema and durable artifact store, including process restart, manifest seal/readback, independent reviewer retrieval, cross-tenant denial, consent withdrawal, and tampered-byte rejection. Keep deployment disabled until that integrated path and the persistent storage/recovery controls have evidence.
+
+
+## Capture protocol version binding — 2026-11-11
+
+**Implementation candidate:** PR #31, Slice 2 workbench branch.
+
+- New sessions default to `claims2car-16-v1`; `claims2car-12-v1` is explicitly selectable.
+- Authority migration 0018 backfills existing sessions as 12-v1, adds a constrained protocol-version column, sets the default for new sessions to 16-v1, and makes the version immutable with a database trigger.
+- Claim-case creation, controlled-session creation, session readback, and claim-case readback carry the selected version. Idempotent retries cannot change it.
+- The authenticated protocol-registry API and operator workbench expose the default and the selectable legacy alternative.
+- The existing 12-v1 manifest/capture contract remains executable. Evidence registration, quality recording, and sealing reject a 16-v1 session until its exact slot contract is approved; 16-v1 never falls through to 12-v1.
+
+**Still open:** the exact authoritative 16 slot IDs/order/semantics remain unresolved because the source architecture contains conflicting enumerations. The separate Slice 2 browser controller's 12-slot list also differs from the API 12-v1 contract. These lists must be reconciled explicitly. No 16-v1 manifest or capture completion is claimed.
+
+See `docs/release/CAPTURE_PROTOCOL_VERSIONING.md` for the immutable-session rules and remaining work.
