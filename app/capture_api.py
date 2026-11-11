@@ -34,7 +34,7 @@ from app.artifact_storage import (
     ArtifactStorageUnavailable, OriginalByteStore,
 )
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
-from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
 CONFIGURATION_SIZE_LIMIT = 65536
@@ -280,6 +280,22 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         except Exception:
             _fail(500, 'CLAIM_CASE_OPERATION_FAILED')
 
+    @api.get('/v1/capture-protocols')
+    def capture_protocol_registry(authorization: str = Depends(authorize)):
+        protocols = []
+        for version in (DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL):
+            definition = resolve_capture_protocol(version)
+            protocols.append({
+                "version": definition.version,
+                "status": definition.status,
+                "selectable_for_new_sessions": True,
+                "capture_enabled": definition.status == "implemented",
+                "required_slots": list(definition.slots),
+            })
+        return JSONResponse({
+            "default_protocol_version": DEFAULT_CAPTURE_PROTOCOL,
+            "protocols": protocols,
+        }, headers=dict(NO_STORE_HEADERS))
     @api.post('/v1/claim-cases')
     def create_claim_case(body: ClaimCaseRequest, authorization: str = Depends(authorize)):
         if claim_cases is None:
