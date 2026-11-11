@@ -73,6 +73,10 @@ class ClaimCaseStore:
                 "FROM faos.claim_cases c JOIN faos.sessions s ON s.tenant_id=c.tenant_id AND s.session_id=c.capture_session_id WHERE c.tenant_id=%s AND c.request_id=%s",
                 (actor.tenant_id, request_id),
             ).fetchone()
+            if row is None:
+                raise ClaimCaseConflict("CLAIM_CASE_CREATE_NOT_ACCEPTED")
+            if row[6] != capture_protocol_version:
+                raise ClaimCaseConflict("CAPTURE_PROTOCOL_VERSION_MISMATCH")
             return self._record(row, created=(outcome == "ACCEPTED"))
 
     def get(self, authorization, claim_id):
