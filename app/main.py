@@ -5,7 +5,7 @@ import os
 import re
 import psycopg
 from fastapi import Depends, FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 @dataclass(frozen=True)
