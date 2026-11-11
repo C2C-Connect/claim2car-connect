@@ -136,6 +136,6 @@ def create_app(settings=None, runtime_mode=None):
         if not source_root.is_dir():
             raise ValueError('INTEGRATED_FRONTEND_SOURCE_REQUIRED')
         api.mount('/src', StaticFiles(directory=str(source_root), html=False), name='claim2car-frontend-source')
-        api.mount('/', StaticFiles(directory=str(frontend_root), html=True), name='claim2car-workbench')
+        api.mount('/prototype', StaticFiles(directory=str(frontend_root), html=True), name='claim2car-workbench-prototype')
 
     return api
