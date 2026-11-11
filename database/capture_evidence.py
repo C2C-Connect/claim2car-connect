@@ -407,7 +407,7 @@ class CaptureEvidenceService:
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             if not history or history[-1][0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
+            manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
             seal = history[-1][2]
             if seal.get("manifest_digest") != manifest.digest():
                 raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
@@ -490,8 +490,8 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
             if not history or history[-1][0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
-            latest = self._artifact_set(history, _session.capture_protocol_version)
+            manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
+            latest = self._artifact_set(history, session.capture_protocol_version)
             return {
                 "session_id": session_id,
                 "manifest_digest": manifest.digest(),
