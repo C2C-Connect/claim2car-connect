@@ -33,7 +33,9 @@ def _load(path, expected_version, expected_count, required_keys):
             or len(set(value["required_angles"])) != expected_count
             or any(not isinstance(slot, str) or not slot for slot in value["required_angles"])):
         raise ValueError("INVALID_CAPTURE_PROTOCOL_CONTRACT")
-    descriptions = value.get("descriptions", {})
+    descriptions = value.get("descriptions")
+    if descriptions is None:
+        descriptions = {slot: slot.replace("_", " ").title() for slot in value["required_angles"]}
     if type(descriptions) is not dict or set(descriptions) != set(value["required_angles"]):
         raise ValueError("INVALID_CAPTURE_PROTOCOL_DESCRIPTIONS")
     if any(not isinstance(label, str) or not label.strip() for label in descriptions.values()):
