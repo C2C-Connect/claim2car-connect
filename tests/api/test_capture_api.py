@@ -57,6 +57,30 @@ class CaptureRouteTests(unittest.TestCase):
         self.claim_store.list_owned.assert_called_once_with('Bearer '+self.token,limit=25)
         self.claim_store.get.assert_called_once_with('Bearer '+self.token,claim_id=record.claim_id)
 
+    def test_protocol_registry_is_authenticated_and_marks_16_default_pending(self):
+        with self.client() as client:
+            registry = client.get('/v1/capture-protocols',headers=self.headers)
+            unauthorized = client.get('/v1/capture-protocols')
+        self.assertEqual(registry.status_code,200)
+        self.assertEqual(registry.json()['default_protocol_version'],DEFAULT_CAPTURE_PROTOCOL)
+        by_version = {item['version']:item for item in registry.json()['protocols']}
+        self.assertEqual(by_version['claims2car-16-v1']['status'],'definition_pending')
+        self.assertFalse(by_version['claims2car-16-v1']['capture_enabled'])
+        self.assertEqual(by_version['claims2car-12-v1']['status'],'implemented')
+        self.assertTrue(by_version['claims2car-12-v1']['capture_enabled'])
+        self.assertEqual(len(by_version['claims2car-12-v1']['required_slots']),12)
+        self.assertEqual(unauthorized.status_code,401)
+
+    def test_claim_case_request_defaults_to_16_v1_and_allows_explicit_12_v1(self):
+        record = ClaimCase(str(UUID(int=13)),str(self.binding.tenant_id),'test-actor',
+                           '2026-11-10T00:00:00+00:00','INTAKE_OPEN',True,str(UUID(int=14)))
+        self.claim_store.create.return_value = record
+        with self.client() as client:
+            client.post('/v1/claim-cases',json={'claim_id':record.claim_id,'request_id':str(UUID(int=15))},headers=self.headers)
+            client.post('/v1/claim-cases',json={'claim_id':record.claim_id,'request_id':str(UUID(int=16)),
+                        'capture_protocol_version':'claims2car-12-v1'},headers=self.headers)
+        self.assertEqual(self.claim_store.create.call_args_list[0].kwargs['capture_protocol_version'],DEFAULT_CAPTURE_PROTOCOL)
+        self.assertEqual(self.claim_store.create.call_args_list[1].kwargs['capture_protocol_version'],'claims2car-12-v1')
     def test_claim_case_list_rejects_invalid_limit(self):
         with self.client() as client:
             response=client.get('/v1/claim-cases?limit=0',headers=self.headers)
