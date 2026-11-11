@@ -100,14 +100,23 @@ class CaptureSessionStore:
                          'WHERE s.tenant_id=%s AND s.session_id=%s',(actor.tenant_id,session_id)).fetchone()
         if row is None:
             raise CaptureSessionNotFound('CAPTURE_SESSION_NOT_FOUND')
-        if row[2:6]==('capture-created','SESSION_CREATED','{"synthetic":true}','0.1'):
-            return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,'controlled-test',None,None,row[8])
         try:
             payload=json.loads(row[4])
         except (ValueError,TypeError):
             raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION') from None
+        controlled_payloads = (
+            {'synthetic':True} if row[8] == LEGACY_CAPTURE_PROTOCOL else None,
+            {'capture_protocol_version':row[8],'synthetic':True},
+        )
+        if (row[2]=='capture-created' and row[3]=='SESSION_CREATED' and row[5]=='0.1'
+                and payload in controlled_payloads):
+            return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,'controlled-test',None,None,row[8])
+        claim_payloads = (
+            {'claim_id':str(row[6]),'synthetic':False} if row[8] == LEGACY_CAPTURE_PROTOCOL and row[6] is not None else None,
+            {'capture_protocol_version':row[8],'claim_id':str(row[6]),'synthetic':False} if row[6] is not None else None,
+        )
         if (row[2]=='claim-created' and row[3]=='SESSION_CREATED' and row[5]=='0.1'
-                and row[6] is not None and payload=={'claim_id':str(row[6]),'synthetic':False}):
+                and row[6] is not None and payload in claim_payloads):
             return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,
                                   'persistent-claim-case',str(row[6]),row[7],row[8])
         raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION')
@@ -123,7 +132,7 @@ class CaptureSessionStore:
             if inserted:
                 timestamp=datetime.now(timezone.utc).isoformat()
                 result=conn.execute('SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-                                    (actor.tenant_id,session_id,'capture-created',1,'SESSION_CREATED',actor.actor_id,timestamp,'controlled test capture session','{"synthetic":true}','0.1')).fetchone()[0]
+                                    (actor.tenant_id,session_id,'capture-created',1,'SESSION_CREATED',actor.actor_id,timestamp,'controlled test capture session','{"capture_protocol_version":"'+protocol_version+'","synthetic":true}','0.1')).fetchone()[0]
                 if result!='ACCEPTED':
                     raise RuntimeError('CAPTURE_CREATION_FAILED')
             result=self._read(conn,actor,session_id,created=inserted)
