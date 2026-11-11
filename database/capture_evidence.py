@@ -448,7 +448,7 @@ class CaptureEvidenceService:
                         or not isinstance(seal_payload.get("manifest_digest"), str)):
                     raise CaptureSessionConflict("UNSUPPORTED_SEAL_HISTORY")
                 # Verify the sealed originals before exposing reviewer-safe metadata.
-                manifest = self._verified_manifest(actor, session_id, history)
+                manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
                 expected_artifact_ids = [entry.artifact_id for entry in manifest.entries]
                 if (
                     manifest.digest() != seal_payload["manifest_digest"]
@@ -490,8 +490,8 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
             if not history or history[-1][0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-            manifest = self._verified_manifest(actor, session_id, history)
-            latest = self._artifact_set(history)
+            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
+            latest = self._artifact_set(history, _session.capture_protocol_version)
             return {
                 "session_id": session_id,
                 "manifest_digest": manifest.digest(),
@@ -521,7 +521,7 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
             if not history or history[-1][0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-            manifest = self._verified_manifest(actor, session_id, history)
+            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
             entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
             if entry is None:
                 raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
