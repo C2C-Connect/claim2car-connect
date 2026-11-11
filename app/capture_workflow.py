@@ -300,8 +300,10 @@ class LocalDraftStore:
     constructing a second store over the same storage.
     """
 
-    def __init__(self, storage):
+    def __init__(self, storage, protocol_version: str = DEFAULT_CAPTURE_PROTOCOL):
         self.storage = storage
+        self.protocol = require_implemented_protocol(protocol_version)
+        self.protocol_version = self.protocol.version
 
     def _load(self):
         return self.storage.get("draft", {"revision": 0, "entries": {}, "synced": []})
@@ -312,7 +314,7 @@ class LocalDraftStore:
     def save_artifact(self, session_id: str, slot: str, artifact_id: str, sha256_hex: str, byte_length: int) -> int:
         if not isinstance(session_id, str) or not session_id.strip():
             raise WorkflowError("INVALID_SESSION")
-        if slot not in REQUIRED_SLOTS:
+        if slot not in self.protocol.slots:
             raise WorkflowError("UNKNOWN_SLOT", slot)
         data = self._load()
         entries = data["entries"]
@@ -327,6 +329,7 @@ class LocalDraftStore:
         }
         data["revision"] += 1
         data["session_id"] = session_id
+        data["capture_protocol_version"] = self.protocol_version
         self._save(data)
         return data["revision"]
 
@@ -357,6 +360,7 @@ class LocalDraftStore:
         data = self._load()
         return {
             "session_id": data.get("session_id"),
+            "capture_protocol_version": data.get("capture_protocol_version", self.protocol_version),
             "revision": data["revision"],
             "captured_slots": sorted(data["entries"]),
             "pending_sync_count": len(self.pending_sync()),
@@ -374,7 +378,9 @@ def sync_draft_to_server(workflow: CaptureWorkflow, draft: LocalDraftStore, acto
         raise WorkflowError("INVALID_SYNC_TARGET")
     results = []
     with workflow_span("capture.sync", session_id=workflow.session_id):
-        for entry in draft.pending_sync():
+        if workflow.protocol_version != draft.protocol_version:
+        raise WorkflowError("CAPTURE_PROTOCOL_VERSION_MISMATCH")
+    for entry in draft.pending_sync():
             outcome = workflow.register_artifact(
                 actor,
                 entry["slot"],
