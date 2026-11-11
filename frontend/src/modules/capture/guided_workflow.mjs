@@ -12,14 +12,34 @@ import { validateVin } from './vin.mjs';
 
 export const DISCLOSURE_VERSION = 'disclosure-v1';
 export const WORKFLOW_STORAGE_KEY = 'c2c.guided-capture.v1';
+export const DEFAULT_CAPTURE_PROTOCOL = 'claims2car-16-v1';
+export const LEGACY_CAPTURE_PROTOCOL = 'claims2car-12-v1';
+export const CAPTURE_PROTOCOL_SLOTS = Object.freeze({
+  [DEFAULT_CAPTURE_PROTOCOL]: Object.freeze([
+    '00_front_exterior','01_front_right_exterior','02_right_side_exterior','03_rear_right_exterior',
+    '04_rear_exterior','05_rear_left_exterior','06_left_side_exterior','07_front_left_exterior',
+    '08_wheel_front_left','09_wheel_front_right','10_wheel_rear_right','11_wheel_rear_left',
+    '12_cabin_front_airbags','13_instrument_cluster_odometer','14_physical_vin','15_license_and_insurance_docs'
+  ]),
+  [LEGACY_CAPTURE_PROTOCOL]: Object.freeze([
+    'vin_ocr','doc_ocr','front','front_left','driver_side','rear_left','rear',
+    'rear_right','passenger_side','front_right','interior_front','undercarriage_engine'
+  ])
+});
 
-export function createGuidedCapture({ shotList, storage, sessionId, now = () => new Date().toISOString() }) {
-  if (!Array.isArray(shotList) || shotList.length === 0) throw new Error('INVALID_SHOT_LIST');
+export function createGuidedCapture({ shotList, storage, sessionId, now = () => new Date().toISOString(), protocolVersion }) {
+  const selectedProtocol = protocolVersion ?? (shotList ? LEGACY_CAPTURE_PROTOCOL : DEFAULT_CAPTURE_PROTOCOL);
+  const canonicalSlots = CAPTURE_PROTOCOL_SLOTS[selectedProtocol];
+  if (!canonicalSlots) throw new Error('UNSUPPORTED_CAPTURE_PROTOCOL');
+  if (shotList === undefined) shotList = canonicalSlots;
+  if (!Array.isArray(shotList) || shotList.length === 0 || shotList.length !== canonicalSlots.length
+      || shotList.some((slot, index) => slot !== canonicalSlots[index])) throw new Error('INVALID_SHOT_LIST');
   if (storage === null || storage === undefined) throw new Error('STORAGE_REQUIRED');
   if (typeof sessionId !== 'string' || !sessionId.trim()) throw new Error('INVALID_SESSION');
 
   const state = {
     sessionId,
+    captureProtocolVersion: selectedProtocol,
     disclosurePresented: null,
     consented: false,
     vin: null,
@@ -112,6 +132,7 @@ export function createGuidedCapture({ shotList, storage, sessionId, now = () => 
   function snapshot() {
     return {
       sessionId: state.sessionId,
+      captureProtocolVersion: state.captureProtocolVersion,
       revision: state.revision,
       disclosurePresented: state.disclosurePresented,
       consented: state.consented,
