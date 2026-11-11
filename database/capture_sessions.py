@@ -109,7 +109,7 @@ class CaptureSessionStore:
         if (row[2]=='claim-created' and row[3]=='SESSION_CREATED' and row[5]=='0.1'
                 and row[6] is not None and payload=={'claim_id':str(row[6]),'synthetic':False}):
             return CaptureSession(session_id,str(actor.tenant_id),row[0],row[1],created,
-                                  'persistent-claim-case',str(row[6]),row[7])
+                                  'persistent-claim-case',str(row[6]),row[7],row[8])
         raise CaptureSessionConflict('UNMANAGED_CAPTURE_SESSION')
 
     def create(self,authorization,session_id,*,protocol_version=LEGACY_CAPTURE_PROTOCOL):
@@ -118,8 +118,8 @@ class CaptureSessionStore:
         with self._authorized(authorization) as (conn,actor):
             if actor.actor_role not in ('operator','supervisor'):
                 raise CaptureAuthorizationError('OPERATOR_IDENTITY_REQUIRED')
-            inserted=conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s) '
-                                  'ON CONFLICT DO NOTHING RETURNING session_id',(actor.tenant_id,session_id)).fetchone() is not None
+            inserted=conn.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s) '
+                                  'ON CONFLICT DO NOTHING RETURNING session_id',(actor.tenant_id,session_id,protocol_version)).fetchone() is not None
             if inserted:
                 timestamp=datetime.now(timezone.utc).isoformat()
                 result=conn.execute('SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
