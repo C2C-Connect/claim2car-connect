@@ -323,8 +323,7 @@ class CaptureEvidenceService:
     def record_quality(self, authorization, session_id, *, request_id, results):
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
-        if (type(results) is not dict or set(results) != _CANONICAL_SLOTS
-                or any(type(value) is not bool for value in results.values())):
+        if type(results) is not dict or any(type(value) is not bool for value in results.values()):
             raise ValueError("INVALID_ADVISORY_QUALITY_RESULTS")
         event_id = "quality:" + request_id
         with self.sessions._authorized(authorization) as (conn, actor):
