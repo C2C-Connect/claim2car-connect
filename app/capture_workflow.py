@@ -383,10 +383,10 @@ def sync_draft_to_server(workflow: CaptureWorkflow, draft: LocalDraftStore, acto
     if not isinstance(workflow, CaptureWorkflow) or not isinstance(draft, LocalDraftStore):
         raise WorkflowError("INVALID_SYNC_TARGET")
     results = []
-    with workflow_span("capture.sync", session_id=workflow.session_id):
-        if workflow.protocol_version != draft.protocol_version:
+    if workflow.protocol_version != draft.protocol_version:
         raise WorkflowError("CAPTURE_PROTOCOL_VERSION_MISMATCH")
-    for entry in draft.pending_sync():
+    with workflow_span("capture.sync", session_id=workflow.session_id):
+        for entry in draft.pending_sync():
             outcome = workflow.register_artifact(
                 actor,
                 entry["slot"],
