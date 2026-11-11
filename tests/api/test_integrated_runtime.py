@@ -116,6 +116,8 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert '<script type="module" src="/prototype/app.mjs"></script>' in prototype.text
                 assert client.get("/prototype/app.mjs").status_code == 200
                 assert client.get("/prototype/styles.css").status_code == 200
+                assert client.get("/app.mjs").status_code == 404
+                assert client.get("/styles.css").status_code == 404
                 assert client.get("/src/modules/capture/vin.mjs").status_code == 200
 
                 # Capture and reviewer APIs are mounted under /api and retain
