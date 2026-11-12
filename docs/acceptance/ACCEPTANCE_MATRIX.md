@@ -1,8 +1,7 @@
 # Claim2Car Connect — Acceptance & Release Gate Matrix
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`
-**Canonical main baseline:** `4c52f169239c79e45ef979f91b2e66b8e51b6336`
-**Current implementation candidate:** branch `feat/db-01-14-executable-acceptance-gates`
+**Current main baseline:** `32ed4174d10ab7ac2d895741e413b0624e53ecaa`
 **Capture protocol:** `claims2car-16-v1` is the new-session default; explicit historical `claims2car-12-v1` compatibility is preserved.
 **Database contract:** `C2C-DB-AC-001 v1.0 proposed`; owner adoption and independent review remain a separate blocker.
 
@@ -10,28 +9,42 @@
 
 ### PR #41 — capture protocol 16-v1
 
-PR #41 was merged into `main` after all 13 PR workflows passed on candidate head `f184f0fa3f79db660ae826ba2a7663ccf22f2373`.
+PR #41 is merged into `main`.
 
 - PR: [#41](https://github.com/C2C-Connect/claim2car-connect/pull/41)
-- Merge commit / current main baseline at merge: `4c52f169239c79e45ef979f91b2e66b8e51b6336`
-- Full pytest suite: **758 passed, 200 subtests passed**.
-- Database authority and legacy database workflows: passed; each reported 297 tests.
-- All 13 PR workflows completed successfully; no failed workflow remained.
-- The authority diagnostics correctly continued to report `gate_passes_awarded: 0` before executable gate implementation.
+- Merge commit: `4c52f169239c79e45ef979f91b2e66b8e51b6336`
+- Full pytest on that merged source: **758 passed, 200 subtests passed**.
+- The 13 PR workflows passed before merge.
 
-### DB-01 through DB-14 — implementation in progress
+### DB-01 through DB-14 — executable criteria implemented and evaluated
 
-The new branch `feat/db-01-14-executable-acceptance-gates` adds individually callable `verify_db_01` through `verify_db_14` functions, maps each gate to recorded database test IDs and post-cutover SQL evidence, rejects missing/failed/skipped evidence, and produces structured gate results.
+PR #43 implemented and merged the 14 gate verifier functions, per-gate test selectors, direct PostgreSQL evidence requirements, and the fail-closed counted-test runner. PR #44 corrected the structured evidence JSON publisher.
 
-Additional direct-SQL regression coverage is being added for Unicode canonicalization, numeric spelling, rejected-event immutability, and exact preservation of historical payload bytes across migrations.
+- PR #43: [Executable DB-01 through DB-14 verifiers](https://github.com/C2C-Connect/claim2car-connect/pull/43)
+- PR #44: [Acceptance evidence JSON serialization fix](https://github.com/C2C-Connect/claim2car-connect/pull/44)
+- Current main SHA: `32ed4174d10ab7ac2d895741e413b0624e53ecaa`
+- Full pytest: **768 passed, 201 subtests passed**, zero skipped.
+- Counted PostgreSQL suite: **307/307 passed**, zero failures, errors, skips, expected failures, or unexpected successes.
+- PostgreSQL: **16.4**, isolated synthetic database `claim2car_test`; explicit `postgres`, `faos_app`, and `faos_migrator` identities recorded.
+- Migration inventory: all 18 migrations recorded with SHA-256 digests.
+- Direct SQL parity probes passed for timestamp validity, compact JSON, key ordering, numeric exponent spelling, escaped Unicode, and positive canonical round trips.
+- Historical payload preservation and rollback tests passed; no migration rewrites or normalizes existing event history.
+- Tenant isolation: 14 tables × 2 tenants × 10 adversarial assertions = **280/280 passed**.
+- All 14 gate criteria evaluated `PASS` in the post-cutover authority report.
+- The structured evidence artifact was successfully published after PR #44.
 
-**No gate is certified by this matrix snapshot.** The implementation branch still requires GitHub Actions execution and review. The database contract remains proposed pending owner adoption and independent review. No `gate_passes_awarded: 14` or `overall_acceptance: ACCEPTED` claim is made until the executable runner actually passes all 14 gates and the contract adoption blocker is resolved.
+**Formal gate award remains 0/14.** The source contract is still `PROPOSED_PENDING_OWNER_ADOPTION`; accordingly, each gate is reported as `NOT AWARDED` with `criteria_result: PASS`, and `overall_acceptance` remains `NOT ACCEPTED`. This is intentional and fail-closed. The contract requires independent review and formal owner adoption before any gate status is awarded.
+
+### Issue disposition
+
+- Issues #33–#38 are closed with PostgreSQL, migration, immutability, replay, and CI evidence.
+- Issue #39 remains open pending independent review and formal owner adoption of C2C-DB-AC-001.
+- No additional SQL parity migration was needed: existing `0017_event_contract_parity.sql` already enforces the Python-equivalent boundary; new adversarial tests validate it.
 
 ### Remaining acceptance and release boundaries
 
-- Issues #33–#38 remain open until their corresponding SQL parity, replay, immutability, and CI evidence is verified on the gate implementation branch.
-- Issue #39 remains open pending independent review and formal adoption of the database acceptance contract.
-- Synthetic PostgreSQL acceptance does not establish production readiness, real participant/field acceptance, legal admissibility, measurement accuracy, or complete commercial deployment.
+- The 14 criteria passing in synthetic PostgreSQL does not constitute formal database acceptance until contract adoption is complete.
+- Synthetic acceptance does not establish production readiness, real participant/field acceptance, legal admissibility, measurement accuracy, or complete commercial deployment.
 - Live Square settlement, external carrier/partner delivery, and live dispatch remain disabled unless separately authorized and verified.
 
 ## Commercial and safety controls
