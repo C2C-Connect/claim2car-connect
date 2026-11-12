@@ -120,6 +120,12 @@ def reconstruct(session_id,events):
             state=replace(state,vehicle=item)
         elif event.kind=='ARTIFACT_REGISTERED':
             item=typed(Artifact,p)
+            if not nonempty(item.artifact_id) or not isinstance(item.slot,str):
+                raise ValueError('INVALID_ARTIFACT_ID_OR_SLOT')
+            if not isinstance(item.bytes_hex,str) or re.fullmatch(r'(?:[0-9a-f]{2})+',item.bytes_hex) is None:
+                raise ValueError('INVALID_ARTIFACT_BYTES')
+            if not isinstance(item.sha256_hex,str) or sha256(bytes.fromhex(item.bytes_hex)).hexdigest()!=item.sha256_hex:
+                raise ValueError('ARTIFACT_HASH_MISMATCH')
             existing=next((a for a in state.artifacts if a.artifact_id==item.artifact_id),None)
             if existing is not None and existing!=item:
                 raise ValueError('CONFLICTING_ARTIFACT')
@@ -127,12 +133,8 @@ def reconstruct(session_id,events):
                 slots=require_implemented_protocol(state.shot_list_version).slots
             except (ValueError, TypeError, OSError):
                 raise ValueError('INVALID_SHOT_CONTRACT') from None
-            if not nonempty(item.artifact_id) or not isinstance(item.slot,str) or item.slot not in slots:
+            if item.slot not in slots:
                 raise ValueError('INVALID_ARTIFACT_ID_OR_SLOT')
-            if not isinstance(item.bytes_hex,str) or re.fullmatch(r'(?:[0-9a-f]{2})+',item.bytes_hex) is None:
-                raise ValueError('INVALID_ARTIFACT_BYTES')
-            if not isinstance(item.sha256_hex,str) or sha256(bytes.fromhex(item.bytes_hex)).hexdigest()!=item.sha256_hex:
-                raise ValueError('ARTIFACT_HASH_MISMATCH')
             if existing is not None:
                 pass
             elif any(a.slot==item.slot for a in state.artifacts):
