@@ -1,5 +1,6 @@
 """Post-cutover PostgreSQL assertions feeding the executable DB-01..DB-14 gate runner."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -319,6 +320,7 @@ if __name__ == '__main__':
     except Exception as error:
         report['diagnostics_successful'] = False
         report['execution_error_type'] = type(error).__name__
+        report['execution_error_message'] = str(error)
     try:
         counted_path, counted_tests = load_counted_database_report()
         report['counted_test_report_path'] = str(counted_path)
@@ -330,6 +332,8 @@ if __name__ == '__main__':
         run_all_gate_verifiers(report, counted_tests, environment_is_synthetic=(report.get('environment', {}).get('classification') == 'synthetic_isolated'), contract_adopted=contract_adopted)
     except Exception as error:
         report['gate_verification_successful'] = False
+        report['gate_error_type'] = type(error).__name__
+        report['gate_error_message'] = str(error)
         report['gate_passes_awarded'] = 0
         report['complete_gate_results'] = [
             {'id':f'DB-{number:02d}','status':'BLOCKED','reason':type(error).__name__}
