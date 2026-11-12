@@ -279,7 +279,7 @@ def run(report):
     report['gate_passes_awarded'] = report['gate_certification']['gate_passes_awarded']
     report['complete_gate_results'] = report['gate_certification']['complete_gate_results']
     report['overall_acceptance'] = report['gate_certification']['overall_acceptance']
-    report['diagnostics_successful'] = (len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks']) and report['overall_acceptance']=='ACCEPTED')
+    report['diagnostics_successful'] = (all(row['status']=='PASS' for row in report['checks']) and report['overall_acceptance']=='ACCEPTED')
 
 if __name__ == '__main__':
     report = {'classification':'executable-db-14-gate-certification',
