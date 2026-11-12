@@ -78,5 +78,28 @@ class TenantContextRegression(unittest.TestCase):
         self.assert_append_denied(uuid.uuid4())
 
 
+
+    def test_connection_reuse_does_not_leak_between_tenants(self):
+        tenant_a, tenant_b = uuid.uuid4(), uuid.uuid4()
+        self.assertIsNone(self.context())
+        self.set_context(tenant_a)
+        self.assertEqual(self.context(), tenant_a)
+        self.conn.commit()
+        self.assertIsNone(self.context())
+        self.set_context(tenant_b)
+        self.assertEqual(self.context(), tenant_b)
+        self.conn.commit()
+        self.assertIsNone(self.context())
+
+    def test_context_clears_after_exception_and_aborted_transaction(self):
+        tenant = uuid.uuid4()
+        self.assertIsNone(self.context())
+        with self.assertRaisesRegex(RuntimeError, 'synthetic transaction failure'):
+            with self.conn.transaction():
+                self.set_context(tenant)
+                self.assertEqual(self.context(), tenant)
+                raise RuntimeError('synthetic transaction failure')
+        self.assertIsNone(self.context())
+
 if __name__ == '__main__':
     unittest.main()

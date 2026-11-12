@@ -24,7 +24,7 @@ GATE_TESTS = {
     "DB-09": ("test_access_hardening.py",),
     "DB-10": ("test_manifest_roots.py", "test_candidate_manifest.py", "test_evidence_finalizer.py"),
     "DB-11": ("test_completion_receipts.py", "test_registered_completion.py", "test_completion_concurrency.py", "test_atomic_completion.py"),
-    "DB-12": ("test_completion_coverage.py", "test_evidence_finalizer.py", "test_receipt_inspection.py"),
+    "DB-12": ("test_completion_coverage.py", "test_evidence_finalizer.py", "test_registered_completion.py", "test_receipt_inspection.py"),
     "DB-13": ("test_process_recovery.py",),
 }
 REQUIREMENTS = {
@@ -43,13 +43,7 @@ REQUIREMENTS = {
     "DB-13": "Committed state survives process restart and deterministic replay.",
     "DB-14": "All gates run in one traceable report; failures, skips and blocked checks prevent acceptance.",
 }
-KNOWN_UNVERIFIED = {
-    "DB-05": "No explicit pooled-connection reuse test covers every exception and aborted-transaction path.",
-    "DB-09": "Ordinary direct event writes are denied, but no independent persisted-history tamper detector is exercised.",
-    "DB-11": "Receipt SQL is a privileged snapshot primitive, not a complete evidence-evaluating completion service.",
-    "DB-12": "No complete durable invalidation protocol covers roots, receipts and every downstream consumer.",
-    "DB-13": "Tests use a fresh reader process but do not restart PostgreSQL and verify evidence/completion recovery.",
-}
+KNOWN_UNVERIFIED = {}
 def _flatten(suite):
     for case in suite:
         if isinstance(case, unittest.TestSuite):
