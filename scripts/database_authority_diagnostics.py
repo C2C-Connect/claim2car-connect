@@ -306,9 +306,12 @@ def load_counted_database_report():
 
 
 if __name__ == '__main__':
+    contract_source = Path('docs/acceptance/database-contract.md').read_text(encoding='utf-8')
+    contract_adopted = '**Version:** 1.0 — ADOPTED' in contract_source
     report = {'classification':'post-cutover-executable-db-gate-verification',
               'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
-              'contract':'C2C-DB-AC-001 v1.0 proposed','contract_status':'PROPOSED_PENDING_OWNER_ADOPTION',
+              'contract':'C2C-DB-AC-001 v1.0 adopted' if contract_adopted else 'C2C-DB-AC-001 v1.0 proposed',
+              'contract_status':'ADOPTED' if contract_adopted else 'PROPOSED_PENDING_OWNER_ADOPTION',
               'gate_passes_awarded':0,'checks':[],'complete_gate_results':[],
               'overall_acceptance':'NOT ACCEPTED','diagnostics_successful':False}
     try:
@@ -321,7 +324,7 @@ if __name__ == '__main__':
         report['counted_test_report_path'] = str(counted_path)
         import hashlib
         report['counted_test_report_sha256'] = hashlib.sha256(counted_path.read_bytes()).hexdigest()
-        run_all_gate_verifiers(report, counted_tests, environment_is_synthetic=(report.get('environment', {}).get('classification') == 'synthetic_isolated'))
+        run_all_gate_verifiers(report, counted_tests, environment_is_synthetic=(report.get('environment', {}).get('classification') == 'synthetic_isolated'), contract_adopted=contract_adopted)
     except Exception as error:
         report['gate_verification_successful'] = False
         report['gate_passes_awarded'] = 0
