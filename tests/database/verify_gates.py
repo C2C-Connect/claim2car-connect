@@ -353,7 +353,7 @@ GATE_FUNCTIONS = (
 )
 
 
-def run_all_gate_verifiers(diagnostics, counted_tests, *, environment_is_synthetic=True):
+def run_all_gate_verifiers(diagnostics, counted_tests, *, environment_is_synthetic=True, contract_adopted=False):
     context = {
         "diagnostics": diagnostics,
         "counted_tests": counted_tests,
@@ -366,24 +366,31 @@ def run_all_gate_verifiers(diagnostics, counted_tests, *, environment_is_synthet
         results.append(result)
         context["prior_gate_results"] = results
     results.append(verify_db_14(context))
-    awarded = sum(row["status"] == "PASS" for row in results)
+    criteria_passes = sum(row["status"] == "PASS" for row in results)
+    if not contract_adopted:
+        for row in results:
+            row["criteria_result"] = row["status"]
+            if row["status"] == "PASS":
+                row["status"] = "IMPLEMENTED — UNVERIFIED"
+    awarded = criteria_passes if contract_adopted else 0
     diagnostics["complete_gate_results"] = results
+    diagnostics["criteria_passes"] = criteria_passes
     diagnostics["gate_passes_awarded"] = awarded
-    diagnostics["gate_verification_successful"] = awarded == 14
+    diagnostics["gate_verification_successful"] = criteria_passes == 14
     diagnostics["counted_test_summary"] = {
         key: counted_tests.get(key) for key in (
             "suite", "discovered", "executed", "failures", "errors", "skipped",
             "expected_failures", "unexpected_successes", "successful",
         )
     } if isinstance(counted_tests, dict) else None
-    # C2C-DB-AC-001 is still explicitly marked PROPOSED in the source document.
-    # Individual gate passes are real, but overall acceptance cannot be declared
-    # until the owner-adoption/review requirement in the contract is resolved.
-    diagnostics["contract_status"] = "PROPOSED_PENDING_OWNER_ADOPTION"
-    diagnostics["overall_acceptance"] = "NOT ACCEPTED"
-    diagnostics["acceptance_blockers"] = (
-        [] if awarded == 14 else ["ONE_OR_MORE_DATABASE_GATES_NOT_PASS"]
-    ) + ["CONTRACT_OWNER_ADOPTION_AND_INDEPENDENT_REVIEW_PENDING"]
+    diagnostics["contract_status"] = "ADOPTED" if contract_adopted else "PROPOSED_PENDING_OWNER_ADOPTION"
+    diagnostics["overall_acceptance"] = "ACCEPTED" if contract_adopted and criteria_passes == 14 else "NOT ACCEPTED"
+    blockers = []
+    if criteria_passes != 14:
+        blockers.append("ONE_OR_MORE_DATABASE_GATE_CRITERIA_NOT_PASS")
+    if not contract_adopted:
+        blockers.append("CONTRACT_OWNER_ADOPTION_AND_INDEPENDENT_REVIEW_PENDING")
+    diagnostics["acceptance_blockers"] = blockers
     diagnostics["classification"] = "executable-db-01-through-db-14-gate-results"
     return results
 
