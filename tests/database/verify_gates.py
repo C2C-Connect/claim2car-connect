@@ -132,11 +132,11 @@ def verify_db_14(context, prior):
     return {"status":"PASS" if ok else "FAIL","requirement":REQUIREMENTS["DB-14"],
             "tests":tests,"prior_gates_all_pass":prior_pass,"minimum_test_count":297,
             "test_count_requirement_met":enough,"no_skips":no_skips,"limitations":limits}
-def run_gate_verification(admin_url=None,app_url=None,commit=None):
+def run_gate_verification(admin_url=None,app_url=None,commit=None,diagnostic_checks=None):
     admin_url=admin_url or os.getenv("MIGRATION_TEST_ADMIN_URL") or os.getenv("MIGRATION_DATABASE_URL")
     app_url=app_url or os.getenv("APP_DATABASE_URL")
     if not admin_url or not app_url: raise RuntimeError("GATE_DATABASE_URLS_REQUIRED")
-    context={"admin_url":admin_url,"app_url":app_url}
+    context={"admin_url":admin_url,"app_url":app_url,"diagnostic_checks":diagnostic_checks or []}
     funcs=(verify_db_01,verify_db_02,verify_db_03,verify_db_04,verify_db_05,verify_db_06,
            verify_db_07,verify_db_08,verify_db_09,verify_db_10,verify_db_11,verify_db_12,verify_db_13)
     gates={}
