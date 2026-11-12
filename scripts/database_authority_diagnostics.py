@@ -324,6 +324,6 @@ if __name__ == '__main__':
         report['acceptance_blockers'] = ['COUNTED_TEST_OR_GATE_EVIDENCE_UNAVAILABLE']
     path = Path('output/acceptance-diagnostics/report.json')
     path.parent.mkdir(parents=True,exist_ok=True)
-    path.write_text(json.dumps(report,indent=2)+'\\n',encoding='utf-8')
+    path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(report,sort_keys=True))
     raise SystemExit(0 if report.get('diagnostics_successful') and report.get('gate_verification_successful') else 1)
