@@ -275,7 +275,7 @@ def run(report):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
-    report['gate_certification'] = run_gate_verification(admin_url=admin_url, app_url=app_url, commit=report.get('commit'))
+    report['gate_certification'] = run_gate_verification(admin_url=admin_url, app_url=app_url, commit=report.get('commit'), diagnostic_checks=report.get('checks',[]))
     report['gate_passes_awarded'] = report['gate_certification']['gate_passes_awarded']
     report['complete_gate_results'] = report['gate_certification']['complete_gate_results']
     report['overall_acceptance'] = report['gate_certification']['overall_acceptance']

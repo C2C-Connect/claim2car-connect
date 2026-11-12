@@ -108,9 +108,21 @@ def verify_db_03(context):
     result["role_assertion"]={"status":"PASS" if role==("faos_app",False,False) else "FAIL","value":role}
     if result["role_assertion"]["status"]!="PASS": result["status"]="FAIL"
     return result
-def verify_db_04(context): return _test_gate("DB-04")
+def verify_db_04(context):
+    result=_test_gate("DB-04")
+    matrix=next((row for row in context.get("diagnostic_checks",[]) if row.get("id")=="POSTCUTOVER-PER-TABLE-ISOLATION"),None)
+    result["tenant_isolation_matrix"]={"status":"PASS" if matrix and matrix.get("status")=="PASS" else "MISSING_OR_FAILED"}
+    if result["tenant_isolation_matrix"]["status"]!="PASS": result["status"]="FAIL"
+    return result
 def verify_db_05(context): return _test_gate("DB-05")
-def verify_db_06(context): return _test_gate("DB-06")
+def verify_db_06(context):
+    result=_test_gate("DB-06")
+    required={"G06-timestamp","G06-naive_timestamp","G06-compact_payload","G06-key_order","G06-numeric_exponent","G06-unicode_escape","CANONICAL-UNICODE-DECIMAL-POSITIVE-CONTROL"}
+    observed={row.get("id") for row in context.get("diagnostic_checks",[]) if row.get("status")=="PASS"}
+    missing=sorted(required-observed)
+    result["direct_sql_parity_probes"]={"required":sorted(required),"missing":missing}
+    if missing: result["status"]="IMPLEMENTED — UNVERIFIED"
+    return result
 def verify_db_07(context): return _test_gate("DB-07")
 def verify_db_08(context): return _test_gate("DB-08")
 def verify_db_09(context): return _test_gate("DB-09")
