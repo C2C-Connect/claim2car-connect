@@ -233,7 +233,8 @@ def _gate(context, gate_id):
         "required_sql_checks": list(required_checks),
         "missing_sql_checks": missing_checks,
         "failed_sql_checks": sorted(set(failed_checks)),
-        "evidence_commit": diagnostics.get("commit"),
+        "candidate_commit": diagnostics.get("candidate_commit") or diagnostics.get("commit"),
+        "evidence_commit": diagnostics.get("tested_checkout_commit") or diagnostics.get("commit"),
     }
 
 
@@ -340,6 +341,8 @@ def verify_db_14(context):
             or any(row.get("status") != "PASS" for row in prior)
             or not diagnostics.get("diagnostics_successful")
             or not diagnostics.get("commit")
+            or not diagnostics.get("candidate_commit")
+            or not diagnostics.get("tested_checkout_commit")
             or len(diagnostics.get("migration_inventory") or []) != 18):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("SAME_RUN_COMPLETE_GATE_EVIDENCE_AND_FAILURE_ACCOUNTING")
