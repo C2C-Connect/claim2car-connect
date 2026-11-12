@@ -24,6 +24,8 @@ class MigrationControlsIntegration(unittest.TestCase):
         self.url=make_conninfo(migrator_url,dbname=self.db)
         self.conn=psycopg.connect(self.url,autocommit=True)
         self.addCleanup(self.conn.close)
+        self.admin_db=psycopg.connect(make_conninfo(admin_url,dbname=self.db),autocommit=True)
+        self.addCleanup(self.admin_db.close)
         self.first=self.migration('0001_first.sql','CREATE SCHEMA faos; CREATE TABLE faos.probe(value integer); INSERT INTO faos.probe VALUES (1);')
     def drop_database(self):
         self.admin.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(self.db)))
@@ -233,21 +235,21 @@ class MigrationControlsIntegration(unittest.TestCase):
         tenant = str(uuid.uuid4())
         session = 'preserve-payload-' + uuid.uuid4().hex
         payload = '{"label":"é","metric":0.00001}'
-        self.conn.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+        self.admin_db.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
                           (tenant, 'synthetic history preservation fixture'))
-        self.conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+        self.admin_db.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                           (tenant, session))
-        self.conn.execute(
+        self.admin_db.execute(
             'INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (tenant, session, 'preserved-event', 1, 'SESSION_CREATED',
              'synthetic-test', '2026-01-01T00:00:00Z', 'preserve exact bytes', payload, '0.1'),
         )
-        before = self.conn.execute(
+        before = self.admin_db.execute(
             'SELECT payload_json,occurred_at FROM faos.events WHERE tenant_id=%s AND session_id=%s',
             (tenant, session),
         ).fetchone()
         apply(self.conn, plan)
-        after = self.conn.execute(
+        after = self.admin_db.execute(
             'SELECT payload_json,occurred_at FROM faos.events WHERE tenant_id=%s AND session_id=%s',
             (tenant, session),
         ).fetchone()
@@ -259,25 +261,25 @@ class MigrationControlsIntegration(unittest.TestCase):
         tenant = str(uuid.uuid4())
         session = 'reject-history-' + uuid.uuid4().hex
         payload = '{"z":1,"a":2}'
-        self.conn.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+        self.admin_db.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
                           (tenant, 'synthetic invalid history fixture'))
-        self.conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+        self.admin_db.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                           (tenant, session))
-        self.conn.execute(
+        self.admin_db.execute(
             'INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (tenant, session, 'noncanonical-event', 1, 'SESSION_CREATED',
              'synthetic-test', '2026-01-01T00:00:00Z', 'preserve invalid history',
              payload, '0.1'),
         )
         before_history = self.history()
-        before_payload = self.conn.execute(
+        before_payload = self.admin_db.execute(
             'SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s',
             (tenant, session),
         ).fetchone()[0]
         with self.assertRaises(psycopg.errors.CheckViolation):
             apply(self.conn, plan)
         self.assertEqual(self.history(), before_history, 'FAILED_MIGRATION_ADVANCED_LEDGER')
-        after_payload = self.conn.execute(
+        after_payload = self.admin_db.execute(
             'SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s',
             (tenant, session),
         ).fetchone()[0]
