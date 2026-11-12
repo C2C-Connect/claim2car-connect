@@ -249,7 +249,7 @@ def run(report):
                 ('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact'),
                 ('key_order','2026-01-01T00:00:00Z','{"z":1,"a":2}','event_payload_python_canonical'),
                 ('numeric_exponent','2026-01-01T00:00:00Z','{"value":1e0}','event_payload_python_canonical'),
-                ('unicode_escape','2026-01-01T00:00:00Z','{"label":"\\\\u00e9"}','event_payload_python_canonical'),
+                ('unicode_escape','2026-01-01T00:00:00Z','{"label":"\\u00e9"}','event_payload_python_canonical'),
             ]:
                 try:
                     with tenant_transaction(connections[0],tenants[0]):
