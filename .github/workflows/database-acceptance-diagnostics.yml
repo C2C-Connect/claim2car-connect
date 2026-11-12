@@ -88,7 +88,7 @@ jobs:
               metadata['criteria_passes'] = value.get('criteria_passes', 0)
               metadata['overall_acceptance'] = value.get('overall_acceptance', 'NOT ACCEPTED')
               allowed = ('classification','commit','candidate_commit','tested_checkout_commit','base_commit','contract','contract_status','gate_passes_awarded','criteria_passes','gate_verification_successful','acceptance_blockers','checks','database','environment','extensions','migration_inventory','complete_gate_results','counted_test_summary','counted_test_report_path','counted_test_report_sha256','overall_acceptance','diagnostics_successful','execution_error_type')
-              (out/'diagnostic-report.json').write_text(json.dumps({k:value[k] for k in allowed if k in value},indent=2)+'\\n')
+              (out/'diagnostic-report.json').write_text(json.dumps({k:value[k] for k in allowed if k in value},indent=2)+'\n')
           counted = list(Path('output/database-runs').rglob('counted-tests.json'))
           metadata['counted_test_report_count'] = len(counted)
           if len(counted) == 1:
