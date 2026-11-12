@@ -198,8 +198,25 @@ acceptance run, with no unresolved mandatory failures or missing evidence. Accep
 progression to the next defined engineering milestone. It does not independently certify the complete
 Claim2Car product or authorize production deployment.
 
-## 7. Relationship to the existing preflight
+## 7. Executable gate runner and adoption boundary
 
-`tests/database/verify_gates.py` remains labeled synthetic preflight until it is replaced or
-supplemented by the actual gate runner. Its current checks provide useful evidence toward parts of
-DB-03–05 and the tenant-context portion of DB-07, but do not establish a full pass for those gates.
+`tests/database/verify_gates.py` now contains the explicit `verify_db_01` through
+`verify_db_14` functions. Each gate requires its mapped counted-test identifiers and its
+gate-specific post-cutover PostgreSQL assertions. DB-04 additionally requires the complete
+14-table, two-tenant, 280-assertion isolation matrix. DB-06 requires direct SQL parity probes for
+timestamp validation, compact payloads, key ordering, numeric spelling, escaped Unicode, and
+positive round-trip controls. DB-14 verifies same-run evidence accounting and requires all
+preceding gate criteria to pass.
+
+The counted database suite is executed before the preflight report is accepted. The post-cutover
+diagnostic runner consumes that exact counted-test report, records its digest, source commit,
+sanitized database connection identity, migration inventory, SQL assertion results, and per-gate
+test IDs. Missing evidence, test errors, failures, skips, expected failures, or unexpected
+successes prevent the corresponding criteria from passing.
+
+**Adoption boundary:** This version remains PROPOSED until the owner approves and merges the
+contract. Before that merge, the runner may report per-gate `criteria_result` values for review,
+but every gate is emitted as `NOT AWARDED`, `gate_passes_awarded` remains zero, and
+`overall_acceptance` remains `NOT ACCEPTED`. After the contract is formally adopted, a new
+traceable run can award PASS only where all mapped tests and SQL assertions pass; overall
+acceptance becomes ACCEPTED only when all 14 gates pass in that same run.
