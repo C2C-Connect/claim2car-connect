@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import uuid
 import psycopg
 from psycopg import sql
@@ -10,6 +11,10 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from app.domain_events import DomainEvent
 from database.journal import append, tenant_transaction
 from database.readback import load_journal
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'tests' / 'database'))
+from verify_gates import run_all_gate_verifiers
 
 APPEND = 'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)'
 
@@ -273,18 +278,41 @@ def run(report):
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
     report['diagnostics_successful'] = len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks'])
 
+def load_counted_database_report():
+    candidates = sorted(Path('output/database-runs').glob('*/database-evidence/counted-tests.json'))
+    if len(candidates) != 1:
+        raise RuntimeError('EXACTLY_ONE_COUNTED_DATABASE_TEST_REPORT_REQUIRED')
+    return candidates[0], json.loads(candidates[0].read_text(encoding='utf-8'))
+
+
 if __name__ == '__main__':
-    report = {'classification':'post-cutover-authority-diagnostics-not-gate-certification',
+    report = {'classification':'post-cutover-executable-db-gate-verification',
               'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
-              'contract':'C2C-DB-AC-001 v1.0 proposed','gate_passes_awarded':0,'checks':[],
-              'complete_gate_results':'NOT RUN','overall_acceptance':'NOT ACCEPTED','diagnostics_successful':False}
+              'contract':'C2C-DB-AC-001 v1.0 proposed','contract_status':'PROPOSED_PENDING_OWNER_ADOPTION',
+              'gate_passes_awarded':0,'checks':[],'complete_gate_results':[],
+              'overall_acceptance':'NOT ACCEPTED','diagnostics_successful':False}
     try:
         run(report)
     except Exception as error:
         report['diagnostics_successful'] = False
         report['execution_error_type'] = type(error).__name__
+    try:
+        counted_path, counted_tests = load_counted_database_report()
+        report['counted_test_report_path'] = str(counted_path)
+        import hashlib
+        report['counted_test_report_sha256'] = hashlib.sha256(counted_path.read_bytes()).hexdigest()
+        run_all_gate_verifiers(report, counted_tests, environment_is_synthetic=True)
+    except Exception as error:
+        report['gate_verification_successful'] = False
+        report['gate_passes_awarded'] = 0
+        report['complete_gate_results'] = [
+            {'id':f'DB-{number:02d}','status':'BLOCKED','reason':type(error).__name__}
+            for number in range(1,15)
+        ]
+        report['overall_acceptance'] = 'NOT ACCEPTED'
+        report['acceptance_blockers'] = ['COUNTED_TEST_OR_GATE_EVIDENCE_UNAVAILABLE']
     path = Path('output/acceptance-diagnostics/report.json')
     path.parent.mkdir(parents=True,exist_ok=True)
-    path.write_text(json.dumps(report,indent=2)+'\n')
+    path.write_text(json.dumps(report,indent=2)+'\\n',encoding='utf-8')
     print(json.dumps(report,sort_keys=True))
-    raise SystemExit(0 if report['diagnostics_successful'] else 1)
+    raise SystemExit(0 if report.get('diagnostics_successful') and report.get('gate_verification_successful') else 1)
