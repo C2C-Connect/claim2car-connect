@@ -291,6 +291,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 "selectable_for_new_sessions": True,
                 "capture_enabled": definition.status == "implemented",
                 "required_slots": list(definition.slots),
+                "slot_descriptions": definition.descriptions,
             })
         return JSONResponse({
             "default_protocol_version": DEFAULT_CAPTURE_PROTOCOL,

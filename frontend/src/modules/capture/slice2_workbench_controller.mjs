@@ -4,11 +4,23 @@
  * Target Runtime: Node 22 CI & React/Capacitor on Apple iPad Pro 11-inch M5
  */
 
-export const CANONICAL_SLOTS = Object.freeze([
-  "front_center", "front_left", "left_side", "rear_left", "rear_center", "rear_right",
-  "right_side", "front_right", "vin_plate", "odometer_cluster",
-  "primary_impact_closeup", "undercarriage_or_wheel_well",
-]);
+export const DEFAULT_CAPTURE_PROTOCOL = "claims2car-16-v1";
+export const LEGACY_CAPTURE_PROTOCOL = "claims2car-12-v1";
+export const CAPTURE_PROTOCOL_SLOTS = Object.freeze({
+  [DEFAULT_CAPTURE_PROTOCOL]: Object.freeze([
+    "00_front_exterior", "01_front_right_exterior", "02_right_side_exterior", "03_rear_right_exterior",
+    "04_rear_exterior", "05_rear_left_exterior", "06_left_side_exterior", "07_front_left_exterior",
+    "08_wheel_front_left", "09_wheel_front_right", "10_wheel_rear_right", "11_wheel_rear_left",
+    "12_cabin_front_airbags", "13_instrument_cluster_odometer", "14_physical_vin", "15_license_and_insurance_docs",
+  ]),
+  [LEGACY_CAPTURE_PROTOCOL]: Object.freeze([
+    "front_center", "front_left", "left_side", "rear_left", "rear_center", "rear_right",
+    "right_side", "front_right", "vin_plate", "odometer_cluster",
+    "primary_impact_closeup", "undercarriage_or_wheel_well",
+  ]),
+});
+export const CANONICAL_SLOTS = CAPTURE_PROTOCOL_SLOTS[DEFAULT_CAPTURE_PROTOCOL];
+export const LEGACY_CANONICAL_SLOTS = CAPTURE_PROTOCOL_SLOTS[LEGACY_CAPTURE_PROTOCOL];
 
 export const REVIEW_DISPOSITIONS = Object.freeze([
   "NOTE_ONLY", "REPAIRABLE_CANDIDATE", "TOTAL_LOSS_CANDIDATE",
@@ -16,9 +28,12 @@ export const REVIEW_DISPOSITIONS = Object.freeze([
 ]);
 
 export class OperatorRoadsideController {
-  constructor({ sessionId, tenantId, operatorId, now = () => new Date().toISOString() }) {
+  constructor({ sessionId, tenantId, operatorId, protocolVersion = DEFAULT_CAPTURE_PROTOCOL, now = () => new Date().toISOString() }) {
     if (!sessionId || !tenantId || !operatorId) throw new Error("OPERATOR_CONTEXT_REQUIRED");
+    if (!CAPTURE_PROTOCOL_SLOTS[protocolVersion]) throw new Error("UNSUPPORTED_CAPTURE_PROTOCOL");
     this.sessionId = sessionId;
+    this.protocolVersion = protocolVersion;
+    this.canonicalSlots = CAPTURE_PROTOCOL_SLOTS[protocolVersion];
     this.tenantId = tenantId;
     this.operatorId = operatorId;
     this.now = now;
@@ -98,7 +113,7 @@ export class OperatorRoadsideController {
     if (this.state !== "capturing" && this.state !== "incomplete_skipped") {
       throw new Error(`CAPTURE_NOT_ACTIVE:${this.state}`);
     }
-    if (!CANONICAL_SLOTS.includes(slot)) throw new Error(`INVALID_CANONICAL_SLOT:${slot}`);
+    if (!this.canonicalSlots.includes(slot)) throw new Error(`INVALID_CANONICAL_SLOT:${slot}`);
     if (typeof artifactId !== "string" || !artifactId.trim()
         || !/^[a-f0-9]{64}$/i.test(sha256Hex)
         || !Number.isSafeInteger(byteLength) || byteLength <= 0) {
@@ -141,7 +156,7 @@ export class OperatorRoadsideController {
     if (this.state !== "capturing" && this.state !== "paused_unsafe") {
       throw new Error(`INVALID_STATE_FOR_SKIP:${this.state}`);
     }
-    if (!CANONICAL_SLOTS.includes(slot)) throw new Error(`INVALID_CANONICAL_SLOT:${slot}`);
+    if (!this.canonicalSlots.includes(slot)) throw new Error(`INVALID_CANONICAL_SLOT:${slot}`);
     const skipRecord = { slot, status: "skipped_unsafe", hazardReason, skippedAt: this.now() };
     this.slots.set(slot, skipRecord);
     this.safetyEvents.push({ action: "skip_slot", slot, reason: hazardReason, occurredAt: this.now() });
@@ -157,14 +172,14 @@ export class OperatorRoadsideController {
   }
 
   _evaluateCaptureCompletion() {
-    if (this.slots.size !== CANONICAL_SLOTS.length) return;
+    if (this.slots.size !== this.canonicalSlots.length) return;
     const allCaptured = Array.from(this.slots.values()).every((s) => s.status === "captured");
     this.state = allCaptured ? "ready_to_seal" : "incomplete_skipped";
   }
 
   exportDraftSnapshot() {
     return JSON.stringify({
-      sessionId: this.sessionId, tenantId: this.tenantId, operatorId: this.operatorId,
+      sessionId: this.sessionId, tenantId: this.tenantId, operatorId: this.operatorId, protocolVersion: this.protocolVersion,
       state: this.state, disclosureVersion: this.disclosureVersion, consent: this.consent,
       vehicle: this.vehicle, slots: Array.from(this.slots.entries()),
       supersededArtifacts: this.supersededArtifacts, safetyEvents: this.safetyEvents,
@@ -175,7 +190,7 @@ export class OperatorRoadsideController {
   static restoreFromDraftSnapshot(serializedSnapshot, now) {
     const d = JSON.parse(serializedSnapshot);
     const c = new OperatorRoadsideController({
-      sessionId: d.sessionId, tenantId: d.tenantId, operatorId: d.operatorId, now,
+      sessionId: d.sessionId, tenantId: d.tenantId, operatorId: d.operatorId, protocolVersion: d.protocolVersion ?? LEGACY_CAPTURE_PROTOCOL, now,
     });
     c.state = d.state;
     c.disclosureVersion = d.disclosureVersion;
@@ -203,13 +218,15 @@ export class ReviewerWorkbenchController {
       throw new Error("SESSION_ID_REQUIRED");
     }
     if (caseEnvelope.tenantId !== this.tenantId) throw new Error("CROSS_TENANT_ACCESS_DENIED");
+    const protocolVersion = caseEnvelope.captureProtocolVersion ?? caseEnvelope.shot_list_version ?? LEGACY_CAPTURE_PROTOCOL;
+    if (!CAPTURE_PROTOCOL_SLOTS[protocolVersion]) throw new Error("UNSUPPORTED_CAPTURE_PROTOCOL");
     if (!caseEnvelope.integrityVerified) throw new Error("UNVERIFIED_MANIFEST_CANNOT_ENTER_QUEUE");
     if (!Number.isFinite(caseEnvelope.confidence) || caseEnvelope.confidence < 0 || caseEnvelope.confidence > 1) {
       throw new Error("INVALID_REVIEW_CONFIDENCE");
     }
     const band = caseEnvelope.confidence < 0.5 ? "priority-review" : "standard-review";
     const record = {
-      ...caseEnvelope, band, lockedBy: null, lockedAt: null,
+      ...caseEnvelope, protocolVersion, canonicalSlots: CAPTURE_PROTOCOL_SLOTS[protocolVersion], band, lockedBy: null, lockedAt: null,
       status: "queued", decision: null, retakeSlots: [],
     };
     this.cases.set(caseEnvelope.sessionId, record);
@@ -244,7 +261,7 @@ export class ReviewerWorkbenchController {
     }
     if (!reasonCode || !String(reasonCode).trim()) throw new Error("RETAKE_REASON_REQUIRED");
     for (const slot of slotsToRetake) {
-      if (!CANONICAL_SLOTS.includes(slot)) throw new Error(`INVALID_RETAKE_SLOT:${slot}`);
+      if (!item.canonicalSlots.includes(slot)) throw new Error(`INVALID_RETAKE_SLOT:${slot}`);
     }
     item.status = "retake_requested";
     item.retakeSlots = [...slotsToRetake];

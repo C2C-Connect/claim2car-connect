@@ -17,7 +17,7 @@ from database.financial_ledger import PersistentFinancialLedger
 from backend.app.anchor.ledger import PartnerAcceptanceRecord
 from app.artifact_storage import OriginalByteStore
 from database.capture_evidence import CaptureEvidenceService
-from app.evidence_manifest import CANONICAL_SLOTS
+from app.evidence_manifest import CANONICAL_SLOTS, LEGACY_CANONICAL_SLOTS
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 
 class CaptureSessionIntegration(unittest.TestCase):
@@ -123,7 +123,7 @@ class CaptureSessionIntegration(unittest.TestCase):
             service.record_vehicle(self.auth(), case.capture_session_id,
                 request_id=uuid.uuid4(), vin='1HGCM82633A004352')
             originals = {}
-            for slot in CANONICAL_SLOTS:
+            for slot in LEGACY_CANONICAL_SLOTS:
                 raw = ('claim-case-original:' + slot).encode('ascii')
                 artifact_id = str(uuid.uuid4())
                 originals[artifact_id] = raw
@@ -131,7 +131,7 @@ class CaptureSessionIntegration(unittest.TestCase):
                     request_id=uuid.uuid4(), artifact_id=artifact_id, slot=slot,
                     payload_base64=base64.b64encode(raw).decode('ascii'),
                     sha256_hex=hashlib.sha256(raw).hexdigest())
-            quality = {slot: True for slot in CANONICAL_SLOTS}
+            quality = {slot: True for slot in LEGACY_CANONICAL_SLOTS}
             self.assertTrue(service.record_quality(self.auth(), case.capture_session_id,
                 request_id=uuid.uuid4(), results=quality)['advisory_only'])
             sealed = service.seal_capture(self.auth(), case.capture_session_id, request_id=uuid.uuid4())
@@ -139,7 +139,7 @@ class CaptureSessionIntegration(unittest.TestCase):
             self.assertIn(case.capture_session_id, {item['session_id'] for item in queue})
             details = service.get_review_details(self.reviewer_auth(), case.capture_session_id)
             self.assertEqual(details['manifest_digest'], sealed['manifest_digest'])
-            self.assertEqual(len(details['artifacts']), len(CANONICAL_SLOTS))
+            self.assertEqual(len(details['artifacts']), len(LEGACY_CANONICAL_SLOTS))
             first_artifact = next(iter(originals))
             self.assertEqual(service.retrieve_for_review(
                 self.reviewer_auth(), case.capture_session_id, first_artifact), originals[first_artifact])
@@ -284,10 +284,10 @@ class CaptureSessionIntegration(unittest.TestCase):
         with self.assertRaisesRegex(CaptureStorageUnavailable,'^CAPTURE_STORAGE_UNAVAILABLE$'):
             store.create(self.auth(),self.key)
 
-    def test_protocol_registry_keeps_16_default_pending_and_12_legacy_executable(self):
+    def test_protocol_registry_exposes_16_default_and_12_legacy_as_executable(self):
         default = resolve_capture_protocol(DEFAULT_CAPTURE_PROTOCOL)
         legacy = resolve_capture_protocol(LEGACY_CAPTURE_PROTOCOL)
-        self.assertEqual((default.status, default.slots), ("definition_pending", ()))
+        self.assertEqual((default.status, len(default.slots)), ("implemented", 16))
         self.assertEqual((legacy.status, len(legacy.slots)), ("implemented", 12))
 
     def test_claim_case_retry_cannot_change_protocol_version(self):
@@ -307,7 +307,7 @@ class CaptureSessionIntegration(unittest.TestCase):
             "SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s",
             (self.f.tenants[0], self.key)).fetchone()[0], DEFAULT_CAPTURE_PROTOCOL)
 
-    def test_default_16_protocol_cannot_accept_12_slot_evidence(self):
+    def test_default_16_protocol_rejects_legacy_12_slot_identifiers(self):
         claim = self.claim_cases.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()))
         with tempfile.TemporaryDirectory() as root:
             service = CaptureEvidenceService(self.store, OriginalByteStore(root), 'P'*43)
@@ -317,12 +317,12 @@ class CaptureSessionIntegration(unittest.TestCase):
                 request_id=uuid.uuid4(), vin='1HGCM82633A004352')
             readiness = service.evidence_readiness(self.auth(), claim.capture_session_id)
             self.assertEqual(readiness["capture_protocol_version"], DEFAULT_CAPTURE_PROTOCOL)
-            self.assertEqual(readiness["capture_protocol_status"], "definition_pending")
-            self.assertFalse(readiness["capture_allowed"])
+            self.assertEqual(readiness["capture_protocol_status"], "implemented")
+            self.assertTrue(readiness["capture_allowed"])
             raw = b"must-not-be-registered"
-            with self.assertRaisesRegex(CaptureSessionConflict, "CAPTURE_PROTOCOL_DEFINITION_PENDING"):
+            with self.assertRaisesRegex(ValueError, "INVALID_CAPTURE_SLOT"):
                 service.register_artifact(self.auth(), claim.capture_session_id,
-                    request_id=uuid.uuid4(), artifact_id=uuid.uuid4(), slot=CANONICAL_SLOTS[0],
+                    request_id=uuid.uuid4(), artifact_id=uuid.uuid4(), slot=LEGACY_CANONICAL_SLOTS[0],
                     payload_base64=base64.b64encode(raw).decode("ascii"),
                     sha256_hex=hashlib.sha256(raw).hexdigest())
 

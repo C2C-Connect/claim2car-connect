@@ -24,12 +24,13 @@ from typing import Callable, Optional
 from uuid import uuid4
 
 from app.domain_events import DomainEvent, canonical_event_payload
-from app.evidence_manifest import CANONICAL_SLOTS, load_shot_contract
+from app.evidence_manifest import LEGACY_CANONICAL_SLOTS
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
 from app.telemetry import workflow_span
 from app.vin_guard import validate_vin
 from contracts.m1_state_machine import M1SessionMachine
 
-REQUIRED_SLOTS = tuple(CANONICAL_SLOTS)
+REQUIRED_SLOTS = tuple(LEGACY_CANONICAL_SLOTS)  # legacy 12-v1 compatibility alias
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 DISCLOSURE_CONTRACT_PATH = Path(__file__).resolve().parents[1] / "contracts" / "disclosure-v1.json"
 DISCLOSURE_SCHEMA_VERSION = "0.1"
@@ -86,10 +87,13 @@ class CaptureWorkflow:
     quality gating, and idempotent sync semantics on top.
     """
 
-    def __init__(self, session_id: str, now: Optional[Callable[[], str]] = None, outbox=None):
+    def __init__(self, session_id: str, now: Optional[Callable[[], str]] = None, outbox=None, protocol_version: str = DEFAULT_CAPTURE_PROTOCOL):
         if not isinstance(session_id, str) or not session_id.strip():
             raise WorkflowError("INVALID_SESSION")
         self.session_id = session_id
+        self.protocol = require_implemented_protocol(protocol_version)
+        self.protocol_version = self.protocol.version
+        self.required_slots = self.protocol.slots
         self._now = now or (lambda: datetime.now(timezone.utc).isoformat())
         self.outbox = outbox  # optional app.outbox.OutboxStore; set via attach_outbox
         self.machine = M1SessionMachine(session_id)
@@ -100,7 +104,7 @@ class CaptureWorkflow:
         self._retakes: list[ArtifactEntry] = []
         self._synced: set[str] = set()
         self.uncertainties: list[UncertaintyRecord] = []
-        self._emit("SESSION_CREATED", "system", "capture session initialized", {"session_id": session_id})
+        self._emit("SESSION_CREATED", "system", "capture session initialized", {"session_id": session_id, "capture_protocol_version": self.protocol_version})
 
     # --- event plumbing -------------------------------------------------
 
@@ -210,7 +214,7 @@ class CaptureWorkflow:
         """Register (or idempotently re-sync) one original's integrity metadata."""
         if not isinstance(actor, str) or not actor.strip():
             raise WorkflowError("INVALID_ACTOR")
-        if slot not in REQUIRED_SLOTS:
+        if slot not in self.required_slots:
             raise WorkflowError("UNKNOWN_SLOT", slot)
         if not isinstance(artifact_id, str) or not artifact_id.strip():
             raise WorkflowError("INVALID_ARTIFACT_ID")
@@ -249,7 +253,7 @@ class CaptureWorkflow:
         return tuple(sorted(self._artifacts))
 
     def pending_slots(self):
-        return tuple(s for s in REQUIRED_SLOTS if s not in self._artifacts)
+        return tuple(s for s in self.required_slots if s not in self._artifacts)
 
     # --- quality -----------------------------------------------------------
 
@@ -258,7 +262,7 @@ class CaptureWorkflow:
             raise WorkflowError("INVALID_ACTOR")
         if self.pending_slots():
             raise WorkflowError("CAPTURE_SET_INCOMPLETE", ",".join(self.pending_slots()))
-        if type(verdicts) is not dict or set(verdicts) != set(REQUIRED_SLOTS):
+        if type(verdicts) is not dict or set(verdicts) != set(self.required_slots):
             raise WorkflowError("QUALITY_VERDICTS_INCOMPLETE", "one verdict per required slot")
         if not all(v is True or v is False for v in verdicts.values()):
             raise WorkflowError("INVALID_QUALITY_VERDICT")
@@ -269,7 +273,7 @@ class CaptureWorkflow:
         if failed:
             raise WorkflowError("QUALITY_GATE_FAILED", ",".join(failed))
         self._require_state("evidence_captured")
-        payload = {"verdicts": {s: True for s in REQUIRED_SLOTS}, "failed_slots": []}
+        payload = {"verdicts": {s: True for s in self.required_slots}, "failed_slots": []}
         if gate is not None:
             payload["gate"] = gate
         self._emit(
@@ -285,7 +289,7 @@ class CaptureWorkflow:
     def manifest_entries(self):
         if self.pending_slots():
             raise WorkflowError("CAPTURE_SET_INCOMPLETE")
-        return tuple(self._artifacts[s] for s in REQUIRED_SLOTS)
+        return tuple(self._artifacts[s] for s in self.required_slots)
 
 
 class LocalDraftStore:
@@ -296,11 +300,19 @@ class LocalDraftStore:
     constructing a second store over the same storage.
     """
 
-    def __init__(self, storage):
+    def __init__(self, storage, protocol_version: str = DEFAULT_CAPTURE_PROTOCOL):
         self.storage = storage
+        self.protocol = require_implemented_protocol(protocol_version)
+        self.protocol_version = self.protocol.version
 
     def _load(self):
-        return self.storage.get("draft", {"revision": 0, "entries": {}, "synced": []})
+        data = self.storage.get("draft", {"revision": 0, "entries": {}, "synced": []})
+        stored_version = data.get("capture_protocol_version")
+        if stored_version is None:
+            stored_version = LEGACY_CAPTURE_PROTOCOL if data.get("entries") else self.protocol_version
+        if stored_version != self.protocol_version:
+            raise WorkflowError("CAPTURE_PROTOCOL_VERSION_MISMATCH")
+        return data
 
     def _save(self, data):
         self.storage["draft"] = data
@@ -308,7 +320,7 @@ class LocalDraftStore:
     def save_artifact(self, session_id: str, slot: str, artifact_id: str, sha256_hex: str, byte_length: int) -> int:
         if not isinstance(session_id, str) or not session_id.strip():
             raise WorkflowError("INVALID_SESSION")
-        if slot not in REQUIRED_SLOTS:
+        if slot not in self.protocol.slots:
             raise WorkflowError("UNKNOWN_SLOT", slot)
         data = self._load()
         entries = data["entries"]
@@ -323,6 +335,7 @@ class LocalDraftStore:
         }
         data["revision"] += 1
         data["session_id"] = session_id
+        data["capture_protocol_version"] = self.protocol_version
         self._save(data)
         return data["revision"]
 
@@ -353,6 +366,7 @@ class LocalDraftStore:
         data = self._load()
         return {
             "session_id": data.get("session_id"),
+            "capture_protocol_version": data.get("capture_protocol_version", self.protocol_version),
             "revision": data["revision"],
             "captured_slots": sorted(data["entries"]),
             "pending_sync_count": len(self.pending_sync()),
@@ -369,6 +383,8 @@ def sync_draft_to_server(workflow: CaptureWorkflow, draft: LocalDraftStore, acto
     if not isinstance(workflow, CaptureWorkflow) or not isinstance(draft, LocalDraftStore):
         raise WorkflowError("INVALID_SYNC_TARGET")
     results = []
+    if workflow.protocol_version != draft.protocol_version:
+        raise WorkflowError("CAPTURE_PROTOCOL_VERSION_MISMATCH")
     with workflow_span("capture.sync", session_id=workflow.session_id):
         for entry in draft.pending_sync():
             outcome = workflow.register_artifact(

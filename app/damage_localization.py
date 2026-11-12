@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 MODEL_VERSION = "damage-localization-v1"
 ANNOTATION_VERSION = "damage-annotation-v1"
@@ -75,6 +76,7 @@ class DamageRegion:
     damage_class: str
     confidence: float
     model_version: str = MODEL_VERSION
+    protocol_version: str = LEGACY_CAPTURE_PROTOCOL
 
     def __post_init__(self):
         if not isinstance(self.slot, str) or not self.slot.strip():
@@ -126,8 +128,28 @@ def iou(a: DamageRegion, b: DamageRegion) -> float:
     return inter / (a.area_fraction + b.area_fraction - inter)
 
 
-def zone_for_slot(slot: str) -> str | None:
-    """Exterior slots map to physics zones; OCR/interior slots do not."""
+def zone_for_slot(slot: str, protocol_version: str = LEGACY_CAPTURE_PROTOCOL) -> str | None:
+    """Map only the eight 16-v1 exterior views to crush zones.
+
+    Wheel, cabin, odometer, VIN and identity-document slots are deliberately
+    excluded from crush physics. Legacy 12-v1 mappings remain available for
+    historical callers and are never reinterpreted as 16-v1.
+    """
+    protocol = require_implemented_protocol(protocol_version)
+    if slot not in protocol.slots:
+        return None
+    if protocol_version == DEFAULT_CAPTURE_PROTOCOL:
+        exterior = {
+            "00_front_exterior": "front",
+            "01_front_right_exterior": "front",
+            "02_right_side_exterior": "side",
+            "03_rear_right_exterior": "rear",
+            "04_rear_exterior": "rear",
+            "05_rear_left_exterior": "rear",
+            "06_left_side_exterior": "side",
+            "07_front_left_exterior": "front",
+        }
+        return exterior.get(slot)
     lowered = slot.lower()
     for prefix, zone in ZONE_BY_SLOT_PREFIX:
         if lowered == prefix or lowered.startswith(prefix):
@@ -145,6 +167,7 @@ class ImpactGeometry:
     depth_cm: float             # provisional estimate pending calibration
     material: str = BASE_MATERIAL
     model_version: str = MODEL_VERSION
+    protocol_version: str = LEGACY_CAPTURE_PROTOCOL
 
     def to_zone_input(self):
         """Backend physics seam: builds the engine's ZoneInput if importable."""
@@ -160,7 +183,7 @@ class PhysicsInputAdapter:
     """DamageRegion on an exterior slot → ImpactGeometry. Refuses the rest."""
 
     def to_impact_geometry(self, region: DamageRegion) -> ImpactGeometry:
-        zone = zone_for_slot(region.slot)
+        zone = zone_for_slot(region.slot, region.protocol_version)
         if zone is None:
             raise DamageLocalizationError("NOT_AN_EXTERIOR_SLOT",
                                           f"{region.slot} does not map to an impact zone")
@@ -173,7 +196,7 @@ class PhysicsInputAdapter:
             tier, depth = "structural", STRUCTURAL_DEPTH_CM
         return ImpactGeometry(
             slot=region.slot, zone=zone, area_fraction=round(area, 6),
-            severity_tier=tier, depth_cm=depth,
+            severity_tier=tier, depth_cm=depth, protocol_version=region.protocol_version,
         )
 
 
@@ -188,7 +211,7 @@ class HeuristicDamageDetector:
     model_version = MODEL_VERSION + "/heuristic-baseline"
     contrast_threshold = 60.0  # pixel deviation from neighborhood mean
 
-    def detect(self, slot: str, pixels, cell: int = 6) -> tuple[DamageRegion, ...]:
+    def detect(self, slot: str, pixels, cell: int = 6, protocol_version: str = LEGACY_CAPTURE_PROTOCOL) -> tuple[DamageRegion, ...]:
         if not isinstance(pixels, (list, tuple)) or not pixels or not pixels[0]:
             raise DamageLocalizationError("INVALID_PIXELS")
         height, width = len(pixels), len(pixels[0])
@@ -212,6 +235,7 @@ class HeuristicDamageDetector:
             x1=round(min(x1, 1.0), 4), y1=round(min(y1, 1.0), 4),
             damage_class="dent", confidence=round(min(len(flagged) / 16.0, 1.0), 4),
             model_version=self.model_version,
+            protocol_version=protocol_version,
         ),)
 
 

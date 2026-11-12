@@ -2,7 +2,7 @@
 // with an injected localStorage-shaped storage; no images, no network, no
 // vehicle decoding. Mirrors backend capture_workflow semantics.
 import assert from 'node:assert/strict';
-import { createGuidedCapture, resumeGuidedCapture, DISCLOSURE_VERSION, WORKFLOW_STORAGE_KEY } from '../src/modules/capture/guided_workflow.mjs';
+import { createGuidedCapture, resumeGuidedCapture, DISCLOSURE_VERSION, WORKFLOW_STORAGE_KEY, DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, CAPTURE_PROTOCOL_SLOTS } from '../src/modules/capture/guided_workflow.mjs';
 import { validateVin } from '../src/modules/capture/vin.mjs';
 
 const SHOT_LIST = ['vin_ocr','doc_ocr','front','front_left','driver_side','rear_left','rear','rear_right','passenger_side','front_right','interior_front','undercarriage_engine'];
@@ -167,6 +167,28 @@ test('revision_monotonic_across_captures', () => {
 
 test('storage_key_is_stable', () => {
   assert.equal(WORKFLOW_STORAGE_KEY, 'c2c.guided-capture.v1');
+});
+
+
+test('new_guided_capture_defaults_to_owner_approved_16_v1', () => {
+  const c = createGuidedCapture({ storage: makeStorage(), sessionId: 'new-default-session' });
+  assert.equal(c.snapshot().captureProtocolVersion, DEFAULT_CAPTURE_PROTOCOL);
+  assert.equal(c.pendingSlots().length, 16);
+  assert.deepEqual(c.pendingSlots(), [...CAPTURE_PROTOCOL_SLOTS[DEFAULT_CAPTURE_PROTOCOL]]);
+});
+
+test('explicit_legacy_12_v1_preserves_historical_slot_contract', () => {
+  const c = createGuidedCapture({ storage: makeStorage(), sessionId: 'legacy-session', protocolVersion: LEGACY_CAPTURE_PROTOCOL });
+  assert.equal(c.snapshot().captureProtocolVersion, LEGACY_CAPTURE_PROTOCOL);
+  assert.equal(c.pendingSlots().length, 12);
+  assert.deepEqual(c.pendingSlots(), SHOT_LIST);
+});
+
+test('explicit_protocol_rejects_mismatched_slot_list', () => {
+  assert.throws(() => createGuidedCapture({
+    shotList: SHOT_LIST, protocolVersion: DEFAULT_CAPTURE_PROTOCOL,
+    storage: makeStorage(), sessionId: 'mismatched-session'
+  }), /INVALID_SHOT_LIST/);
 });
 
 const failures = records.filter(r => r.outcome !== 'passed').length;

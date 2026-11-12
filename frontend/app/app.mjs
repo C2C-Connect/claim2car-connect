@@ -120,7 +120,7 @@ function renderCaptureSlots(){
     const row=document.createElement("div");row.className="quality-item";
     const name=document.createElement("span");name.textContent=label;
     const select=document.createElement("select");select.dataset.slot=slot;
-    select.innerHTML='<option value="">Not checked</option><option value="usable">Usable</option><option value="retake">Needs retake</option>';
+    for(const [value,text] of [["","Not checked"],["usable","Usable"],["retake","Needs retake"]]){const option=document.createElement("option");option.value=value;option.textContent=text;select.append(option);}
     select.addEventListener("change",updateSealButton);row.append(name,select);quality.append(row);
   });
   updateSealButton();
@@ -176,7 +176,7 @@ function renderReviewCase(item){
   });
   const form=document.createElement("form");form.className="review-form";
   const dispositionLabel=document.createElement("label");dispositionLabel.textContent="Human disposition";
-  const disposition=document.createElement("select");disposition.innerHTML='<option value="NOTE_ONLY">Note only</option><option value="HUMAN_QC_REQUIRED">Human QC required</option>';
+  const disposition=document.createElement("select");for(const [value,text] of [["NOTE_ONLY","Note only"],["HUMAN_QC_REQUIRED","Human QC required"]]){const option=document.createElement("option");option.value=value;option.textContent=text;disposition.append(option);}
   const reasonLabel=document.createElement("label");reasonLabel.textContent="Review rationale";
   const reason=document.createElement("textarea");reason.required=true;reason.maxLength=1000;reason.placeholder="Record the evidence-based reason for this disposition.";
   const submit=document.createElement("button");submit.type="submit";submit.className="button primary";submit.textContent="Record human review";

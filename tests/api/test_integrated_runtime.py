@@ -132,9 +132,8 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 review_details = client.get(f"/api/v1/review-sessions/{SESSION_ID}")
                 assert review_details.status_code == 401
 
-                # The protocol registry is authenticated and distinguishes
-                # the approved 16-v1 default from the executable 12-v1
-                # alternative without inventing the pending 16 slots.
+                # The authenticated registry exposes the owner-approved
+                # executable 16-v1 default and historical 12-v1 alternative.
                 registry_denied = client.get("/api/v1/capture-protocols")
                 assert registry_denied.status_code == 401
                 registry = client.get(
@@ -144,15 +143,16 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert registry.status_code == 200
                 assert registry.json()["default_protocol_version"] == "claims2car-16-v1"
                 by_version = {item["version"]: item for item in registry.json()["protocols"]}
-                assert by_version["claims2car-16-v1"]["status"] == "definition_pending"
-                assert by_version["claims2car-16-v1"]["required_slots"] == []
-                assert by_version["claims2car-16-v1"]["capture_enabled"] is False
+                assert by_version["claims2car-16-v1"]["status"] == "implemented"
+                assert by_version["claims2car-16-v1"]["capture_enabled"] is True
+                assert len(by_version["claims2car-16-v1"]["required_slots"]) == 16
+                assert by_version["claims2car-16-v1"]["required_slots"][0] == "00_front_exterior"
+                assert by_version["claims2car-16-v1"]["required_slots"][-1] == "15_license_and_insurance_docs"
                 assert by_version["claims2car-12-v1"]["status"] == "implemented"
                 assert len(by_version["claims2car-12-v1"]["required_slots"]) == 12
-                ui_slots_match = re.search(r"const SLOTS = \[(.*?)\];", workbench_script.text, re.S)
-                assert ui_slots_match is not None
-                ui_slots = re.findall(r'\["([^"]+)"', ui_slots_match.group(1))
-                assert ui_slots == by_version["claims2car-12-v1"]["required_slots"]
+                assert "PROTOCOL_SLOTS[protocol.version]" in workbench_script.text
+                assert "SLOTS = PROTOCOL_SLOTS[protocolVersion]" in workbench_script.text
+                assert "buildSlots()" in workbench_script.text
                 # Identity discovery is authenticated and returns only the
                 # server-resolved actor/tenant/role, never client assertions.
                 identity_denied = client.get("/api/v1/identity")

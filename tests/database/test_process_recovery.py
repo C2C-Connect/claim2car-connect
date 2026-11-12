@@ -59,10 +59,10 @@ class PersistedEvidenceRecovery(unittest.TestCase):
         self.session = 'evidence-recovery-' + uuid.uuid4().hex
         self.events = []
         self.data = {}
-        self.add_event('SESSION_CREATED', {'synthetic': True})
+        version, slots = load_shot_contract()
+        self.add_event('SESSION_CREATED', {'synthetic': True, 'shot_list_version': version})
         self.add_event('CONSENT_RECORDED', {'disclosure_version': 'synthetic-v1', 'evidence_scope': True})
         self.add_event('VEHICLE_RECORDED', {'status': 'AVAILABLE', 'reference': 'synthetic-vehicle', 'unavailable_reason': None})
-        version, slots = load_shot_contract()
         for slot in slots:
             data = ('SYNTHETIC-NOT-A-PHOTO-' + slot).encode()
             self.data[slot] = data

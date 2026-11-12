@@ -28,7 +28,8 @@ from app.capture_workflow import (
     sha256_hex_of,
     sync_draft_to_server,
 )
-from app.evidence_manifest import CANONICAL_SLOTS
+from app.evidence_manifest import LEGACY_CANONICAL_SLOTS as CANONICAL_SLOTS
+from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL
 from app.vin_guard import VIN_WEIGHTS, validate_vin
 
 pytestmark = pytest.mark.subtests
@@ -115,14 +116,14 @@ def test_disclosure_contract_loads():
 
 
 def test_consent_requires_disclosure_presentation():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     with pytest.raises(WorkflowError) as e:
         w.record_consent("driver-1", True, "disclosure-v1")
     assert err_code(e) == "DISCLOSURE_NOT_PRESENTED"
 
 
 def test_consent_rejects_wrong_disclosure_version():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     w.present_disclosure("disclosure-v1")
     with pytest.raises(WorkflowError) as e:
         w.record_consent("driver-1", True, "disclosure-stale")
@@ -130,7 +131,7 @@ def test_consent_rejects_wrong_disclosure_version():
 
 
 def test_consent_rejects_implicit_acceptance():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     w.present_disclosure("disclosure-v1")
     for accepted in (False, None, "yes", 1):
         with pytest.raises(WorkflowError) as e:
@@ -139,7 +140,7 @@ def test_consent_rejects_implicit_acceptance():
 
 
 def test_presentation_rejects_stale_version():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     with pytest.raises(WorkflowError) as e:
         w.present_disclosure("disclosure-2024")
     assert err_code(e) == "DISCLOSURE_VERSION_MISMATCH"
@@ -149,7 +150,7 @@ def test_presentation_rejects_stale_version():
 # --- VIN uncertainty handling --------------------------------------------------
 
 def test_uncertain_vin_recorded_and_recapture_required():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     w.present_disclosure("disclosure-v1")
     w.record_consent("driver-1", True, "disclosure-v1")
     with pytest.raises(WorkflowError) as e:
@@ -160,7 +161,7 @@ def test_uncertain_vin_recorded_and_recapture_required():
 
 
 def test_vin_correction_allowed_with_traceability():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     w.present_disclosure("disclosure-v1")
     w.record_consent("driver-1", True, "disclosure-v1")
     w.record_vehicle("driver-1", " " + VALID_VIN.lower() + " ")
@@ -174,7 +175,7 @@ def test_vin_correction_allowed_with_traceability():
 
 
 def test_vehicle_requires_consent_first():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     w.present_disclosure("disclosure-v1")
     with pytest.raises(WorkflowError) as e:
         w.record_vehicle("driver-1", VALID_VIN)
@@ -184,7 +185,7 @@ def test_vehicle_requires_consent_first():
 # --- guided capture ------------------------------------------------------------
 
 def make_started_workflow():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     w.present_disclosure("disclosure-v1")
     w.record_consent("driver-1", True, "disclosure-v1")
     w.record_vehicle("driver-1", VALID_VIN)
@@ -213,7 +214,7 @@ def test_capture_invalid_digest_and_length_rejected():
 
 
 def test_capture_requires_vehicle_identified():
-    w = CaptureWorkflow(str(uuid4()))
+    w = CaptureWorkflow(str(uuid4()), protocol_version=LEGACY_CAPTURE_PROTOCOL)
     w.present_disclosure("disclosure-v1")
     w.record_consent("driver-1", True, "disclosure-v1")
     with pytest.raises(WorkflowError) as e:
@@ -289,12 +290,12 @@ def test_quality_pass_reaches_quality_verified():
 
 def test_local_draft_survives_restart_and_resumes():
     storage = {}
-    draft = LocalDraftStore(storage)
+    draft = LocalDraftStore(storage, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     draft.save_artifact("s1", *artifact(1, "vin_ocr"))
     draft.save_artifact("s1", *artifact(2, "front"))
     assert draft.revision() == 2
     # Simulated app restart: a new store over the same persisted state.
-    resumed = LocalDraftStore(storage)
+    resumed = LocalDraftStore(storage, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     snapshot = resumed.resume()
     assert snapshot["revision"] == 2
     assert snapshot["captured_slots"] == ["front", "vin_ocr"]
@@ -304,7 +305,7 @@ def test_local_draft_survives_restart_and_resumes():
 
 def test_local_retake_replaces_pending_entry():
     storage = {}
-    draft = LocalDraftStore(storage)
+    draft = LocalDraftStore(storage, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     draft.save_artifact("s1", *artifact(1, "front"))
     draft.save_artifact("s1", *artifact(2, "front"))  # local retake
     assert draft.revision() == 2
@@ -315,7 +316,7 @@ def test_local_retake_replaces_pending_entry():
 def test_sync_idempotent_retry_no_duplicate():
     w = make_started_workflow()
     storage = {}
-    draft = LocalDraftStore(storage)
+    draft = LocalDraftStore(storage, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     draft.save_artifact(w.session_id, *artifact(1, "front"))
     first = sync_draft_to_server(w, draft, "driver-1")
     assert first["synced"][0]["status"] == "registered"
@@ -331,7 +332,7 @@ def test_sync_idempotent_retry_no_duplicate():
 def test_sync_retake_allowed_before_quality_rejected_after():
     w = make_started_workflow()
     storage = {}
-    draft = LocalDraftStore(storage)
+    draft = LocalDraftStore(storage, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     draft.save_artifact(w.session_id, *artifact(1, "front"))
     sync_draft_to_server(w, draft, "driver-1")
     # A local retake for a synced slot syncs fine while quality is open.
@@ -350,7 +351,7 @@ def test_sync_retake_allowed_before_quality_rejected_after():
 
 def test_synthetic_incident_capture_to_sync_end_to_end():
     session_id = str(uuid4())
-    w = CaptureWorkflow(session_id)
+    w = CaptureWorkflow(session_id, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     assert w.state == "initialized"
 
     # Disclosure gate then explicit consent.
@@ -368,14 +369,14 @@ def test_synthetic_incident_capture_to_sync_end_to_end():
 
     # Guided capture happens locally, with a crash mid-capture.
     storage = {}
-    draft = LocalDraftStore(storage)
+    draft = LocalDraftStore(storage, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     for i, slot in enumerate(CANONICAL_SLOTS[:6], start=1):
         draft.save_artifact(session_id, *artifact(i, slot))
     crashed_pending = draft.pending_sync()
     assert len(crashed_pending) == 6
 
     # App restart: draft recovered, capture resumes from remaining slots.
-    draft = LocalDraftStore(storage)
+    draft = LocalDraftStore(storage, protocol_version=LEGACY_CAPTURE_PROTOCOL)
     snapshot = draft.resume()
     assert snapshot["revision"] == 6 and snapshot["pending_sync_count"] == 6
     for i, slot in enumerate(CANONICAL_SLOTS[6:], start=7):

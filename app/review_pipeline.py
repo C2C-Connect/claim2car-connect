@@ -114,6 +114,7 @@ class SealService:
         return build_manifest(
             workflow.session_id,
             tuple(ManifestEntry(e.artifact_id, e.slot, e.sha256_hex) for e in entries),
+            protocol_version=workflow.protocol_version,
         )
 
 

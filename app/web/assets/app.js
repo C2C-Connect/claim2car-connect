@@ -1,13 +1,6 @@
 import { createIndexedDbEvidenceStore, createOfflineEvidenceQueue } from "./offline_evidence_queue.mjs";
-// Keep this list byte-for-byte aligned with app/evidence_manifest.py and
-// contracts/shot-list.json (claims2car-12-v1).
-const SLOTS = [
-  ["vin_ocr","VIN plate"],["doc_ocr","Registration / document"],["front","Front"],
-  ["front_left","Front left"],["driver_side","Driver side"],["rear_left","Rear left"],
-  ["rear","Rear"],["rear_right","Rear right"],["passenger_side","Passenger side"],
-  ["front_right","Front right"],["interior_front","Front interior"],
-  ["undercarriage_engine","Undercarriage / engine"]
-];
+let SLOTS = [];
+let PROTOCOL_SLOTS = {};
 let token = null;
 let identity = null;
 let activeSession = null;
@@ -38,21 +31,23 @@ function message(id, text, bad = false) {
   $(id).className = bad ? "message error" : "message";
 }
 function applyProtocolCaptureState() {
-  const enabled = Boolean(activeSession) && activeProtocolVersion === "claims2car-12-v1";
+  const enabled = Boolean(activeSession) && Array.isArray(PROTOCOL_SLOTS[activeProtocolVersion]) && PROTOCOL_SLOTS[activeProtocolVersion].length > 0;
   for (const input of $("capture-slots").querySelectorAll('input[type="file"], .quality-check input')) input.disabled = !enabled;
   $("record-quality").disabled = !enabled;
   $("seal-case").disabled = !enabled;
   if (!enabled) {
-    for (const status of $("capture-slots").querySelectorAll(".slot-status")) status.textContent = "Capture disabled · 16-v1 slot contract pending approval";
+    for (const status of $("capture-slots").querySelectorAll(".slot-status")) status.textContent = "Capture protocol unavailable";
     $("sync-pending-evidence").disabled = true;
-    $("sync-pending-evidence").textContent = "16-v1 capture contract pending";
+    $("sync-pending-evidence").textContent = "Capture protocol unavailable";
   }
 }
 function setCase(id, protocolVersion = activeProtocolVersion) {
   activeSession = id;
   activeProtocolVersion = protocolVersion;
+  SLOTS = PROTOCOL_SLOTS[protocolVersion] || [];
   activeReadiness = null;
-  applyProtocolCaptureState();
+  buildSlots();
+    applyProtocolCaptureState();
   $("session-id").value = id;
   $("owner-session-id").value = id;
   void restoreEvidenceQueue(id);
@@ -87,11 +82,13 @@ async function loadCaptureProtocols() {
   for (const protocol of registry.protocols) {
     const option = document.createElement("option");
     option.value = protocol.version;
-    option.textContent = protocol.version + (protocol.capture_enabled ? " · capture enabled" : " · slot definition pending");
+    option.textContent = protocol.version + (protocol.capture_enabled ? " · " + protocol.required_slots.length + " slots" : " · unavailable");
+    PROTOCOL_SLOTS[protocol.version] = protocol.required_slots.map(slot => [slot, protocol.slot_descriptions?.[slot] || slot.replaceAll("_", " ")]);
     select.append(option);
   }
   select.value = registry.default_protocol_version;
-  $("capture-protocol-help").textContent = "16-v1 is the default. Its exact slot contract is being finalized; evidence capture remains disabled until approved. Select 12-v1 to use the currently implemented legacy contract.";
+  SLOTS = PROTOCOL_SLOTS[registry.default_protocol_version] || [];
+  $("capture-protocol-help").textContent = "New sessions default to the owner-approved 16-slot protocol. Historical 12-v1 sessions retain their original slot contract and remain selectable for new sessions.";
 }
 function disconnect() {
   token = null; identity = null; activeSession = null; activeReadiness = null;
@@ -118,9 +115,7 @@ async function createClaimCase() {
       : "Existing claim record confirmed: " + result.claim_id;
     if (result.capture_session_id) {
       setCase(result.capture_session_id,result.capture_protocol_version);
-      message("operator-message",result.capture_protocol_version === "claims2car-16-v1"
-        ? "Persistent claim session created with the 16-v1 default. Its slot contract is pending approval; choose 12-v1 for the currently implemented capture workflow."
-        : "Persistent claim capture session is ready. Owner consent is required before VIN or evidence entry.");
+      message("operator-message","Persistent claim session created with " + result.capture_protocol_version + ". Owner consent is required before VIN or evidence entry.");
     }
     pendingClaimCase = null;
     await refreshClaimCases();
@@ -167,9 +162,7 @@ async function createCase() {
     const result = await api("/api/v1/capture-sessions", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:id,capture_protocol_version:$("capture-protocol-version").value})});
     setCase(id,result.capture_protocol_version);
     $("case-created").textContent = result.created ? "Case created · " + result.capture_protocol_version : "Existing case resumed · " + result.capture_protocol_version;
-    message("operator-message", result.capture_protocol_version === "claims2car-16-v1"
-      ? "Case created with the 16-v1 default. Capture controls remain locked until its exact slot contract is approved; select 12-v1 for the implemented legacy workflow."
-      : "Case ready. Owner consent must be recorded with the provisioned owner actor credential; this workspace does not provide end-user login.");
+    message("operator-message","Case ready with " + result.capture_protocol_version + ". Owner consent must be recorded with the provisioned owner actor credential; this workspace does not provide end-user login.");
     await refreshOwnedSessions();
   } catch (error) { message("operator-message", error.message, true); }
 }
@@ -337,9 +330,9 @@ async function refreshCaptureQueueStatus(sessionId) {
   $("sync-pending-evidence").textContent = state.pending
     ? `Sync pending originals (${state.pending})`
     : "All originals synced";
-  if (activeProtocolVersion !== "claims2car-12-v1") {
+  if (!SLOTS.length) {
     $("sync-pending-evidence").disabled = true;
-    $("sync-pending-evidence").textContent = "16-v1 capture contract pending";
+    $("sync-pending-evidence").textContent = "Capture protocol unavailable";
   }
 }
 async function refreshEvidenceReadiness(sessionId) {
@@ -357,8 +350,8 @@ async function syncPendingUploads(sessionId) {
   if (!evidenceQueue) throw evidenceQueueError || new Error("LOCAL_EVIDENCE_QUEUE_UNAVAILABLE");
   const readiness = await refreshEvidenceReadiness(sessionId);
   if (readiness.capture_protocol_status !== "implemented") {
-    message("operator-message","Capture protocol " + readiness.capture_protocol_version + " is registered as the default, but its slot definition is not yet approved. Select claims2car-12-v1 for the implemented legacy capture contract.",true);
-    return {uploaded:0,blockedAtQueueId:null,error:"CAPTURE_PROTOCOL_DEFINITION_PENDING"};
+    message("operator-message","Capture protocol " + readiness.capture_protocol_version + " is not available for evidence capture.",true);
+    return {uploaded:0,blockedAtQueueId:null,error:"CAPTURE_PROTOCOL_UNAVAILABLE"};
   }
   if (!readiness.consent_active) {
     const deleted = await evidenceQueue.deleteSession(sessionId,{tenantId:identity.tenant_id});
@@ -423,7 +416,7 @@ async function upload(slot, file, status) {
     let readiness = activeReadiness?.session_id === id ? activeReadiness : null;
     if (navigator.onLine) readiness = await refreshEvidenceReadiness(id);
     if (readiness?.capture_protocol_status !== "implemented") {
-      throw new Error("CAPTURE_PROTOCOL_DEFINITION_PENDING: select claims2car-12-v1 or wait for the approved 16-v1 slot contract.");
+      throw new Error("CAPTURE_PROTOCOL_UNAVAILABLE: the session protocol has no executable slot contract.");
     }
     if (!readiness?.capture_allowed) {
       throw new Error("OWNER_CONSENT_AND_VALID_VEHICLE_REFERENCE_REQUIRED_BEFORE_LOCAL_CAPTURE");
@@ -439,6 +432,7 @@ async function upload(slot, file, status) {
 }
 function buildSlots() {
   const root = $("capture-slots");
+  root.replaceChildren();
   for (const [slot,label] of SLOTS) {
     const row = document.createElement("div"); row.className = "slot";
     const title = document.createElement("label"); title.textContent = label;
@@ -454,7 +448,7 @@ function buildSlots() {
 }
 async function recordQuality() {
   const id = $("session-id").value.trim();
-  if (activeProtocolVersion !== "claims2car-12-v1") return message("operator-message","The 16-v1 slot contract is pending; quality recording is enabled only for an explicitly selected 12-v1 session.",true);
+  if (!SLOTS.length) return message("operator-message","The selected capture protocol has no executable slot contract.",true);
   const uploaded = [...$("capture-slots").querySelectorAll(".slot")];
   if (uploaded.length !== SLOTS.length || uploaded.some(row => row.querySelector("span").dataset.uploaded !== "true")) {
     return message("operator-message","Upload an original image for every required capture slot before recording quality.",true);
@@ -472,7 +466,7 @@ async function recordQuality() {
 }
 async function sealCase() {
   const id = $("session-id").value.trim();
-  if (activeProtocolVersion !== "claims2car-12-v1") return message("operator-message","The 16-v1 slot contract is pending; manifest sealing is enabled only for an explicitly selected 12-v1 session.",true);
+  if (!SLOTS.length) return message("operator-message","The selected capture protocol has no executable slot contract.",true);
   try {
     const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/seal`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid()})

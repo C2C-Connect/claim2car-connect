@@ -57,15 +57,19 @@ class CaptureRouteTests(unittest.TestCase):
         self.claim_store.list_owned.assert_called_once_with('Bearer '+self.token,limit=25)
         self.claim_store.get.assert_called_once_with('Bearer '+self.token,claim_id=record.claim_id)
 
-    def test_protocol_registry_is_authenticated_and_marks_16_default_pending(self):
+    def test_protocol_registry_is_authenticated_and_exposes_both_executable_versions(self):
         with self.client() as client:
             registry = client.get('/v1/capture-protocols',headers=self.headers)
             unauthorized = client.get('/v1/capture-protocols')
         self.assertEqual(registry.status_code,200)
         self.assertEqual(registry.json()['default_protocol_version'],DEFAULT_CAPTURE_PROTOCOL)
         by_version = {item['version']:item for item in registry.json()['protocols']}
-        self.assertEqual(by_version['claims2car-16-v1']['status'],'definition_pending')
-        self.assertFalse(by_version['claims2car-16-v1']['capture_enabled'])
+        self.assertEqual(by_version['claims2car-16-v1']['status'],'implemented')
+        self.assertTrue(by_version['claims2car-16-v1']['capture_enabled'])
+        self.assertEqual(len(by_version['claims2car-16-v1']['required_slots']),16)
+        self.assertEqual(by_version['claims2car-16-v1']['required_slots'][0],'00_front_exterior')
+        self.assertEqual(by_version['claims2car-16-v1']['required_slots'][-1],'15_license_and_insurance_docs')
+        self.assertEqual(len(by_version['claims2car-16-v1']['slot_descriptions']),16)
         self.assertEqual(by_version['claims2car-12-v1']['status'],'implemented')
         self.assertTrue(by_version['claims2car-12-v1']['capture_enabled'])
         self.assertEqual(len(by_version['claims2car-12-v1']['required_slots']),12)

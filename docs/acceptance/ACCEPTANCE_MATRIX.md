@@ -1,57 +1,51 @@
 # Claim2Car Connect — Acceptance & Release Gate Matrix
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
-**Candidate branch:** `cto/spec-production-implementation` (PR #29)  
-**Latest code-bearing verification candidate:** `b537ec8d96eb74e9c1d54d5f1b52dd76423acb5f` (2026-11-10)  
+**Canonical main baseline:** `3aa87f9d1523a68a1df09c6930ab57efbd182ba4`  
+**Current implementation candidate:** PR #41, `feat/capture-protocol-16-v1`  
+**Current PR head inspected:** `6463a1087c14b89254221060218f50dd994eac7c` (2026-11-12)  
 **Machine contract:** `m1-v1`  
-**Status rule:** code, CI, field validation, review, and release authorization are recorded separately. A passing synthetic test does not establish product acceptance or production readiness. The candidate revision is not merged and has no submitted independent review.
+**Status rule:** code, CI, field validation, review, and release authorization are recorded separately. A passing synthetic test does not establish product acceptance or production readiness.
 
-## Current verification snapshot — 2026-11-10
+## Current verification snapshot — 2026-11-12
 
-**Branch head at verification:** `b537ec8d96eb74e9c1d54d5f1b52dd76423acb5f`  
-**Main base:** `21bcd4e677d71cb985e83815d5b70b8d3504f471`  
-**Divergence:** 223 commits ahead, 0 behind.  
-**PR #29:** open and Draft; unmerged.  
-**GitHub PR test merge candidate:** `3313f3b30d094ff5aeb4168998ddfedeb62f9515`.
+**Main:** remains at the owner-approved canonical baseline `3aa87f9d1523a68a1df09c6930ab57efbd182ba4`.  
+**PR #41:** open, not merged; base `main`; head `6463a1087c14b89254221060218f50dd994eac7c`.  
+**PR #28:** closed unmerged.  
+**Capture protocol:** PR #41 implements `claims2car-16-v1` as the new-session default and retains explicit `claims2car-12-v1` compatibility.
 
 ### Current-head CI evidence
 
-All 13 workflow runs associated with the candidate completed successfully:
+The 13 PR-triggered workflow runs associated with the inspected PR #41 head are all completed: **10 successful, 3 failed**. This is not a green candidate.
 
-- Full repository suite: **713 passed, 200 subtests passed, 23 warnings** — [run 42912960647](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960647).
-- Database authority/cutover: [run 42912961234](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912961234). Its counted database suite discovered and executed **281 tests, 0 failures, 0 errors, 0 skipped**. The authenticated HTTP test `test_authenticated_http_capture_survives_runtime_restart_and_fails_closed` passed. The synthetic HTTP journey covers claim creation, owner consent, VIN reference, all currently canonical 12 slots, quality attestations, manifest sealing, cross-tenant reviewer denial, runtime/service-object restart, independent reviewer retrieval, original-byte readback, tamper rejection, and consent withdrawal/deletion.
-- Integrated runtime container build/smoke: [run 42912960932](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960932) — passed. This now runs on pull requests. It verifies the integrated image, exact build revision, non-root UID, evidence-volume ownership/writeability, shell availability, and internal service-auth boundaries; it is not a persistent cloud deployment or full database-backed container journey.
-- Chromium/Playwright IndexedDB browser test: [run 42912960788](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960788) — passed with synthetic bytes and a mocked upload callback.
-- Offline guided-capture checks: [run 42912960961](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960961) — passed.
-- Legacy database component checks: [run 42912960755](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960755) — passed.
-- Controlled-test intake PostgreSQL: [run 42912960879](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960879) — passed.
-- FastAPI foundation: [run 42912960632](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960632) — passed.
-- Frontend VIN/decoder/transport: [run 42912961155](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912961155) — passed.
-- Controlled synthetic demonstration: [run 42912960996](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960996) — passed.
-- Offline VIN lookup: [run 42912960896](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960896) — passed.
-- Restricted intake container: [run 42912960800](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912960800) — passed.
-- Restricted Railway staging verification: [run 42912961132](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42912961132) — synthetic containment smoke passed; the deploy job was **skipped**.
+Failed runs:
+- Full test suite: [run 43087879584](https://github.com/C2C-Connect/claim2car-connect/actions/runs/43087879584) — **48 failed, 711 passed, 195 subtests passed**.
+- Legacy database component verification: [run 43087879179](https://github.com/C2C-Connect/claim2car-connect/actions/runs/43087879179) — failed with 5 assertion failures and 42 errors.
+- Database authority cutover verification: [run 43087879106](https://github.com/C2C-Connect/claim2car-connect/actions/runs/43087879106) — failed during pre-cutover components; post-cutover diagnostics did not execute.
+
+Principal failure signatures from the exact job logs:
+- `ROOT_SEAL_MISMATCH` during manifest-root registration, affecting completion receipt, manifest-root, receipt-inspection, registered-completion, and tenant-authority tests.
+- HTTP capture integration rejects the new canonical slot `00_front_exterior` with `422 INVALID_CAPTURE_EVIDENCE_REQUEST`.
+- Legacy fixture expectations and error identifiers are stale relative to the 16-v1/default implementation.
+- Capture tamper/quality/review-reference expectations also fail in the database suite.
+- Database diagnostics still classify themselves as baseline/preflight diagnostics, not 14-gate certification; `gate_passes_awarded` remains `0` and complete gate results remain `NOT RUN`.
+
+Skipped cleanup/post-steps after failed jobs are workflow steps, not evidence of skipped tests. The 13 workflow count is not a certification count.
 
 ### Authority and acceptance interpretation
 
-The authority workflow applied and verified the migration plan through `0017_event_contract_parity.sql` on isolated PostgreSQL 16.4/PostGIS 3.4.3 test infrastructure. Its diagnostics report the 14 tenant-scoped application tables with RLS enabled and forced and exercise tenant-isolation/privilege checks.
-
-**This is not formal acceptance certification.** The structured diagnostic classifies itself as `post-cutover-authority-diagnostics-not-gate-certification`; `complete_gate_results` is `NOT RUN`, `gate_passes_awarded` is `0`, and `overall_acceptance` is `NOT ACCEPTED`. The authority workflow passing means its migration and diagnostic assertions succeeded; it does not mean the product acceptance gates passed.
+**No 14-gate certification is established.** The current diagnostic implementation does not execute DB-01 through DB-14 as complete, individually evidenced acceptance gates. Do not infer 14/14 from a historical 297+ database-test count or from a passing preflight. Each gate requires executable criteria and actual PostgreSQL evidence.
 
 ### Still not complete / not claimed
 
-- No integrated persistent staging or production deployment. The Railway restricted deployment job remains skipped.
-- No provisioned/verified integrated staging PostgreSQL service, durable evidence volume, sealed runtime secrets, TLS/private ingress, monitoring, or backup/restore evidence.
-- The integrated container CI smoke is a disposable local container test; it does not prove the container's full capture-to-review path against a persistent database and cloud object store.
-- The HTTP-to-PostgreSQL-to-original-bytes journey is synthetic CI evidence, not real participant evidence or field acceptance.
-- The code snapshot at this revision still implements `claims2car-12-v1`. The founder-approved target is `claims2car-16-v1` as the default, with `claims2car-12-v1` retained as a selectable, versioned alternative and historical 12-v1 sessions preserved. Exact 16-v1 slot IDs/order and the cross-layer compatibility contract remain implementation blockers; no historical session may be silently reclassified.
-- Owner authentication/invitation and identity proofing remain unimplemented; owner actor credentials are provisioned out-of-band.
-- Supplemental incident disclosure remains `draft_pending_legal_review` and incident intake remains disabled by default.
-- Safari/iPad/physical-device qualification, roadside validation, field-calibrated quality thresholds, and real-world model accuracy remain unverified.
-- Production model weights and validated physics/AI accuracy are not established.
+- PR #41 is not merged and its current CI is red.
+- No PR #41 merge or new main commit has occurred.
+- No integrated persistent staging or production deployment is established.
+- No real participant/field acceptance, qualified-device validation, or model accuracy certification is claimed.
 - Live Square payment settlement, external carrier/partner delivery, and live dispatch remain disabled.
+- Historical 12-v1 sessions must retain their original protocol identity; no historical evidence is reclassified.
 
-This snapshot supersedes older verification counts and candidate SHAs below. Older entries remain for historical traceability and must not be interpreted as current-head evidence.
+This snapshot supersedes stale historical candidate/main/CI claims below. Older entries remain for traceability and are not current-head evidence.
 
 ## Commercial and safety controls
 
@@ -107,7 +101,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 **Founder-approved capture-protocol direction — 2026-11-10:** `claims2car-16-v1` is the default target; `claims2car-12-v1` remains a selectable, explicitly versioned alternative. Historical 12-v1 sessions and manifests must retain their original protocol identity and interpretation. This supersedes the earlier open question about which count is the target.
 
-**Remaining implementation blocker — exact 16-v1 contract:** The architecture source is internally inconsistent. One section describes 12 standard framing angles plus up to 4 specialized detail angles, while enumerating 8 exterior + 2 undercarriage + 2 interior + 2 legal/document views (14 before the optional details). Another mandatory-16 breakdown enumerates 8 exterior + 2 interior + 1 license-plate + 1 insurance-document + 3 damage close-ups (15). The Slice 2 controller also uses a third set of 12 slot identifiers that does not match `contracts/shot-list.json`. Reconcile one exact 16-slot ID/order and map it to API, manifest, controller, browser, and reviewer contracts before implementation. Do not guess, silently rename, or reclassify existing 12-v1 evidence.
+**Resolved by Owner Executive Approval — canonical 16-v1 contract:** The binding 16 ordered slot IDs and descriptions are in `contracts/shot-list-16-v1.json`. The implementation maps those exact IDs through the API, evidence manifest, capture service, root workbench, guided workflow, and reviewer controller. The prior conflicting architecture enumerations are superseded for new sessions by this owner-supplied contract; the original 12-v1 contract remains unchanged for historical sessions and explicit selection.
 
 **Verification evidence at the candidate revision:**
 - Full repository suite: **685 passed, 192 subtests passed, 21 warnings** — GitHub Actions run [42755651654](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387422).
@@ -178,7 +172,7 @@ The current Railway configuration is a restricted synthetic containment service.
 
 ## Event-journal SQL/Python contract parity — 2026-11-10
 
-**Validated candidate code revision:** `c6f36810affb72f61a4e4fb3e6d8345705cffb73` (PR #29; still draft and unmerged).
+**Validated historical candidate code revision:** `c6f36810affb72f61a4e4fb3e6d8345705cffb73`. PR #29, PR #31, and wrapper PR #40 have since been consolidated and merged into `main` at `3aa87f9d1523a68a1df09c6930ab57efbd182ba4`. The verification below is historical evidence for the candidate revision, not a claim that its historical run proves the current database acceptance gates.
 
 - Added authority migration `0017_event_contract_parity.sql`. It requires RFC3339 timestamps with an explicit timezone, checks calendar validity, enforces compact canonical JSON with lexically ordered object keys and consistent UTF-8 string encoding, and aligns the SQL event-kind allowlist with Python.
 - The shared Python serializer now emits deterministic compact JSON, preserves legitimate decimal quality metrics using fixed decimal notation, and is used by capture, manifest-sealing, and review event producers.
@@ -203,14 +197,14 @@ The current Railway configuration is a restricted synthetic containment service.
 
 ## Capture protocol version binding — 2026-11-11
 
-**Implementation candidate:** PR #31, Slice 2 workbench branch.
+**Implementation history:** PR #31 was consolidated through PR #29 and merged to `main` via PR #40 at `3aa87f9d1523a68a1df09c6930ab57efbd182ba4`. The exact owner-approved 16-v1 contract and end-to-end version binding are implemented in the current PR #41 candidate; merge and acceptance remain gated on its current CI.
 
 - New sessions default to `claims2car-16-v1`; `claims2car-12-v1` is explicitly selectable.
 - Authority migration 0018 backfills existing sessions as 12-v1, adds a constrained protocol-version column, sets the default for new sessions to 16-v1, and makes the version immutable with a database trigger.
 - Claim-case creation, controlled-session creation, session readback, and claim-case readback carry the selected version. Idempotent retries cannot change it.
 - The authenticated protocol-registry API and operator workbench expose the default and the selectable legacy alternative.
-- The existing 12-v1 manifest/capture contract remains executable. Evidence registration, quality recording, and sealing reject a 16-v1 session until its exact slot contract is approved; 16-v1 never falls through to 12-v1.
+- Both 16-v1 and 12-v1 contracts are executable. Evidence registration, quality recording, sealing, and reviewer retrieval resolve the exact immutable protocol stored on the session; neither version falls through to the other.
 
-**Still open:** the exact authoritative 16 slot IDs/order/semantics remain unresolved because the source architecture contains conflicting enumerations. The separate Slice 2 browser controller's 12-slot list also differs from the API 12-v1 contract. These lists must be reconciled explicitly. No 16-v1 manifest or capture completion is claimed.
+**Implementation status:** the owner-authorized 16-v1 slot list is now committed in `contracts/shot-list-16-v1.json`. New-session defaults, legacy selection, protocol-specific manifests, capture validation, reviewer verification, browser workbench rendering, and exterior-only crush-physics mapping have dedicated coverage. This establishes software-contract implementation, not real-device/field acceptance or persistent staging acceptance.
 
 See `docs/release/CAPTURE_PROTOCOL_VERSIONING.md` for the immutable-session rules and remaining work.
