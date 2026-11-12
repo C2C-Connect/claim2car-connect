@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import uuid
 import psycopg
 from psycopg import sql
