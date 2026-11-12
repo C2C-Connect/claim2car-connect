@@ -1,0 +1,17 @@
+{
+  "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+  "tested_checkout_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+  "base_commit": null,
+  "run_id": "43248392649",
+  "run_attempt": "1",
+  "event": "push",
+  "ref": "refs/heads/main",
+  "classification": "executable-db-01-through-db-14-gate-results",
+  "gate_passes_awarded": 0,
+  "criteria_passes": 14,
+  "overall_acceptance": "NOT ACCEPTED",
+  "component_phase": "legacy primary through0007; isolated full-authority migration and integration databases",
+  "diagnostic_phase": "primary after full default migration plan through0018",
+  "diagnostic_report_present": true,
+  "counted_test_report_count": 1
+}

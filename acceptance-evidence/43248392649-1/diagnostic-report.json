@@ -1,0 +1,2686 @@
+{
+  "classification": "executable-db-01-through-db-14-gate-results",
+  "commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+  "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+  "tested_checkout_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+  "base_commit": null,
+  "contract": "C2C-DB-AC-001 v1.0 proposed",
+  "contract_status": "PROPOSED_PENDING_OWNER_ADOPTION",
+  "gate_passes_awarded": 0,
+  "criteria_passes": 14,
+  "gate_verification_successful": true,
+  "acceptance_blockers": [
+    "CONTRACT_OWNER_ADOPTION_AND_INDEPENDENT_REVIEW_PENDING"
+  ],
+  "checks": [
+    {
+      "id": "BOUND-APPEND-RETRY-READBACK",
+      "status": "PASS"
+    },
+    {
+      "id": "G04-DIRECT-SQL-TENANT-SWITCH",
+      "status": "PASS",
+      "other_tenant_visible": false
+    },
+    {
+      "id": "UNBOUND-SHARED-LOGIN-DENIED",
+      "status": "PASS"
+    },
+    {
+      "id": "PRIVATE-AUTHORITY-REGISTRY",
+      "status": "PASS"
+    },
+    {
+      "id": "G06-timestamp",
+      "status": "PASS",
+      "constraint_name": "event_timestamp_input_valid"
+    },
+    {
+      "id": "G06-naive_timestamp",
+      "status": "PASS",
+      "constraint_name": "event_timestamp_rfc3339"
+    },
+    {
+      "id": "G06-compact_payload",
+      "status": "PASS",
+      "constraint_name": "event_payload_compact"
+    },
+    {
+      "id": "G06-key_order",
+      "status": "PASS",
+      "constraint_name": "event_payload_python_canonical"
+    },
+    {
+      "id": "G06-numeric_exponent",
+      "status": "PASS",
+      "constraint_name": "event_payload_python_canonical"
+    },
+    {
+      "id": "G06-unicode_escape",
+      "status": "PASS",
+      "constraint_name": "event_payload_python_canonical"
+    },
+    {
+      "id": "G06-unicode-positive-control",
+      "status": "PASS"
+    },
+    {
+      "id": "COMPACT-JSON-POSITIVE-CONTROL",
+      "status": "PASS"
+    },
+    {
+      "id": "POSTCUTOVER-PER-TABLE-ISOLATION",
+      "status": "PASS",
+      "table_count": 14,
+      "tenant_directions": 2,
+      "fixture_classification": "admin-provisioned storage-isolation fixtures; not evidence evaluation or accepted completion",
+      "results": [
+        {
+          "tenant_index": 0,
+          "table": "organizations",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "users",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "memberships",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "dealer_groups",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "dealer_locations",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "location_brands",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "sessions",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "writer_tenant",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "events",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "writer_tenant",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 4
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "manifest_roots",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_root_read",
+                  "SELECT",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_roots",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "completion_receipts",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_receipt_read",
+                  "SELECT",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_receipts",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "financial_ledger_entries",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_financial_entries",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_financial_entries",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "financial_ledger_postings",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_financial_postings",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_financial_postings",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 2
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "claim_cases",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_claim_cases",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_claim_cases",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 0,
+          "table": "claim_case_incident_intake",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_claim_case_incident",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_claim_case_incident",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1,
+              "path": "actor-filtered-function",
+              "direct_table_select": "DENIED"
+            },
+            "cross_read": {
+              "status": "PASS",
+              "path": "actor-filtered-function"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "organizations",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "users",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "memberships",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "dealer_groups",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "dealer_locations",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "location_brands",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "fixture_tenant",
+                  "ALL",
+                  "{faos_fixture}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "layer": "rls",
+              "affected_rows": 0
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "sessions",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "writer_tenant",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "rls"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "events",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_tenant",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ],
+                [
+                  "writer_tenant",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 2
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "manifest_roots",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_root_read",
+                  "SELECT",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_roots",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "completion_receipts",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_receipt_read",
+                  "SELECT",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_receipts",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "financial_ledger_entries",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_financial_entries",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_financial_entries",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "financial_ledger_postings",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_financial_postings",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_financial_postings",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 2
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "claim_cases",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_claim_cases",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_claim_cases",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1
+            },
+            "cross_read": {
+              "status": "PASS"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        },
+        {
+          "tenant_index": 1,
+          "table": "claim_case_incident_intake",
+          "checks": {
+            "rls_flags": {
+              "status": "PASS",
+              "enabled": true,
+              "forced": true,
+              "policies": [
+                [
+                  "app_claim_case_incident",
+                  "ALL",
+                  "{faos_app}",
+                  "(tenant_id = faos.tenant_id())",
+                  null
+                ],
+                [
+                  "writer_claim_case_incident",
+                  "ALL",
+                  "{faos_writer}",
+                  "(tenant_id = faos.tenant_id())",
+                  "(tenant_id = faos.tenant_id())"
+                ]
+              ]
+            },
+            "own_read": {
+              "status": "PASS",
+              "rows": 1,
+              "path": "actor-filtered-function",
+              "direct_table_select": "DENIED"
+            },
+            "cross_read": {
+              "status": "PASS",
+              "path": "actor-filtered-function"
+            },
+            "cross_insert": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_update": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "cross_delete": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "tenant_reassignment": {
+              "status": "PASS",
+              "sqlstate": "42501",
+              "layer": "table_privilege"
+            },
+            "spoofed_context": {
+              "status": "PASS"
+            },
+            "missing_context": {
+              "status": "PASS"
+            },
+            "malformed_context": {
+              "status": "PASS",
+              "sqlstate": "22P02"
+            }
+          }
+        }
+      ],
+      "assertion_count": 280
+    },
+    {
+      "id": "BINDING-REVOCATION-NEXT-TRANSACTION",
+      "status": "PASS"
+    }
+  ],
+  "database": [
+    "claim2car_test",
+    "PostgreSQL 16.4 (Debian 16.4-1.pgdg110+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit"
+  ],
+  "environment": {
+    "classification": "synthetic_isolated",
+    "connections": {
+      "admin": {
+        "user": "postgres",
+        "host": "127.0.0.1",
+        "port": "55432",
+        "dbname": "claim2car_test"
+      },
+      "application": {
+        "user": "faos_app",
+        "host": "127.0.0.1",
+        "port": "55432",
+        "dbname": "claim2car_test"
+      },
+      "migrator": {
+        "user": "faos_migrator",
+        "host": "127.0.0.1",
+        "port": "55432",
+        "dbname": "claim2car_test"
+      }
+    }
+  },
+  "extensions": [
+    [
+      "fuzzystrmatch",
+      "1.2"
+    ],
+    [
+      "plpgsql",
+      "1.0"
+    ],
+    [
+      "postgis",
+      "3.4.3"
+    ],
+    [
+      "postgis_tiger_geocoder",
+      "3.4.3"
+    ],
+    [
+      "postgis_topology",
+      "3.4.3"
+    ]
+  ],
+  "migration_inventory": [
+    [
+      "0001_tenant_registry.sql",
+      "0cbf695b51f57124a071fd125af91e3fc889a727e80d8935559957e2c8627d65"
+    ],
+    [
+      "0002_event_journal.sql",
+      "11e02549f8bb03f0f17301303573605eb635d0425ca95ba9f0eb761237e2fdcb"
+    ],
+    [
+      "0003_completion_lock.sql",
+      "5905aa2971cb38d6fb0b8f3838fbc6ce120fe2a0f2cfa2b91795e3b908f87678"
+    ],
+    [
+      "0004_manifest_roots.sql",
+      "de933f3a7261c1cbacd1793a802e4e1b8940370a9c316cf272ce6ab76946c7b7"
+    ],
+    [
+      "0005_completion_receipts.sql",
+      "1d106bcdc57599f1c763f2b60d4ddb84048090c61dd2a16489d7c7503de67332"
+    ],
+    [
+      "0006_event_timestamp_validity.sql",
+      "b333fbbcd134cdf5c9a3261640924ab08c7294b36c40335ab98665d744006e39"
+    ],
+    [
+      "0007_event_payload_compactness.sql",
+      "47fba2b4be66ba9a27ed0d36eb0dd68df726036edc52d242ee47a672b363b456"
+    ],
+    [
+      "0008_tenant_login_authority.sql",
+      "b50e1010f635984a467a2f23d9184165f372b82f857ca88405dfef3c7d099983"
+    ],
+    [
+      "0009_integer_financial_ledger.sql",
+      "89ded2f8b0845ffcde9ae2529760b87b1203497b9b887c9f06e5959a814c4c5c"
+    ],
+    [
+      "0010_claim_case_registry.sql",
+      "fa35faf9f02e6b741c53d1864eeaa0515bc2206933db2573aba053884439acde"
+    ],
+    [
+      "0011_claim_case_idempotency_conflicts.sql",
+      "a00c1bf9055bec317c90bfc787913480baa1c62b85f3c864f0c7046492e5e54a"
+    ],
+    [
+      "0012_claim_case_retry_without_update_lock.sql",
+      "7a2ac5bb3fab3d19bdac252d55877384794f12acab2a57c4c0ad826641de4118"
+    ],
+    [
+      "0013_claim_case_capture_session.sql",
+      "629e5cf70f44cc914b41b5836c33bbb40a04334d69569cca135b38894214549d"
+    ],
+    [
+      "0014_claim_case_incident_intake.sql",
+      "c4f5ede3038a4d7bb9b88bd13db2e7676f62b107338622b0a555577649b5ae30"
+    ],
+    [
+      "0015_incident_event_kinds.sql",
+      "e7352d72847449b80eb5fd80a07ea68d813a731df78633ad2706f275a7b4d053"
+    ],
+    [
+      "0016_claim_case_incident_read_boundary.sql",
+      "de878c887046e9bf4f6fa28cdad7b057510289b44ba6057d0f43686965012916"
+    ],
+    [
+      "0017_event_contract_parity.sql",
+      "54c0410e0dab3e217e9c93174b773e4689882169fef72fdc3da3696bfb160a26"
+    ],
+    [
+      "0018_capture_protocol_session_binding.sql",
+      "97fed7108cc84cefb3cf05061857e689aead2656849f3f06ad77a1bfd81c859e"
+    ]
+  ],
+  "complete_gate_results": [
+    {
+      "id": "DB-01",
+      "title": "Reproducible environment and configuration",
+      "status": "NOT AWARDED",
+      "test_count": 31,
+      "test_ids": [
+        "test_candidate_manifest.CandidateManifestTests.test_added_migration_detected",
+        "test_candidate_manifest.CandidateManifestTests.test_extra_migration_hashed_exactly",
+        "test_candidate_manifest.CandidateManifestTests.test_missing_required_file_rejected",
+        "test_candidate_manifest.CandidateManifestTests.test_modified_migration_detected",
+        "test_candidate_manifest.CandidateManifestTests.test_removed_extra_migration_detected",
+        "test_candidate_manifest.CandidateManifestTests.test_rows_sorted_and_unique",
+        "test_candidate_manifest.CandidateManifestTests.test_symlink_migration_directory_rejected",
+        "test_candidate_manifest.CandidateManifestTests.test_symlink_migration_rejected",
+        "test_candidate_manifest.CandidateManifestTests.test_unchanged_candidate_compares",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_default_entry_point_clean_full_initialization_and_rerun",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_default_entry_point_upgrades_legacy_seven_migration_schema",
+        "test_migration_plan.MigrationPlanTests.test_blank",
+        "test_migration_plan.MigrationPlanTests.test_changed",
+        "test_migration_plan.MigrationPlanTests.test_duplicate_version",
+        "test_migration_plan.MigrationPlanTests.test_empty",
+        "test_migration_plan.MigrationPlanTests.test_exact_bytes",
+        "test_migration_plan.MigrationPlanTests.test_initial",
+        "test_migration_plan.MigrationPlanTests.test_long_history",
+        "test_migration_plan.MigrationPlanTests.test_missing",
+        "test_migration_plan.MigrationPlanTests.test_name",
+        "test_migration_plan.MigrationPlanTests.test_noop",
+        "test_migration_plan.MigrationPlanTests.test_order",
+        "test_migration_plan.MigrationPlanTests.test_suffix",
+        "test_migration_plan.MigrationPlanTests.test_symlink",
+        "test_migration_plan.MigrationPlanTests.test_unknown_history",
+        "test_migration_preflight.MigrationPreflightTests.test_bad_connections",
+        "test_migration_preflight.MigrationPreflightTests.test_filesystem_preflight_before_connect",
+        "test_migration_preflight.MigrationPreflightTests.test_history_conflict",
+        "test_migration_preflight.MigrationPreflightTests.test_initial_execution",
+        "test_migration_preflight.MigrationPreflightTests.test_noop",
+        "test_migration_preflight.MigrationPreflightTests.test_untracked_schema"
+      ],
+      "required_test_selectors": [
+        "test_candidate_manifest.CandidateManifestTests.",
+        "test_migration_plan.MigrationPlanTests.",
+        "test_migration_preflight.MigrationPreflightTests.",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_default_entry_point_clean_full_initialization_and_rerun",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_default_entry_point_upgrades_legacy_seven_migration_schema"
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-02",
+      "title": "Migration integrity and schema versioning",
+      "status": "NOT AWARDED",
+      "test_count": 42,
+      "test_ids": [
+        "test_candidate_manifest.CandidateManifestTests.test_added_migration_detected",
+        "test_candidate_manifest.CandidateManifestTests.test_extra_migration_hashed_exactly",
+        "test_candidate_manifest.CandidateManifestTests.test_missing_required_file_rejected",
+        "test_candidate_manifest.CandidateManifestTests.test_modified_migration_detected",
+        "test_candidate_manifest.CandidateManifestTests.test_removed_extra_migration_detected",
+        "test_candidate_manifest.CandidateManifestTests.test_rows_sorted_and_unique",
+        "test_candidate_manifest.CandidateManifestTests.test_symlink_migration_directory_rejected",
+        "test_candidate_manifest.CandidateManifestTests.test_symlink_migration_rejected",
+        "test_candidate_manifest.CandidateManifestTests.test_unchanged_candidate_compares",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_applied_authority_migration_checksum_change_is_rejected",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_checksum_change_rejected",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_default_entry_point_clean_full_initialization_and_rerun",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_default_entry_point_upgrades_legacy_seven_migration_schema",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_failed_batch_rolls_back_ddl_and_ledger",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_first_application",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_full_migration_enforces_python_sql_event_contract_parity",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_identical_rerun",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_lock_contention_and_release",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_noncanonical_historical_event_blocks_parity_migration_without_rewrite",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_parity_migration_preserves_existing_event_payload_bytes",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_pending_suffix",
+        "test_migration_plan.MigrationPlanTests.test_blank",
+        "test_migration_plan.MigrationPlanTests.test_changed",
+        "test_migration_plan.MigrationPlanTests.test_duplicate_version",
+        "test_migration_plan.MigrationPlanTests.test_empty",
+        "test_migration_plan.MigrationPlanTests.test_exact_bytes",
+        "test_migration_plan.MigrationPlanTests.test_initial",
+        "test_migration_plan.MigrationPlanTests.test_long_history",
+        "test_migration_plan.MigrationPlanTests.test_missing",
+        "test_migration_plan.MigrationPlanTests.test_name",
+        "test_migration_plan.MigrationPlanTests.test_noop",
+        "test_migration_plan.MigrationPlanTests.test_order",
+        "test_migration_plan.MigrationPlanTests.test_suffix",
+        "test_migration_plan.MigrationPlanTests.test_symlink",
+        "test_migration_plan.MigrationPlanTests.test_unknown_history",
+        "test_migration_preflight.MigrationPreflightTests.test_bad_connections",
+        "test_migration_preflight.MigrationPreflightTests.test_filesystem_preflight_before_connect",
+        "test_migration_preflight.MigrationPreflightTests.test_history_conflict",
+        "test_migration_preflight.MigrationPreflightTests.test_initial_execution",
+        "test_migration_preflight.MigrationPreflightTests.test_noop",
+        "test_migration_preflight.MigrationPreflightTests.test_untracked_schema"
+      ],
+      "required_test_selectors": [
+        "test_migration_plan.MigrationPlanTests.",
+        "test_migration_preflight.MigrationPreflightTests.",
+        "test_migration_controls_integration.MigrationControlsIntegration.",
+        "test_candidate_manifest.CandidateManifestTests."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-03",
+      "title": "Restricted application privileges",
+      "status": "NOT AWARDED",
+      "test_count": 25,
+      "test_ids": [
+        "test_access_hardening.TestAccessHardening.test_application_cannot_assume_privileged_roles",
+        "test_access_hardening.TestAccessHardening.test_application_cannot_create_schema_objects",
+        "test_access_hardening.TestAccessHardening.test_application_cannot_read_or_modify_migration_ledger",
+        "test_access_hardening.TestAccessHardening.test_direct_event_delete_denied",
+        "test_access_hardening.TestAccessHardening.test_direct_event_insert_denied",
+        "test_access_hardening.TestAccessHardening.test_direct_event_update_denied",
+        "test_adapter_validation.TestAdapterValidation.test_invalid_event_fields_rejected_before_database_calls",
+        "test_adapter_validation.TestAdapterValidation.test_malformed_tenant_rejected_before_database_calls",
+        "test_adapter_validation.TestAdapterValidation.test_non_events_rejected_before_database_calls",
+        "test_adapter_validation.TestAdapterValidation.test_unsuitable_connections_rejected_before_database_calls",
+        "test_completion_receipts.CompletionReceiptTests.test_application_cannot_record_or_insert",
+        "test_identity_boundary.IdentityBoundaryTests.test_actor_cannot_have_conflicting_tenant_bindings",
+        "test_identity_boundary.IdentityBoundaryTests.test_caller_list_mutation_cannot_change_active_configuration",
+        "test_identity_boundary.IdentityBoundaryTests.test_database_login_cannot_map_to_conflicting_tenants",
+        "test_identity_boundary.IdentityBoundaryTests.test_disabled_expired_and_exact_expiry_are_rejected",
+        "test_identity_boundary.IdentityBoundaryTests.test_distinct_credentials_resolve_distinct_tenants",
+        "test_identity_boundary.IdentityBoundaryTests.test_duplicate_digest_is_rejected",
+        "test_identity_boundary.IdentityBoundaryTests.test_invalid_digest_expiry_and_binding_configuration_are_rejected",
+        "test_identity_boundary.IdentityBoundaryTests.test_missing_malformed_and_injected_headers_are_rejected",
+        "test_identity_boundary.IdentityBoundaryTests.test_no_configured_credentials_means_no_authority",
+        "test_identity_boundary.IdentityBoundaryTests.test_resolved_binding_is_frozen_and_digest_is_not_in_repr",
+        "test_identity_boundary.IdentityBoundaryTests.test_unknown_token_is_rejected_without_identity_details",
+        "test_identity_boundary.IdentityBoundaryTests.test_valid_token_returns_server_binding",
+        "test_manifest_roots.ManifestRootTests.test_application_cannot_register_or_insert_root",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_application_cannot_read_or_modify_authority_registry"
+      ],
+      "required_test_selectors": [
+        "test_access_hardening.TestAccessHardening.",
+        "test_adapter_validation.TestAdapterValidation.",
+        "test_identity_boundary.IdentityBoundaryTests.",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_application_cannot_read_or_modify_authority_registry",
+        "test_completion_receipts.CompletionReceiptTests.test_application_cannot_record_or_insert",
+        "test_manifest_roots.ManifestRootTests.test_application_cannot_register_or_insert_root"
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [
+        "PRIVATE-AUTHORITY-REGISTRY",
+        "UNBOUND-SHARED-LOGIN-DENIED"
+      ],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-04",
+      "title": "Tenant isolation and row-level security",
+      "status": "NOT AWARDED",
+      "test_count": 21,
+      "test_ids": [
+        "test_identity_bound_prototype.IdentityBoundPrototype.test_binding_table_is_not_application_accessible",
+        "test_identity_bound_prototype.IdentityBoundPrototype.test_each_login_reads_its_bound_tenant",
+        "test_identity_bound_prototype.IdentityBoundPrototype.test_login_cannot_assume_other_tenant_role",
+        "test_identity_bound_prototype.IdentityBoundPrototype.test_spoofed_context_cannot_mutate_other_tenant",
+        "test_identity_bound_prototype.IdentityBoundPrototype.test_switching_context_cannot_impersonate_other_tenant",
+        "test_remaining_integration.TestRemainingIntegration.test_cleared_context_exposes_neither_tenants_rows",
+        "test_remaining_integration.TestRemainingIntegration.test_cross_tenant_user_delete_affects_no_rows",
+        "test_remaining_integration.TestRemainingIntegration.test_cross_tenant_user_insert_denied",
+        "test_remaining_integration.TestRemainingIntegration.test_cross_tenant_user_update_affects_no_rows",
+        "test_remaining_integration.TestRemainingIntegration.test_missing_context_user_insert_denied",
+        "test_remaining_integration.TestRemainingIntegration.test_switching_context_limits_reads_without_tenant_predicates",
+        "test_schema_integrity.SchemaIntegrityTests.test_external_subject_unique_per_tenant_not_globally",
+        "test_schema_integrity.SchemaIntegrityTests.test_location_cannot_reference_other_tenant_group",
+        "test_schema_integrity.SchemaIntegrityTests.test_membership_cannot_reference_other_tenant_user",
+        "test_schema_integrity.SchemaIntegrityTests.test_membership_key_unique_within_tenant",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_application_cannot_read_or_modify_authority_registry",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_binding_revocation_blocks_subsequent_transactions",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_bound_login_cannot_impersonate_other_tenant",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_bound_logins_append_retry_and_read_actual_journal",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_dealer_fee_cannot_be_booked_from_partner_acceptance",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_unbound_shared_login_fails_closed"
+      ],
+      "required_test_selectors": [
+        "test_remaining_integration.TestRemainingIntegration.",
+        "test_identity_bound_prototype.IdentityBoundPrototype.",
+        "test_schema_integrity.SchemaIntegrityTests.",
+        "test_tenant_authority_integration.TenantAuthorityIntegration."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [
+        "G04-DIRECT-SQL-TENANT-SWITCH",
+        "UNBOUND-SHARED-LOGIN-DENIED",
+        "POSTCUTOVER-PER-TABLE-ISOLATION"
+      ],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-05",
+      "title": "Tenant-context lifecycle",
+      "status": "NOT AWARDED",
+      "test_count": 15,
+      "test_ids": [
+        "test_completion_lock.CompletionLockTests.test_lock_released_after_rollback",
+        "test_completion_lock.CompletionLockTests.test_lock_serializes_append_until_commit",
+        "test_completion_lock.CompletionLockTests.test_mismatched_tenant_rejected",
+        "test_completion_lock.CompletionLockTests.test_missing_context_rejected",
+        "test_completion_lock.CompletionLockTests.test_missing_session_rejected",
+        "test_completion_lock.CompletionLockTests.test_other_tenant_session_not_visible",
+        "test_locked_evaluation.LockedEvaluationTests.test_caller_exception_releases_lock_and_context",
+        "test_locked_evaluation.LockedEvaluationTests.test_full_evaluation_serializes_consent_change",
+        "test_locked_evaluation.LockedEvaluationTests.test_other_tenant_cannot_enter_locked_read",
+        "test_tenant_context_regression.TenantContextRegression.test_append_rejects_mismatched_context_with_exact_error",
+        "test_tenant_context_regression.TenantContextRegression.test_append_rejects_missing_context_with_exact_error",
+        "test_tenant_context_regression.TenantContextRegression.test_context_clears_after_commit_on_same_connection",
+        "test_tenant_context_regression.TenantContextRegression.test_context_clears_after_rollback_on_same_connection",
+        "test_tenant_context_regression.TenantContextRegression.test_empty_context_returns_null",
+        "test_tenant_context_regression.TenantContextRegression.test_malformed_context_rejected_as_invalid_uuid"
+      ],
+      "required_test_selectors": [
+        "test_tenant_context_regression.TenantContextRegression.",
+        "test_completion_lock.CompletionLockTests.",
+        "test_locked_evaluation.LockedEvaluationTests."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-06",
+      "title": "Event schema and domain-contract validation",
+      "status": "NOT AWARDED",
+      "test_count": 16,
+      "test_ids": [
+        "test_adapter_validation.TestAdapterValidation.test_invalid_event_fields_rejected_before_database_calls",
+        "test_adapter_validation.TestAdapterValidation.test_malformed_tenant_rejected_before_database_calls",
+        "test_adapter_validation.TestAdapterValidation.test_non_events_rejected_before_database_calls",
+        "test_adapter_validation.TestAdapterValidation.test_unsuitable_connections_rejected_before_database_calls",
+        "test_event_contract_regression.EventContractRegression.test_canonical_unicode_and_decimal_payload_uses_utf8_fixed_notation",
+        "test_event_contract_regression.EventContractRegression.test_conflicting_retry_rejected_without_mutation",
+        "test_event_contract_regression.EventContractRegression.test_cross_session_history_rejected",
+        "test_event_contract_regression.EventContractRegression.test_duplicate_history_rejected",
+        "test_event_contract_regression.EventContractRegression.test_event_is_frozen_and_payload_read_is_independent",
+        "test_event_contract_regression.EventContractRegression.test_gap_rejected_without_mutation",
+        "test_event_contract_regression.EventContractRegression.test_identical_retry_is_not_appended_twice",
+        "test_event_contract_regression.EventContractRegression.test_invalid_contract_fields",
+        "test_event_contract_regression.EventContractRegression.test_valid_history_reconstructs_independent_journal",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_full_migration_enforces_python_sql_event_contract_parity",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_noncanonical_historical_event_blocks_parity_migration_without_rewrite",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_parity_migration_preserves_existing_event_payload_bytes"
+      ],
+      "required_test_selectors": [
+        "test_event_contract_regression.EventContractRegression.",
+        "test_adapter_validation.TestAdapterValidation.",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_full_migration_enforces_python_sql_event_contract_parity",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_parity_migration_preserves_existing_event_payload_bytes",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_noncanonical_historical_event_blocks_parity_migration_without_rewrite"
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [
+        "G06-timestamp",
+        "G06-naive_timestamp",
+        "G06-compact_payload",
+        "G06-key_order",
+        "G06-numeric_exponent",
+        "G06-unicode_escape",
+        "G06-unicode-positive-control",
+        "COMPACT-JSON-POSITIVE-CONTROL"
+      ],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-07",
+      "title": "Durable event append and idempotency",
+      "status": "NOT AWARDED",
+      "test_count": 12,
+      "test_ids": [
+        "test_event_contract_regression.EventContractRegression.test_canonical_unicode_and_decimal_payload_uses_utf8_fixed_notation",
+        "test_event_contract_regression.EventContractRegression.test_conflicting_retry_rejected_without_mutation",
+        "test_event_contract_regression.EventContractRegression.test_cross_session_history_rejected",
+        "test_event_contract_regression.EventContractRegression.test_duplicate_history_rejected",
+        "test_event_contract_regression.EventContractRegression.test_event_is_frozen_and_payload_read_is_independent",
+        "test_event_contract_regression.EventContractRegression.test_gap_rejected_without_mutation",
+        "test_event_contract_regression.EventContractRegression.test_identical_retry_is_not_appended_twice",
+        "test_event_contract_regression.EventContractRegression.test_invalid_contract_fields",
+        "test_event_contract_regression.EventContractRegression.test_valid_history_reconstructs_independent_journal",
+        "test_journal_integration.TestJournalIntegration.test_duplicate_is_idempotent_and_conflicting_duplicate_preserves_history",
+        "test_journal_integration.TestJournalIntegration.test_sequence_conflicts_preserve_history_and_allow_next_valid_append",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_bound_logins_append_retry_and_read_actual_journal"
+      ],
+      "required_test_selectors": [
+        "test_journal_integration.TestJournalIntegration.",
+        "test_tenant_authority_integration.TenantAuthorityIntegration.test_bound_logins_append_retry_and_read_actual_journal",
+        "test_event_contract_regression.EventContractRegression."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [
+        "BOUND-APPEND-RETRY-READBACK"
+      ],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-08",
+      "title": "Sequence integrity and concurrent writes",
+      "status": "NOT AWARDED",
+      "test_count": 12,
+      "test_ids": [
+        "test_completion_concurrency.CompletionConcurrencyTests.test_concurrent_revocation_has_only_serialized_outcomes",
+        "test_completion_concurrency.CompletionConcurrencyTests.test_distinct_concurrent_requests_record_distinct_receipts",
+        "test_completion_concurrency.CompletionConcurrencyTests.test_identical_concurrent_request_creates_one_receipt",
+        "test_completion_lock.CompletionLockTests.test_lock_released_after_rollback",
+        "test_completion_lock.CompletionLockTests.test_lock_serializes_append_until_commit",
+        "test_completion_lock.CompletionLockTests.test_mismatched_tenant_rejected",
+        "test_completion_lock.CompletionLockTests.test_missing_context_rejected",
+        "test_completion_lock.CompletionLockTests.test_missing_session_rejected",
+        "test_completion_lock.CompletionLockTests.test_other_tenant_session_not_visible",
+        "test_journal_integration.TestConcurrentJournal.test_competing_sequence_rejects_one_writer",
+        "test_journal_integration.TestConcurrentJournal.test_conflicting_concurrent_retry_rejects_changed_event",
+        "test_journal_integration.TestConcurrentJournal.test_identical_concurrent_retry_stores_one_event"
+      ],
+      "required_test_selectors": [
+        "test_journal_integration.TestConcurrentJournal.",
+        "test_completion_concurrency.CompletionConcurrencyTests.",
+        "test_completion_lock.CompletionLockTests."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-09",
+      "title": "Event immutability and history integrity",
+      "status": "NOT AWARDED",
+      "test_count": 22,
+      "test_ids": [
+        "test_access_hardening.TestAccessHardening.test_application_cannot_assume_privileged_roles",
+        "test_access_hardening.TestAccessHardening.test_application_cannot_create_schema_objects",
+        "test_access_hardening.TestAccessHardening.test_application_cannot_read_or_modify_migration_ledger",
+        "test_access_hardening.TestAccessHardening.test_direct_event_delete_denied",
+        "test_access_hardening.TestAccessHardening.test_direct_event_insert_denied",
+        "test_access_hardening.TestAccessHardening.test_direct_event_update_denied",
+        "test_event_contract_regression.EventContractRegression.test_canonical_unicode_and_decimal_payload_uses_utf8_fixed_notation",
+        "test_event_contract_regression.EventContractRegression.test_conflicting_retry_rejected_without_mutation",
+        "test_event_contract_regression.EventContractRegression.test_cross_session_history_rejected",
+        "test_event_contract_regression.EventContractRegression.test_duplicate_history_rejected",
+        "test_event_contract_regression.EventContractRegression.test_event_is_frozen_and_payload_read_is_independent",
+        "test_event_contract_regression.EventContractRegression.test_gap_rejected_without_mutation",
+        "test_event_contract_regression.EventContractRegression.test_identical_retry_is_not_appended_twice",
+        "test_event_contract_regression.EventContractRegression.test_invalid_contract_fields",
+        "test_event_contract_regression.EventContractRegression.test_valid_history_reconstructs_independent_journal",
+        "test_journal_integration.TestConcurrentJournal.test_competing_sequence_rejects_one_writer",
+        "test_journal_integration.TestConcurrentJournal.test_conflicting_concurrent_retry_rejects_changed_event",
+        "test_journal_integration.TestConcurrentJournal.test_identical_concurrent_retry_stores_one_event",
+        "test_journal_integration.TestJournalIntegration.test_duplicate_is_idempotent_and_conflicting_duplicate_preserves_history",
+        "test_journal_integration.TestJournalIntegration.test_sequence_conflicts_preserve_history_and_allow_next_valid_append",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_noncanonical_historical_event_blocks_parity_migration_without_rewrite",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_parity_migration_preserves_existing_event_payload_bytes"
+      ],
+      "required_test_selectors": [
+        "test_access_hardening.TestAccessHardening.",
+        "test_event_contract_regression.EventContractRegression.",
+        "test_journal_integration.TestJournalIntegration.",
+        "test_journal_integration.TestConcurrentJournal.",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_parity_migration_preserves_existing_event_payload_bytes",
+        "test_migration_controls_integration.MigrationControlsIntegration.test_noncanonical_historical_event_blocks_parity_migration_without_rewrite"
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-10",
+      "title": "Evidence-manifest integrity and root registration",
+      "status": "NOT AWARDED",
+      "test_count": 44,
+      "test_ids": [
+        "test_completion_coverage.CompletionCoverage.test_artifact_hash_mismatch",
+        "test_completion_coverage.CompletionCoverage.test_bad_record_types_and_schema",
+        "test_completion_coverage.CompletionCoverage.test_canonical_contract",
+        "test_completion_coverage.CompletionCoverage.test_changed_contract_rejected",
+        "test_completion_coverage.CompletionCoverage.test_conflicting_artifact",
+        "test_completion_coverage.CompletionCoverage.test_consent_revocation",
+        "test_completion_coverage.CompletionCoverage.test_cross_session_rejected",
+        "test_completion_coverage.CompletionCoverage.test_deterministic_immutable_replay",
+        "test_completion_coverage.CompletionCoverage.test_duplicate_slot",
+        "test_completion_coverage.CompletionCoverage.test_empty_history_blocked",
+        "test_completion_coverage.CompletionCoverage.test_every_missing_slot_blocks",
+        "test_completion_coverage.CompletionCoverage.test_failed_quality_blocks",
+        "test_completion_coverage.CompletionCoverage.test_history_order_rejected",
+        "test_completion_coverage.CompletionCoverage.test_invalid_seal_fields",
+        "test_completion_coverage.CompletionCoverage.test_manifest_bad_entries",
+        "test_completion_coverage.CompletionCoverage.test_manifest_canonical_order",
+        "test_completion_coverage.CompletionCoverage.test_manifest_empty_or_nonbytes",
+        "test_completion_coverage.CompletionCoverage.test_manifest_incomplete_and_duplicates",
+        "test_completion_coverage.CompletionCoverage.test_manifest_wrong_version",
+        "test_completion_coverage.CompletionCoverage.test_missing_quality_blocks",
+        "test_completion_coverage.CompletionCoverage.test_no_seal_blocks",
+        "test_completion_coverage.CompletionCoverage.test_note_preserves_eligibility_and_attribution",
+        "test_completion_coverage.CompletionCoverage.test_required_review_blocks_completion",
+        "test_completion_coverage.CompletionCoverage.test_review_cannot_override",
+        "test_completion_coverage.CompletionCoverage.test_tampered_missing_extra_bytes",
+        "test_completion_coverage.CompletionCoverage.test_unknown_review_reference",
+        "test_completion_coverage.CompletionCoverage.test_valid_completion",
+        "test_completion_coverage.CompletionCoverage.test_vehicle_unavailable_requires_review",
+        "test_completion_coverage.CompletionCoverage.test_wrong_external_root",
+        "test_completion_coverage.CompletionCoverage.test_wrong_seal_snapshot_rejected",
+        "test_manifest_roots.ManifestRootTests.test_application_cannot_register_or_insert_root",
+        "test_manifest_roots.ManifestRootTests.test_application_cannot_update_delete_or_truncate_registered_root",
+        "test_manifest_roots.ManifestRootTests.test_digest_must_match_persisted_seal",
+        "test_manifest_roots.ManifestRootTests.test_fixture_registration_and_exact_retry",
+        "test_manifest_roots.ManifestRootTests.test_missing_context_cannot_register",
+        "test_manifest_roots.ManifestRootTests.test_nonseal_event_rejected",
+        "test_manifest_roots.ManifestRootTests.test_other_tenant_cannot_read_registered_root",
+        "test_registered_completion.RegisteredCompletionTests.test_eligible_history_without_registered_root_blocks",
+        "test_registered_completion.RegisteredCompletionTests.test_fresh_process_loads_root_without_caller_digest",
+        "test_registered_completion.RegisteredCompletionTests.test_new_seal_requires_its_own_registration",
+        "test_registered_completion.RegisteredCompletionTests.test_other_tenant_cannot_evaluate_registered_session",
+        "test_registered_completion.RegisteredCompletionTests.test_registered_root_allows_current_eligible_snapshot",
+        "test_registered_completion.RegisteredCompletionTests.test_registered_root_does_not_override_revoked_consent",
+        "test_registered_completion.RegisteredCompletionTests.test_tampered_bytes_block_despite_registered_root"
+      ],
+      "required_test_selectors": [
+        "test_completion_coverage.CompletionCoverage.",
+        "test_manifest_roots.ManifestRootTests.",
+        "test_registered_completion.RegisteredCompletionTests."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-11",
+      "title": "Completion receipts and protected completion state",
+      "status": "NOT AWARDED",
+      "test_count": 19,
+      "test_ids": [
+        "test_atomic_completion.AtomicCompletionTests.test_application_role_cannot_use_writer_adapter",
+        "test_atomic_completion.AtomicCompletionTests.test_committed_receipt_readable_in_fresh_process",
+        "test_atomic_completion.AtomicCompletionTests.test_failure_after_insert_rolls_back_receipt",
+        "test_atomic_completion.AtomicCompletionTests.test_historical_receipt_does_not_override_later_revocation",
+        "test_atomic_completion.AtomicCompletionTests.test_revoked_consent_cannot_write_receipt",
+        "test_atomic_completion.AtomicCompletionTests.test_tampering_cannot_write_receipt",
+        "test_atomic_completion.AtomicCompletionTests.test_unregistered_new_seal_cannot_write_receipt",
+        "test_atomic_completion.AtomicCompletionTests.test_valid_evaluation_records_and_retries_once",
+        "test_completion_concurrency.CompletionConcurrencyTests.test_concurrent_revocation_has_only_serialized_outcomes",
+        "test_completion_concurrency.CompletionConcurrencyTests.test_distinct_concurrent_requests_record_distinct_receipts",
+        "test_completion_concurrency.CompletionConcurrencyTests.test_identical_concurrent_request_creates_one_receipt",
+        "test_completion_receipts.CompletionReceiptTests.test_application_cannot_record_or_insert",
+        "test_completion_receipts.CompletionReceiptTests.test_application_cannot_update_delete_or_truncate_recorded_receipt",
+        "test_completion_receipts.CompletionReceiptTests.test_missing_context_rejected",
+        "test_completion_receipts.CompletionReceiptTests.test_other_tenant_cannot_read_receipt",
+        "test_completion_receipts.CompletionReceiptTests.test_privileged_record_and_same_snapshot_retry",
+        "test_completion_receipts.CompletionReceiptTests.test_request_cannot_be_reused_for_different_snapshot",
+        "test_completion_receipts.CompletionReceiptTests.test_stale_seal_rejected_without_receipt",
+        "test_completion_receipts.CompletionReceiptTests.test_wrong_sequence_rejected_without_receipt"
+      ],
+      "required_test_selectors": [
+        "test_completion_receipts.CompletionReceiptTests.",
+        "test_atomic_completion.AtomicCompletionTests.",
+        "test_completion_concurrency.CompletionConcurrencyTests."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-12",
+      "title": "Revocation, tampering, and invalidation behavior",
+      "status": "NOT AWARDED",
+      "test_count": 27,
+      "test_ids": [
+        "test_atomic_completion.AtomicCompletionTests.test_application_role_cannot_use_writer_adapter",
+        "test_atomic_completion.AtomicCompletionTests.test_committed_receipt_readable_in_fresh_process",
+        "test_atomic_completion.AtomicCompletionTests.test_failure_after_insert_rolls_back_receipt",
+        "test_atomic_completion.AtomicCompletionTests.test_historical_receipt_does_not_override_later_revocation",
+        "test_atomic_completion.AtomicCompletionTests.test_revoked_consent_cannot_write_receipt",
+        "test_atomic_completion.AtomicCompletionTests.test_tampering_cannot_write_receipt",
+        "test_atomic_completion.AtomicCompletionTests.test_unregistered_new_seal_cannot_write_receipt",
+        "test_atomic_completion.AtomicCompletionTests.test_valid_evaluation_records_and_retries_once",
+        "test_process_recovery.PersistedEvidenceRecovery.test_full_evidence_reconstructs_in_fresh_process",
+        "test_process_recovery.PersistedEvidenceRecovery.test_full_history_retry_is_idempotent",
+        "test_process_recovery.PersistedEvidenceRecovery.test_other_tenant_cannot_load_evidence",
+        "test_process_recovery.PersistedEvidenceRecovery.test_persisted_consent_revocation_blocks_completion",
+        "test_process_recovery.PersistedEvidenceRecovery.test_tampered_bytes_block_persisted_history",
+        "test_process_recovery.PersistedEvidenceRecovery.test_wrong_root_blocks_persisted_history",
+        "test_receipt_inspection.ReceiptInspectionTests.test_fresh_process_reads_same_metadata",
+        "test_receipt_inspection.ReceiptInspectionTests.test_metadata_matches_committed_snapshot",
+        "test_receipt_inspection.ReceiptInspectionTests.test_new_note_changes_snapshot_without_implying_ineligibility",
+        "test_receipt_inspection.ReceiptInspectionTests.test_other_tenant_cannot_inspect_receipt",
+        "test_receipt_inspection.ReceiptInspectionTests.test_revocation_marks_history_mismatch_not_current_completion",
+        "test_receipt_inspection.ReceiptInspectionTests.test_unknown_request_rejected",
+        "test_registered_completion.RegisteredCompletionTests.test_eligible_history_without_registered_root_blocks",
+        "test_registered_completion.RegisteredCompletionTests.test_fresh_process_loads_root_without_caller_digest",
+        "test_registered_completion.RegisteredCompletionTests.test_new_seal_requires_its_own_registration",
+        "test_registered_completion.RegisteredCompletionTests.test_other_tenant_cannot_evaluate_registered_session",
+        "test_registered_completion.RegisteredCompletionTests.test_registered_root_allows_current_eligible_snapshot",
+        "test_registered_completion.RegisteredCompletionTests.test_registered_root_does_not_override_revoked_consent",
+        "test_registered_completion.RegisteredCompletionTests.test_tampered_bytes_block_despite_registered_root"
+      ],
+      "required_test_selectors": [
+        "test_atomic_completion.AtomicCompletionTests.",
+        "test_registered_completion.RegisteredCompletionTests.",
+        "test_receipt_inspection.ReceiptInspectionTests.",
+        "test_process_recovery.PersistedEvidenceRecovery."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [
+        "BINDING-REVOCATION-NEXT-TRANSACTION"
+      ],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-13",
+      "title": "Restart, recovery, and replay",
+      "status": "NOT AWARDED",
+      "test_count": 14,
+      "test_ids": [
+        "test_process_recovery.PersistedEvidenceRecovery.test_full_evidence_reconstructs_in_fresh_process",
+        "test_process_recovery.PersistedEvidenceRecovery.test_full_history_retry_is_idempotent",
+        "test_process_recovery.PersistedEvidenceRecovery.test_other_tenant_cannot_load_evidence",
+        "test_process_recovery.PersistedEvidenceRecovery.test_persisted_consent_revocation_blocks_completion",
+        "test_process_recovery.PersistedEvidenceRecovery.test_tampered_bytes_block_persisted_history",
+        "test_process_recovery.PersistedEvidenceRecovery.test_wrong_root_blocks_persisted_history",
+        "test_process_recovery.ProcessRecovery.test_committed_history_survives_fresh_reader_process",
+        "test_receipt_inspection.ReceiptInspectionTests.test_fresh_process_reads_same_metadata",
+        "test_receipt_inspection.ReceiptInspectionTests.test_metadata_matches_committed_snapshot",
+        "test_receipt_inspection.ReceiptInspectionTests.test_new_note_changes_snapshot_without_implying_ineligibility",
+        "test_receipt_inspection.ReceiptInspectionTests.test_other_tenant_cannot_inspect_receipt",
+        "test_receipt_inspection.ReceiptInspectionTests.test_revocation_marks_history_mismatch_not_current_completion",
+        "test_receipt_inspection.ReceiptInspectionTests.test_unknown_request_rejected",
+        "test_tenant_authority_vertical_slice.TenantAuthorityVerticalSlice.test_evidence_receipt_restart_isolation_and_revocation"
+      ],
+      "required_test_selectors": [
+        "test_process_recovery.ProcessRecovery.",
+        "test_process_recovery.PersistedEvidenceRecovery.",
+        "test_receipt_inspection.ReceiptInspectionTests.",
+        "test_tenant_authority_vertical_slice.TenantAuthorityVerticalSlice."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    },
+    {
+      "id": "DB-14",
+      "title": "Failure handling, end-to-end acceptance, and evidence reporting",
+      "status": "NOT AWARDED",
+      "test_count": 21,
+      "test_ids": [
+        "test_counted_runner.CountedRunnerTests.test_class_setup_failure_recorded_without_execution",
+        "test_counted_runner.CountedRunnerTests.test_cleanup_error_cannot_be_success",
+        "test_counted_runner.CountedRunnerTests.test_empty_suite_cannot_be_success",
+        "test_counted_runner.CountedRunnerTests.test_exception_cannot_be_success",
+        "test_counted_runner.CountedRunnerTests.test_expected_failure_cannot_be_success",
+        "test_counted_runner.CountedRunnerTests.test_failure_cannot_be_success",
+        "test_counted_runner.CountedRunnerTests.test_passing_case_is_recorded",
+        "test_counted_runner.CountedRunnerTests.test_skip_cannot_be_success",
+        "test_counted_runner.CountedRunnerTests.test_source_revision_metadata_distinguishes_candidate_and_merge_checkout",
+        "test_counted_runner.CountedRunnerTests.test_subtest_error_cannot_be_success",
+        "test_counted_runner.CountedRunnerTests.test_subtest_failure_cannot_be_success",
+        "test_counted_runner.CountedRunnerTests.test_unexpected_success_cannot_be_success",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_checksum_generation_failure_blocks",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_compare_failure_preserved",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_footer_exclusion_is_explicit",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_gate_failure_preserved",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_harness_failure_preserved",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_manifest_hash_failure_preserved",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_payload_tampering_blocks",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_primary_failure_not_masked_by_checksum_failure",
+        "test_evidence_finalizer.EvidenceFinalizerTests.test_success_verifies_checksums"
+      ],
+      "required_test_selectors": [
+        "test_counted_runner.CountedRunnerTests.",
+        "test_evidence_finalizer.EvidenceFinalizerTests."
+      ],
+      "missing_test_selectors": [],
+      "failed_tests": [],
+      "required_sql_checks": [],
+      "missing_sql_checks": [],
+      "failed_sql_checks": [],
+      "candidate_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "evidence_commit": "6da5ea36b3fc07802fab09169bdce054889f0ff9",
+      "criteria_result": "PASS",
+      "blocking_reason": "C2C-DB-AC-001 is not yet formally adopted"
+    }
+  ],
+  "counted_test_summary": {
+    "suite": "database",
+    "discovered": 307,
+    "executed": 307,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "expected_failures": 0,
+    "unexpected_successes": 0,
+    "successful": true
+  },
+  "counted_test_report_path": "output/database-runs/9e0bba3d3889465cb66aa5efb740336d/database-evidence/counted-tests.json",
+  "counted_test_report_sha256": "e01754a603b0cdc8207810e8f5a9d7945ea0677e7c058d7ced8d27c9b3d1a790",
+  "overall_acceptance": "NOT ACCEPTED",
+  "diagnostics_successful": true
+}
