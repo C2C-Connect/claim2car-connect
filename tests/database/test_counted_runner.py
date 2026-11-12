@@ -1,8 +1,13 @@
 """Regression tests for evidence accounting; no database connection required."""
 import contextlib
 import io
+import json
+import os
+from pathlib import Path
+import tempfile
 import unittest
-from scripts.run_counted_tests import run_suite
+from unittest.mock import patch
+from scripts.run_counted_tests import run_suite, source_revision_metadata
 
 class CountedRunnerTests(unittest.TestCase):
     def execute_case(self, body, decorator=None):
@@ -19,6 +24,26 @@ class CountedRunnerTests(unittest.TestCase):
         self.assertEqual(record['tests'][0]['id'], case.id())
         self.assertGreaterEqual(record['tests'][0]['duration_seconds'], 0)
         return record
+
+    def test_source_revision_metadata_distinguishes_candidate_and_merge_checkout(self):
+        event = {
+            'pull_request': {
+                'head': {'sha': 'candidate-head-sha'},
+                'base': {'sha': 'base-main-sha'},
+            }
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            event_path = Path(temporary) / 'event.json'
+            event_path.write_text(json.dumps(event), encoding='utf-8')
+            with patch.dict(os.environ, {'GITHUB_EVENT_PATH': str(event_path)}):
+                with patch('scripts.run_counted_tests.subprocess.check_output',
+                           return_value='tested-merge-checkout-sha'):
+                    result = source_revision_metadata()
+        self.assertEqual(result, {
+            'candidate_commit': 'candidate-head-sha',
+            'tested_checkout_commit': 'tested-merge-checkout-sha',
+            'base_commit': 'base-main-sha',
+        })
 
     def test_passing_case_is_recorded(self):
         record = self.execute_case(lambda case: case.assertTrue(True))
