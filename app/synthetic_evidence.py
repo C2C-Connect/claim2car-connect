@@ -7,6 +7,7 @@ from hashlib import sha256
 import re
 from app.domain_events import EventJournal, VERSION, nonempty
 from app.evidence_manifest import ManifestEntry, build_manifest, verify_manifest, load_shot_contract
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 @dataclass(frozen=True)
 class Consent:
@@ -60,6 +61,7 @@ class Seal:
 @dataclass(frozen=True)
 class EvidenceState:
     session_id: str
+    shot_list_version: str = LEGACY_CAPTURE_PROTOCOL
     created: bool = False
     consent: Consent | None = None
     vehicle: Vehicle | None = None
@@ -88,14 +90,20 @@ def typed(cls,payload):
 
 def reconstruct(session_id,events):
     journal=EventJournal.replay(session_id,events)
-    slots=load_shot_contract()[1]
     state=EvidenceState(session_id)
     for event in journal.events:
         p=event.payload
         if event.kind=='SESSION_CREATED':
-            if state.created or event.sequence!=1 or p!={'synthetic':True} or type(p.get('synthetic')) is not bool:
+            if (state.created or event.sequence!=1 or type(p) is not dict
+                    or set(p) not in ({'synthetic'}, {'synthetic','shot_list_version'})
+                    or type(p.get('synthetic')) is not bool or p.get('synthetic') is not True):
                 raise ValueError('INVALID_SYNTHETIC_CREATION')
-            state=replace(state,created=True)
+            version=p.get('shot_list_version', LEGACY_CAPTURE_PROTOCOL)
+            try:
+                version=require_implemented_protocol(version).version
+            except (ValueError, TypeError, OSError):
+                raise ValueError('INVALID_SHOT_CONTRACT') from None
+            state=replace(state,created=True,shot_list_version=version)
             continue
         if not state.created:
             raise ValueError('SESSION_NOT_CREATED')
@@ -112,16 +120,21 @@ def reconstruct(session_id,events):
             state=replace(state,vehicle=item)
         elif event.kind=='ARTIFACT_REGISTERED':
             item=typed(Artifact,p)
+            existing=next((a for a in state.artifacts if a.artifact_id==item.artifact_id),None)
+            if existing is not None and existing!=item:
+                raise ValueError('CONFLICTING_ARTIFACT')
+            try:
+                slots=require_implemented_protocol(state.shot_list_version).slots
+            except (ValueError, TypeError, OSError):
+                raise ValueError('INVALID_SHOT_CONTRACT') from None
             if not nonempty(item.artifact_id) or not isinstance(item.slot,str) or item.slot not in slots:
                 raise ValueError('INVALID_ARTIFACT_ID_OR_SLOT')
             if not isinstance(item.bytes_hex,str) or re.fullmatch(r'(?:[0-9a-f]{2})+',item.bytes_hex) is None:
                 raise ValueError('INVALID_ARTIFACT_BYTES')
             if not isinstance(item.sha256_hex,str) or sha256(bytes.fromhex(item.bytes_hex)).hexdigest()!=item.sha256_hex:
                 raise ValueError('ARTIFACT_HASH_MISMATCH')
-            existing=next((a for a in state.artifacts if a.artifact_id==item.artifact_id),None)
             if existing is not None:
-                if existing!=item:
-                    raise ValueError('CONFLICTING_ARTIFACT')
+                pass
             elif any(a.slot==item.slot for a in state.artifacts):
                 raise ValueError('DUPLICATE_CAPTURE_SLOT')
             else:
@@ -155,7 +168,11 @@ def reconstruct(session_id,events):
     return state
 
 def manifest_for(state):
-    return build_manifest(state.session_id,tuple(ManifestEntry(a.artifact_id,a.slot,a.sha256_hex) for a in state.artifacts))
+    return build_manifest(
+        state.session_id,
+        tuple(ManifestEntry(a.artifact_id,a.slot,a.sha256_hex) for a in state.artifacts),
+        protocol_version=state.shot_list_version,
+    )
 
 def evaluate(session_id,events,supplied_bytes,trusted_digest):
     history=tuple(events)
