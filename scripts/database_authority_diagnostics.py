@@ -196,7 +196,8 @@ def verify(report,admin,connections,tenants,session):
 def run(report):
     admin_url = os.environ['MIGRATION_TEST_ADMIN_URL']
     app_url = os.environ['APP_DATABASE_URL']
-    for url,user in ((admin_url,'postgres'),(app_url,'faos_app')):
+    migrator_url = os.environ['MIGRATION_DATABASE_URL']
+    for url,user in ((admin_url,'postgres'),(app_url,'faos_app'),(migrator_url,'faos_migrator')):
         config = conninfo_to_dict(url)
         expect(all(config.get(k)==v for k,v in {'host':'127.0.0.1','port':'55432','dbname':'claim2car_test','user':user}.items()),'EXPLICIT_SYNTHETIC_TARGET_REQUIRED')
     tenants = [str(uuid.uuid4()),str(uuid.uuid4())]
