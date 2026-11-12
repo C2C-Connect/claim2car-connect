@@ -205,28 +205,31 @@ def verify_postcutover_context_reset(report,connections,tenants):
     expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None,'TENANT_CONTEXT_LEAKED_AFTER_REUSE')
     report['checks'].append({'id':'POSTCUTOVER-CONTEXT-RESET','status':'PASS','same_connection_reused':True})
 
-def verify_protocol_16_root_binding(report,admin,conn,tenant):
+def verify_protocol_16_root_binding(report,admin,conn,tenant,admin_url):
     session='protocol16-'+uuid.uuid4().hex
     seal='protocol16-seal-'+uuid.uuid4().hex
     digest='a'*64
+    role='rootfixture_'+uuid.uuid4().hex
+    password=uuid.uuid4().hex
+    root_conn=None
     payload=json.dumps({'manifest_digest':digest,'schema_version':'0.1','shot_list_version':'claims2car-16-v1'},sort_keys=True,separators=(',',':'))
-    admin.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
-                  (tenant,session,'claims2car-16-v1'))
-    event=DomainEvent(session,seal,1,'MANIFEST_SEALED','synthetic-protocol-test','2026-01-01T00:00:00Z','16-v1 root binding',payload)
-    expect(append(conn,tenant,event)=='ACCEPTED','PROTOCOL_16_SEAL_APPEND_FAILED')
     try:
-        with admin.transaction():
-            admin.execute('SET LOCAL ROLE faos_writer')
-            admin.execute("SELECT set_config('faos.tenant_id',%s,true)",(tenant,))
-            result=admin.execute('SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
-                                 (tenant,session,seal,digest,'claims2car-16-v1')).fetchone()[0]
+        admin.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
+                      (tenant,session,'claims2car-16-v1'))
+        admin.execute(sql.SQL('CREATE ROLE {} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(password)))
+        admin.execute(sql.SQL('GRANT faos_app,faos_fixture TO {}').format(sql.Identifier(role)))
+        expect(admin.execute('INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id) SELECT oid,rolname,%s FROM pg_roles WHERE rolname=%s',(tenant,role)).rowcount==1,'ROOT_FIXTURE_BINDING_NOT_CREATED')
+        root_conn=psycopg.connect(make_conninfo(admin_url,user=role,password=password),autocommit=True,connect_timeout=5)
+        event=DomainEvent(session,seal,1,'MANIFEST_SEALED','synthetic-protocol-test','2026-01-01T00:00:00Z','16-v1 root binding',payload)
+        expect(append(conn,tenant,event)=='ACCEPTED','PROTOCOL_16_SEAL_APPEND_FAILED')
+        with tenant_transaction(root_conn,tenant):
+            result=root_conn.execute('SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                                     (tenant,session,seal,digest,'claims2car-16-v1')).fetchone()[0]
             expect(result=='REGISTERED','PROTOCOL_16_ROOT_NOT_REGISTERED')
         try:
-            with admin.transaction():
-                admin.execute('SET LOCAL ROLE faos_writer')
-                admin.execute("SELECT set_config('faos.tenant_id',%s,true)",(tenant,))
-                admin.execute('SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
-                              (tenant,session,seal,digest,'claims2car-12-v1'))
+            with tenant_transaction(root_conn,tenant):
+                root_conn.execute('SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                                  (tenant,session,seal,digest,'claims2car-12-v1'))
                 raise AssertionError('PROTOCOL_MISMATCH_ROOT_ACCEPTED')
         except psycopg.errors.RaiseException as error:
             expect(error.diag.message_primary=='ROOT_PROTOCOL_SESSION_MISMATCH','WRONG_PROTOCOL_MISMATCH_ERROR')
@@ -235,9 +238,14 @@ def verify_protocol_16_root_binding(report,admin,conn,tenant):
         expect(roots==[('claims2car-16-v1',)],'PROTOCOL_16_ROOT_VERSION_NOT_PERSISTED')
         report['checks'].append({'id':'POSTCUTOVER-ROOT-16-PROTOCOL-BINDING','status':'PASS','mismatch_error':'ROOT_PROTOCOL_SESSION_MISMATCH'})
     finally:
+        if root_conn is not None:
+            root_conn.close()
         admin.execute('DELETE FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',(tenant,session))
         admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s',(tenant,session))
         admin.execute('DELETE FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',(tenant,session))
+        admin.execute('DELETE FROM faos.tenant_login_bindings WHERE role_name=%s',(role,))
+        admin.execute(sql.SQL('DROP ROLE IF EXISTS {}').format(sql.Identifier(role)))
+
 
 def run(report):
     admin_url = os.environ['MIGRATION_TEST_ADMIN_URL']
@@ -312,7 +320,7 @@ def run(report):
             report['checks'].append({'id':'CANONICAL-UNICODE-DECIMAL-POSITIVE-CONTROL','status':'PASS','round_trip':'byte-for-byte'})
             verify(report,admin,connections,tenants,session)
             verify_postcutover_context_reset(report,connections,tenants)
-            verify_protocol_16_root_binding(report,admin,connections[0],tenants[0])
+            verify_protocol_16_root_binding(report,admin,connections[0],tenants[0],admin_url)
             expect(admin.execute('UPDATE faos.tenant_login_bindings SET enabled=false WHERE role_name=%s',(roles[0],)).rowcount==1,'REVOCATION_FAILED')
             denied(connections[0],tenants[0],event)
             expect(load_journal(connections[1],tenants[1],session).events==(event,),'OTHER_TENANT_DISRUPTED')
@@ -344,6 +352,7 @@ if __name__ == '__main__':
     except Exception as error:
         report['diagnostics_successful'] = False
         report['execution_error_type'] = type(error).__name__
+        report['execution_error_message'] = str(error)
     path = Path('output/acceptance-diagnostics/report.json')
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(json.dumps(report,indent=2)+'\n')
