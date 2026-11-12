@@ -68,10 +68,13 @@ GATE_TESTS = {
             "test_event_contract_regression.EventContractRegression.",
             "test_adapter_validation.TestAdapterValidation.",
             "test_migration_controls_integration.MigrationControlsIntegration.test_full_migration_enforces_python_sql_event_contract_parity",
+            "test_migration_controls_integration.MigrationControlsIntegration.test_parity_migration_preserves_existing_event_payload_bytes",
+            "test_migration_controls_integration.MigrationControlsIntegration.test_noncanonical_historical_event_blocks_parity_migration_without_rewrite",
         ),
         (
             "G06-timestamp", "G06-naive_timestamp", "G06-compact_payload",
-            "G06-key_order", "G06-numeric_exponent", "COMPACT-JSON-POSITIVE-CONTROL",
+            "G06-key_order", "G06-numeric_exponent", "G06-unicode_escape",
+            "G06-unicode-positive-control", "COMPACT-JSON-POSITIVE-CONTROL",
         ),
     ),
     "DB-07": (
@@ -99,6 +102,8 @@ GATE_TESTS = {
             "test_event_contract_regression.EventContractRegression.",
             "test_journal_integration.TestJournalIntegration.",
             "test_journal_integration.TestConcurrentJournal.",
+            "test_migration_controls_integration.MigrationControlsIntegration.test_parity_migration_preserves_existing_event_payload_bytes",
+            "test_migration_controls_integration.MigrationControlsIntegration.test_noncanonical_historical_event_blocks_parity_migration_without_rewrite",
         ),
         (),
     ),
