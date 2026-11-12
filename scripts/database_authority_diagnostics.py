@@ -209,7 +209,7 @@ def run(report):
         try:
             for tenant in tenants:
                 admin.execute('INSERT INTO faos.organizations VALUES (%s,%s)',(tenant,'synthetic post-cutover diagnostic'))
-                admin.execute('INSERT INTO faos.sessions VALUES (%s,%s)',(tenant,session))
+                admin.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',(tenant,session,'claims2car-12-v1'))
                 role,password = 'cutover_'+uuid.uuid4().hex,uuid.uuid4().hex
                 admin.execute(sql.SQL('CREATE ROLE {} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(password)))
                 roles.append(role)
@@ -246,6 +246,7 @@ def run(report):
                 ('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact'),
                 ('key_order','2026-01-01T00:00:00Z','{"z":1,"a":2}','event_payload_python_canonical'),
                 ('numeric_exponent','2026-01-01T00:00:00Z','{"value":1e0}','event_payload_python_canonical'),
+                ('unicode_escape','2026-01-01T00:00:00Z','{"label":"\\u00e9"}','event_payload_python_canonical'),
             ]:
                 try:
                     with tenant_transaction(connections[0],tenants[0]):
@@ -255,12 +256,12 @@ def run(report):
                     expect(error.sqlstate=='23514' and error.diag.constraint_name==constraint,'WRONG_VALIDATION_REJECTION')
                 expect(load_journal(connections[0],tenants[0],session).events==(event,),'REJECTED_EVENT_CHANGED_HISTORY')
                 report['checks'].append({'id':'G06-'+name,'status':'PASS','constraint_name':constraint})
-            payload = json.dumps({'message':'a b','quote':'a" b'},sort_keys=True,separators=(',',':'))
+            payload = '{"label":"é","metric":0.00001,"whole":1.0}'
             positive = DomainEvent(session,'event-2',2,'SESSION_CREATED','synthetic-test','2026-01-01T00:00:00Z','compact positive control',payload)
             expect(append(connections[0],tenants[0],positive)=='ACCEPTED','COMPACT_APPEND_FAILED')
             expect(append(connections[0],tenants[0],positive)=='DUPLICATE','COMPACT_RETRY_FAILED')
             expect(load_journal(connections[0],tenants[0],session).events==(event,positive),'COMPACT_READBACK_FAILED')
-            report['checks'].append({'id':'COMPACT-JSON-POSITIVE-CONTROL','status':'PASS'})
+            report['checks'].append({'id':'CANONICAL-UNICODE-DECIMAL-POSITIVE-CONTROL','status':'PASS','round_trip':'byte-for-byte'})
             verify(report,admin,connections,tenants,session)
             expect(admin.execute('UPDATE faos.tenant_login_bindings SET enabled=false WHERE role_name=%s',(roles[0],)).rowcount==1,'REVOCATION_FAILED')
             denied(connections[0],tenants[0],event)

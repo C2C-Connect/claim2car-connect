@@ -22,7 +22,7 @@ class ManifestRootTests(unittest.TestCase):
         self.assertEqual(self.conn.execute('SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone(), ('faos_app', False, False))
         with tenant_transaction(self.conn, self.tenant):
             self.conn.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)', (self.tenant, 'synthetic root fixture'))
-            self.conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)', (self.tenant, self.session))
+            self.conn.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)', (self.tenant, self.session, self.version))
         for event in self.events:
             self.assertEqual(append(self.conn, self.tenant, event), 'ACCEPTED')
 
@@ -93,6 +93,34 @@ class ManifestRootTests(unittest.TestCase):
 
     def test_missing_context_cannot_register(self):
         self.assert_registration_rejected(self.values, 'TENANT_CONTEXT_MISMATCH', context=False)
+
+
+    def test_protocol_16_root_registration_and_session_binding(self):
+        from app.domain_events import DomainEvent
+        session16 = self.session + '-16'
+        digest16 = 'a' * 64
+        seal16 = DomainEvent(
+            session16, 'seal-16', 1, 'MANIFEST_SEALED', 'synthetic-test',
+            '2026-01-01T00:00:00Z', 'synthetic 16-v1 root',
+            '{"manifest_digest":"' + digest16 + '","schema_version":"0.1","shot_list_version":"claims2car-16-v1"}',
+        )
+        with tenant_transaction(self.conn, self.tenant):
+            self.conn.execute(
+                'INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
+                (self.tenant, session16, 'claims2car-16-v1'),
+            )
+        self.assertEqual(append(self.conn, self.tenant, seal16), 'ACCEPTED')
+        values16 = (self.tenant, session16, 'seal-16', digest16, 'claims2car-16-v1')
+        self.assertEqual(self.register(values16), 'REGISTERED')
+        with self.assertRaises(psycopg.errors.RaiseException) as caught:
+            self.register((self.tenant, session16, 'seal-16', digest16, 'claims2car-12-v1'))
+        self.assertEqual(caught.exception.diag.message_primary, 'ROOT_PROTOCOL_SESSION_MISMATCH')
+        with tenant_transaction(self.conn, self.tenant):
+            roots = self.conn.execute(
+                'SELECT shot_list_version FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',
+                (self.tenant, session16),
+            ).fetchall()
+        self.assertEqual(roots, [('claims2car-16-v1',)])
 
 if __name__ == '__main__':
     unittest.main()
