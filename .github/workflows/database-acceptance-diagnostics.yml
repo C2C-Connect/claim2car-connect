@@ -67,23 +67,27 @@ jobs:
         run: |
           import json, os, subprocess
           from pathlib import Path
-          source = subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          checkout = subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
           out = Path('output/structured-evidence')
           out.mkdir(parents=True,exist_ok=True)
-          metadata = {'candidate_commit':source,'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
-                      'event':os.environ['GITHUB_EVENT_NAME'],'ref':os.environ['GITHUB_REF'],
+          report = Path('output/acceptance-diagnostics/report.json')
+          value = json.loads(report.read_text()) if report.is_file() else {}
+          source = value.get('candidate_commit') or checkout
+          metadata = {'candidate_commit':source,'tested_checkout_commit':value.get('tested_checkout_commit', checkout),
+                      'base_commit':value.get('base_commit'),'run_id':os.environ['GITHUB_RUN_ID'],
+                      'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'event':os.environ['GITHUB_EVENT_NAME'],
+                      'ref':os.environ['GITHUB_REF'],
                       'classification':'executable-db-01-through-db-14-gate-results','gate_passes_awarded':0,
-                      'overall_acceptance':'NOT ACCEPTED',
+                      'criteria_passes':0,'overall_acceptance':'NOT ACCEPTED',
                       'component_phase':'legacy primary through0007; isolated full-authority migration and integration databases',
                       'diagnostic_phase':'primary after full default migration plan through0018'}
-          report = Path('output/acceptance-diagnostics/report.json')
           metadata['diagnostic_report_present'] = report.is_file()
           if report.is_file():
-              value = json.loads(report.read_text())
               metadata['classification'] = value.get('classification', metadata['classification'])
               metadata['gate_passes_awarded'] = value.get('gate_passes_awarded', 0)
+              metadata['criteria_passes'] = value.get('criteria_passes', 0)
               metadata['overall_acceptance'] = value.get('overall_acceptance', 'NOT ACCEPTED')
-              allowed = ('classification','commit','contract','contract_status','gate_passes_awarded','gate_verification_successful','acceptance_blockers','checks','database','environment','extensions','migration_inventory','complete_gate_results','counted_test_summary','counted_test_report_path','counted_test_report_sha256','overall_acceptance','diagnostics_successful','execution_error_type')
+              allowed = ('classification','commit','candidate_commit','tested_checkout_commit','base_commit','contract','contract_status','gate_passes_awarded','criteria_passes','gate_verification_successful','acceptance_blockers','checks','database','environment','extensions','migration_inventory','complete_gate_results','counted_test_summary','counted_test_report_path','counted_test_report_sha256','overall_acceptance','diagnostics_successful','execution_error_type')
               (out/'diagnostic-report.json').write_text(json.dumps({k:value[k] for k in allowed if k in value},indent=2)+'\\n')
           counted = list(Path('output/database-runs').rglob('counted-tests.json'))
           metadata['counted_test_report_count'] = len(counted)
