@@ -322,8 +322,11 @@ if __name__ == '__main__':
     try:
         counted_path, counted_tests = load_counted_database_report()
         report['counted_test_report_path'] = str(counted_path)
-        import hashlib
         report['counted_test_report_sha256'] = hashlib.sha256(counted_path.read_bytes()).hexdigest()
+        report['candidate_commit'] = counted_tests.get('candidate_commit')
+        report['tested_checkout_commit'] = counted_tests.get('tested_checkout_commit')
+        report['base_commit'] = counted_tests.get('base_commit')
+        report['commit'] = report['candidate_commit'] or report['commit']
         run_all_gate_verifiers(report, counted_tests, environment_is_synthetic=(report.get('environment', {}).get('classification') == 'synthetic_isolated'), contract_adopted=contract_adopted)
     except Exception as error:
         report['gate_verification_successful'] = False
