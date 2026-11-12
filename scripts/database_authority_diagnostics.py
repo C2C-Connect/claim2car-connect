@@ -10,7 +10,8 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from app.domain_events import DomainEvent
 from database.journal import append, tenant_transaction
 from database.readback import load_journal
-from tests.database.verify_gates import run_gate_verification
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tests' / 'database'))
+from verify_gates import run_gate_verification
 
 APPEND = 'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)'
 
