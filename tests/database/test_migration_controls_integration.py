@@ -122,7 +122,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                     "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v1' WHERE tenant_id=%s AND session_id=%s",
                     (tenant,legacy_session))
             self.assertEqual(raised.exception.diag.message_primary,'CAPTURE_PROTOCOL_VERSION_IMMUTABLE')
-            self.assertEqual(apply(self.conn,(plan[-1],)),(plan[-1].name,))
+            self.assertEqual(apply(self.conn,plan),(plan[-1].name,))
 
     def test_full_migration_enforces_python_sql_event_contract_parity(self):
         from app.domain_events import DomainEvent, KINDS
