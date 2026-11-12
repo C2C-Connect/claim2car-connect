@@ -22,7 +22,7 @@ class ManifestRootTests(unittest.TestCase):
         self.assertEqual(self.conn.execute('SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone(), ('faos_app', False, False))
         with tenant_transaction(self.conn, self.tenant):
             self.conn.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)', (self.tenant, 'synthetic root fixture'))
-            self.has_protocol_column = self.conn.execute(\"SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')\").fetchone()[0]
+            self.has_protocol_column = self.conn.execute("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')").fetchone()[0]
             if self.has_protocol_column:
                 self.conn.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)', (self.tenant, self.session, self.version))
             else:
@@ -101,7 +101,7 @@ class ManifestRootTests(unittest.TestCase):
 
     def test_protocol_16_root_registration_and_session_binding(self):
         if not self.has_protocol_column:
-            self.assertFalse(self.conn.execute(\"SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')\").fetchone()[0])
+            self.assertFalse(self.conn.execute("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')").fetchone()[0])
             return
         from app.domain_events import DomainEvent
         session16 = self.session + '-16'

@@ -30,9 +30,9 @@ class TenantAuthorityVerticalSlice(unittest.TestCase):
         events,data,digest = CompletionCoverage().fixture()
         session = events[0].session_id
         seal = events[-1].event_id
-        has_protocol = f.seed.execute(\"SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')\").fetchone()[0]
+        has_protocol = f.seed.execute("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')").fetchone()[0]
         if has_protocol:
-            f.seed.execute(\"INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,'claims2car-12-v1') ON CONFLICT DO NOTHING\",(tenant,session))
+            f.seed.execute("INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,'claims2car-12-v1') ON CONFLICT DO NOTHING",(tenant,session))
         else:
             f.seed.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s) ON CONFLICT DO NOTHING',(tenant,session))
         for event in events:
