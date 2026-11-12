@@ -24,6 +24,8 @@ class MigrationControlsIntegration(unittest.TestCase):
         self.url=make_conninfo(migrator_url,dbname=self.db)
         self.conn=psycopg.connect(self.url,autocommit=True)
         self.addCleanup(self.conn.close)
+        self.admin_db=psycopg.connect(make_conninfo(admin_url,dbname=self.db),autocommit=True)
+        self.addCleanup(self.admin_db.close)
         self.first=self.migration('0001_first.sql','CREATE SCHEMA faos; CREATE TABLE faos.probe(value integer); INSERT INTO faos.probe VALUES (1);')
     def drop_database(self):
         self.admin.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(self.db)))
@@ -175,6 +177,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                 '{ "a":1}',
                 '{"z":1,"a":2}',
                 '{"value":1e0}',
+                '{"label":"\\u00e9"}',
             )
             probes = [
                 ('timestamp-' + str(i), '2026-01-01T00:00:00Z', '{}')
@@ -211,6 +214,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                     (tenant, session, 'event-2'),
                 ).fetchone()
                 self.assertEqual(DomainEvent(*row).validate().payload['value'], 1.25)
+                self.assertEqual(row[7], valid_payload, 'PERSISTED_EVENT_PAYLOAD_BYTES_CHANGED')
 
             sequence = 3
             with tenant_transaction(app, tenant):
@@ -224,6 +228,62 @@ class MigrationControlsIntegration(unittest.TestCase):
                     (tenant, session),
                 ).fetchall()
                 self.assertEqual({row[0] for row in kinds}, set(KINDS))
+
+    def test_parity_migration_preserves_existing_event_payload_bytes(self):
+        plan = self.authority_plan()
+        apply(self.conn, plan[:-2])
+        tenant = str(uuid.uuid4())
+        session = 'preserve-payload-' + uuid.uuid4().hex
+        payload = '{"label":"é","metric":0.00001}'
+        self.admin_db.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                          (tenant, 'synthetic history preservation fixture'))
+        self.admin_db.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                          (tenant, session))
+        self.admin_db.execute(
+            'INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+            (tenant, session, 'preserved-event', 1, 'SESSION_CREATED',
+             'synthetic-test', '2026-01-01T00:00:00Z', 'preserve exact bytes', payload, '0.1'),
+        )
+        before = self.admin_db.execute(
+            'SELECT payload_json,occurred_at FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+            (tenant, session),
+        ).fetchone()
+        apply(self.conn, plan)
+        after = self.admin_db.execute(
+            'SELECT payload_json,occurred_at FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+            (tenant, session),
+        ).fetchone()
+        self.assertEqual(after, before, 'MIGRATION_REWROTE_HISTORICAL_EVENT_BYTES')
+
+    def test_noncanonical_historical_event_blocks_parity_migration_without_rewrite(self):
+        plan = self.authority_plan()
+        apply(self.conn, plan[:-2])
+        tenant = str(uuid.uuid4())
+        session = 'reject-history-' + uuid.uuid4().hex
+        payload = '{"z":1,"a":2}'
+        self.admin_db.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                          (tenant, 'synthetic invalid history fixture'))
+        self.admin_db.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                          (tenant, session))
+        self.admin_db.execute(
+            'INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+            (tenant, session, 'noncanonical-event', 1, 'SESSION_CREATED',
+             'synthetic-test', '2026-01-01T00:00:00Z', 'preserve invalid history',
+             payload, '0.1'),
+        )
+        before_history = self.history()
+        before_payload = self.admin_db.execute(
+            'SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+            (tenant, session),
+        ).fetchone()[0]
+        with self.assertRaises(psycopg.errors.CheckViolation):
+            apply(self.conn, plan)
+        self.assertEqual(self.history(), before_history, 'FAILED_MIGRATION_ADVANCED_LEDGER')
+        after_payload = self.admin_db.execute(
+            'SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+            (tenant, session),
+        ).fetchone()[0]
+        self.assertEqual(after_payload, before_payload, 'FAILED_MIGRATION_REWROTE_HISTORY')
 
     def test_applied_authority_migration_checksum_change_is_rejected(self):
         plan = self.authority_plan()

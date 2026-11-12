@@ -1,8 +1,10 @@
-"""Post-cutover synthetic assertions; not full 14-gate acceptance."""
+"""Post-cutover PostgreSQL assertions feeding the executable DB-01..DB-14 gate runner."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
+import sys
 import uuid
 import psycopg
 from psycopg import sql
@@ -10,6 +12,10 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from app.domain_events import DomainEvent
 from database.journal import append, tenant_transaction
 from database.readback import load_journal
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'tests' / 'database'))
+from verify_gates import run_all_gate_verifiers
 
 APPEND = 'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)'
 
@@ -191,9 +197,18 @@ def verify(report,admin,connections,tenants,session):
 def run(report):
     admin_url = os.environ['MIGRATION_TEST_ADMIN_URL']
     app_url = os.environ['APP_DATABASE_URL']
-    for url,user in ((admin_url,'postgres'),(app_url,'faos_app')):
+    migrator_url = os.environ['MIGRATION_DATABASE_URL']
+    connection_urls = {
+        'admin': (admin_url, 'postgres'),
+        'application': (app_url, 'faos_app'),
+        'migrator': (migrator_url, 'faos_migrator'),
+    }
+    sanitized = {}
+    for name,(url,user) in connection_urls.items():
         config = conninfo_to_dict(url)
         expect(all(config.get(k)==v for k,v in {'host':'127.0.0.1','port':'55432','dbname':'claim2car_test','user':user}.items()),'EXPLICIT_SYNTHETIC_TARGET_REQUIRED')
+        sanitized[name] = {key:config.get(key) for key in ('user','host','port','dbname')}
+    report['environment'] = {'classification':'synthetic_isolated','connections':sanitized}
     tenants = [str(uuid.uuid4()),str(uuid.uuid4())]
     roles = []
     connections = []
@@ -243,6 +258,7 @@ def run(report):
                 ('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact'),
                 ('key_order','2026-01-01T00:00:00Z','{"z":1,"a":2}','event_payload_python_canonical'),
                 ('numeric_exponent','2026-01-01T00:00:00Z','{"value":1e0}','event_payload_python_canonical'),
+                ('unicode_escape','2026-01-01T00:00:00Z','{"label":"\\u00e9"}','event_payload_python_canonical'),
             ]:
                 try:
                     with tenant_transaction(connections[0],tenants[0]):
@@ -252,11 +268,21 @@ def run(report):
                     expect(error.sqlstate=='23514' and error.diag.constraint_name==constraint,'WRONG_VALIDATION_REJECTION')
                 expect(load_journal(connections[0],tenants[0],session).events==(event,),'REJECTED_EVENT_CHANGED_HISTORY')
                 report['checks'].append({'id':'G06-'+name,'status':'PASS','constraint_name':constraint})
+            unicode_payload = '{"label":"é","metric":0.00001}'
+            canonical_unicode = connections[0].execute(
+                'SELECT faos.canonical_event_jsonb(%s::jsonb)', (unicode_payload,)
+            ).fetchone()[0]
+            expect(canonical_unicode == unicode_payload, 'SQL_UNICODE_OR_NUMERIC_CANONICALIZATION_MISMATCH')
+            unicode_event = DomainEvent(session,'event-unicode',2,'SESSION_CREATED','synthetic-test',
+                                        '2026-01-01T00:00:00Z','unicode and decimal positive control',unicode_payload)
+            expect(append(connections[0],tenants[0],unicode_event)=='ACCEPTED','UNICODE_APPEND_FAILED')
+            expect(load_journal(connections[0],tenants[0],session).events==(event,unicode_event),'UNICODE_READBACK_CHANGED_BYTES')
+            report['checks'].append({'id':'G06-unicode-positive-control','status':'PASS'})
             payload = json.dumps({'message':'a b','quote':'a" b'},sort_keys=True,separators=(',',':'))
-            positive = DomainEvent(session,'event-2',2,'SESSION_CREATED','synthetic-test','2026-01-01T00:00:00Z','compact positive control',payload)
+            positive = DomainEvent(session,'event-3',3,'SESSION_CREATED','synthetic-test','2026-01-01T00:00:00Z','compact positive control',payload)
             expect(append(connections[0],tenants[0],positive)=='ACCEPTED','COMPACT_APPEND_FAILED')
             expect(append(connections[0],tenants[0],positive)=='DUPLICATE','COMPACT_RETRY_FAILED')
-            expect(load_journal(connections[0],tenants[0],session).events==(event,positive),'COMPACT_READBACK_FAILED')
+            expect(load_journal(connections[0],tenants[0],session).events==(event,unicode_event,positive),'COMPACT_READBACK_FAILED')
             report['checks'].append({'id':'COMPACT-JSON-POSITIVE-CONTROL','status':'PASS'})
             verify(report,admin,connections,tenants,session)
             expect(admin.execute('UPDATE faos.tenant_login_bindings SET enabled=false WHERE role_name=%s',(roles[0],)).rowcount==1,'REVOCATION_FAILED')
@@ -271,20 +297,52 @@ def run(report):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
-    report['diagnostics_successful'] = len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks'])
+    report['diagnostics_successful'] = len(report['checks'])==14 and all(row['status']=='PASS' for row in report['checks'])
+
+def load_counted_database_report():
+    candidates = sorted(Path('output/database-runs').glob('*/database-evidence/counted-tests.json'))
+    if len(candidates) != 1:
+        raise RuntimeError('EXACTLY_ONE_COUNTED_DATABASE_TEST_REPORT_REQUIRED')
+    return candidates[0], json.loads(candidates[0].read_text(encoding='utf-8'))
+
 
 if __name__ == '__main__':
-    report = {'classification':'post-cutover-authority-diagnostics-not-gate-certification',
+    contract_source = Path('docs/acceptance/database-contract.md').read_text(encoding='utf-8')
+    contract_adopted = '**Version:** 1.0 — ADOPTED' in contract_source
+    report = {'classification':'post-cutover-executable-db-gate-verification',
               'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
-              'contract':'C2C-DB-AC-001 v1.0 proposed','gate_passes_awarded':0,'checks':[],
-              'complete_gate_results':'NOT RUN','overall_acceptance':'NOT ACCEPTED','diagnostics_successful':False}
+              'contract':'C2C-DB-AC-001 v1.0 adopted' if contract_adopted else 'C2C-DB-AC-001 v1.0 proposed',
+              'contract_status':'ADOPTED' if contract_adopted else 'PROPOSED_PENDING_OWNER_ADOPTION',
+              'gate_passes_awarded':0,'checks':[],'complete_gate_results':[],
+              'overall_acceptance':'NOT ACCEPTED','diagnostics_successful':False}
     try:
         run(report)
     except Exception as error:
         report['diagnostics_successful'] = False
         report['execution_error_type'] = type(error).__name__
+        report['execution_error_message'] = str(error)
+    try:
+        counted_path, counted_tests = load_counted_database_report()
+        report['counted_test_report_path'] = str(counted_path)
+        report['counted_test_report_sha256'] = hashlib.sha256(counted_path.read_bytes()).hexdigest()
+        report['candidate_commit'] = counted_tests.get('candidate_commit')
+        report['tested_checkout_commit'] = counted_tests.get('tested_checkout_commit')
+        report['base_commit'] = counted_tests.get('base_commit')
+        report['commit'] = report['candidate_commit'] or report['commit']
+        run_all_gate_verifiers(report, counted_tests, environment_is_synthetic=(report.get('environment', {}).get('classification') == 'synthetic_isolated'), contract_adopted=contract_adopted)
+    except Exception as error:
+        report['gate_verification_successful'] = False
+        report['gate_error_type'] = type(error).__name__
+        report['gate_error_message'] = str(error)
+        report['gate_passes_awarded'] = 0
+        report['complete_gate_results'] = [
+            {'id':f'DB-{number:02d}','status':'BLOCKED','reason':type(error).__name__}
+            for number in range(1,15)
+        ]
+        report['overall_acceptance'] = 'NOT ACCEPTED'
+        report['acceptance_blockers'] = ['COUNTED_TEST_OR_GATE_EVIDENCE_UNAVAILABLE']
     path = Path('output/acceptance-diagnostics/report.json')
     path.parent.mkdir(parents=True,exist_ok=True)
-    path.write_text(json.dumps(report,indent=2)+'\n')
+    path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(report,sort_keys=True))
-    raise SystemExit(0 if report['diagnostics_successful'] else 1)
+    raise SystemExit(0 if report.get('diagnostics_successful') and report.get('gate_verification_successful') else 1)

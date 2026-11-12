@@ -1,51 +1,38 @@
 # Claim2Car Connect — Acceptance & Release Gate Matrix
 
-**Canonical repository:** `C2C-Connect/claim2car-connect`  
-**Canonical main baseline:** `3aa87f9d1523a68a1df09c6930ab57efbd182ba4`  
-**Current implementation candidate:** PR #41, `feat/capture-protocol-16-v1`  
-**Current PR head inspected:** `6463a1087c14b89254221060218f50dd994eac7c` (2026-11-12)  
-**Machine contract:** `m1-v1`  
-**Status rule:** code, CI, field validation, review, and release authorization are recorded separately. A passing synthetic test does not establish product acceptance or production readiness.
+**Canonical repository:** `C2C-Connect/claim2car-connect`
+**Canonical main baseline:** `4c52f169239c79e45ef979f91b2e66b8e51b6336`
+**Current implementation candidate:** branch `feat/db-01-14-executable-acceptance-gates`
+**Capture protocol:** `claims2car-16-v1` is the new-session default; explicit historical `claims2car-12-v1` compatibility is preserved.
+**Database contract:** `C2C-DB-AC-001 v1.0 proposed`; owner adoption and independent review remain a separate blocker.
 
 ## Current verification snapshot — 2026-11-12
 
-**Main:** remains at the owner-approved canonical baseline `3aa87f9d1523a68a1df09c6930ab57efbd182ba4`.  
-**PR #41:** open, not merged; base `main`; head `6463a1087c14b89254221060218f50dd994eac7c`.  
-**PR #28:** closed unmerged.  
-**Capture protocol:** PR #41 implements `claims2car-16-v1` as the new-session default and retains explicit `claims2car-12-v1` compatibility.
+### PR #41 — capture protocol 16-v1
 
-### Current-head CI evidence
+PR #41 was merged into `main` after all 13 PR workflows passed on candidate head `f184f0fa3f79db660ae826ba2a7663ccf22f2373`.
 
-The 13 PR-triggered workflow runs associated with the inspected PR #41 head are all completed: **10 successful, 3 failed**. This is not a green candidate.
+- PR: [#41](https://github.com/C2C-Connect/claim2car-connect/pull/41)
+- Merge commit / current main baseline at merge: `4c52f169239c79e45ef979f91b2e66b8e51b6336`
+- Full pytest suite: **758 passed, 200 subtests passed**.
+- Database authority and legacy database workflows: passed; each reported 297 tests.
+- All 13 PR workflows completed successfully; no failed workflow remained.
+- The authority diagnostics correctly continued to report `gate_passes_awarded: 0` before executable gate implementation.
 
-Failed runs:
-- Full test suite: [run 43087879584](https://github.com/C2C-Connect/claim2car-connect/actions/runs/43087879584) — **48 failed, 711 passed, 195 subtests passed**.
-- Legacy database component verification: [run 43087879179](https://github.com/C2C-Connect/claim2car-connect/actions/runs/43087879179) — failed with 5 assertion failures and 42 errors.
-- Database authority cutover verification: [run 43087879106](https://github.com/C2C-Connect/claim2car-connect/actions/runs/43087879106) — failed during pre-cutover components; post-cutover diagnostics did not execute.
+### DB-01 through DB-14 — implementation in progress
 
-Principal failure signatures from the exact job logs:
-- `ROOT_SEAL_MISMATCH` during manifest-root registration, affecting completion receipt, manifest-root, receipt-inspection, registered-completion, and tenant-authority tests.
-- HTTP capture integration rejects the new canonical slot `00_front_exterior` with `422 INVALID_CAPTURE_EVIDENCE_REQUEST`.
-- Legacy fixture expectations and error identifiers are stale relative to the 16-v1/default implementation.
-- Capture tamper/quality/review-reference expectations also fail in the database suite.
-- Database diagnostics still classify themselves as baseline/preflight diagnostics, not 14-gate certification; `gate_passes_awarded` remains `0` and complete gate results remain `NOT RUN`.
+The new branch `feat/db-01-14-executable-acceptance-gates` adds individually callable `verify_db_01` through `verify_db_14` functions, maps each gate to recorded database test IDs and post-cutover SQL evidence, rejects missing/failed/skipped evidence, and produces structured gate results.
 
-Skipped cleanup/post-steps after failed jobs are workflow steps, not evidence of skipped tests. The 13 workflow count is not a certification count.
+Additional direct-SQL regression coverage is being added for Unicode canonicalization, numeric spelling, rejected-event immutability, and exact preservation of historical payload bytes across migrations.
 
-### Authority and acceptance interpretation
+**No gate is certified by this matrix snapshot.** The implementation branch still requires GitHub Actions execution and review. The database contract remains proposed pending owner adoption and independent review. No `gate_passes_awarded: 14` or `overall_acceptance: ACCEPTED` claim is made until the executable runner actually passes all 14 gates and the contract adoption blocker is resolved.
 
-**No 14-gate certification is established.** The current diagnostic implementation does not execute DB-01 through DB-14 as complete, individually evidenced acceptance gates. Do not infer 14/14 from a historical 297+ database-test count or from a passing preflight. Each gate requires executable criteria and actual PostgreSQL evidence.
+### Remaining acceptance and release boundaries
 
-### Still not complete / not claimed
-
-- PR #41 is not merged and its current CI is red.
-- No PR #41 merge or new main commit has occurred.
-- No integrated persistent staging or production deployment is established.
-- No real participant/field acceptance, qualified-device validation, or model accuracy certification is claimed.
-- Live Square payment settlement, external carrier/partner delivery, and live dispatch remain disabled.
-- Historical 12-v1 sessions must retain their original protocol identity; no historical evidence is reclassified.
-
-This snapshot supersedes stale historical candidate/main/CI claims below. Older entries remain for traceability and are not current-head evidence.
+- Issues #33–#38 remain open until their corresponding SQL parity, replay, immutability, and CI evidence is verified on the gate implementation branch.
+- Issue #39 remains open pending independent review and formal adoption of the database acceptance contract.
+- Synthetic PostgreSQL acceptance does not establish production readiness, real participant/field acceptance, legal admissibility, measurement accuracy, or complete commercial deployment.
+- Live Square settlement, external carrier/partner delivery, and live dispatch remain disabled unless separately authorized and verified.
 
 ## Commercial and safety controls
 

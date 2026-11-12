@@ -1,6 +1,8 @@
 import argparse
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
 import time
 import unittest
@@ -84,6 +86,25 @@ def run_suite(suite):
     }
 
 
+def source_revision_metadata():
+    checkout = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    event_path = os.environ.get('GITHUB_EVENT_PATH')
+    event = {}
+    if event_path and Path(event_path).is_file():
+        try:
+            event = json.loads(Path(event_path).read_text(encoding='utf-8'))
+        except (OSError, ValueError, TypeError):
+            event = {}
+    pull_request = event.get('pull_request') or {}
+    candidate = (pull_request.get('head') or {}).get('sha') or event.get('after') or checkout
+    base = (pull_request.get('base') or {}).get('sha')
+    return {
+        'candidate_commit': candidate,
+        'tested_checkout_commit': checkout,
+        'base_commit': base,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('suite', choices=['database', 'foundation', 'lifecycle'])
@@ -93,6 +114,7 @@ def main():
         parser.error('Only the database suite is implemented by this runner')
     suite = unittest.defaultTestLoader.discover(str(ROOT / 'tests' / 'database'), pattern='test_*.py')
     record = run_suite(suite)
+    record.update(source_revision_metadata())
     record_path = Path(args.record)
     record_path.parent.mkdir(parents=True, exist_ok=True)
     record_path.write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
