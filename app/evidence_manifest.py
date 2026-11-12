@@ -32,7 +32,10 @@ class Manifest:
         return sha256(b'Claims2Car:manifest:0.1\0'+encoded).hexdigest()
 
 def load_shot_contract(protocol_version=DEFAULT_CAPTURE_PROTOCOL):
-    protocol=require_implemented_protocol(protocol_version)
+    try:
+        protocol=require_implemented_protocol(protocol_version)
+    except (ValueError, OSError, TypeError, KeyError):
+        raise ValueError('INVALID_SHOT_CONTRACT') from None
     return protocol.version,protocol.slots
 
 def build_manifest(session_id,entries,protocol_version=DEFAULT_CAPTURE_PROTOCOL):
