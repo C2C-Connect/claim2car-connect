@@ -5,6 +5,7 @@
 ## Implemented in the current PR #31 increment
 
 - Authority migration `0018_capture_protocol_session_binding.sql` adds `faos.sessions.capture_protocol_version`.
+- Authority migration `0019_manifest_root_protocol_binding.sql` permits roots for both protocol versions and enforces exact equality with the immutable session protocol in both the registration function and a database trigger.
 - The migration backfills all existing sessions as `claims2car-12-v1`, then changes the database default for new rows to `claims2car-16-v1`.
 - A database trigger rejects attempts to change the protocol version after session creation.
 - The claim-case constructor accepts an explicit protocol ID; the default is 16-v1. Idempotent retries that attempt to change the protocol ID are rejected.

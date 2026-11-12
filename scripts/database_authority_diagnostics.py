@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import uuid
 import psycopg
 from psycopg import sql
@@ -10,6 +11,8 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from app.domain_events import DomainEvent
 from database.journal import append, tenant_transaction
 from database.readback import load_journal
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tests' / 'database'))
+from verify_gates import run_gate_verification
 
 APPEND = 'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)'
 
@@ -188,6 +191,62 @@ def verify(report,admin,connections,tenants,session):
         for brand in ('brand','extra_brand'):
             admin.execute('DELETE FROM faos.brands WHERE brand_id=%s',(ids[brand],))
 
+def verify_postcutover_context_reset(report,connections,tenants):
+    conn=connections[0]
+    with tenant_transaction(conn,tenants[0]):
+        active=conn.execute('SELECT faos.tenant_id()').fetchone()[0]
+        expect(str(active)==str(tenants[0]),'BOUND_TENANT_CONTEXT_NOT_ACTIVE')
+    expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None,'TENANT_CONTEXT_LEAKED_AFTER_TRANSACTION')
+    with tenant_transaction(conn,tenants[1]):
+        expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None,'BOUND_ROLE_ACCEPTED_CROSS_TENANT_CONTEXT')
+    with tenant_transaction(conn,tenants[0]):
+        restored=conn.execute('SELECT faos.tenant_id()').fetchone()[0]
+        expect(str(restored)==str(tenants[0]),'BOUND_TENANT_CONTEXT_NOT_RESTORED')
+    expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None,'TENANT_CONTEXT_LEAKED_AFTER_REUSE')
+    report['checks'].append({'id':'POSTCUTOVER-CONTEXT-RESET','status':'PASS','same_connection_reused':True})
+
+def verify_protocol_16_root_binding(report,admin,conn,tenant,admin_url):
+    session='protocol16-'+uuid.uuid4().hex
+    seal='protocol16-seal-'+uuid.uuid4().hex
+    digest='a'*64
+    role='rootfixture_'+uuid.uuid4().hex
+    password=uuid.uuid4().hex
+    root_conn=None
+    payload=json.dumps({'manifest_digest':digest,'schema_version':'0.1','shot_list_version':'claims2car-16-v1'},sort_keys=True,separators=(',',':'))
+    try:
+        admin.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
+                      (tenant,session,'claims2car-16-v1'))
+        admin.execute(sql.SQL('CREATE ROLE {} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(password)))
+        admin.execute(sql.SQL('GRANT faos_app,faos_fixture TO {}').format(sql.Identifier(role)))
+        expect(admin.execute('INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id) SELECT oid,rolname,%s FROM pg_roles WHERE rolname=%s',(tenant,role)).rowcount==1,'ROOT_FIXTURE_BINDING_NOT_CREATED')
+        root_conn=psycopg.connect(make_conninfo(admin_url,user=role,password=password),autocommit=True,connect_timeout=5)
+        event=DomainEvent(session,seal,1,'MANIFEST_SEALED','synthetic-protocol-test','2026-01-01T00:00:00Z','16-v1 root binding',payload)
+        expect(append(conn,tenant,event)=='ACCEPTED','PROTOCOL_16_SEAL_APPEND_FAILED')
+        with tenant_transaction(root_conn,tenant):
+            result=root_conn.execute('SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                                     (tenant,session,seal,digest,'claims2car-16-v1')).fetchone()[0]
+            expect(result=='REGISTERED','PROTOCOL_16_ROOT_NOT_REGISTERED')
+        try:
+            with tenant_transaction(root_conn,tenant):
+                root_conn.execute('SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                                  (tenant,session,seal,digest,'claims2car-12-v1'))
+                raise AssertionError('PROTOCOL_MISMATCH_ROOT_ACCEPTED')
+        except psycopg.errors.RaiseException as error:
+            expect(error.diag.message_primary=='ROOT_PROTOCOL_SESSION_MISMATCH','WRONG_PROTOCOL_MISMATCH_ERROR')
+        with tenant_transaction(conn,tenant):
+            roots=conn.execute('SELECT shot_list_version FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',(tenant,session)).fetchall()
+        expect(roots==[('claims2car-16-v1',)],'PROTOCOL_16_ROOT_VERSION_NOT_PERSISTED')
+        report['checks'].append({'id':'POSTCUTOVER-ROOT-16-PROTOCOL-BINDING','status':'PASS','mismatch_error':'ROOT_PROTOCOL_SESSION_MISMATCH'})
+    finally:
+        if root_conn is not None:
+            root_conn.close()
+        admin.execute('DELETE FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',(tenant,session))
+        admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s',(tenant,session))
+        admin.execute('DELETE FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',(tenant,session))
+        admin.execute('DELETE FROM faos.tenant_login_bindings WHERE role_name=%s',(role,))
+        admin.execute(sql.SQL('DROP ROLE IF EXISTS {}').format(sql.Identifier(role)))
+
+
 def run(report):
     admin_url = os.environ['MIGRATION_TEST_ADMIN_URL']
     app_url = os.environ['APP_DATABASE_URL']
@@ -200,13 +259,13 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        expect(report['migration_inventory'][-1][0]=='0018_capture_protocol_session_binding.sql','EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
+        expect(report['migration_inventory'][-1][0]=='0019_manifest_root_protocol_binding.sql','EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:
             for tenant in tenants:
                 admin.execute('INSERT INTO faos.organizations VALUES (%s,%s)',(tenant,'synthetic post-cutover diagnostic'))
-                admin.execute('INSERT INTO faos.sessions VALUES (%s,%s)',(tenant,session))
+                admin.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',(tenant,session,'claims2car-12-v1'))
                 role,password = 'cutover_'+uuid.uuid4().hex,uuid.uuid4().hex
                 admin.execute(sql.SQL('CREATE ROLE {} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(password)))
                 roles.append(role)
@@ -243,6 +302,7 @@ def run(report):
                 ('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact'),
                 ('key_order','2026-01-01T00:00:00Z','{"z":1,"a":2}','event_payload_python_canonical'),
                 ('numeric_exponent','2026-01-01T00:00:00Z','{"value":1e0}','event_payload_python_canonical'),
+                ('unicode_escape','2026-01-01T00:00:00Z','{"label":"\\u00e9"}','event_payload_python_canonical'),
             ]:
                 try:
                     with tenant_transaction(connections[0],tenants[0]):
@@ -252,13 +312,15 @@ def run(report):
                     expect(error.sqlstate=='23514' and error.diag.constraint_name==constraint,'WRONG_VALIDATION_REJECTION')
                 expect(load_journal(connections[0],tenants[0],session).events==(event,),'REJECTED_EVENT_CHANGED_HISTORY')
                 report['checks'].append({'id':'G06-'+name,'status':'PASS','constraint_name':constraint})
-            payload = json.dumps({'message':'a b','quote':'a" b'},sort_keys=True,separators=(',',':'))
+            payload = '{"label":"é","metric":0.00001,"whole":1.0}'
             positive = DomainEvent(session,'event-2',2,'SESSION_CREATED','synthetic-test','2026-01-01T00:00:00Z','compact positive control',payload)
             expect(append(connections[0],tenants[0],positive)=='ACCEPTED','COMPACT_APPEND_FAILED')
             expect(append(connections[0],tenants[0],positive)=='DUPLICATE','COMPACT_RETRY_FAILED')
             expect(load_journal(connections[0],tenants[0],session).events==(event,positive),'COMPACT_READBACK_FAILED')
-            report['checks'].append({'id':'COMPACT-JSON-POSITIVE-CONTROL','status':'PASS'})
+            report['checks'].append({'id':'CANONICAL-UNICODE-DECIMAL-POSITIVE-CONTROL','status':'PASS','round_trip':'byte-for-byte'})
             verify(report,admin,connections,tenants,session)
+            verify_postcutover_context_reset(report,connections,tenants)
+            verify_protocol_16_root_binding(report,admin,connections[0],tenants[0],admin_url)
             expect(admin.execute('UPDATE faos.tenant_login_bindings SET enabled=false WHERE role_name=%s',(roles[0],)).rowcount==1,'REVOCATION_FAILED')
             denied(connections[0],tenants[0],event)
             expect(load_journal(connections[1],tenants[1],session).events==(event,),'OTHER_TENANT_DISRUPTED')
@@ -271,10 +333,17 @@ def run(report):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
-    report['diagnostics_successful'] = len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks'])
+    counted_reports=sorted(Path('output/database-runs').rglob('counted-tests.json'))
+    expect(len(counted_reports)==1,'COUNTED_DATABASE_TEST_REPORT_NOT_UNIQUE')
+    counted_report=json.loads(counted_reports[0].read_text())
+    report['gate_certification'] = run_gate_verification(admin_url=admin_url, app_url=app_url, commit=report.get('commit'), diagnostic_checks=report.get('checks',[]), counted_test_report=counted_report)
+    report['gate_passes_awarded'] = report['gate_certification']['gate_passes_awarded']
+    report['complete_gate_results'] = report['gate_certification']['complete_gate_results']
+    report['overall_acceptance'] = report['gate_certification']['overall_acceptance']
+    report['diagnostics_successful'] = (all(row['status']=='PASS' for row in report['checks']) and report['overall_acceptance']=='ACCEPTED')
 
 if __name__ == '__main__':
-    report = {'classification':'post-cutover-authority-diagnostics-not-gate-certification',
+    report = {'classification':'executable-db-14-gate-certification',
               'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
               'contract':'C2C-DB-AC-001 v1.0 proposed','gate_passes_awarded':0,'checks':[],
               'complete_gate_results':'NOT RUN','overall_acceptance':'NOT ACCEPTED','diagnostics_successful':False}
@@ -283,6 +352,7 @@ if __name__ == '__main__':
     except Exception as error:
         report['diagnostics_successful'] = False
         report['execution_error_type'] = type(error).__name__
+        report['execution_error_message'] = str(error)
     path = Path('output/acceptance-diagnostics/report.json')
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(json.dumps(report,indent=2)+'\n')

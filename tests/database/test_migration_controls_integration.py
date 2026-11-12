@@ -72,7 +72,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0018_capture_protocol_session_binding.sql')
+        self.assertEqual(plan[-1].name,'0019_manifest_root_protocol_binding.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -87,13 +87,13 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql'))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
     def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-1])
+        apply(self.conn, plan[:-2])
         tenant = str(uuid.uuid4())
         legacy_session = 'legacy-' + uuid.uuid4().hex
         new_session = 'new-' + uuid.uuid4().hex
@@ -106,7 +106,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                           (tenant,'protocol migration fixture'))
             admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                           (tenant,legacy_session))
-            self.assertEqual(apply(self.conn,plan),(plan[-1].name,))
+            self.assertEqual(apply(self.conn,plan[:-1]),(plan[-2].name,))
             legacy_version = admin.execute(
                 'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
                 (tenant,legacy_session)).fetchone()[0]
@@ -122,6 +122,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                     "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v1' WHERE tenant_id=%s AND session_id=%s",
                     (tenant,legacy_session))
             self.assertEqual(raised.exception.diag.message_primary,'CAPTURE_PROTOCOL_VERSION_IMMUTABLE')
+            self.assertEqual(apply(self.conn,plan),(plan[-1].name,))
 
     def test_full_migration_enforces_python_sql_event_contract_parity(self):
         from app.domain_events import DomainEvent, KINDS
@@ -225,11 +226,49 @@ class MigrationControlsIntegration(unittest.TestCase):
                 ).fetchall()
                 self.assertEqual({row[0] for row in kinds}, set(KINDS))
 
+
+    def test_event_contract_migration_preserves_historical_payload_bytes(self):
+        plan = self.authority_plan()
+        parity_index = next(i for i,item in enumerate(plan) if item.name == '0017_event_contract_parity.sql')
+        apply(self.conn, plan[:parity_index])
+        tenant = str(uuid.uuid4())
+        session = 'parity-history-' + uuid.uuid4().hex
+        payload = '{"label":"é","metric":0.00001,"whole":1.0}'
+        admin_url = make_conninfo(
+            os.getenv('MIGRATION_TEST_ADMIN_URL', 'postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test'),
+            dbname=self.db,
+        )
+        with psycopg.connect(admin_url, autocommit=True) as admin:
+            admin.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+                          (tenant,'historical event byte preservation'))
+            admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
+                          (tenant,session))
+            admin.execute(
+                'INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) '
+                'VALUES (%s,%s,%s,1,%s,%s,%s,%s,%s,%s)',
+                (tenant,session,'historical-1','SESSION_CREATED','synthetic-history-test',
+                 '2026-01-01T00:00:00Z','pre-parity historical fixture',payload,'0.1'))
+            before = admin.execute(
+                'SELECT payload_json,convert_to(payload_json,\'UTF8\') FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+                (tenant,session)).fetchone()
+            self.assertEqual(before[0],payload)
+            self.assertEqual(before[1],payload.encode('utf-8'))
+            apply(self.conn, plan[:parity_index+1])
+            after = admin.execute(
+                'SELECT payload_json,convert_to(payload_json,\'UTF8\') FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+                (tenant,session)).fetchone()
+            self.assertEqual(after,before)
+            self.assertEqual(apply(self.conn,plan),tuple(item.name for item in plan[parity_index+1:]))
+            final = admin.execute(
+                'SELECT payload_json,convert_to(payload_json,\'UTF8\') FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+                (tenant,session)).fetchone()
+            self.assertEqual(final,before)
+
     def test_applied_authority_migration_checksum_change_is_rejected(self):
         plan = self.authority_plan()
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0018_capture_protocol_session_binding.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0019_manifest_root_protocol_binding.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
