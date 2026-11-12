@@ -197,9 +197,17 @@ def run(report):
     admin_url = os.environ['MIGRATION_TEST_ADMIN_URL']
     app_url = os.environ['APP_DATABASE_URL']
     migrator_url = os.environ['MIGRATION_DATABASE_URL']
-    for url,user in ((admin_url,'postgres'),(app_url,'faos_app'),(migrator_url,'faos_migrator')):
+    connection_urls = {
+        'admin': (admin_url, 'postgres'),
+        'application': (app_url, 'faos_app'),
+        'migrator': (migrator_url, 'faos_migrator'),
+    }
+    sanitized = {}
+    for name,(url,user) in connection_urls.items():
         config = conninfo_to_dict(url)
         expect(all(config.get(k)==v for k,v in {'host':'127.0.0.1','port':'55432','dbname':'claim2car_test','user':user}.items()),'EXPLICIT_SYNTHETIC_TARGET_REQUIRED')
+        sanitized[name] = {key:config.get(key) for key in ('user','host','port','dbname')}
+    report['environment'] = {'classification':'synthetic_isolated','connections':sanitized}
     tenants = [str(uuid.uuid4()),str(uuid.uuid4())]
     roles = []
     connections = []
