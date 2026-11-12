@@ -321,7 +321,7 @@ if __name__ == '__main__':
         report['counted_test_report_path'] = str(counted_path)
         import hashlib
         report['counted_test_report_sha256'] = hashlib.sha256(counted_path.read_bytes()).hexdigest()
-        run_all_gate_verifiers(report, counted_tests, environment_is_synthetic=True)
+        run_all_gate_verifiers(report, counted_tests, environment_is_synthetic=(report.get('environment', {}).get('classification') == 'synthetic_isolated'))
     except Exception as error:
         report['gate_verification_successful'] = False
         report['gate_passes_awarded'] = 0
