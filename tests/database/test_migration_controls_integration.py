@@ -175,7 +175,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                 '{ "a":1}',
                 '{"z":1,"a":2}',
                 '{"value":1e0}',
-                '{"label":"\\\\u00e9"}',
+                '{"label":"\\u00e9"}',
             )
             probes = [
                 ('timestamp-' + str(i), '2026-01-01T00:00:00Z', '{}')
