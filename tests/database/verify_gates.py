@@ -18,7 +18,7 @@ GATE_TESTS = {
     "DB-03": ("test_access_hardening.py",),
     "DB-04": ("test_tenant_authority_integration.py", "test_tenant_authority_vertical_slice.py"),
     "DB-05": ("test_tenant_context_regression.py",),
-    "DB-06": ("test_event_contract_regression.py", "test_adapter_validation.py", "test_journal_integration.py"),
+    "DB-06": ("test_event_contract_regression.py", "test_adapter_validation.py", "test_journal_integration.py", "test_migration_controls_integration.py"),
     "DB-07": ("test_journal_integration.py",),
     "DB-08": ("test_journal_integration.py",),
     "DB-09": ("test_access_hardening.py",),
@@ -53,6 +53,10 @@ def _flatten(suite):
 def _run_files(files):
     loader = unittest.TestLoader()
     discovered = loader.discover(str(TEST_DIR), pattern="test_*.py", top_level_dir=str(TEST_DIR))
+    discovery_errors = list(loader.errors)
+    if discovery_errors:
+        return {"status":"FAIL","tests_run":0,"failures":0,"errors":len(discovery_errors),"skipped":0,
+                "details":["TEST_DISCOVERY_ERROR:"+item for item in discovery_errors]}
     wanted = {name[:-3] for name in files}
     selected = [case for case in _flatten(discovered) if case.id().split(".")[0] in wanted]
     if not selected:
