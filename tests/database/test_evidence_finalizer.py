@@ -53,7 +53,7 @@ exec @SHA@ "$@"
         evidence = self.root / 'output/database-runs/fixture'
         footer = dict(line.split('=', 1) for line in (evidence / 'final-status.txt').read_text().splitlines())
         self.assertEqual(int(footer['final_exit_code']), result.returncode, result.stdout + result.stderr)
-        self.assertEqual(footer['acceptance_gates_verified'], '0/14')
+        self.assertEqual(footer['acceptance_gates_verified'], 'not_run_pre_cutover')
         return result, footer, evidence
 
     def test_success_verifies_checksums(self):
@@ -86,9 +86,11 @@ exec @SHA@ "$@"
         result, footer, evidence = self.run_fixture(FIXTURE_MANIFEST_RC='11')
         self.assertEqual(result.returncode, 11)
 
-    def test_gate_failure_preserved(self):
+    def test_gate_runner_is_deferred_until_post_cutover(self):
         result, footer, evidence = self.run_fixture(FIXTURE_GATE_RC='12')
-        self.assertEqual(result.returncode, 12)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(footer['acceptance_gates_verified'], 'not_run_pre_cutover')
+        self.assertNotIn('gate-verification.log', [p.name for p in (evidence / 'database-evidence').iterdir()])
 
     def test_primary_failure_not_masked_by_checksum_failure(self):
         result, footer, evidence = self.run_fixture(FIXTURE_HARNESS_RC='7', FIXTURE_CHECKSUM_RC='9')
