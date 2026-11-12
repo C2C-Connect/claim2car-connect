@@ -115,7 +115,12 @@ def verify_db_06(context):
 def verify_db_07(context): return _test_gate("DB-07",context)
 def verify_db_08(context): return _test_gate("DB-08",context)
 def verify_db_09(context): return _test_gate("DB-09",context)
-def verify_db_10(context): return _test_gate("DB-10",context)
+def verify_db_10(context):
+    result=_test_gate("DB-10",context)
+    probe=next((row for row in context.get("diagnostic_checks",[]) if row.get("id")=="POSTCUTOVER-ROOT-16-PROTOCOL-BINDING"),None)
+    result["protocol_16_root_binding"]={"status":"PASS" if probe and probe.get("status")=="PASS" else "MISSING_OR_FAILED"}
+    if result["protocol_16_root_binding"]["status"]!="PASS": result["status"]="FAIL"
+    return result
 def verify_db_11(context): return _test_gate("DB-11",context)
 def verify_db_12(context): return _test_gate("DB-12",context)
 def verify_db_13(context): return _test_gate("DB-13",context)
@@ -167,7 +172,11 @@ def run_gate_verification(admin_url=None,app_url=None,commit=None,diagnostic_che
             "total_tests":final_tests["tests_run"],"failures":final_tests["failures"],
             "errors":final_tests["errors"],"skipped":final_tests["skipped"]}
 if __name__=="__main__":
-    report=run_gate_verification()
+    reports=sorted((ROOT/"output"/"database-runs").rglob("counted-tests.json"))
+    if len(reports)!=1:
+        raise SystemExit("COUNTED_DATABASE_TEST_REPORT_NOT_UNIQUE")
+    counted=json.loads(reports[0].read_text())
+    report=run_gate_verification(counted_test_report=counted)
     output=ROOT/"output"/"acceptance-diagnostics"/"gate-report.json"
     output.parent.mkdir(parents=True,exist_ok=True)
     output.write_text(json.dumps(report,indent=2)+"\n")
