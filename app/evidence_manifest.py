@@ -36,6 +36,9 @@ def load_shot_contract(protocol_version=DEFAULT_CAPTURE_PROTOCOL):
         protocol=require_implemented_protocol(protocol_version)
     except (ValueError, OSError, TypeError, KeyError):
         raise ValueError('INVALID_SHOT_CONTRACT') from None
+    canonical = LEGACY_CANONICAL_SLOTS if protocol.version == LEGACY_CAPTURE_PROTOCOL else DEFAULT_CANONICAL_SLOTS
+    if protocol.slots != canonical:
+        raise ValueError('INVALID_SHOT_CONTRACT')
     return protocol.version,protocol.slots
 
 def build_manifest(session_id,entries,protocol_version=DEFAULT_CAPTURE_PROTOCOL):
