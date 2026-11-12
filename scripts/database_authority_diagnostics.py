@@ -10,6 +10,7 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from app.domain_events import DomainEvent
 from database.journal import append, tenant_transaction
 from database.readback import load_journal
+from tests.database.verify_gates import run_gate_verification
 
 APPEND = 'SELECT faos.append_event(%s::uuid,%s::text,%s::text,%s::bigint,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)'
 
@@ -271,10 +272,14 @@ def run(report):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
-    report['diagnostics_successful'] = len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks'])
+    report['gate_certification'] = run_gate_verification(admin_url=admin_url, app_url=app_url, commit=report.get('commit'))
+    report['gate_passes_awarded'] = report['gate_certification']['gate_passes_awarded']
+    report['complete_gate_results'] = report['gate_certification']['complete_gate_results']
+    report['overall_acceptance'] = report['gate_certification']['overall_acceptance']
+    report['diagnostics_successful'] = (len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks']) and report['overall_acceptance']=='ACCEPTED')
 
 if __name__ == '__main__':
-    report = {'classification':'post-cutover-authority-diagnostics-not-gate-certification',
+    report = {'classification':'executable-db-14-gate-certification',
               'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
               'contract':'C2C-DB-AC-001 v1.0 proposed','gate_passes_awarded':0,'checks':[],
               'complete_gate_results':'NOT RUN','overall_acceptance':'NOT ACCEPTED','diagnostics_successful':False}
