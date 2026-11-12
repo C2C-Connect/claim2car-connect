@@ -139,7 +139,7 @@ class CaptureSessionIntegration(unittest.TestCase):
             self.assertIn(case.capture_session_id, {item['session_id'] for item in queue})
             details = service.get_review_details(self.reviewer_auth(), case.capture_session_id)
             self.assertEqual(details['manifest_digest'], sealed['manifest_digest'])
-            self.assertEqual(len(details['artifacts']), len(CANONICAL_SLOTS))
+            self.assertEqual(len(details['artifacts']), len(LEGACY_CANONICAL_SLOTS))
             first_artifact = next(iter(originals))
             self.assertEqual(service.retrieve_for_review(
                 self.reviewer_auth(), case.capture_session_id, first_artifact), originals[first_artifact])
