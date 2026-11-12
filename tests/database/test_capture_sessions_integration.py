@@ -123,7 +123,7 @@ class CaptureSessionIntegration(unittest.TestCase):
             service.record_vehicle(self.auth(), case.capture_session_id,
                 request_id=uuid.uuid4(), vin='1HGCM82633A004352')
             originals = {}
-            for slot in CANONICAL_SLOTS:
+            for slot in LEGACY_CANONICAL_SLOTS:
                 raw = ('claim-case-original:' + slot).encode('ascii')
                 artifact_id = str(uuid.uuid4())
                 originals[artifact_id] = raw
@@ -131,7 +131,7 @@ class CaptureSessionIntegration(unittest.TestCase):
                     request_id=uuid.uuid4(), artifact_id=artifact_id, slot=slot,
                     payload_base64=base64.b64encode(raw).decode('ascii'),
                     sha256_hex=hashlib.sha256(raw).hexdigest())
-            quality = {slot: True for slot in CANONICAL_SLOTS}
+            quality = {slot: True for slot in LEGACY_CANONICAL_SLOTS}
             self.assertTrue(service.record_quality(self.auth(), case.capture_session_id,
                 request_id=uuid.uuid4(), results=quality)['advisory_only'])
             sealed = service.seal_capture(self.auth(), case.capture_session_id, request_id=uuid.uuid4())
