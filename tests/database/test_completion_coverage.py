@@ -5,7 +5,8 @@ from hashlib import sha256
 import unittest
 from unittest.mock import patch
 from app.domain_events import DomainEvent
-from app.evidence_manifest import ManifestEntry, build_manifest, verify_manifest, load_shot_contract, CANONICAL_SLOTS
+from app.evidence_manifest import ManifestEntry, build_manifest, verify_manifest, load_shot_contract, LEGACY_LEGACY_CANONICAL_SLOTS
+from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL
 from app.synthetic_evidence import reconstruct, manifest_for, evaluate, check_completion
 
 class CompletionCoverage(unittest.TestCase):
@@ -20,7 +21,7 @@ class CompletionCoverage(unittest.TestCase):
         events=self.append(events,'CONSENT_RECORDED',{'disclosure_version':'synthetic-v1','evidence_scope':True})
         events=self.append(events,'VEHICLE_RECORDED',{'status':'AVAILABLE','reference':'synthetic-vehicle','unavailable_reason':None})
         data={}
-        for slot in load_shot_contract()[1]:
+        for slot in load_shot_contract(LEGACY_CAPTURE_PROTOCOL)[1]:
             if slot==omit:
                 continue
             data[slot]=('SYNTHETIC-NOT-A-PHOTO-'+slot).encode()
@@ -28,14 +29,14 @@ class CompletionCoverage(unittest.TestCase):
             events=self.append(events,'QUALITY_RECORDED',{'artifact_id':slot,'passed':True,'method':'synthetic-fixture'})
         digest=manifest_for(reconstruct('synthetic-s',events)).digest() if omit is None else 'missing-root'
         if seal and omit is None:
-            events=self.append(events,'MANIFEST_SEALED',{'schema_version':'0.1','shot_list_version':load_shot_contract()[0],'manifest_digest':digest})
+            events=self.append(events,'MANIFEST_SEALED',{'schema_version':'0.1','shot_list_version':load_shot_contract(LEGACY_CAPTURE_PROTOCOL)[0],'manifest_digest':digest})
         return events,data,digest
     def test_canonical_contract(self):
         version,slots=load_shot_contract()
         self.assertEqual(version,'claims2car-12-v1')
         self.assertEqual(slots,('vin_ocr','doc_ocr','front','front_left','driver_side','rear_left','rear','rear_right','passenger_side','front_right','interior_front','undercarriage_engine'))
     def test_changed_contract_rejected(self):
-        value={'schema_version':'0.1','shot_list_version':'claims2car-12-v1','required_angles':list(reversed(CANONICAL_SLOTS))}
+        value={'schema_version':'0.1','shot_list_version':'claims2car-12-v1','required_angles':list(reversed(LEGACY_CANONICAL_SLOTS))}
         with patch('app.evidence_manifest.Path.read_text',return_value=json.dumps(value)):
             with self.assertRaisesRegex(ValueError,'INVALID_SHOT_CONTRACT'):
                 load_shot_contract()
@@ -50,7 +51,7 @@ class CompletionCoverage(unittest.TestCase):
         check_completion('synthetic-s',e,b,d)
         self.assertEqual(e,before)
     def test_every_missing_slot_blocks(self):
-        for slot in CANONICAL_SLOTS:
+        for slot in LEGACY_CANONICAL_SLOTS:
             with self.subTest(slot=slot):
                 e,b,d=self.fixture(omit=slot)
                 self.assertIn('CAPTURE_SET_INCOMPLETE',evaluate('synthetic-s',e,b,d).reasons)
