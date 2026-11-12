@@ -191,6 +191,54 @@ def verify(report,admin,connections,tenants,session):
         for brand in ('brand','extra_brand'):
             admin.execute('DELETE FROM faos.brands WHERE brand_id=%s',(ids[brand],))
 
+def verify_postcutover_context_reset(report,connections,tenants):
+    conn=connections[0]
+    with tenant_transaction(conn,tenants[0]):
+        active=conn.execute('SELECT faos.tenant_id()').fetchone()[0]
+        expect(str(active)==str(tenants[0]),'BOUND_TENANT_CONTEXT_NOT_ACTIVE')
+    expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None,'TENANT_CONTEXT_LEAKED_AFTER_TRANSACTION')
+    with tenant_transaction(conn,tenants[1]):
+        expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None,'BOUND_ROLE_ACCEPTED_CROSS_TENANT_CONTEXT')
+    with tenant_transaction(conn,tenants[0]):
+        restored=conn.execute('SELECT faos.tenant_id()').fetchone()[0]
+        expect(str(restored)==str(tenants[0]),'BOUND_TENANT_CONTEXT_NOT_RESTORED')
+    expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None,'TENANT_CONTEXT_LEAKED_AFTER_REUSE')
+    report['checks'].append({'id':'POSTCUTOVER-CONTEXT-RESET','status':'PASS','same_connection_reused':True})
+
+def verify_protocol_16_root_binding(report,admin,conn,tenant):
+    session='protocol16-'+uuid.uuid4().hex
+    seal='protocol16-seal-'+uuid.uuid4().hex
+    digest='a'*64
+    payload=json.dumps({'manifest_digest':digest,'schema_version':'0.1','shot_list_version':'claims2car-16-v1'},sort_keys=True,separators=(',',':'))
+    admin.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
+                  (tenant,session,'claims2car-16-v1'))
+    event=DomainEvent(session,seal,1,'MANIFEST_SEALED','synthetic-protocol-test','2026-01-01T00:00:00Z','16-v1 root binding',payload)
+    expect(append(conn,tenant,event)=='ACCEPTED','PROTOCOL_16_SEAL_APPEND_FAILED')
+    try:
+        with admin.transaction():
+            admin.execute('SET LOCAL ROLE faos_writer')
+            admin.execute("SELECT set_config('faos.tenant_id',%s,true)",(tenant,))
+            result=admin.execute('SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                                 (tenant,session,seal,digest,'claims2car-16-v1')).fetchone()[0]
+            expect(result=='REGISTERED','PROTOCOL_16_ROOT_NOT_REGISTERED')
+        try:
+            with admin.transaction():
+                admin.execute('SET LOCAL ROLE faos_writer')
+                admin.execute("SELECT set_config('faos.tenant_id',%s,true)",(tenant,))
+                admin.execute('SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                              (tenant,session,seal,digest,'claims2car-12-v1'))
+                raise AssertionError('PROTOCOL_MISMATCH_ROOT_ACCEPTED')
+        except psycopg.errors.RaiseException as error:
+            expect(error.diag.message_primary=='ROOT_PROTOCOL_SESSION_MISMATCH','WRONG_PROTOCOL_MISMATCH_ERROR')
+        with tenant_transaction(conn,tenant):
+            roots=conn.execute('SELECT shot_list_version FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',(tenant,session)).fetchall()
+        expect(roots==[('claims2car-16-v1',)],'PROTOCOL_16_ROOT_VERSION_NOT_PERSISTED')
+        report['checks'].append({'id':'POSTCUTOVER-ROOT-16-PROTOCOL-BINDING','status':'PASS','mismatch_error':'ROOT_PROTOCOL_SESSION_MISMATCH'})
+    finally:
+        admin.execute('DELETE FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',(tenant,session))
+        admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s',(tenant,session))
+        admin.execute('DELETE FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',(tenant,session))
+
 def run(report):
     admin_url = os.environ['MIGRATION_TEST_ADMIN_URL']
     app_url = os.environ['APP_DATABASE_URL']
@@ -263,6 +311,8 @@ def run(report):
             expect(load_journal(connections[0],tenants[0],session).events==(event,positive),'COMPACT_READBACK_FAILED')
             report['checks'].append({'id':'CANONICAL-UNICODE-DECIMAL-POSITIVE-CONTROL','status':'PASS','round_trip':'byte-for-byte'})
             verify(report,admin,connections,tenants,session)
+            verify_postcutover_context_reset(report,connections,tenants)
+            verify_protocol_16_root_binding(report,admin,connections[0],tenants[0])
             expect(admin.execute('UPDATE faos.tenant_login_bindings SET enabled=false WHERE role_name=%s',(roles[0],)).rowcount==1,'REVOCATION_FAILED')
             denied(connections[0],tenants[0],event)
             expect(load_journal(connections[1],tenants[1],session).events==(event,),'OTHER_TENANT_DISRUPTED')
@@ -275,7 +325,10 @@ def run(report):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
-    report['gate_certification'] = run_gate_verification(admin_url=admin_url, app_url=app_url, commit=report.get('commit'), diagnostic_checks=report.get('checks',[]))
+    counted_reports=sorted(Path('output/database-runs').rglob('counted-tests.json'))
+    expect(len(counted_reports)==1,'COUNTED_DATABASE_TEST_REPORT_NOT_UNIQUE')
+    counted_report=json.loads(counted_reports[0].read_text())
+    report['gate_certification'] = run_gate_verification(admin_url=admin_url, app_url=app_url, commit=report.get('commit'), diagnostic_checks=report.get('checks',[]), counted_test_report=counted_report)
     report['gate_passes_awarded'] = report['gate_certification']['gate_passes_awarded']
     report['complete_gate_results'] = report['gate_certification']['complete_gate_results']
     report['overall_acceptance'] = report['gate_certification']['overall_acceptance']
