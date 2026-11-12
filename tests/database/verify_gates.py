@@ -370,8 +370,8 @@ def run_all_gate_verifiers(diagnostics, counted_tests, *, environment_is_synthet
     if not contract_adopted:
         for row in results:
             row["criteria_result"] = row["status"]
-            if row["status"] == "PASS":
-                row["status"] = "IMPLEMENTED — UNVERIFIED"
+            row["status"] = "NOT AWARDED"
+            row["blocking_reason"] = "C2C-DB-AC-001 is not yet formally adopted"
     awarded = criteria_passes if contract_adopted else 0
     diagnostics["complete_gate_results"] = results
     diagnostics["criteria_passes"] = criteria_passes
