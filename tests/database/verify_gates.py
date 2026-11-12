@@ -243,11 +243,23 @@ def verify_db_01(context):
     database = diagnostics.get("database") or []
     extensions = {row[0] for row in diagnostics.get("extensions", []) if isinstance(row, (list, tuple)) and row}
     inventory = diagnostics.get("migration_inventory") or []
+    environment = diagnostics.get("environment") or {}
+    expected_connections = {
+        "admin": ("postgres", "127.0.0.1", "55432", "claim2car_test"),
+        "application": ("faos_app", "127.0.0.1", "55432", "claim2car_test"),
+        "migrator": ("faos_migrator", "127.0.0.1", "55432", "claim2car_test"),
+    }
+    connections_ok = all(
+        isinstance(environment.get(name), dict)
+        and tuple(environment[name].get(key) for key in ("user", "host", "port", "dbname")) == expected
+        for name, expected in expected_connections.items()
+    )
     env_ok = bool(
         database and database[0] == "claim2car_test"
         and "PostgreSQL" in str(database[1] if len(database) > 1 else "")
         and {"plpgsql", "postgis"}.issubset(extensions)
         and len(inventory) == 18
+        and connections_ok
         and context.get("environment_is_synthetic") is True
     )
     if not env_ok:
@@ -264,7 +276,11 @@ def verify_db_02(context):
     if len(names) != 18 or any(not name.startswith(prefix) for name, prefix in zip(names, expected)):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("ORDERED_COMPLETE_MIGRATION_INVENTORY")
-    if any(len(row[1]) != 64 for row in inventory if isinstance(row, (list, tuple)) and len(row) > 1):
+    if (len(inventory) != 18 or any(
+            not isinstance(row, (list, tuple)) or len(row) != 2
+            or not isinstance(row[1], str) or len(row[1]) != 64
+            or any(character not in "0123456789abcdef" for character in row[1])
+            for row in inventory)):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("MIGRATION_SHA256_INVENTORY")
     return result
