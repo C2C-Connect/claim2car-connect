@@ -243,7 +243,7 @@ def verify_db_01(context):
     database = diagnostics.get("database") or []
     extensions = {row[0] for row in diagnostics.get("extensions", []) if isinstance(row, (list, tuple)) and row}
     inventory = diagnostics.get("migration_inventory") or []
-    environment = diagnostics.get("environment") or {}
+    environment = (diagnostics.get("environment") or {}).get("connections", {})
     expected_connections = {
         "admin": ("postgres", "127.0.0.1", "55432", "claim2car_test"),
         "application": ("faos_app", "127.0.0.1", "55432", "claim2car_test"),
