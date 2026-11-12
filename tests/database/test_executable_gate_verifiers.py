@@ -28,7 +28,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(len(results), 14)
         self.assertEqual(sum(row["status"] == "PASS" for row in results), 0)
         self.assertEqual(results[-1]["id"], "DB-14")
-        self.assertEqual(results[-1]["status"], "FAIL")
+        self.assertEqual(results[-1]["status"], "NOT AWARDED")
 
     def test_gate_requires_each_mapped_test_and_sql_assertion(self):
         ids = (
@@ -99,6 +99,8 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         report = {"checks": [], "diagnostics_successful": False, "migration_inventory": []}
         run_all_gate_verifiers(report, None)
         self.assertEqual(report["contract_status"], "PROPOSED_PENDING_OWNER_ADOPTION")
+        self.assertEqual(report["gate_passes_awarded"], 0)
+        self.assertTrue(all(row["status"] == "NOT AWARDED" for row in report["complete_gate_results"]))
         self.assertEqual(report["overall_acceptance"], "NOT ACCEPTED")
         self.assertIn("CONTRACT_OWNER_ADOPTION_AND_INDEPENDENT_REVIEW_PENDING",
                       report["acceptance_blockers"])
