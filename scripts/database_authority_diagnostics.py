@@ -1,4 +1,4 @@
-"""Post-cutover synthetic assertions; not full 14-gate acceptance."""
+"""Post-cutover PostgreSQL assertions feeding the executable DB-01..DB-14 gate runner."""
 import json
 import os
 from pathlib import Path
