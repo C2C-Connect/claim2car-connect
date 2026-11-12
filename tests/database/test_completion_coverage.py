@@ -32,14 +32,14 @@ class CompletionCoverage(unittest.TestCase):
             events=self.append(events,'MANIFEST_SEALED',{'schema_version':'0.1','shot_list_version':load_shot_contract(LEGACY_CAPTURE_PROTOCOL)[0],'manifest_digest':digest})
         return events,data,digest
     def test_canonical_contract(self):
-        version,slots=load_shot_contract()
+        version,slots=load_shot_contract(LEGACY_CAPTURE_PROTOCOL)
         self.assertEqual(version,'claims2car-12-v1')
         self.assertEqual(slots,('vin_ocr','doc_ocr','front','front_left','driver_side','rear_left','rear','rear_right','passenger_side','front_right','interior_front','undercarriage_engine'))
     def test_changed_contract_rejected(self):
         value={'schema_version':'0.1','shot_list_version':'claims2car-12-v1','required_angles':list(reversed(LEGACY_CANONICAL_SLOTS))}
         with patch('app.evidence_manifest.Path.read_text',return_value=json.dumps(value)):
             with self.assertRaisesRegex(ValueError,'INVALID_SHOT_CONTRACT'):
-                load_shot_contract()
+                load_shot_contract(LEGACY_CAPTURE_PROTOCOL)
     def test_valid_completion(self):
         e,b,d=self.fixture()
         decision=check_completion('synthetic-s',e,b,d)
@@ -148,7 +148,7 @@ class CompletionCoverage(unittest.TestCase):
     def test_manifest_canonical_order(self):
         e,b,d=self.fixture()
         m=manifest_for(reconstruct('synthetic-s',e))
-        self.assertEqual(build_manifest(m.session_id,reversed(m.entries)),m)
+        self.assertEqual(build_manifest(m.session_id,reversed(m.entries),protocol_version=LEGACY_CAPTURE_PROTOCOL),m)
         reversed_manifest=replace(m,entries=tuple(reversed(m.entries)))
         self.assertFalse(verify_manifest(m.session_id,reversed_manifest,reversed_manifest.digest(),b))
     def test_manifest_incomplete_and_duplicates(self):
@@ -156,13 +156,13 @@ class CompletionCoverage(unittest.TestCase):
         m=manifest_for(reconstruct('synthetic-s',e))
         for entries in (m.entries[:-1],m.entries[:-1]+(m.entries[0],)):
             with self.assertRaisesRegex(ValueError,'CAPTURE_SET_INCOMPLETE_OR_DUPLICATE'):
-                build_manifest(m.session_id,entries)
+                build_manifest(m.session_id,entries,protocol_version=LEGACY_CAPTURE_PROTOCOL)
     def test_manifest_bad_entries(self):
         e,b,d=self.fixture()
         m=manifest_for(reconstruct('synthetic-s',e))
         for changes in ({'sha256_hex':'bad'},{'slot':'unknown'},{'artifact_id':''}):
             with self.assertRaisesRegex(ValueError,'INVALID_MANIFEST_ENTRY'):
-                build_manifest(m.session_id,(replace(m.entries[0],**changes),)+m.entries[1:])
+                build_manifest(m.session_id,(replace(m.entries[0],**changes),)+m.entries[1:],protocol_version=LEGACY_CAPTURE_PROTOCOL)
     def test_manifest_empty_or_nonbytes(self):
         e,b,d=self.fixture()
         m=manifest_for(reconstruct('synthetic-s',e))
