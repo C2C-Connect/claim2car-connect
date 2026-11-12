@@ -7,7 +7,7 @@ from hashlib import sha256
 import re
 from app.domain_events import EventJournal, VERSION, nonempty
 from app.evidence_manifest import ManifestEntry, build_manifest, verify_manifest, load_shot_contract
-from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
+from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 @dataclass(frozen=True)
 class Consent:
@@ -61,7 +61,6 @@ class Seal:
 @dataclass(frozen=True)
 class EvidenceState:
     session_id: str
-    shot_list_version: str = LEGACY_CAPTURE_PROTOCOL
     created: bool = False
     consent: Consent | None = None
     vehicle: Vehicle | None = None
@@ -69,6 +68,7 @@ class EvidenceState:
     quality: tuple[Quality, ...] = ()
     reviews: tuple[Review, ...] = ()
     seal: Seal | None = None
+    shot_list_version: str = LEGACY_CAPTURE_PROTOCOL
     schema_version: str = VERSION
 
 @dataclass(frozen=True)
@@ -95,10 +95,10 @@ def reconstruct(session_id,events):
         p=event.payload
         if event.kind=='SESSION_CREATED':
             if (state.created or event.sequence!=1 or type(p) is not dict
-                    or set(p) not in ({'synthetic'}, {'synthetic','shot_list_version'})
+                    or set(p) not in ({'synthetic'}, {'synthetic','shot_list_version'}, {'synthetic','capture_protocol_version'})
                     or type(p.get('synthetic')) is not bool or p.get('synthetic') is not True):
                 raise ValueError('INVALID_SYNTHETIC_CREATION')
-            version=p.get('shot_list_version', LEGACY_CAPTURE_PROTOCOL)
+            version=p.get('shot_list_version', p.get('capture_protocol_version', LEGACY_CAPTURE_PROTOCOL))
             try:
                 version=require_implemented_protocol(version).version
             except (ValueError, TypeError, OSError):
