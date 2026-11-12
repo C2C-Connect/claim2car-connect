@@ -6,6 +6,21 @@ from pathlib import Path
 DEFAULT_CAPTURE_PROTOCOL = "claims2car-16-v1"
 LEGACY_CAPTURE_PROTOCOL = "claims2car-12-v1"
 SUPPORTED_PROTOCOL_IDS = frozenset({DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL})
+CANONICAL_PROTOCOL_SLOTS = {
+    DEFAULT_CAPTURE_PROTOCOL: (
+        "00_front_exterior", "01_front_right_exterior", "02_right_side_exterior",
+        "03_rear_right_exterior", "04_rear_exterior", "05_rear_left_exterior",
+        "06_left_side_exterior", "07_front_left_exterior", "08_wheel_front_left",
+        "09_wheel_front_right", "10_wheel_rear_right", "11_wheel_rear_left",
+        "12_cabin_front_airbags", "13_instrument_cluster_odometer", "14_physical_vin",
+        "15_license_and_insurance_docs",
+    ),
+    LEGACY_CAPTURE_PROTOCOL: (
+        "vin_ocr", "doc_ocr", "front", "front_left", "driver_side", "rear_left",
+        "rear", "rear_right", "passenger_side", "front_right", "interior_front",
+        "undercarriage_engine",
+    ),
+}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -31,7 +46,8 @@ def _load(path, expected_version, expected_count, required_keys):
             or type(value["required_angles"]) is not list
             or len(value["required_angles"]) != expected_count
             or len(set(value["required_angles"])) != expected_count
-            or any(not isinstance(slot, str) or not slot for slot in value["required_angles"])):
+            or any(not isinstance(slot, str) or not slot for slot in value["required_angles"])
+            or tuple(value["required_angles"]) != CANONICAL_PROTOCOL_SLOTS[expected_version]):
         raise ValueError("INVALID_CAPTURE_PROTOCOL_CONTRACT")
     descriptions = value.get("descriptions")
     if descriptions is None:
