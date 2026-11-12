@@ -44,33 +44,19 @@ REQUIREMENTS = {
     "DB-14": "All gates run in one traceable report; failures, skips and blocked checks prevent acceptance.",
 }
 KNOWN_UNVERIFIED = {}
-def _flatten(suite):
-    for case in suite:
-        if isinstance(case, unittest.TestSuite):
-            yield from _flatten(case)
-        else:
-            yield case
-def _run_files(files):
-    loader = unittest.TestLoader()
-    discovered = loader.discover(str(TEST_DIR), pattern="test_*.py", top_level_dir=str(TEST_DIR))
-    discovery_errors = list(loader.errors)
-    if discovery_errors:
-        return {"status":"FAIL","tests_run":0,"failures":0,"errors":len(discovery_errors),"skipped":0,
-                "details":["TEST_DISCOVERY_ERROR:"+item for item in discovery_errors]}
-    wanted = {name[:-3] for name in files}
-    selected = [case for case in _flatten(discovered) if case.id().split(".")[0] in wanted]
-    if not selected:
-        return {"status":"FAIL","tests_run":0,"failures":0,"errors":1,"skipped":0,
-                "details":["NO_MATCHING_TESTS:"+",".join(files)]}
-    stream = io.StringIO()
-    result = unittest.TextTestRunner(stream=stream, verbosity=0).run(unittest.TestSuite(selected))
-    details = [{"test":str(test),"traceback":err[-10000:]} for test,err in result.failures+result.errors]
-    details += [{"test":str(test),"skipped":reason} for test,reason in result.skipped]
-    ok = result.wasSuccessful() and not result.skipped and not result.expectedFailures and not result.unexpectedSuccesses
-    return {"status":"PASS" if ok else "FAIL","tests_run":result.testsRun,
-            "failures":len(result.failures),"errors":len(result.errors),"skipped":len(result.skipped),
-            "expected_failures":len(result.expectedFailures),"unexpected_successes":len(result.unexpectedSuccesses),
-            "details":details,"runner_output":stream.getvalue()[-10000:]}
+def _recorded_files(files, context):
+    report=context.get("counted_test_report") or {}
+    records=report.get("tests") or []
+    wanted={name[:-3] for name in files}
+    selected=[row for row in records if any(row.get("id","").startswith(module+".") for module in wanted)]
+    missing=sorted(module for module in wanted if not any(row.get("id","").startswith(module+".") for row in selected))
+    bad=[row for row in selected if row.get("outcome")!="passed"]
+    return {"status":"PASS" if selected and not missing and not bad else "FAIL",
+            "tests_run":len(selected),"failures":sum(row.get("outcome") in ("failed","subtest_failed") for row in bad),
+            "errors":sum(row.get("outcome")=="error" for row in bad),
+            "skipped":sum(row.get("outcome")=="skipped" for row in bad),
+            "missing_modules":missing,"details":bad}
+
 def _config(url, user):
     p = conninfo_to_dict(url)
     return p.get("host")=="127.0.0.1" and p.get("port")=="55432" and p.get("dbname")=="claim2car_test" and p.get("user")==user
@@ -81,7 +67,7 @@ def verify_db_01(context):
     with psycopg.connect(context["admin_url"]) as conn:
         db,version=conn.execute("SELECT current_database(),version()").fetchone()
         ext=sorted(row[0] for row in conn.execute("SELECT extname FROM pg_extension"))
-    tests=_run_files(GATE_TESTS["DB-01"])
+    tests=_recorded_files(GATE_TESTS["DB-01"],context)
     return {"status":"PASS" if db=="claim2car_test" and tests["status"]=="PASS" else "FAIL",
             **base,"database":db,"server_version":version,"extensions":ext,"tests":tests}
 def verify_db_02(context):
@@ -89,64 +75,80 @@ def verify_db_02(context):
     expected=[(m.name,m.sha256) for m in discover_authority(ROOT)]
     with psycopg.connect(context["admin_url"]) as conn:
         actual=conn.execute("SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal").fetchall()
-    tests=_run_files(GATE_TESTS["DB-02"])
+    tests=_recorded_files(GATE_TESTS["DB-02"],context)
     ok=actual==expected and tests["status"]=="PASS"
     return {"status":"PASS" if ok else "FAIL","requirement":REQUIREMENTS["DB-02"],
             "migration_count":len(actual),"migration_inventory_matches":actual==expected,"tests":tests,
             "details":[] if actual==expected else ["MIGRATION_LEDGER_MISMATCH"]}
-def _test_gate(gate):
-    tests=_run_files(GATE_TESTS[gate])
+def _test_gate(gate,context):
+    tests=_recorded_files(GATE_TESTS[gate],context)
     limits=[KNOWN_UNVERIFIED[gate]] if gate in KNOWN_UNVERIFIED else []
     status="PASS" if tests["status"]=="PASS" and not limits else "IMPLEMENTED — UNVERIFIED"
     return {"status":status,"requirement":REQUIREMENTS[gate],"tests":tests,"limitations":limits}
 def verify_db_03(context):
     with psycopg.connect(context["app_url"]) as conn:
         role=conn.execute("SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user").fetchone()
-    result=_test_gate("DB-03")
+    result=_test_gate("DB-03",context)
     result["role_assertion"]={"status":"PASS" if role==("faos_app",False,False) else "FAIL","value":role}
     if result["role_assertion"]["status"]!="PASS": result["status"]="FAIL"
     return result
 def verify_db_04(context):
-    result=_test_gate("DB-04")
+    result=_test_gate("DB-04",context)
     matrix=next((row for row in context.get("diagnostic_checks",[]) if row.get("id")=="POSTCUTOVER-PER-TABLE-ISOLATION"),None)
     result["tenant_isolation_matrix"]={"status":"PASS" if matrix and matrix.get("status")=="PASS" else "MISSING_OR_FAILED"}
     if result["tenant_isolation_matrix"]["status"]!="PASS": result["status"]="FAIL"
     return result
-def verify_db_05(context): return _test_gate("DB-05")
+def verify_db_05(context):
+    result=_test_gate("DB-05",context)
+    probe=next((row for row in context.get("diagnostic_checks",[]) if row.get("id")=="POSTCUTOVER-CONTEXT-RESET"),None)
+    result["postcutover_context_reset"]={"status":"PASS" if probe and probe.get("status")=="PASS" else "MISSING_OR_FAILED"}
+    if result["postcutover_context_reset"]["status"]!="PASS": result["status"]="FAIL"
+    return result
 def verify_db_06(context):
-    result=_test_gate("DB-06")
+    result=_test_gate("DB-06",context)
     required={"G06-timestamp","G06-naive_timestamp","G06-compact_payload","G06-key_order","G06-numeric_exponent","G06-unicode_escape","CANONICAL-UNICODE-DECIMAL-POSITIVE-CONTROL"}
     observed={row.get("id") for row in context.get("diagnostic_checks",[]) if row.get("status")=="PASS"}
     missing=sorted(required-observed)
     result["direct_sql_parity_probes"]={"required":sorted(required),"missing":missing}
     if missing: result["status"]="IMPLEMENTED — UNVERIFIED"
     return result
-def verify_db_07(context): return _test_gate("DB-07")
-def verify_db_08(context): return _test_gate("DB-08")
-def verify_db_09(context): return _test_gate("DB-09")
-def verify_db_10(context): return _test_gate("DB-10")
-def verify_db_11(context): return _test_gate("DB-11")
-def verify_db_12(context): return _test_gate("DB-12")
-def verify_db_13(context): return _test_gate("DB-13")
+def verify_db_07(context): return _test_gate("DB-07",context)
+def verify_db_08(context): return _test_gate("DB-08",context)
+def verify_db_09(context): return _test_gate("DB-09",context)
+def verify_db_10(context): return _test_gate("DB-10",context)
+def verify_db_11(context): return _test_gate("DB-11",context)
+def verify_db_12(context): return _test_gate("DB-12",context)
+def verify_db_13(context): return _test_gate("DB-13",context)
 def verify_db_14(context, prior):
-    files=tuple(sorted(p.name for p in TEST_DIR.glob("test_*.py")))
-    tests=_run_files(files)
+    report=context.get("counted_test_report") or {}
+    discovered=report.get("discovered",0)
+    executed=report.get("executed",0)
+    failures=report.get("failures",0)
+    errors=report.get("errors",0)
+    skipped=report.get("skipped",0)
+    records=report.get("tests") or []
     prior_pass=all(v["status"]=="PASS" for v in prior.values())
-    enough=tests["tests_run"]>=297
-    no_skips=tests["skipped"]==0
+    enough=discovered>=297 and executed>=297
+    no_skips=skipped==0 and all(row.get("outcome")=="passed" for row in records)
+    successful=bool(report.get("successful")) and failures==0 and errors==0 and executed==discovered
     limits=[]
     if not prior_pass: limits.append("ONE_OR_MORE_MANDATORY_GATES_NOT_PASS")
     if not enough: limits.append("DATABASE_TEST_COUNT_BELOW_297")
-    if not no_skips: limits.append("SKIPPED_TESTS_PRESENT")
-    ok=tests["status"]=="PASS" and prior_pass and enough and no_skips
+    if not no_skips: limits.append("SKIPPED_OR_NONPASS_TEST_RECORDS_PRESENT")
+    if not successful: limits.append("RECORDED_DATABASE_SUITE_NOT_SUCCESSFUL")
+    ok=successful and prior_pass and enough and no_skips
     return {"status":"PASS" if ok else "FAIL","requirement":REQUIREMENTS["DB-14"],
-            "tests":tests,"prior_gates_all_pass":prior_pass,"minimum_test_count":297,
+            "tests":{"tests_run":executed,"discovered":discovered,"failures":failures,"errors":errors,
+                     "skipped":skipped,"successful":successful},
+            "prior_gates_all_pass":prior_pass,"minimum_test_count":297,
             "test_count_requirement_met":enough,"no_skips":no_skips,"limitations":limits}
-def run_gate_verification(admin_url=None,app_url=None,commit=None,diagnostic_checks=None):
+
+def run_gate_verification(admin_url=None,app_url=None,commit=None,diagnostic_checks=None,counted_test_report=None):
     admin_url=admin_url or os.getenv("MIGRATION_TEST_ADMIN_URL") or os.getenv("MIGRATION_DATABASE_URL")
     app_url=app_url or os.getenv("APP_DATABASE_URL")
     if not admin_url or not app_url: raise RuntimeError("GATE_DATABASE_URLS_REQUIRED")
-    context={"admin_url":admin_url,"app_url":app_url,"diagnostic_checks":diagnostic_checks or []}
+    if not counted_test_report: raise RuntimeError("COUNTED_DATABASE_TEST_REPORT_REQUIRED")
+    context={"admin_url":admin_url,"app_url":app_url,"diagnostic_checks":diagnostic_checks or [],"counted_test_report":counted_test_report}
     funcs=(verify_db_01,verify_db_02,verify_db_03,verify_db_04,verify_db_05,verify_db_06,
            verify_db_07,verify_db_08,verify_db_09,verify_db_10,verify_db_11,verify_db_12,verify_db_13)
     gates={}
