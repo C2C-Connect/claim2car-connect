@@ -248,6 +248,7 @@ def run(report):
                 ('compact_payload','2026-01-01T00:00:00Z','{"a": 1}','event_payload_compact'),
                 ('key_order','2026-01-01T00:00:00Z','{"z":1,"a":2}','event_payload_python_canonical'),
                 ('numeric_exponent','2026-01-01T00:00:00Z','{"value":1e0}','event_payload_python_canonical'),
+                ('unicode_escape','2026-01-01T00:00:00Z','{"label":"\\\\u00e9"}','event_payload_python_canonical'),
             ]:
                 try:
                     with tenant_transaction(connections[0],tenants[0]):
@@ -257,11 +258,21 @@ def run(report):
                     expect(error.sqlstate=='23514' and error.diag.constraint_name==constraint,'WRONG_VALIDATION_REJECTION')
                 expect(load_journal(connections[0],tenants[0],session).events==(event,),'REJECTED_EVENT_CHANGED_HISTORY')
                 report['checks'].append({'id':'G06-'+name,'status':'PASS','constraint_name':constraint})
+            unicode_payload = '{"label":"é","metric":0.00001}'
+            canonical_unicode = connections[0].execute(
+                'SELECT faos.canonical_event_jsonb(%s::jsonb)', (unicode_payload,)
+            ).fetchone()[0]
+            expect(canonical_unicode == unicode_payload, 'SQL_UNICODE_OR_NUMERIC_CANONICALIZATION_MISMATCH')
+            unicode_event = DomainEvent(session,'event-unicode',2,'SESSION_CREATED','synthetic-test',
+                                        '2026-01-01T00:00:00Z','unicode and decimal positive control',unicode_payload)
+            expect(append(connections[0],tenants[0],unicode_event)=='ACCEPTED','UNICODE_APPEND_FAILED')
+            expect(load_journal(connections[0],tenants[0],session).events==(event,unicode_event),'UNICODE_READBACK_CHANGED_BYTES')
+            report['checks'].append({'id':'G06-unicode-positive-control','status':'PASS'})
             payload = json.dumps({'message':'a b','quote':'a" b'},sort_keys=True,separators=(',',':'))
-            positive = DomainEvent(session,'event-2',2,'SESSION_CREATED','synthetic-test','2026-01-01T00:00:00Z','compact positive control',payload)
+            positive = DomainEvent(session,'event-3',3,'SESSION_CREATED','synthetic-test','2026-01-01T00:00:00Z','compact positive control',payload)
             expect(append(connections[0],tenants[0],positive)=='ACCEPTED','COMPACT_APPEND_FAILED')
             expect(append(connections[0],tenants[0],positive)=='DUPLICATE','COMPACT_RETRY_FAILED')
-            expect(load_journal(connections[0],tenants[0],session).events==(event,positive),'COMPACT_READBACK_FAILED')
+            expect(load_journal(connections[0],tenants[0],session).events==(event,unicode_event,positive),'COMPACT_READBACK_FAILED')
             report['checks'].append({'id':'COMPACT-JSON-POSITIVE-CONTROL','status':'PASS'})
             verify(report,admin,connections,tenants,session)
             expect(admin.execute('UPDATE faos.tenant_login_bindings SET enabled=false WHERE role_name=%s',(roles[0],)).rowcount==1,'REVOCATION_FAILED')
@@ -276,7 +287,7 @@ def run(report):
                     admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
-    report['diagnostics_successful'] = len(report['checks'])==12 and all(row['status']=='PASS' for row in report['checks'])
+    report['diagnostics_successful'] = len(report['checks'])==14 and all(row['status']=='PASS' for row in report['checks'])
 
 def load_counted_database_report():
     candidates = sorted(Path('output/database-runs').glob('*/database-evidence/counted-tests.json'))
