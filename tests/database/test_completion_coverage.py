@@ -5,7 +5,7 @@ from hashlib import sha256
 import unittest
 from unittest.mock import patch
 from app.domain_events import DomainEvent
-from app.evidence_manifest import ManifestEntry, build_manifest, verify_manifest, load_shot_contract, LEGACY_LEGACY_CANONICAL_SLOTS
+from app.evidence_manifest import ManifestEntry, build_manifest, verify_manifest, load_shot_contract, LEGACY_CANONICAL_SLOTS
 from app.capture_protocols import LEGACY_CAPTURE_PROTOCOL
 from app.synthetic_evidence import reconstruct, manifest_for, evaluate, check_completion
 
