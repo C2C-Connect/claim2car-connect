@@ -147,6 +147,11 @@ class MigrationControlsIntegration(unittest.TestCase):
             (tenant, session, seal, 'MANIFEST_SEALED', 'synthetic-test',
              '2026-01-01T00:00:00Z', 'synthetic 16-v1 manifest root', payload, '0.1'),
         )
+        self.admin_db.execute(
+            'INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) '
+            'SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=%s',
+            (tenant, 'faos_fixture'),
+        )
 
         def register(version):
             with self.admin_db.transaction():
