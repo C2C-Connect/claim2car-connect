@@ -149,8 +149,8 @@ class MigrationControlsIntegration(unittest.TestCase):
         )
         self.admin_db.execute(
             'INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) '
-            'SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=%s',
-            (tenant, 'faos_fixture'),
+            'SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=session_user',
+            (tenant,),
         )
 
         def register(version):
