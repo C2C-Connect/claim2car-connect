@@ -3,7 +3,7 @@
 **Canonical repository:** `C2C-Connect/claim2car-connect`
 **Current main baseline before PR #47 integration:** `f35b50bf4fb222de2ac4eb3eced466371a8be293`
 **Capture protocol:** `claims2car-16-v1` is the new-session default; explicit historical `claims2car-12-v1` compatibility is preserved.
-**Database contract:** `C2C-DB-AC-001 v1.0 proposed`; owner adoption and independent review remain a separate blocker.
+**Database contract:** `C2C-DB-AC-001 v1.0 owner-adopted on 2026-11-17`; independent review explicitly waived by owner for v1.0 adoption (not performed); post-adoption DB-01–DB-14 run required before formal awards.
 
 ## Current verification snapshot — 2026-11-17
 
@@ -225,3 +225,11 @@ The current Railway configuration is a restricted synthetic containment service.
 **Implementation status:** the owner-authorized 16-v1 slot list is now committed in `contracts/shot-list-16-v1.json`. New-session defaults, legacy selection, protocol-specific manifests, capture validation, reviewer verification, browser workbench rendering, and exterior-only crush-physics mapping have dedicated coverage. This establishes software-contract implementation, not real-device/field acceptance or persistent staging acceptance.
 
 See `docs/release/CAPTURE_PROTOCOL_VERSIONING.md` for the immutable-session rules and remaining work.
+
+
+## Database contract owner adoption — 2026-11-17
+
+- The Claim2Car hub account owner expressly authorized adoption of `C2C-DB-AC-001 v1.0` and explicitly waived independent review as a prerequisite to this version's adoption.
+- The waiver is not an independent review and no reviewer approval or attestation is claimed. A later independent review remains recommended.
+- Owner adoption does not retroactively award gates. Formal DB-01–DB-14 awards remain **0/14** until a complete post-adoption run passes against the exact merged source SHA.
+- This database-only adoption does not authorize production deployment, real participant intake, live payments, dispatch, external distribution, or claims of legal admissibility or field acceptance.
