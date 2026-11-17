@@ -67,7 +67,7 @@ Within an approved slice, routine engineering may proceed without file-by-file a
 
 ### Deployment truth
 
-The existing Railway configuration is a restricted synthetic containment rehearsal. It mounts health checks and disabled dispatch construction only; it is not the integrated claims application and reports `business_ready: false`. Do not call it a product deployment. Earlier staging prose identifying `P_BRITTLE_BETA` and `DEFAULT_TAX_RATE` as missing is stale at the reviewed baseline: both constants exist in `config/forensic_constants.py`. Their presence does not prove the complete backend imports or is deployable.
+The restricted health-only container is provider-neutral CI containment, not the integrated claims application. The owner-selected integrated staging target is OCI in `us-chicago-1`. No integrated OCI compute instance, PostgreSQL/PostGIS authority database, persistent evidence volume, backup/restore rehearsal, or OCI deployment workflow is currently evidenced. The configured OCI MySQL DB System is not compatible with the PostgreSQL/PostGIS architecture and is not the application authority database. Keep the integrated runtime private; do not expose it publicly until ingress, authentication, TLS, backup/restore, and security-list controls are verified.
 
 ### Security finding requiring Slice 1 closure
 The internal backend routes in `backend/app/api/analysis.py` and `backend/app/api/triage.py` currently define business POST endpoints without an authentication dependency. `backend/app/api/dispatch.py` also exposes redaction and verification routes without an authenticated actor boundary; dispatch build is disabled. `backend/app/main.py` applies a CORS allowlist, but CORS is not authentication or network access control. The route-control matrix labels these routes `INTERNAL_ANALYSIS`; that classification is an operational assumption, not an enforced security boundary in the route handlers. **Do not expose this backend entrypoint on a public network until a private network boundary or server-side authentication/authorization is implemented and tested.** Slice 1 must verify actual ingress and route reachability, define the enforcement point, and add negative tests before any integrated deployment.
@@ -170,7 +170,7 @@ Reference target: Apple iPad Pro 11-inch M5, 512GB, Wi-Fi + Cellular; purchase i
 **Objective:** run the complete application against persistent infrastructure with verifiable security and recovery.
 
 ### 3A — Database environment
-1. Select provider, region, PostgreSQL/PostGIS version, environment owner, and cost boundary.
+1. Confirm OCI region/resource identifiers, PostgreSQL 16/PostGIS version, environment owner, and Always Free/cost boundary before provisioning.
 2. Separate CI, staging, and production credentials.
 3. Create least-privilege migrator, application, reviewer, and operations roles.
 4. Apply migrations from an empty database and supported upgrade paths.

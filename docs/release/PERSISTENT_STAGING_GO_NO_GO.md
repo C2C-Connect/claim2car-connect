@@ -8,7 +8,7 @@
 - [ ] Inventory the complete diff against `main`; identify migrations, API/schema changes, security boundaries, feature flags, and rollback implications.
 - [ ] Obtain independent review of each mergeable increment. A self-authored check or green CI run is not an independent review.
 - [ ] Require current-head CI for the exact candidate SHA. Reject stale checks, missing required lanes, and unexplained skips.
-- [ ] Inspect job- and step-level conclusions. In particular, distinguish restricted Railway verification from integrated Railway deployment.
+- [ ] Inspect job- and step-level conclusions. In particular, distinguish provider-neutral restricted-container verification from actual OCI integrated deployment.
 - [ ] Preserve a rollback point and document the migration/data-compatibility strategy before any persistent environment is changed.
 
 ### PR #29 / PR #31 scope decision
@@ -72,19 +72,21 @@ This is a dependency plan, not a claim that all listed slices are already implem
 - [ ] Backup and restore are rehearsed; recovery point/time objectives and evidence reconciliation are recorded.
 - [ ] Synthetic end-to-end capture, restart, reviewer retrieval, tamper rejection and deletion are repeated against the persistent staging services.
 
-**Current known blocker:** no provisioned/verified persistent integrated staging database and evidence volume, encryption, or backup/restore evidence.
+**Current known blocker:** no provisioned/verified OCI PostgreSQL/PostGIS database or evidence volume, encryption, or backup/restore evidence. The existing OCI MySQL DB System is not used for the application authority database.
 
-## Gate E — Exact integrated staging deployment
+## Gate E — Exact OCI integrated staging deployment
 
-- [ ] Dedicated integrated Railway service is identified and separated from the restricted health-only service.
-- [ ] Service variables, sealed secrets, private database networking, persistent volume, TLS/ingress, health checks and one-replica storage constraints are verified.
-- [ ] GitHub environment secrets/variables are present and least-privileged.
-- [ ] Deployment runs from the approved `main` SHA with explicit confirmation and the deployment-enable flag.
-- [ ] Migration job succeeds; deployed `/health/build` reports the exact candidate SHA and integrated runtime mode.
-- [ ] Post-deployment route/auth checks, evidence write/read, restart persistence, reviewer retrieval and negative tenant tests pass.
-- [ ] Deployment record includes service identity, timestamp, SHA, migration ledger, smoke results, logs and rollback reference.
+- [ ] OCI compute instance is identified in the existing private VCN/subnet, with no public IP by default and an approved Bastion/VPN administration path.
+- [ ] PostgreSQL 16 with PostGIS is provisioned as the authority database; the existing MySQL DB System is not used for application data.
+- [ ] Separate persistent storage is attached for PostgreSQL data and original evidence; the evidence volume is mounted at `/var/lib/claim2car/evidence` and writable by UID 10001.
+- [ ] OCI Vault or another approved secret manager holds database credentials, runtime tokens, VIN pepper, internal service token, and registry credentials; no secrets are committed.
+- [ ] An OCIR repository and pinned integrated image are available; deployment is bound to the approved `main` SHA.
+- [ ] Private ingress, TLS, DNS, health checks, security-list rules, and one-replica filesystem-storage constraints are verified.
+- [ ] Authority migrations succeed and the deployed `/health/build` reports the exact candidate SHA and integrated runtime mode.
+- [ ] Post-deployment route/auth checks, evidence write/read, restart persistence, reviewer retrieval, negative tenant tests, backup and restore pass.
+- [ ] Deployment record includes OCI resource identity (stored outside public source), timestamp, SHA, migration ledger, smoke results, logs, backup/restore evidence, and rollback reference.
 
-**Critical distinction:** a green restricted Railway smoke with a skipped deploy job is not integrated staging. The integrated staging workflow is manual-only, requires `main`, `confirm_deploy=true`, and `RAILWAY_INTEGRATED_DEPLOY_ENABLED=true`. Its `/health/ready` probe now fails closed unless the PostgreSQL authority probe passes and the evidence-storage root is writable; `C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true` additionally requires that exact root to appear as a mount point in `/proc/self/mountinfo`. No successful integrated deployment is currently evidenced.
+**Critical distinction:** the provider-neutral restricted-container CI is not an integrated deployment. OCI is the selected integrated-staging target, but no OCI compute instance, PostgreSQL/PostGIS service, evidence volume, backup/restore rehearsal, or OCI deployment workflow is currently evidenced. The integrated `/health/ready` probe fails closed unless PostgreSQL is healthy and the evidence root is writable; `C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true` additionally requires the exact evidence root to appear as a mount point in `/proc/self/mountinfo`. No integrated deployment is claimed.
 
 ## Gate F — Operations and support
 

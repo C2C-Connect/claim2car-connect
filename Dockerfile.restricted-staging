@@ -5,11 +5,11 @@ WORKDIR /srv/claim2car
 COPY requirements-api.txt requirements-database.txt ./
 RUN pip install --no-cache-dir -r requirements-api.txt \
     && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin claim2car
-COPY app/railway_staging.py app/_build_revision.txt ./app/
+COPY app/restricted_staging.py app/_build_revision.txt ./app/
 COPY backend/ ./backend/
 COPY config/ ./config/
 USER 10001:10001
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8000') + '/health/ready', timeout=3).read()"
-CMD ["python", "-m", "app.railway_staging"]
+CMD ["python", "-m", "app.restricted_staging"]

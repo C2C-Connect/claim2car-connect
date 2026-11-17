@@ -1,0 +1,47 @@
+name: Restricted container verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+
+jobs:
+  verify:
+    name: Restricted container verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install verification dependencies
+        run: pip install -r requirements-api.txt 'httpx>=0.27,<1' 'pytest>=8,<10'
+      - name: Verify API and dispatch containment regressions
+        run: python -m pytest tests/api tests/test_dispatch.py -q
+      - name: Stamp and build restricted runtime
+        run: |
+          printf '%s\n' "$GITHUB_SHA" > app/_build_revision.txt
+          docker build --file Dockerfile.restricted-staging --tag claim2car-restricted:ci .
+          test "$(docker run --rm --entrypoint id claim2car-restricted:ci -u)" = 10001
+      - name: Start with dynamic port and restricted filesystem
+        run: |
+          docker run -d --name c2c-restricted-smoke --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            -e PORT=18765 -p 127.0.0.1:18001:18765 claim2car-restricted:ci
+      - name: Verify exact revision and safety boundaries
+        run: |
+          python scripts/container_smoke.py --base-url http://127.0.0.1:18001 \
+            --expected-revision "$GITHUB_SHA" --wait-seconds 90
+      - name: Remove disposable container
+        if: always()
+        run: docker rm -f c2c-restricted-smoke || true

@@ -10,9 +10,10 @@ React/Capacitor capture shell. References to a separate "Grok-built app" describ
 deprecated external prototypes, not another canonical product or deployment.
 
 This release candidate provides the database/event/evidence foundation and its
-tests. It does not establish that the FastAPI service or React/Capacitor shell
-has been fully implemented, integrated or deployed. PR #1 tracks those coverage
-boundaries and the foundation release acceptance criteria.
+tests. The integrated FastAPI runtime, capture/reviewer workflows, and React/Capacitor
+capture shell are present in the repository. Persistent OCI staging deployment,
+physical-device qualification, and field acceptance remain unverified. The
+acceptance matrix records the current evidence and release boundaries.
 
 San Antonio pilot direction includes a multi-dealer network with brand-appropriate
 routing (Ford to Ford, Toyota to Toyota). Tenant authority is a security boundary;
@@ -59,7 +60,7 @@ python -m database.migrate  # identical rerun must have no pending migrations
 ```
 
 The default plan includes both migrations/ and authority_migrations/, ordered and
-validated together, currently through 0016_claim_case_incident_read_boundary.sql. The 0010–0013 increments add the tenant-scoped claim-case register, least-privilege idempotent creation, and owner-bound capture-session association; 0014 adds separately deletable, owner-consented structured incident details under RLS. Existing
+validated together, currently through authority migration 0019_manifest_root_protocol_binding.sql. The 0010–0013 increments add the tenant-scoped claim-case register, least-privilege idempotent creation, and owner-bound capture-session association; 0014 adds separately deletable, owner-consented structured incident details under RLS. Existing
 ledger checksums, migration locking and transactional application remain in force.
 python -m database.authority_migrate is a compatibility alias for the same plan.
 No synthetic connection URL is used as a fallback by the normal migration command.
@@ -70,7 +71,7 @@ setup only, never the staging or production migration route. The guarded compone
 harness is a legacy comparison suite; the authority workflow subsequently runs
 full-plan migration regressions and upgrades the primary database before its
 post-cutover checks. Component counts are not a complete post-cutover regression
-claim. No full 14-gate certification follows from green CI alone.
+claim. Formal DB-01–DB-14 acceptance is recorded separately in the acceptance evidence package; green CI alone never awards gates.
 
 ## Automated verification
 
@@ -85,28 +86,28 @@ tag verification retains artifact evidence without publishing an evidence branch
 Required-check/ruleset enforcement and event-specific execution still need review;
 workflow trigger configuration alone does not prevent all unverified merges.
 
-## Railway restricted staging rehearsal
+## Restricted container verification
 
-Railway project `463d410b-09a3-4117-a3b5-05e6646e7807` is the supplied hosting
-target. [The staging deployment guide](docs/railway-staging.md) describes a
-dedicated restricted runtime, exact-revision HTTP checks, and the repository
-settings needed to enable deployment. Deployment is disabled by default until
-the environment, service, and token are verified. The runtime exposes only
-scoped health checks and disabled dispatch construction, not the integrated
-claims application. The existing intake Dockerfile is unchanged.
+The CI-only restricted runtime is provider-neutral. `Dockerfile.restricted-staging`
+builds a health-only containment image; `.github/workflows/restricted-container-verification.yml`
+verifies the exact revision, disabled business capabilities, non-root execution,
+and HTTP safety boundaries. It does not deploy to a cloud provider and is not
+the integrated claims application.
 
-## San Antonio database staging target - not provisioned
+## OCI integrated staging target — not provisioned
 
-Proposed logical environment: san-antonio-pilot-staging. This is a planning name,
-not a provisioned database, hosting project or verified GitHub Environment.
-The database provider, region, existing/new database target and owner must be
-resolved before database deployment. Use persistent storage, managed secrets,
-restricted bound identities and the full default migration route. The tmpfs test
-Compose stack and claim2car_test bootstrap are not a persistent staging recipe.
-The migration engine is not production-certified; environment-specific provisioning,
-restore/recreation rehearsal and an approved deployment operation remain required.
-Only synthetic data is in scope for the first staging rehearsal; live financial
-and dispatch integrations are not enabled by this release candidate.
+The owner-selected infrastructure target is Oracle Cloud Infrastructure (OCI),
+region `us-chicago-1`. Existing OCI network foundations are available, but this
+repository does not yet evidence an integrated compute instance, PostgreSQL/
+PostGIS authority database, persistent evidence volume, backup/restore rehearsal,
+or OCI deployment workflow. The existing OCI MySQL DB System is not compatible
+with the product's PostgreSQL/PostGIS architecture and must not be used as the
+authority database.
+
+See [the OCI integrated-staging runbook](docs/deployment/oci-integrated-staging.md).
+No OCIDs, API keys, private keys, or service credentials belong in this repository.
+Only synthetic data is in scope for the first persistent staging rehearsal; live
+financial and dispatch integrations remain disabled.
 
 Retired prototypes (do not use as canonical): C2C-Connect/C2C and
 claim2car-network/claim2car-faos-core. PR #1 remains Draft pending release review.

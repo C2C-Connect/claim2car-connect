@@ -18,7 +18,7 @@ def request(base, path):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("usage: railway_integrated_smoke.py HTTPS_URL FULL_GIT_SHA")
+        raise SystemExit("usage: integrated_staging_smoke.py HTTPS_URL FULL_GIT_SHA")
     base, expected_revision = sys.argv[1].rstrip("/"), sys.argv[2]
     if not base.startswith("https://") or len(expected_revision) != 40:
         raise SystemExit("INVALID_STAGING_SMOKE_TARGET")

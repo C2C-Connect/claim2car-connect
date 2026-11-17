@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import URLError
 
-from scripts import railway_smoke as smoke
+from scripts import container_smoke as smoke
 
 
 SHA = "1" * 40
@@ -25,7 +25,7 @@ class Clock:
         self.now += seconds
 
 
-class RailwaySmokeTests(unittest.TestCase):
+class ContainerSmokeTests(unittest.TestCase):
     def setUp(self):
         self.clock = Clock()
         self.faults = defaultdict(deque)
