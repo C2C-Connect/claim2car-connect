@@ -1,4 +1,4 @@
-"""Unit tests for executable 14-gate acceptance and 19-migration inventory accounting."""
+"""Unit tests for 14-gate acceptance, 19 migrations, and 16-v1 root binding."""
 import unittest
 
 from verify_gates import (
