@@ -215,13 +215,19 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        expect(report['migration_inventory'][-1][0]=='0018_capture_protocol_session_binding.sql','EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
+        migration_names = [row[0] for row in report['migration_inventory']]
+        expect('0017_event_contract_parity.sql' in migration_names,'EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
+        expect('0018_capture_protocol_session_binding.sql' in migration_names,'CAPTURE_PROTOCOL_SESSION_MIGRATION_REQUIRED')
+        expect(migration_names[-1]=='0019_manifest_root_protocol_binding.sql','MANIFEST_ROOT_PROTOCOL_BINDING_MIGRATION_REQUIRED')
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:
             for tenant in tenants:
                 admin.execute('INSERT INTO faos.organizations VALUES (%s,%s)',(tenant,'synthetic post-cutover diagnostic'))
-                admin.execute('INSERT INTO faos.sessions VALUES (%s,%s)',(tenant,session))
+                admin.execute(
+                    'INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
+                    (tenant,session,'claims2car-12-v1'),
+                )
                 role,password = 'cutover_'+uuid.uuid4().hex,uuid.uuid4().hex
                 admin.execute(sql.SQL('CREATE ROLE {} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(password)))
                 roles.append(role)
