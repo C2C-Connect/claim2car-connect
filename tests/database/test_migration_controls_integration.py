@@ -158,7 +158,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                 self.admin_db.execute('SET LOCAL ROLE faos_fixture')
                 self.admin_db.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
                 context = self.admin_db.execute(
-                    "SELECT current_user,current_setting('faos.tenant_id',true),faos.tenant_id()"
+                    "SELECT current_user,current_setting('faos.tenant_id',true),faos.tenant_id()::text"
                 ).fetchone()
                 self.assertEqual(context, ('faos_fixture', tenant, tenant), 'FIXTURE_TENANT_CONTEXT_NOT_ESTABLISHED')
                 return self.admin_db.execute(
