@@ -1,4 +1,4 @@
-"""PostgreSQL migration controls with normalized tenant context and 16-v1 root-binding checks."""
+"""PostgreSQL migration controls with session-bound tenant context and 16-v1 root binding."""
 from dataclasses import replace
 import hashlib
 import os
