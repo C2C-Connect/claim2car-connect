@@ -83,15 +83,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         self.assertEqual(self.history(),before)
         self.assertIsNotNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
 
-    def test_manifest_root_migration_checksum_change_is_rejected(self):
-        plan = self.authority_plan()
-        apply(self.conn, plan)
-        before = self.history()
-        changed = plan[:-1] + (replace(plan[-1], sha256='0' * 64),)
-        with self.assertRaisesRegex(ValueError, 'APPLIED_MIGRATION_CHANGED:0019_manifest_root_protocol_binding.sql'):
-            apply(self.conn, changed)
-        self.assertEqual(self.history(), before)
-
     def test_default_entry_point_upgrades_legacy_seven_migration_schema(self):
         legacy = discover(Path(__file__).resolve().parents[2]/'migrations')
         self.assertEqual(len(legacy),7)
@@ -240,7 +231,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_parity_migration_preserves_existing_event_payload_bytes(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-2])
+        apply(self.conn, plan[:-3])
         tenant = str(uuid.uuid4())
         session = 'preserve-payload-' + uuid.uuid4().hex
         payload = '{"label":"é","metric":0.00001}'
@@ -266,7 +257,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_noncanonical_historical_event_blocks_parity_migration_without_rewrite(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-2])
+        apply(self.conn, plan[:-3])
         tenant = str(uuid.uuid4())
         session = 'reject-history-' + uuid.uuid4().hex
         payload = '{"z":1,"a":2}'
@@ -299,6 +290,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0018_capture_protocol_session_binding.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0019_manifest_root_protocol_binding.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
