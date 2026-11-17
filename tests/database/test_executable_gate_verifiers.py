@@ -7,6 +7,8 @@ from verify_gates import (
     _counted_report_ok,
     preflight_counted_report,
     run_all_gate_verifiers,
+    verify_db_01,
+    verify_db_02,
     verify_db_06,
     verify_db_07,
 )
@@ -29,6 +31,58 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(sum(row["status"] == "PASS" for row in results), 0)
         self.assertEqual(results[-1]["id"], "DB-14")
         self.assertEqual(results[-1]["status"], "NOT AWARDED")
+
+    def test_authority_migration_inventory_requires_all_nineteen_ordered_files(self):
+        names = [
+            '0001_tenant_registry.sql',
+            '0002_event_journal.sql',
+            '0003_completion_lock.sql',
+            '0004_manifest_roots.sql',
+            '0005_completion_receipts.sql',
+            '0006_event_timestamp_validity.sql',
+            '0007_event_payload_compactness.sql',
+            '0008_tenant_login_authority.sql',
+            '0009_integer_financial_ledger.sql',
+            '0010_claim_case_registry.sql',
+            '0011_claim_case_idempotency_conflicts.sql',
+            '0012_claim_case_retry_without_update_lock.sql',
+            '0013_claim_case_capture_session.sql',
+            '0014_claim_case_incident_intake.sql',
+            '0015_incident_event_kinds.sql',
+            '0016_claim_case_incident_read_boundary.sql',
+            '0017_event_contract_parity.sql',
+            '0018_capture_protocol_session_binding.sql',
+            '0019_manifest_root_protocol_binding.sql',
+        ]
+        selectors = (
+            'test_candidate_manifest.CandidateManifestTests.test_added_migration_detected',
+            'test_migration_plan.MigrationPlanTests.test_initial',
+            'test_migration_preflight.MigrationPreflightTests.test_initial_execution',
+            'test_migration_controls_integration.MigrationControlsIntegration.test_default_entry_point_clean_full_initialization_and_rerun',
+            'test_migration_controls_integration.MigrationControlsIntegration.test_default_entry_point_upgrades_legacy_seven_migration_schema',
+        )
+        counted = {
+            'discovered': len(selectors), 'executed': len(selectors), 'failures': 0,
+            'errors': 0, 'skipped': 0, 'expected_failures': 0,
+            'unexpected_successes': 0, 'successful': True,
+            'tests': [{'id': value, 'outcome': 'passed'} for value in selectors],
+        }
+        inventory = [(name, '0' * 64) for name in names]
+        diagnostics = {
+            'diagnostics_successful': True,
+            'checks': [],
+            'database': ['claim2car_test', 'PostgreSQL synthetic'],
+            'extensions': [('plpgsql', '1.0'), ('postgis', '3.4')],
+            'migration_inventory': inventory,
+            'environment': {'connections': {
+                'admin': {'user': 'postgres', 'host': '127.0.0.1', 'port': '55432', 'dbname': 'claim2car_test'},
+                'application': {'user': 'faos_app', 'host': '127.0.0.1', 'port': '55432', 'dbname': 'claim2car_test'},
+                'migrator': {'user': 'faos_migrator', 'host': '127.0.0.1', 'port': '55432', 'dbname': 'claim2car_test'},
+            }},
+        }
+        context = {'diagnostics': diagnostics, 'counted_tests': counted, 'environment_is_synthetic': True}
+        self.assertEqual(verify_db_01(context)['status'], 'PASS')
+        self.assertEqual(verify_db_02(context)['status'], 'PASS')
 
     def test_gate_requires_each_mapped_test_and_sql_assertion(self):
         ids = (
