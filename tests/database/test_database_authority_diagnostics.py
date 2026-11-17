@@ -1,4 +1,4 @@
-"""Regression tests for strict 0017-0019 authority-migration inventory diagnostics."""
+"""Regression tests for strict 0017-0019 inventory and DB-01/DB-02 acceptance diagnostics."""
 import unittest
 
 from scripts.database_authority_diagnostics import validate_authority_migration_inventory
