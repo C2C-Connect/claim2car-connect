@@ -6,16 +6,16 @@
 **PR #47 candidate:** `776265a555df9f844837ba788ca4b456a9491319`  
 **Tested synthetic merge checkout:** `ccca9dd8375119715fdebddf70d9294e28b1c3ea`  
 **Contract blob SHA:** `2619ad3ba3634200aa0a839f6ace9f3e15746190`  
-**Package status:** PREPARED — INDEPENDENT REVIEW NOT YET RECORDED  
-**Contract status:** PROPOSED_PENDING_OWNER_ADOPTION  
-**Formal gate awards:** 0/14  
+**Package status:** OWNER ADOPTED — INDEPENDENT REVIEW EXPLICITLY WAIVED FOR V1.0 ADOPTION; REVIEW NOT PERFORMED  
+**Contract status:** OWNER_ADOPTED_PENDING_POST-ADOPTION_GATE_RUN  
+**Formal gate awards:** 0/14 — post-adoption acceptance run required  
 **Overall database acceptance:** NOT ACCEPTED
 
 > This package organizes contract, implementation, and verification evidence for an independent reviewer. It is not an independent review, owner approval, database certification, production-readiness statement, or authorization to use real participant data. Candidate and tested-checkout SHAs are distinct and must remain separately identified.
 
 ## 1. Decision requested
 
-An independent database/security reviewer is asked to assess whether C2C-DB-AC-001 v1.0 is complete, internally consistent, technically testable, and appropriately bounded for the stated database foundation milestone. The reviewer should assess the normative contract on the main baseline and the PR #47 implementation delta, including migration 0019, before issuing a decision.
+An independent database/security review remains recommended as a follow-on assurance activity. The Product Owner explicitly waived independent review as a prerequisite to v1.0 adoption on 2026-11-17. No independent review has been performed or is claimed in this package. Any later reviewer must assess the normative contract and implementation delta, including migration 0019, and record findings against exact SHAs.
 
 Record one of:
 - **APPROVE** — contract and supporting evidence are adequate for owner adoption, subject to explicitly listed non-blocking observations.
@@ -131,30 +131,27 @@ The reviewer should add any further limitations discovered during review.
 
 A review is not complete until reviewer identity, independence statement, reviewed SHAs, decision, findings, and attestation are recorded in a durable repository artifact or attributable signed review record.
 
-## 7. Owner adoption record — intentionally uncompleted
+## 7. Owner adoption record — RECORDED
 
-The owner alone makes the formal adoption decision after considering the independent review.
+**Owner decision:** ADOPT C2C-DB-AC-001 v1.0  
+**Owner:** Claim2Car hub account owner (owner identity/authority expressly attested in the ChatGPT session; this repository entry is recorded at the owner's direction)  
+**Adopted contract version:** C2C-DB-AC-001 v1.0  
+**Adoption date:** 2026-11-17  
+**Owner rationale / conditions:** The owner expressly authorized acceptance and directed the implementation agent to proceed with full autonomy. The owner explicitly waived independent review as a prerequisite to v1.0 adoption. This waiver is not represented as an independent review, reviewer approval, or reviewer attestation. Technical gate awards remain contingent on a new complete post-adoption DB-01–DB-14 run against the exact merged source revision. Production readiness, real-participant authorization, legal admissibility, payment activation, dispatch, and deployment are not granted by this adoption.
 
-**Owner decision:** [ADOPT / RETURN FOR CHANGES / REJECT]  
-**Owner:** Product Owner, Claim2Car Connect  
-**Adopted contract version and SHA:** [to be completed only upon approval]  
-**Adoption date:** [to be completed]  
-**Owner rationale / conditions:** [to be completed]
+**Independent-review disposition:** WAIVED BY OWNER FOR V1.0 ADOPTION; NOT PERFORMED. The reviewer fields in Section 6 intentionally remain uncompleted. A later independent review remains recommended and must be recorded honestly if undertaken.
 
-No contributor, automation, CI run, or reviewer may fill this owner decision on the owner's behalf.
-
-After a positive independent review and explicit owner adoption, update the contract status through a reviewed change, merge that adoption change, and run a new complete, traceable DB-01–DB-14 acceptance run against the adopted contract. Only that subsequent run may award formal gate statuses. Do not retroactively convert proposed-state criteria results into formal awards.
+The owner adoption is effective when this contract revision is merged to `main`. A new complete, traceable DB-01–DB-14 acceptance run must then execute against the adopted contract and exact merged source SHA. Only that subsequent run may award formal gate statuses. Proposed-state results must not be retroactively converted into formal awards.
 
 ## 8. Closure criteria for Issue #39
 
-Issue #39 may be closed only after all of the following are evidenced:
+Issue #39 may be closed after the following are evidenced:
 
-1. Independent review completed by a suitably qualified reviewer who did not author the implementation under review.
-2. Reviewer decision and all material findings recorded.
-3. Required changes resolved and re-reviewed, if applicable.
-4. Product Owner explicitly adopts or rejects the contract; adoption is recorded in the repository.
-5. The adopted contract is merged to `main`.
-6. A new complete DB-01–DB-14 run is executed against the adopted contract and exact source SHA.
-7. Formal gate results and overall acceptance are reported exactly as produced; no production-readiness claims are inferred.
+1. Independent review is completed and recorded, OR the Product Owner explicitly waives it for the stated contract version and the waiver is recorded without being misrepresented as a review.
+2. Any findings from a completed review are resolved or explicitly accepted by the owner.
+3. Product Owner adoption is recorded in the repository.
+4. The adopted contract and associated implementation are merged to `main`.
+5. A new complete DB-01–DB-14 run is executed against the adopted contract and exact source SHA.
+6. Formal gate results and overall acceptance are reported exactly as produced; no production-readiness claims are inferred.
 
-Until then: Issue #39 remains open; contract remains proposed; formal gate awards remain 0/14; overall acceptance remains NOT ACCEPTED.
+For v1.0, criterion 1 is satisfied by the owner's explicit waiver recorded in Section 7; independent review remains NOT PERFORMED. Until the post-adoption run passes and is recorded, Issue #39 remains open, formal gate awards remain 0/14, and overall acceptance remains NOT ACCEPTED.
