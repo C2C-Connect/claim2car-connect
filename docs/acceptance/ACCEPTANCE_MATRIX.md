@@ -1,11 +1,11 @@
 # Claim2Car Connect — Acceptance & Release Gate Matrix
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`
-**Current main baseline:** `32ed4174d10ab7ac2d895741e413b0624e53ecaa`
+**Current main baseline before PR #47 integration:** `f35b50bf4fb222de2ac4eb3eced466371a8be293`
 **Capture protocol:** `claims2car-16-v1` is the new-session default; explicit historical `claims2car-12-v1` compatibility is preserved.
 **Database contract:** `C2C-DB-AC-001 v1.0 proposed`; owner adoption and independent review remain a separate blocker.
 
-## Current verification snapshot — 2026-11-12
+## Current verification snapshot — 2026-11-17
 
 ### PR #41 — capture protocol 16-v1
 
@@ -40,6 +40,23 @@ PR #43 implemented and merged the 14 gate verifier functions, per-gate test sele
 - Issues #33–#38 are closed with PostgreSQL, migration, immutability, replay, and CI evidence.
 - Issue #39 remains open pending independent review and formal owner adoption of C2C-DB-AC-001.
 - No additional SQL parity migration was needed: existing `0017_event_contract_parity.sql` already enforces the Python-equivalent boundary; new adversarial tests validate it.
+
+### PR #47 — manifest-root protocol binding migration 0019 (candidate, not merged)
+
+- PR: [#47](https://github.com/C2C-Connect/claim2car-connect/pull/47)
+- Previous candidate head (superseded; historical CI only): `a7352a839776b9a1d1d9db357925d6b9c6a62524`.
+- The previous 13/13 workflow and test results below apply only to that prior head and its then-current merge checkout. They do **not** validate the rebased or revised candidate. Current-head verification is pending.
+- Adds `0019_manifest_root_protocol_binding.sql` after the existing 0017 event-contract parity and 0018 session-protocol migrations.
+- The database now requires every registered manifest root's `shot_list_version` to match the immutable `capture_protocol_version` on its owning session. Both historical 12-v1 and approved 16-v1 are supported; mismatches fail closed.
+- Historical GitHub Actions: **13/13 workflows successful** on the previous candidate head only; not transferable to a changed source revision.
+- Historical full pytest: **780 passed, 201 subtests passed, 23 warnings** on the previous candidate head only.
+- Historical counted PostgreSQL suite: **319/319 passed**, zero failures, errors, skips, expected failures, or unexpected successes on the previous candidate head only.
+- Historical post-cutover diagnostics: **14/14 checks PASS**, including the 14-table / 280-assertion tenant-isolation matrix, on the previous candidate head only.
+- Historical DB-01 through DB-14 technical criteria: **14/14 PASS** on the previous candidate head only.
+- Formal gate awards remain **0/14** because C2C-DB-AC-001 is still proposed pending owner adoption and independent review.
+- PR #47 remains Draft pending independent review. Its CI Railway lane verifies the restricted health-only runtime; integrated persistent staging deployment has not occurred.
+
+Migration 0019 is not a replacement for event-contract parity. It adds a separate evidence-manifest/session protocol binding boundary.
 
 ### Remaining acceptance and release boundaries
 

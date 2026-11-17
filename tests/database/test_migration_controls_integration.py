@@ -1,4 +1,4 @@
-"""Real PostgreSQL migration controls in unique disposable databases."""
+"""PostgreSQL migration controls with session-bound tenant context and 16-v1 root binding."""
 from dataclasses import replace
 import hashlib
 import os
@@ -74,7 +74,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0018_capture_protocol_session_binding.sql')
+        self.assertEqual(plan[-1].name,'0019_manifest_root_protocol_binding.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -89,13 +89,13 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql'))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
     def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-1])
+        apply(self.conn, plan[:-2])
         tenant = str(uuid.uuid4())
         legacy_session = 'legacy-' + uuid.uuid4().hex
         new_session = 'new-' + uuid.uuid4().hex
@@ -108,7 +108,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                           (tenant,'protocol migration fixture'))
             admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                           (tenant,legacy_session))
-            self.assertEqual(apply(self.conn,plan),(plan[-1].name,))
+            self.assertEqual(apply(self.conn,plan[:-1]),(plan[-2].name,))
             legacy_version = admin.execute(
                 'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
                 (tenant,legacy_session)).fetchone()[0]
@@ -124,6 +124,73 @@ class MigrationControlsIntegration(unittest.TestCase):
                     "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v1' WHERE tenant_id=%s AND session_id=%s",
                     (tenant,legacy_session))
             self.assertEqual(raised.exception.diag.message_primary,'CAPTURE_PROTOCOL_VERSION_IMMUTABLE')
+
+    def test_manifest_root_protocol_binding_accepts_16_and_rejects_mismatch(self):
+        plan = self.authority_plan()
+        apply(self.conn, plan)
+        tenant = str(uuid.uuid4())
+        session = 'manifest-root-16-' + uuid.uuid4().hex
+        seal = 'seal-16-' + uuid.uuid4().hex
+        digest = 'a' * 64
+        payload = '{"manifest_digest":"' + digest + '","schema_version":"0.1","shot_list_version":"claims2car-16-v1"}'
+        self.admin_db.execute(
+            'INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+            (tenant, 'synthetic manifest root protocol fixture'),
+        )
+        self.admin_db.execute(
+            'INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
+            (tenant, session, 'claims2car-16-v1'),
+        )
+        self.admin_db.execute(
+            'INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) '
+            'VALUES (%s,%s,%s,1,%s,%s,%s,%s,%s,%s)',
+            (tenant, session, seal, 'MANIFEST_SEALED', 'synthetic-test',
+             '2026-01-01T00:00:00Z', 'synthetic 16-v1 manifest root', payload, '0.1'),
+        )
+        self.admin_db.execute(
+            'INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) '
+            'SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=session_user',
+            (tenant,),
+        )
+
+        def register(version):
+            with self.admin_db.transaction():
+                self.admin_db.execute('SET LOCAL ROLE faos_fixture')
+                self.admin_db.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+                context = self.admin_db.execute(
+                    "SELECT current_user,current_setting('faos.tenant_id',true),faos.tenant_id()::text"
+                ).fetchone()
+                self.assertEqual(context, ('faos_fixture', tenant, tenant), 'FIXTURE_TENANT_CONTEXT_NOT_ESTABLISHED')
+                return self.admin_db.execute(
+                    'SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                    (tenant, session, seal, digest, version),
+                ).fetchone()[0]
+
+        self.assertEqual(register('claims2car-16-v1'), 'REGISTERED')
+        with self.assertRaisesRegex(psycopg.errors.RaiseException, 'ROOT_PROTOCOL_SESSION_MISMATCH'):
+            register('claims2car-12-v1')
+
+        with self.assertRaises(psycopg.errors.RaiseException) as raised:
+            with self.admin_db.transaction():
+                self.admin_db.execute('SET LOCAL ROLE faos_writer')
+                self.admin_db.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+                context = self.admin_db.execute(
+                    "SELECT current_user,current_setting('faos.tenant_id',true),faos.tenant_id()::text"
+                ).fetchone()
+                self.assertEqual(context, ('faos_writer', tenant, tenant), 'WRITER_TENANT_CONTEXT_NOT_ESTABLISHED')
+                self.admin_db.execute(
+                    'INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) '
+                    'VALUES (%s,%s,%s,%s,%s)',
+                    (tenant, session, seal, digest, 'claims2car-12-v1'),
+                )
+        self.assertEqual(raised.exception.diag.message_primary, 'ROOT_PROTOCOL_SESSION_MISMATCH')
+        self.assertEqual(
+            self.admin_db.execute(
+                'SELECT shot_list_version FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',
+                (tenant, session),
+            ).fetchall(),
+            [('claims2car-16-v1',)],
+        )
 
     def test_full_migration_enforces_python_sql_event_contract_parity(self):
         from app.domain_events import DomainEvent, KINDS
@@ -231,7 +298,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_parity_migration_preserves_existing_event_payload_bytes(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-2])
+        apply(self.conn, plan[:-3])
         tenant = str(uuid.uuid4())
         session = 'preserve-payload-' + uuid.uuid4().hex
         payload = '{"label":"é","metric":0.00001}'
@@ -257,7 +324,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_noncanonical_historical_event_blocks_parity_migration_without_rewrite(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-2])
+        apply(self.conn, plan[:-3])
         tenant = str(uuid.uuid4())
         session = 'reject-history-' + uuid.uuid4().hex
         payload = '{"z":1,"a":2}'
@@ -290,6 +357,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0018_capture_protocol_session_binding.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0019_manifest_root_protocol_binding.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)

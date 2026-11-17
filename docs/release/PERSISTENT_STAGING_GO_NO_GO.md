@@ -51,7 +51,7 @@ This is a dependency plan, not a claim that all listed slices are already implem
 
 ## Gate C — Operator and reviewer product experience
 
-- [ ] Canonical protocol registry defines `claims2car-16-v1` as the default and `claims2car-12-v1` as an explicit selectable alternative.
+- [x] Canonical protocol registry defines `claims2car-16-v1` as the enabled default and `claims2car-12-v1` as an explicit selectable legacy alternative.
 - [x] Exact 16-v1 slot IDs/order and descriptions are owner-approved in `contracts/shot-list-16-v1.json`.
 - [x] Protocol version is bound to each capture session and immutable manifest; historical 12-v1 sessions retain their original identity.
 - [x] Browser/controller/API/backend contract parity is covered by protocol-specific tests for both versions.
@@ -59,9 +59,9 @@ This is a dependency plan, not a claim that all listed slices are already implem
 - [ ] Roadside pause, unsafe-slot skip, scene abort, interruption recovery and sync are validated on supported physical devices.
 - [ ] An authorized operator completes capture with consent and original-byte evidence; an independent reviewer retrieves it and records an attributable decision.
 
-**Implementation progress:** migration 0018 now persists an immutable protocol version per session, backfills historical sessions as 12-v1, defaults new sessions to 16-v1, and binds the version into new session-creation journal events. The authenticated registry API and operator selector expose 16-v1 as default and 12-v1 as an explicit alternative. 16-v1 evidence capture fails closed until its contract is approved.
+**Implementation progress:** the founder-approved 16-slot contract is implemented in `contracts/shot-list-16-v1.json`; the authenticated registry reports 16-v1 as implemented and capture-enabled, with 12-v1 retained as an explicit legacy alternative. Migration 0018 binds the immutable protocol to each session; PR #47 adds migration 0019 to bind registered manifest roots to the owning session protocol. Slots 00–07 alone may feed crush-physics geometry; slots 08–15 are evidence-only for that analysis path.
 
-**Current status:** the software protocol contract and cross-layer version binding are implemented on the protocol feature branch, pending its CI and mainline merge. Safari/iPad/physical-device and roadside validation are not complete.
+**Current status:** PR #41 merged the approved 16-v1 contract and cross-layer implementation. PR #47's migration 0019 integration has passed its 13-workflow CI and 14/14 technical database criteria, but still requires independent review before merge. Safari/iPad/physical-device qualification and roadside field validation remain outstanding.
 
 ## Gate D — Persistent data, storage, retention and recovery
 
