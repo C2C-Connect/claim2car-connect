@@ -113,6 +113,7 @@ GATE_TESTS = {
             "test_completion_coverage.CompletionCoverage.",
             "test_manifest_roots.ManifestRootTests.",
             "test_registered_completion.RegisteredCompletionTests.",
+            "test_migration_controls_integration.MigrationControlsIntegration.test_manifest_root_protocol_binding_accepts_16_and_rejects_mismatch",
         ),
         (),
     ),
