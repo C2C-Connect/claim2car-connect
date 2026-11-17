@@ -135,7 +135,7 @@ The former Railway configuration was a restricted synthetic containment service,
 
 **Implementation:** PR #29 candidate branch, migrations `0014_claim_case_incident_intake.sql` and `0015_incident_event_kinds.sql`; synthetic PostgreSQL integration coverage added and verified.
 
-**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** full repository suite passed; database authority migration/cutover and tenant-isolation diagnostics passed, including direct-table-read denial and actor-filtered read verification; API health, controlled intake PostgreSQL, integrated-container smoke, frontend, VIN, CodeQL, and restricted Railway smoke checks passed. The Railway deploy job remained skipped. These are CI/synthetic results, not field acceptance or a live deployment.
+**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** full repository suite passed; database authority migration/cutover and tenant-isolation diagnostics passed, including direct-table-read denial and actor-filtered read verification; API health, controlled intake PostgreSQL, integrated-container smoke, frontend, VIN, CodeQL, and historical Railway-hosted restricted smoke checks passed. The historical Railway deploy job remained skipped. These are CI/synthetic results, not field acceptance or a live deployment.
 
 - Added a separate owner consent event with disclosure version `incident-intake-v1` and scope `incident_details`. It is distinct from the existing `disclosure-v1` capture/evidence consent.
 - Added a tenant-scoped, RLS-forced `faos.claim_case_incident_intake` table. The first version collects only incident timestamp, category, city, two-letter state/territory code, and ZIP code.
@@ -155,7 +155,7 @@ The former Railway configuration was a restricted synthetic containment service,
 - The operator shell can load the details after the owner separately consents. Withdrawal removes the row, so the read path no longer returns it.
 - The database authority diagnostic now verifies that the shared application role cannot directly select this table and must use the actor-filtered read function.
 
-**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** the complete database authority/cutover workflow and full repository suite passed (**693 passed, 23 warnings, 192 subtests**), including the owner/creator readback and denial-to-other-operator integration test. API health, integrated-container smoke, controlled PostgreSQL intake, VIN, frontend, CodeQL, and restricted Railway verification also passed; the actual Railway deploy job remained skipped.
+**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** the complete database authority/cutover workflow and full repository suite passed (**693 passed, 23 warnings, 192 subtests**), including the owner/creator readback and denial-to-other-operator integration test. API health, integrated-container smoke, controlled PostgreSQL intake, VIN, frontend, CodeQL, and historical Railway-hosted restricted verification also passed; the actual historical Railway deploy job remained skipped.
 
 **Remaining boundary:** owner authentication is still based on a provisioned actor credential; this does not establish the real person's identity. The feature remains disabled by default and the disclosure remains pending legal review.
 
