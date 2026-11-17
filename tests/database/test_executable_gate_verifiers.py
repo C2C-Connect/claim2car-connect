@@ -3,6 +3,7 @@ import unittest
 
 from verify_gates import (
     GATE_FUNCTIONS,
+    GATE_TESTS,
     _matrix_ok,
     _counted_report_ok,
     preflight_counted_report,
@@ -11,6 +12,7 @@ from verify_gates import (
     verify_db_02,
     verify_db_06,
     verify_db_07,
+    verify_db_10,
 )
 
 
@@ -83,6 +85,26 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         context = {'diagnostics': diagnostics, 'counted_tests': counted, 'environment_is_synthetic': True}
         self.assertEqual(verify_db_01(context)['status'], 'PASS')
         self.assertEqual(verify_db_02(context)['status'], 'PASS')
+
+    def test_manifest_root_gate_requires_16_v1_session_binding_integration(self):
+        required = "test_migration_controls_integration.MigrationControlsIntegration.test_manifest_root_protocol_binding_accepts_16_and_rejects_mismatch"
+        selectors = GATE_TESTS["DB-10"][1]
+        self.assertIn(required, selectors)
+        tests = [
+            {"id": prefix + "fixture", "outcome": "passed"}
+            for prefix in selectors if prefix != required
+        ]
+        counted = {
+            "discovered": len(tests), "executed": len(tests), "failures": 0,
+            "errors": 0, "skipped": 0, "expected_failures": 0,
+            "unexpected_successes": 0, "successful": True, "tests": tests,
+        }
+        result = verify_db_10({
+            "diagnostics": {"diagnostics_successful": True, "checks": []},
+            "counted_tests": counted,
+        })
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn(required, result["missing_test_selectors"])
 
     def test_gate_requires_each_mapped_test_and_sql_assertion(self):
         ids = (
