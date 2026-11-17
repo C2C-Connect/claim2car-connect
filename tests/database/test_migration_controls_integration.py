@@ -1,4 +1,4 @@
-"""Real PostgreSQL migration controls in unique disposable databases."""
+"""Real PostgreSQL migration controls, including 16-v1 root binding, in disposable databases."""
 from dataclasses import replace
 import hashlib
 import os
