@@ -28,7 +28,7 @@ For reviewed source/test revision `294c11132bb344e59b193ef7b160644edfeab770`, 11
 - Entrypoint: `backend/app/main.py`.
 - Independently instantiates and mounts analysis, triage, and dispatch routers.
 - It is not composed into `app/main.py`.
-- `Dockerfile.railway` copies `app/railway_staging.py` and starts `python -m app.railway_staging`; that staging entrypoint creates the health-only foundation app. The Dockerfile also copies `backend/`, but copying code into an image does not mount its routers or make those routes reachable.
+- At the reviewed historical baseline, `Dockerfile.railway` copied `app/railway_staging.py` and started a health-only foundation app. That provider-specific path has since been retired. The current CI-only equivalent is `Dockerfile.restricted-staging` / `app.restricted_staging`; `Dockerfile.integrated` is the separate integrated application image and has not yet been deployed to OCI.
 - Therefore, the reviewed deployment configuration does not establish public reachability of the backend analysis routes. Actual provider ingress and running cloud state have not been independently enumerated in this review.
 
 ### C. Data / persistence

@@ -2,7 +2,7 @@
 
 No database, capture, analysis, valuation, payments, reports, or verification
 routes are mounted. Dispatch build stays unconditionally disabled using the
-existing containment handler. Railway's readiness probe covers this narrow
+existing containment handler. The readiness probe covers this narrow
 surface only, not database readiness or product acceptance.
 """
 from __future__ import annotations

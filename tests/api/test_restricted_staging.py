@@ -1,23 +1,22 @@
-"""HTTP unit tests for the deliberately restricted Railway staging surface."""
+"""HTTP unit tests for the provider-neutral restricted staging surface."""
 import os
-from pathlib import Path
-import tomllib
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app import railway_staging
+from app import restricted_staging
 from backend.app.api import dispatch
 
 
 REVISION = "1" * 40
 
 
-class RailwayStagingTests(unittest.TestCase):
+class RestrictedStagingTests(unittest.TestCase):
     def client(self):
-        with patch.object(railway_staging, "read_build_revision", return_value=REVISION):
-            return TestClient(railway_staging.create_staging_app())
+        with patch.object(restricted_staging, "read_build_revision", return_value=REVISION):
+            return TestClient(restricted_staging.create_staging_app())
 
     def test_readiness_is_scoped_not_business_acceptance(self):
         with self.client() as client:
@@ -28,7 +27,7 @@ class RailwayStagingTests(unittest.TestCase):
                 body = response.json()
                 self.assertEqual(body["status"], status)
                 self.assertEqual(body["revision"], REVISION)
-                self.assertEqual(body["scope"], railway_staging.SCOPE)
+                self.assertEqual(body["scope"], restricted_staging.SCOPE)
                 for key in (
                     "business_ready", "database_integrated", "capture_enabled",
                     "analysis_enabled", "dispatch_build_enabled", "payments_enabled",
@@ -73,45 +72,49 @@ class RailwayStagingTests(unittest.TestCase):
         self.assertIs(body["build_enabled"], False)
         self.assertIs(body["redact_enabled"], False)
         self.assertIs(body["verify_enabled"], False)
-        self.assertEqual(body["scope"], railway_staging.SCOPE)
+        self.assertEqual(body["scope"], restricted_staging.SCOPE)
 
     def test_build_revision_must_be_a_full_commit(self):
         for value in ("UNSTAMPED", "", "main", "a" * 39, "a" * 41, "../../secret"):
             with self.subTest(value=value):
                 with patch("pathlib.Path.read_text", return_value=value):
                     with self.assertRaisesRegex(RuntimeError, "BUILD_REVISION_INVALID"):
-                        railway_staging.create_staging_app()
+                        restricted_staging.create_staging_app()
         with patch("pathlib.Path.read_text", return_value=REVISION + "\n"):
-            self.assertEqual(railway_staging.read_build_revision(), REVISION)
+            self.assertEqual(restricted_staging.read_build_revision(), REVISION)
 
     def test_missing_build_revision_fails_startup(self):
         with patch("pathlib.Path.read_text", side_effect=OSError):
             with self.assertRaisesRegex(RuntimeError, "BUILD_REVISION_UNAVAILABLE"):
-                railway_staging.create_staging_app()
+                restricted_staging.create_staging_app()
 
-    def test_port_defaults_and_railway_override(self):
+    def test_port_defaults_and_override(self):
         with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(railway_staging.listen_port(), 8000)
+            self.assertEqual(restricted_staging.listen_port(), 8000)
         with patch.dict(os.environ, {"PORT": "18765"}):
-            self.assertEqual(railway_staging.listen_port(), 18765)
+            self.assertEqual(restricted_staging.listen_port(), 18765)
 
     def test_invalid_ports_fail_closed(self):
         for value in ("", "abc", "0", "-1", "65536"):
             with self.subTest(value=value), patch.dict(os.environ, {"PORT": value}):
                 with self.assertRaisesRegex(RuntimeError, "PORT_INVALID"):
-                    railway_staging.listen_port()
+                    restricted_staging.listen_port()
 
-    def test_railway_build_configuration_is_service_specific(self):
+    def test_ci_workflow_verifies_without_deploying_to_a_provider(self):
         root = Path(__file__).resolve().parents[2]
-        self.assertFalse((root / "railway.toml").exists())
-        config = tomllib.loads(
-            (root / "deployment" / "railway-staging.toml").read_text(encoding="utf-8")
-        )
-        self.assertEqual(config["build"]["builder"], "DOCKERFILE")
-        self.assertEqual(config["build"]["dockerfilePath"], "Dockerfile.railway")
-        self.assertEqual(config["deploy"]["healthcheckPath"], "/health/ready")
-        self.assertEqual(config["deploy"]["restartPolicyType"], "ON_FAILURE")
-        self.assertEqual(config["deploy"]["restartPolicyMaxRetries"], 3)
+        workflow = (root / ".github" / "workflows" / "restricted-container-verification.yml").read_text(encoding="utf-8")
+        self.assertIn("docker build --file Dockerfile.restricted-staging", workflow)
+        self.assertIn("python scripts/container_smoke.py", workflow)
+        self.assertIn("contents: read", workflow)
+        self.assertNotIn("railway", workflow.lower())
+        self.assertNotIn("docker push", workflow.lower())
+        self.assertNotIn("RAILWAY_", workflow)
+
+    def test_container_build_configuration_is_provider_neutral(self):
+        root = Path(__file__).resolve().parents[2]
+        dockerfile = (root / "Dockerfile.restricted-staging").read_text(encoding="utf-8")
+        self.assertIn("USER 10001:10001", dockerfile)
+        self.assertIn("app.restricted_staging", dockerfile)
 
 
 if __name__ == "__main__":

@@ -65,7 +65,7 @@ Do not translate, rename, or reinterpret historical 12-v1 evidence as 16-v1.
 
 The contract has executable parity tests for its exact 16 ordered slots, 12-v1 compatibility, manifest digest binding, and the exclusion of slots 08–15 from crush-physics geometry. The current PR #47 additionally verifies database-level manifest-root/session protocol binding.
 
-This does not establish persistent deployment or field acceptance. Real-participant use remains gated by owner identity proofing, legally reviewed disclosure for the full 16-slot collection (including license and insurance documentation), qualified-device testing, roadside field validation, persistent storage/backup/restore, operational ownership, and the applicable release approvals. The restricted Railway health-only service is not an integrated product deployment.
+This does not establish persistent deployment or field acceptance. Real-participant use remains gated by owner identity proofing, legally reviewed disclosure for the full 16-slot collection (including license and insurance documentation), qualified-device testing, roadside field validation, persistent storage/backup/restore, operational ownership, and the applicable release approvals. The provider-neutral restricted health-only container is not an integrated product deployment.
 
 ## Non-negotiable compatibility rules
 

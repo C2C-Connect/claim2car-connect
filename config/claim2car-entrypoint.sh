@@ -7,7 +7,7 @@ if [ "$storage_root" != "/var/lib/claim2car/evidence" ]; then
   exit 78
 fi
 
-# Railway attaches volumes as root. Fix only the mount root, then drop all
+# Container volume mounts may be owned by root. Fix only the mount root, then drop all
 # privileges before starting the application; the application never runs root.
 mkdir -p "$storage_root"
 chown 10001:10001 "$storage_root"
