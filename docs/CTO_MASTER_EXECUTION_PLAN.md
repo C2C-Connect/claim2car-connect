@@ -170,7 +170,7 @@ Reference target: Apple iPad Pro 11-inch M5, 512GB, Wi-Fi + Cellular; purchase i
 **Objective:** run the complete application against persistent infrastructure with verifiable security and recovery.
 
 ### 3A — Database environment
-1. Select provider, region, PostgreSQL/PostGIS version, environment owner, and cost boundary.
+1. Confirm OCI region/resource identifiers, PostgreSQL 16/PostGIS version, environment owner, and Always Free/cost boundary before provisioning.
 2. Separate CI, staging, and production credentials.
 3. Create least-privilege migrator, application, reviewer, and operations roles.
 4. Apply migrations from an empty database and supported upgrade paths.
