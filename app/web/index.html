@@ -40,7 +40,7 @@
         <p class="muted">Create and reopen tenant-scoped claim-case records. The register stores case identity, creator/owner binding, and capture-session association. Optional structured incident details are separately consent-gated; claimant and policy details are not collected by this v1 intake.</p>
         <label for="capture-protocol-version">Capture protocol for new sessions</label>
         <select id="capture-protocol-version"><option value="claims2car-16-v1" selected>claims2car-16-v1 · default</option><option value="claims2car-12-v1">claims2car-12-v1 · legacy alternative</option></select>
-        <p id="capture-protocol-help" class="fine">16-v1 is the default. Its exact slot contract is being finalized; evidence capture remains disabled for 16-v1 until that contract is approved. Select 12-v1 to use the currently implemented legacy capture contract.</p>
+        <p id="capture-protocol-help" class="fine">16-v1 is the owner-approved 16-slot default and is enabled for controlled capture. It records eight exterior views, four wheel assemblies, cabin/airbag indicators, odometer, physical VIN, and license/insurance documentation. 12-v1 remains an explicit legacy alternative for compatible historical workflows.</p>
         <div class="actions"><button id="create-claim-case" class="primary">Create claim record</button><span id="claim-case-created" class="fine"></span></div>
         <div id="claim-cases" class="owned-sessions" aria-live="polite"></div>
         <div class="rule"></div>
@@ -79,6 +79,7 @@
           <p>This capture session records vehicle condition evidence for a claim file.</p>
           <p>Participation is voluntary; you may pause or stop at any time without penalty.</p>
           <p>The session captures vehicle photographs and a VIN plate image. It does not decode your VIN, authenticate the vehicle, or make ownership claims.</p>
+          <p class="fine">Disclosure-v1 predates the approved 16-v1 slot contract and does not enumerate license and insurance documentation. This is a controlled-test surface only; do not use real participant data until a separately versioned 16-v1 disclosure is reviewed and approved.</p>
           <p>Captured originals are stored at full resolution and may be shared with your insurance carrier, a repair shop, or a dealership as part of claim handling.</p>
           <p>No payment or compensation is offered or implied for participation in this capture session.</p>
           <p>By proceeding you affirmatively consent to the capture described above.</p>

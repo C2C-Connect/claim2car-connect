@@ -1,55 +1,78 @@
 # Capture Protocol Versioning and Session Identity
 
-**Decision:** `claims2car-16-v1` is the default for newly created sessions. `claims2car-12-v1` remains an explicitly selectable, versioned alternative. Historical sessions are never silently relabelled.
+**Decision:** Founder-approved `claims2car-16-v1` is the default and enabled protocol for new capture sessions. `claims2car-12-v1` remains an explicitly selectable, versioned legacy alternative. Historical sessions and manifests are never silently relabelled.
 
-## Implemented in the current PR #31 increment
+**Approval and implementation:** The exact 16-slot contract was approved on 2026-11-11 and merged with PR #41 on 2026-11-12. The contract is defined in `contracts/shot-list-16-v1.json`; the registry reports 16-v1 as `implemented` with `capture_enabled: true`.
 
-- Authority migration `0018_capture_protocol_session_binding.sql` adds `faos.sessions.capture_protocol_version`.
-- The migration backfills all existing sessions as `claims2car-12-v1`, then changes the database default for new rows to `claims2car-16-v1`.
-- A database trigger rejects attempts to change the protocol version after session creation.
-- The claim-case constructor accepts an explicit protocol ID; the default is 16-v1. Idempotent retries that attempt to change the protocol ID are rejected.
-- Controlled capture-session creation accepts a protocol ID and defaults to 16-v1. A retry with a different version is rejected.
-- Session and claim-case readback return the immutable protocol version.
-- New `SESSION_CREATED` journal payloads also record the protocol version; readback verifies the journal value matches the immutable session column. Historical pre-0018 creation payloads remain readable only as 12-v1 after the migration backfill.
-- Authenticated `GET /v1/capture-protocols` exposes the default and each protocol's status, slot contract, and capture-enabled state.
-- The operator workbench fetches that registry and lets operators choose the protocol for a new session. Existing sessions retain their own stored version regardless of the selector's current value.
-- Manifest construction requires an implemented protocol. The existing 12-v1 manifest remains supported without changing its slots or historical digest identity.
-- Evidence registration, quality recording, and sealing fail closed for a 16-v1 session while its exact slot definition is pending.
+## Canonical 16-v1 contract
 
-## Source-document reconciliation findings
+The following 16 slots are required in this exact order:
 
-The architecture source files do not yet define one internally consistent 16-slot contract:
+| Order | Slot ID | Evidence purpose |
+|---:|---|---|
+| 00 | `00_front_exterior` | Front-facing vehicle framing |
+| 01 | `01_front_right_exterior` | Front-right 45° quarter view |
+| 02 | `02_right_side_exterior` | Right-side profile |
+| 03 | `03_rear_right_exterior` | Rear-right 45° quarter view |
+| 04 | `04_rear_exterior` | Rear-facing vehicle framing |
+| 05 | `05_rear_left_exterior` | Rear-left 45° quarter view |
+| 06 | `06_left_side_exterior` | Left-side profile |
+| 07 | `07_front_left_exterior` | Front-left 45° quarter view |
+| 08 | `08_wheel_front_left` | Front-left wheel assembly |
+| 09 | `09_wheel_front_right` | Front-right wheel assembly |
+| 10 | `10_wheel_rear_right` | Rear-right wheel assembly |
+| 11 | `11_wheel_rear_left` | Rear-left wheel assembly |
+| 12 | `12_cabin_front_airbags` | Front cabin/dashboard and visible airbag indicators |
+| 13 | `13_instrument_cluster_odometer` | Odometer and warning-light evidence |
+| 14 | `14_physical_vin` | Readable physical VIN plate/sticker |
+| 15 | `15_license_and_insurance_docs` | Driver's license and insurance-card documentation |
 
-- The section titled **12-to-16 Angle Perspective Matrix** says 12 standard views plus up to four specialized details, but its own standard-view enumeration is 8 exterior + 2 undercarriage + 2 interior + 2 legal/document = **14 standard views**. Four additional details would make 18, not 16.
-- The section titled **Breakdown of the Mandatory 16-Point Shot Protocol** enumerates 8 exterior + 2 interior + 1 license plate + 1 insurance/document + 3 damage close-ups = **15 items**, not 16.
-- A separate **16-Point Perspective Matrix** repeats 8 exterior + 2 undercarriage + 2 interior + 2 legal/document = **14 items**.
-- The three close-ups are described as primary impact, structural frame-rail buckling, glass stress fractures, and ADAS sensor clusters at 0°, 45°, and 90°; the text does not establish whether these are three required slots, four semantic targets, or a conditional multi-angle set.
+The machine-readable contract and exact descriptions are authoritative. Cross-layer implementations must preserve the same slot IDs and order.
 
-These are source-level arithmetic and semantics conflicts, not merely inconsistent code identifiers. The implementation therefore keeps 16-v1 as the approved new-session default while refusing to fabricate a missing slot or reinterpret the historical 12-v1 list.
+## Interpretation and analysis boundary
+
+- Slots **00–07** are the eight exterior perspectives and are the only 16-v1 slots eligible as inputs to crush-physics geometry.
+- Slots **08–15** are wheel, cabin/airbag, odometer, VIN, and document evidence. They must not be treated as crush-physics geometry or used to infer impact-zone geometry.
+- A slot's presence proves only that the corresponding evidence item was captured and recorded. It does not, by itself, prove damage, causation, vehicle identity, ownership, coverage, liability, or legal authenticity.
+- Preserve original bytes, session/protocol binding, actor/tenant attribution, timestamps, ordered manifest identity, and retry/conflict semantics. A replacement is explicit supersession, not silent mutation.
+- Roadside safety takes priority over completing the checklist. Pause, skip, or abort behavior must not delay emergency response, police, traffic control, stabilization, loading, or scene clearance.
+
+## Legacy 12-v1 compatibility
+
+The legacy contract remains selectable for new sessions when a currently deployed workflow requires it. Its historical slot IDs and interpretation remain unchanged:
+
+`vin_ocr`, `doc_ocr`, `front`, `front_left`, `driver_side`, `rear_left`, `rear`, `rear_right`, `passenger_side`, `front_right`, `interior_front`, `undercarriage_engine`.
+
+Do not translate, rename, or reinterpret historical 12-v1 evidence as 16-v1.
+
+## Database identity and manifest binding
+
+- Authority migration `0018_capture_protocol_session_binding.sql` adds `faos.sessions.capture_protocol_version`, backfills historical sessions as 12-v1, and defaults new sessions to 16-v1.
+- The session protocol version is immutable after creation.
+- New session-creation events record the protocol version; readback verifies that the event and immutable session column agree.
+- Authority migration `0019_manifest_root_protocol_binding.sql` permits both version IDs and enforces that each registered manifest root matches the protocol version on its owning session.
+- Root registration also verifies tenant context, the persisted seal event, manifest digest, schema version, and protocol version. A mismatch fails closed.
+- The application, API registry, operator workbench, browser controller, manifest builder, and reviewer path must use the same version-specific contract.
+
 ## Registry state
 
-| Protocol | New-session default | Contract state | Evidence capture |
-|---|---:|---|---|
-| `claims2car-16-v1` | Yes | Definition pending | Disabled until exact 16 slots and ordering are approved |
-| `claims2car-12-v1` | No | Existing contract retained | Enabled as explicit legacy alternative |
+| Protocol | New-session selection | Contract state | Capture |
+|---|---|---|---|
+| `claims2car-16-v1` | Default | Founder-approved and implemented | Enabled |
+| `claims2car-12-v1` | Explicit legacy alternative | Existing contract retained | Enabled |
+
+## Verification and remaining release boundaries
+
+The contract has executable parity tests for its exact 16 ordered slots, 12-v1 compatibility, manifest digest binding, and the exclusion of slots 08–15 from crush-physics geometry. The current PR #47 additionally verifies database-level manifest-root/session protocol binding.
+
+This does not establish persistent deployment or field acceptance. Real-participant use remains gated by owner identity proofing, legally reviewed disclosure for the full 16-slot collection (including license and insurance documentation), qualified-device testing, roadside field validation, persistent storage/backup/restore, operational ownership, and the applicable release approvals. The restricted Railway health-only service is not an integrated product deployment.
 
 ## Non-negotiable compatibility rules
 
-1. Existing sessions are backfilled as 12-v1 and retain that identity.
-2. The protocol version is immutable on the session row.
-3. Manifest `shot_list_version` must match the session's protocol version.
-4. A retry using a different protocol is an idempotency conflict, not an update.
-5. The 16-v1 default must never silently fall through to the 12-v1 slot list.
-6. No 16-v1 manifest may be constructed until the authoritative slot IDs, order, and capture semantics are approved.
-7. The Slice 2 browser controller's separate 12-slot set must be reconciled explicitly; do not assume its identifiers are aliases for the API's 12-v1 slots.
-
-## Remaining implementation work
-
-- Reconcile the source architecture's inconsistent 14/15-item enumerations with the founder-approved 16-item contract.
-- Record each of the 16 required slot IDs, order, semantic definition, required/conditional status, image framing guidance, safety constraints, and allowed skip/retake behavior.
-- Obtain founder approval for the exact contract before changing the registry to `implemented`.
-- Add the approved 16-v1 contract to the API, manifest builder, operator UI, browser controller, offline queue, and reviewer presentation.
-- Add cross-layer contract-parity tests proving every layer uses the same exact ordered slots.
-- Keep historical 12-v1 verification fixtures and manifests unchanged.
-
-**Status interpretation:** the 16-v1 session identity and default are implemented; the 16-v1 capture contract is not. A newly created 16-v1 session is correctly versioned but cannot accept 12-v1 evidence. Select 12-v1 when a currently executable capture flow is required.
+1. New sessions default to the founder-approved 16-v1 contract.
+2. Existing sessions retain their immutable protocol version.
+3. Every manifest root must match the protocol version of its owning session.
+4. Historical 12-v1 manifests and digests remain unchanged.
+5. No 12-v1 slot may be silently substituted for a missing 16-v1 slot.
+6. Only slots 00–07 may feed crush-physics geometry; slots 08–15 are evidence-only for that analysis path.
+7. Conflicting retries, supersession, consent withdrawal, and recovery remain explicit and auditable.

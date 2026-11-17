@@ -1,14 +1,11 @@
 # Claim2Car Connect — Database Acceptance Contract
 
 **Document ID:** C2C-DB-AC-001
-**Version:** 1.0 — PROPOSED, pending owner adoption
+**Version:** 1.0 — ADOPTED 2026-11-17 (owner-authorized; independent review waived for adoption)
 **Scope:** Database foundation, tenant isolation, durable event journal, evidence integrity, and completion controls
 **Acceptance principle:** No gate passes without reproducible evidence tied to a specific source revision and test environment.
 
-> Status at adoption: this contract becomes authoritative only when the owner approves and merges it.
-> Until then, no gate in this document is awarded any status. Passing these gates does not establish
-> production readiness, validate real-world accident measurements, certify legal admissibility, or
-> demonstrate the complete end-to-end commercial product.
+ > Owner adoption: the Claim2Car hub account owner expressly adopted v1.0 on 2026-11-17 and explicitly waived independent review as a prerequisite to adoption. The waiver is not an independent review; no reviewer approval or attestation is claimed. Formal gate awards still require a new complete post-adoption run against the exact merged source revision. Passing these gates does not establish production readiness, validate real-world accident measurements, certify legal admissibility, or demonstrate the complete end-to-end commercial product.
 
 **Provenance:** Adapted from the owner-supplied proposal "Database Acceptance Contract — 14-Gate
 Baseline" (C2C-DB-AC-001, drafted October 2026). No adopted copy of that proposal was located in
@@ -214,9 +211,13 @@ sanitized database connection identity, migration inventory, SQL assertion resul
 test IDs. Missing evidence, test errors, failures, skips, expected failures, or unexpected
 successes prevent the corresponding criteria from passing.
 
-**Adoption boundary:** This version remains PROPOSED until the owner approves and merges the
-contract. Before that merge, the runner may report per-gate `criteria_result` values for review,
-but every gate is emitted as `NOT AWARDED`, `gate_passes_awarded` remains zero, and
-`overall_acceptance` remains `NOT ACCEPTED`. After the contract is formally adopted, a new
-traceable run can award PASS only where all mapped tests and SQL assertions pass; overall
-acceptance becomes ACCEPTED only when all 14 gates pass in that same run.
+**Adoption boundary:** The owner adopted this version on 2026-11-17 and waived independent review as a prerequisite to v1.0 adoption. This waiver does not constitute or imply an independent review. The contract becomes authoritative when this revision is merged to `main`. A new traceable post-adoption run must then award PASS only where all mapped tests and SQL assertions pass; overall acceptance becomes ACCEPTED only when all 14 gates pass in that same run. No proposed-state result is retroactively converted into a formal award.
+
+
+## 8. Owner adoption record
+
+- **Owner decision:** ADOPT C2C-DB-AC-001 v1.0.
+- **Owner authority:** Claim2Car hub account owner expressly attested ownership and directed adoption in the ChatGPT session on 2026-11-17; this repository change is entered at the owner's direction.
+- **Adoption date:** 2026-11-17.
+- **Independent review:** Explicitly waived by the owner as a prerequisite to v1.0 adoption; NOT PERFORMED. This waiver is not an independent reviewer attestation or approval.
+- **Conditions:** Formal DB-01–DB-14 awards require a complete, clean, post-adoption acceptance run against the exact merged source SHA. This adoption does not authorize production deployment, real participant intake, live payment settlement, dispatch, external distribution, or claims of legal admissibility, field acceptance, or full product readiness.
