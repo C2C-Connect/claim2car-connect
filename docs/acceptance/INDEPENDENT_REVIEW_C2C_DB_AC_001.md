@@ -2,14 +2,16 @@
 
 **Repository:** `C2C-Connect/claim2car-connect`  
 **Review target:** `docs/acceptance/database-contract.md` (Document ID `C2C-DB-AC-001`, v1.0) and the PR #47 database implementation delta  
-**Main baseline:** `f35b50bf4fb222de2ac4eb3eced466371a8be293`  
-**PR #47 candidate:** `776265a555df9f844837ba788ca4b456a9491319`  
-**Tested synthetic merge checkout:** `ccca9dd8375119715fdebddf70d9294e28b1c3ea`  
+**Main baseline before PR #47:** `8217bbf3723b0087c8cab340da6fe19ebf356e4f`  
+**Merged main commit:** `f3ba5b28eede44eff5fef70a6b5fda8b4358757f`  
+**PR #47 head / adopted candidate:** `4b753441374130c21e39b16780d0b85472cdd202`  
+**Implementation candidate:** `776265a555df9f844837ba788ca4b456a9491319`  
+**Tested synthetic merge checkout:** `64488e5d5ab4d94347cd55bbe709bc59ab69c174`  
 **Contract blob SHA:** `2619ad3ba3634200aa0a839f6ace9f3e15746190`  
 **Package status:** OWNER ADOPTED — INDEPENDENT REVIEW EXPLICITLY WAIVED FOR V1.0 ADOPTION; REVIEW NOT PERFORMED  
-**Contract status:** OWNER_ADOPTED_PENDING_POST-ADOPTION_GATE_RUN  
-**Formal gate awards:** 0/14 — post-adoption acceptance run required  
-**Overall database acceptance:** NOT ACCEPTED
+**Contract status:** ADOPTED  
+**Formal gate awards:** 14/14 — post-adoption run complete  
+**Overall database acceptance:** ACCEPTED
 
 > This package organizes contract, implementation, and verification evidence for an independent reviewer. It is not an independent review, owner approval, database certification, production-readiness statement, or authorization to use real participant data. Candidate and tested-checkout SHAs are distinct and must remain separately identified.
 
@@ -37,23 +39,23 @@ The reviewer must not infer production readiness, legal admissibility, physical-
 
 ## 3. Current candidate and verification evidence
 
-The following evidence is tied to PR #47 candidate `776265a555df9f844837ba788ca4b456a9491319` and GitHub-generated synthetic merge checkout `ccca9dd8375119715fdebddf70d9294e28b1c3ea`, with main baseline `f35b50bf4fb222de2ac4eb3eced466371a8be293`.
+The following post-adoption evidence is tied to PR #47 head `4b753441374130c21e39b16780d0b85472cdd202`, implementation candidate `776265a555df9f844837ba788ca4b456a9491319`, and GitHub-generated synthetic merge checkout `64488e5d5ab4d94347cd55bbe709bc59ab69c174`, with main baseline `8217bbf3723b0087c8cab340da6fe19ebf356e4f`. The actual merge commit is `f3ba5b28eede44eff5fef70a6b5fda8b4358757f`; GitHub's commit comparison reports no file differences between the tested checkout and merged source tree.
 
-- Latest full repository suite: **780 passed, 201 subtests passed, 23 warnings** — [run 44175861637](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44175861637); [evidence artifact](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44175861637/artifacts/14369048095).
-- Latest counted PostgreSQL suite: **319/319 passed**, zero failures, errors, skips, expected failures, or unexpected successes — [run 44175861670](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44175861670); [evidence artifact](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44175861670/artifacts/14370181890).
-- Latest authority diagnostics: **14/14 technical criteria PASS**, 19-migration inventory (0001–0019), 14 tenant-scoped tables and 280 adversarial tenant-isolation assertions — [run 44175861783](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44175861783); [evidence artifact](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44175861783/artifacts/14369971928).
+- Post-adoption full repository suite: **780 passed, 201 subtests passed, 23 warnings** — [run 44183764131](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44183764131); [evidence artifact](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44183764131/artifacts/14373761156).
+- Post-adoption counted PostgreSQL suite: **319/319 passed**, zero failures, errors, skips, expected failures, or unexpected successes — [authority run 44183764027](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44183764027); [acceptance evidence artifact](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44183764027/artifacts/14372808585).
+- Post-adoption authority diagnostics: **14/14 technical criteria PASS and 14 formal gate awards**, 19-migration inventory (0001–0019), 14 tenant-scoped tables and 280 adversarial tenant-isolation assertions; `overall_acceptance: ACCEPTED` — [run 44183764027](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44183764027); [evidence artifact](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44183764027/artifacts/14372808585).
 - The specific regression `test_manifest_root_protocol_binding_accepts_16_and_rejects_mismatch` passed. It verifies successful 16-v1 root registration, rejection of a 12-v1 registration against a 16-v1 session, direct mismatched insert rejection as `faos_writer` under valid tenant context, and absence of an extra persisted root.
 - The counted database evidence records PostgreSQL 16.4 in an isolated synthetic database, with separate administrative, application, and migrator identities.
 - Current candidate CI listing showed **13/13 distinct workflow types successful**; duplicate reruns are not counted as additional workflow types. The restricted Railway verification is not an integrated deployment.
 
-**Formal accounting:** The diagnostic report records `criteria_passes: 14`, `gate_passes_awarded: 0`, and `overall_acceptance: NOT ACCEPTED`. Each criterion is technically PASS in the proposed-contract state, but no formal DB-01–DB-14 gate is awarded until independent review and explicit owner adoption. Do not describe this as 14 formally awarded gates.
+**Formal accounting:** The post-adoption diagnostic report records `criteria_passes: 14`, `gate_passes_awarded: 14`, and `overall_acceptance: ACCEPTED`. All DB-01–DB-14 gates are formally awarded PASS for this synthetic database foundation milestone. This does not establish production readiness, field/device acceptance, legal admissibility, or deployment.
 
 Relevant merged work:
 - PR #43 — executable DB-01 through DB-14 verifiers.
 - PR #44 — structured evidence JSON serialization fix.
 - PR #45 — acceptance matrix refresh.
 - PR #46 — independent review package preparation.
-- PR #47 — migration 0019 candidate; not merged and still Draft pending independent review.
+- PR #47 — migration 0019; merged to `main` at `f3ba5b28eede44eff5fef70a6b5fda8b4358757f` after 13/13 workflow types passed and the post-adoption DB-01–DB-14 run awarded 14/14 gates.
 
 ## 4. Independent reviewer checklist
 
@@ -137,7 +139,7 @@ A review is not complete until reviewer identity, independence statement, review
 **Owner:** Claim2Car hub account owner (owner identity/authority expressly attested in the ChatGPT session; this repository entry is recorded at the owner's direction)  
 **Adopted contract version:** C2C-DB-AC-001 v1.0  
 **Adoption date:** 2026-11-17  
-**Owner rationale / conditions:** The owner expressly authorized acceptance and directed the implementation agent to proceed with full autonomy. The owner explicitly waived independent review as a prerequisite to v1.0 adoption. This waiver is not represented as an independent review, reviewer approval, or reviewer attestation. Technical gate awards remain contingent on a new complete post-adoption DB-01–DB-14 run against the exact merged source revision. Production readiness, real-participant authorization, legal admissibility, payment activation, dispatch, and deployment are not granted by this adoption.
+**Owner rationale / conditions:** The owner expressly authorized adoption and directed the implementation agent to proceed with full autonomy. The owner explicitly waived independent review as a prerequisite to v1.0 adoption. This waiver is not represented as an independent review, reviewer approval, or reviewer attestation. The complete post-adoption DB-01–DB-14 run subsequently awarded 14/14 gates against tested checkout `64488e5d5ab4d94347cd55bbe709bc59ab69c174`, whose tree has no file differences from merged main commit `f3ba5b28eede44eff5fef70a6b5fda8b4358757f`. Production readiness, real-participant authorization, legal admissibility, payment activation, dispatch, and deployment are not granted by this adoption.
 
 **Independent-review disposition:** WAIVED BY OWNER FOR V1.0 ADOPTION; NOT PERFORMED. The reviewer fields in Section 6 intentionally remain uncompleted. A later independent review remains recommended and must be recorded honestly if undertaken.
 
@@ -154,4 +156,4 @@ Issue #39 may be closed after the following are evidenced:
 5. A new complete DB-01–DB-14 run is executed against the adopted contract and exact source SHA.
 6. Formal gate results and overall acceptance are reported exactly as produced; no production-readiness claims are inferred.
 
-For v1.0, criterion 1 is satisfied by the owner's explicit waiver recorded in Section 7; independent review remains NOT PERFORMED. Until the post-adoption run passes and is recorded, Issue #39 remains open, formal gate awards remain 0/14, and overall acceptance remains NOT ACCEPTED.
+For v1.0, criterion 1 is satisfied by the owner's explicit waiver recorded in Section 7; independent review remains NOT PERFORMED. Criteria 2–6 are satisfied by the recorded owner adoption, PR #47 merge, exact-tree comparison, and post-adoption run `44183764027` (14/14 formal gate awards; overall `ACCEPTED`). Issue #39 may now be closed. Production deployment, real-participant use, payments, dispatch, and field/legal acceptance remain separate release gates.
