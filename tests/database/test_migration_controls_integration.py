@@ -125,6 +125,56 @@ class MigrationControlsIntegration(unittest.TestCase):
                     (tenant,legacy_session))
             self.assertEqual(raised.exception.diag.message_primary,'CAPTURE_PROTOCOL_VERSION_IMMUTABLE')
 
+    def test_manifest_root_protocol_binding_accepts_16_and_rejects_mismatch(self):
+        plan = self.authority_plan()
+        apply(self.conn, plan)
+        tenant = str(uuid.uuid4())
+        session = 'manifest-root-16-' + uuid.uuid4().hex
+        seal = 'seal-16-' + uuid.uuid4().hex
+        digest = 'a' * 64
+        payload = '{"manifest_digest":"' + digest + '","schema_version":"0.1","shot_list_version":"claims2car-16-v1"}'
+        self.admin_db.execute(
+            'INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
+            (tenant, 'synthetic manifest root protocol fixture'),
+        )
+        self.admin_db.execute(
+            'INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
+            (tenant, session, 'claims2car-16-v1'),
+        )
+        self.admin_db.execute(
+            'INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) '
+            'VALUES (%s,%s,%s,1,%s,%s,%s,%s,%s,%s)',
+            (tenant, session, seal, 'MANIFEST_SEALED', 'synthetic-test',
+             '2026-01-01T00:00:00Z', 'synthetic 16-v1 manifest root', payload, '0.1'),
+        )
+
+        def register(version):
+            with self.admin_db.transaction():
+                self.admin_db.execute('SET LOCAL ROLE faos_fixture')
+                self.admin_db.execute("SELECT set_config('faos.tenant_id',%s,true)", (tenant,))
+                return self.admin_db.execute(
+                    'SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                    (tenant, session, seal, digest, version),
+                ).fetchone()[0]
+
+        self.assertEqual(register('claims2car-16-v1'), 'REGISTERED')
+        with self.assertRaisesRegex(psycopg.errors.RaiseException, 'ROOT_PROTOCOL_SESSION_MISMATCH'):
+            register('claims2car-12-v1')
+
+        with self.assertRaisesRegex(psycopg.errors.RaiseException, 'ROOT_PROTOCOL_SESSION_MISMATCH'):
+            self.admin_db.execute(
+                'INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) '
+                'VALUES (%s,%s,%s,%s,%s)',
+                (tenant, session, seal, digest, 'claims2car-12-v1'),
+            )
+        self.assertEqual(
+            self.admin_db.execute(
+                'SELECT shot_list_version FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',
+                (tenant, session),
+            ).fetchall(),
+            [('claims2car-16-v1',)],
+        )
+
     def test_full_migration_enforces_python_sql_event_contract_parity(self):
         from app.domain_events import DomainEvent, KINDS
         from database.journal import tenant_transaction
