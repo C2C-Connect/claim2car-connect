@@ -25,6 +25,7 @@ def expect(value, message):
 
 def validate_authority_migration_inventory(inventory):
     names = [row[0] for row in inventory]
+    expect(len(names)==len(set(names)),'DUPLICATE_AUTHORITY_MIGRATION')
     expect('0017_event_contract_parity.sql' in names,'EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
     expect('0018_capture_protocol_session_binding.sql' in names,'CAPTURE_PROTOCOL_SESSION_MIGRATION_REQUIRED')
     expect('0019_manifest_root_protocol_binding.sql' in names,'MANIFEST_ROOT_PROTOCOL_BINDING_MIGRATION_REQUIRED')
