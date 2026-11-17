@@ -166,7 +166,9 @@ class AnalysisSurfaceIsolationTests(unittest.TestCase):
             self.assertIn(("/internal/v1/dispatch/health", ("GET",)), table)
             self.assertNotIn(("/api/v1/analysis/health", ("GET",)), table)
 
-            with patch("app.main.probe_database", return_value=True) as probe:
+            with patch("app.main.probe_database", return_value=True) as probe, patch(
+                "app.main.probe_evidence_storage", return_value=True
+            ) as storage_probe:
                 with TestClient(integrated) as client:
                     missing = client.get("/internal/v1/analysis/health")
                     accepted = client.get(
@@ -176,6 +178,7 @@ class AnalysisSurfaceIsolationTests(unittest.TestCase):
                     intake_route = client.get("/api/v1/capture-sessions")
                     readiness = client.get("/health/ready")
                 probe.assert_called_once_with("integrated-health-dsn")
+                storage_probe.assert_called_once_with(None, require_mount=True)
             self.assertEqual(missing.status_code, 401)
             self.assertEqual(accepted.status_code, 200)
             self.assertEqual(

@@ -17,7 +17,7 @@ from uuid import UUID
 
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+from app.main import create_app, probe_evidence_storage
 
 
 SERVICE_TOKEN = "I" * 43
@@ -61,6 +61,8 @@ def _runtime_environment(directory: str) -> dict[str, str]:
         "C2C_ARTIFACT_STORAGE_ROOT": str(storage_root),
         "C2C_VIN_HMAC_PEPPER": "P" * 43,
         "C2C_INTERNAL_SERVICE_TOKEN": SERVICE_TOKEN,
+        # Unit tests use a temporary directory, not a real persistent mount.
+        "C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT": "false",
     }
 
 
@@ -225,3 +227,34 @@ def test_integrated_dispatch_remains_disabled_after_service_authentication():
                 )
                 assert disabled.status_code == 503
                 assert disabled.json()["detail"]["code"] == "dispatch_build_disabled"
+
+
+
+def test_evidence_storage_probe_checks_writability_and_removes_its_sentinel():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        assert probe_evidence_storage(str(root), require_mount=False) is True
+        assert list(root.iterdir()) == []
+        # A writable temporary directory is not proof of a persistent mount.
+        assert probe_evidence_storage(str(root), require_mount=True) is False
+        assert list(root.iterdir()) == []
+
+
+def test_integrated_readiness_fails_closed_when_persistent_volume_is_not_ready():
+    with tempfile.TemporaryDirectory() as directory:
+        environment = _runtime_environment(directory)
+        environment["C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT"] = "true"
+        storage_root = str(Path(directory) / "original-evidence")
+        with patch.dict(os.environ, environment, clear=False):
+            app = create_app(runtime_mode="integrated")
+            with TestClient(app) as client:
+                with patch("app.main.probe_database", return_value=True):
+                    with patch("app.main.probe_evidence_storage", return_value=False) as storage_probe:
+                        unavailable = client.get("/health/ready")
+                        assert unavailable.status_code == 503
+                        assert unavailable.json()["status"] == "not_ready"
+                        storage_probe.assert_called_once_with(storage_root, require_mount=True)
+                    with patch("app.main.probe_evidence_storage", return_value=True):
+                        ready = client.get("/health/ready")
+                        assert ready.status_code == 200
+                        assert ready.json()["status"] == "ready"

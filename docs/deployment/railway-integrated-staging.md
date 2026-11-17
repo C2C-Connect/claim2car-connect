@@ -20,13 +20,14 @@ Set these service variables:
 | `C2C_INTERNAL_SERVICE_TOKEN` | High-entropy internal-service bearer secret; seal it |
 | `C2C_VIN_HMAC_PEPPER` | High-entropy VIN HMAC secret; seal it |
 | `C2C_ARTIFACT_STORAGE_ROOT` | `/var/lib/claim2car/evidence` |
+| `C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT` | `true` (required for integrated staging) |
 | `C2C_INCIDENT_INTAKE_ENABLED` | `false` until counsel approves the supplemental disclosure |
 
 Railway supports multiline variables and sealed values. The runtime accepts the JSON directly from `C2C_CAPTURE_CONFIG_JSON`; the file-based `C2C_CAPTURE_CONFIG_FILE` path remains supported for local and other deployments. The JSON must contain `health_database_url`, `dsn_by_role`, and `credentials`. Each credential entry contains an actor ID, tenant ID, database role, SHA-256 token hash, expiry, enabled flag, and actor role. Do not put raw bearer tokens in this JSON.
 
 Attach one persistent Railway volume to the integrated service at exactly `/var/lib/claim2car/evidence`. Keep this service at one replica; the evidence store is local filesystem-backed. Configure and rehearse volume backups before storing any real evidence. The image starts a short root entrypoint only to set the mounted directory ownership, then drops the application process to UID 10001. Do not override this with `RAILWAY_RUN_UID=10001` or run the application as root.
 
-The container listens on port 8000. Configure the service health check to `/health/ready`. The deploy smoke also checks `/health/build` for the exact commit SHA and integrated runtime mode, the operator shell, and unauthenticated API boundaries.
+The container listens on port 8000. Configure the service health check to `/health/ready`. In integrated mode, readiness requires the PostgreSQL authority probe plus a writable evidence root. With `C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true`, the exact evidence root must also be a mount point in Linux `/proc/self/mountinfo`; the probe writes, fsyncs, removes, and directory-fsyncs a disposable sentinel. This prevents an absent Railway volume from silently falling back to ephemeral container storage. The deploy smoke also checks `/health/build` for the exact commit SHA and integrated runtime mode, the operator shell, and unauthenticated API boundaries.
 
 ## Database requirements
 
@@ -54,4 +55,4 @@ The workflow `Integrated Railway staging deployment` is manual-only. It requires
 
 ## Release limitations
 
-A successful infrastructure smoke is not business acceptance. The incident-intake feature remains disabled by default and pending legal review. Owner credentials are still provisioned rather than issued through a real identity-proofing/invitation flow. The 12-versus-16 capture-slot contract remains unresolved. Do not use real claimant or vehicle evidence until authentication, consent/legal review, storage backup/restore, field validation, and incident response controls are accepted.
+A successful infrastructure smoke is not business acceptance. The incident-intake feature remains disabled by default and pending legal review. Owner credentials are still provisioned out of band rather than issued through a real identity-proofing/invitation flow. The owner-approved 16-v1 capture contract is implemented and database-bound; 12-v1 remains the explicit legacy alternative. Do not use real claimant or vehicle evidence until user identity proofing, separately reviewed 16-v1 disclosure, storage backup/restore, field validation, and incident response controls are accepted.

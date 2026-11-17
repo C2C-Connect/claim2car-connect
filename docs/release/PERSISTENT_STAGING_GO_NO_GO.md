@@ -59,9 +59,9 @@ This is a dependency plan, not a claim that all listed slices are already implem
 - [ ] Roadside pause, unsafe-slot skip, scene abort, interruption recovery and sync are validated on supported physical devices.
 - [ ] An authorized operator completes capture with consent and original-byte evidence; an independent reviewer retrieves it and records an attributable decision.
 
-**Implementation progress:** the founder-approved 16-slot contract is implemented in `contracts/shot-list-16-v1.json`; the authenticated registry reports 16-v1 as implemented and capture-enabled, with 12-v1 retained as an explicit legacy alternative. Migration 0018 binds the immutable protocol to each session; PR #47 adds migration 0019 to bind registered manifest roots to the owning session protocol. Slots 00–07 alone may feed crush-physics geometry; slots 08–15 are evidence-only for that analysis path.
+**Implementation and acceptance status:** PR #41 merged the owner-approved 16-v1 contract and cross-layer implementation. PR #47 merged migration 0019, binding registered manifest roots to the owning session protocol, at main commit `f3ba5b28eede44eff5fef70a6b5fda8b4358757f`. Its current-head CI passed 13/13 workflow types; the post-adoption database acceptance run awarded DB-01–DB-14 **14/14 PASS**, with overall database acceptance `ACCEPTED`. Independent review was explicitly waived by the owner for C2C-DB-AC-001 v1.0 and was NOT performed. The 16-v1 contract is the approved new-session default; 12-v1 remains the explicit historical/legacy alternative. Slots 00–07 alone may feed crush-physics geometry; slots 08–15 are evidence-only for that analysis path.
 
-**Current status:** PR #41 merged the approved 16-v1 contract and cross-layer implementation. PR #47's migration 0019 integration has passed its 13-workflow CI and 14/14 technical database criteria, but still requires independent review before merge. Safari/iPad/physical-device qualification and roadside field validation remain outstanding.
+**Remaining product validation:** Safari/iPad/physical-device qualification, roadside interruption/recovery testing, and field validation remain outstanding. Database acceptance does not award those product or deployment gates.
 
 ## Gate D — Persistent data, storage, retention and recovery
 
@@ -84,7 +84,7 @@ This is a dependency plan, not a claim that all listed slices are already implem
 - [ ] Post-deployment route/auth checks, evidence write/read, restart persistence, reviewer retrieval and negative tenant tests pass.
 - [ ] Deployment record includes service identity, timestamp, SHA, migration ledger, smoke results, logs and rollback reference.
 
-**Critical distinction:** a green restricted Railway smoke with a skipped deploy job is not integrated staging. The integrated staging workflow is manual-only, requires `main`, `confirm_deploy=true`, and `RAILWAY_INTEGRATED_DEPLOY_ENABLED=true`. No such successful integrated deployment is currently evidenced.
+**Critical distinction:** a green restricted Railway smoke with a skipped deploy job is not integrated staging. The integrated staging workflow is manual-only, requires `main`, `confirm_deploy=true`, and `RAILWAY_INTEGRATED_DEPLOY_ENABLED=true`. Its `/health/ready` probe now fails closed unless the PostgreSQL authority probe passes and the evidence-storage root is writable; `C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true` additionally requires that exact root to appear as a mount point in `/proc/self/mountinfo`. No successful integrated deployment is currently evidenced.
 
 ## Gate F — Operations and support
 
