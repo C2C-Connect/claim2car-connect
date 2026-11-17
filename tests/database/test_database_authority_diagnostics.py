@@ -44,6 +44,15 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0019_manifest_root_protocol_binding.sql',
             ]))
 
+    def test_rejects_duplicate_authority_migration_names(self):
+        with self.assertRaisesRegex(AssertionError, 'DUPLICATE_AUTHORITY_MIGRATION'):
+            validate_authority_migration_inventory(self.inventory([
+                '0017_event_contract_parity.sql',
+                '0018_capture_protocol_session_binding.sql',
+                '0019_manifest_root_protocol_binding.sql',
+                '0019_manifest_root_protocol_binding.sql',
+            ]))
+
     def test_rejects_unreviewed_migration_after_0019(self):
         with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0019'):
             validate_authority_migration_inventory(self.inventory([
