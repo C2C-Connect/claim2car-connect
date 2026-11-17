@@ -23,6 +23,15 @@ def expect(value, message):
     if not value:
         raise AssertionError(message)
 
+def validate_authority_migration_inventory(inventory):
+    names = [row[0] for row in inventory]
+    expect('0017_event_contract_parity.sql' in names,'EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
+    expect('0018_capture_protocol_session_binding.sql' in names,'CAPTURE_PROTOCOL_SESSION_MIGRATION_REQUIRED')
+    expect('0019_manifest_root_protocol_binding.sql' in names,'MANIFEST_ROOT_PROTOCOL_BINDING_MIGRATION_REQUIRED')
+    expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql'),
+           'AUTHORITY_MIGRATION_ORDER_INVALID')
+    expect(names[-1]=='0019_manifest_root_protocol_binding.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0019')
+
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
         expect(conn.execute('SELECT faos.tenant_id()').fetchone()[0] is None,'UNAUTHORIZED_CONTEXT_ACCEPTED')
@@ -215,10 +224,7 @@ def run(report):
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
-        migration_names = [row[0] for row in report['migration_inventory']]
-        expect('0017_event_contract_parity.sql' in migration_names,'EVENT_CONTRACT_PARITY_MIGRATION_REQUIRED')
-        expect('0018_capture_protocol_session_binding.sql' in migration_names,'CAPTURE_PROTOCOL_SESSION_MIGRATION_REQUIRED')
-        expect(migration_names[-1]=='0019_manifest_root_protocol_binding.sql','MANIFEST_ROOT_PROTOCOL_BINDING_MIGRATION_REQUIRED')
+        validate_authority_migration_inventory(report['migration_inventory'])
         report['database'] = admin.execute('SELECT current_database(),version()').fetchone()
         report['extensions'] = admin.execute('SELECT extname,extversion FROM pg_extension ORDER BY extname').fetchall()
         try:
