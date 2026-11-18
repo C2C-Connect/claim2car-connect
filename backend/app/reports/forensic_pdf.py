@@ -435,7 +435,7 @@ class FourTierDossierService:
 
     def generate_repair_shop_packet(
         self, *, consent: ConsentSnapshot, binding: SourceEvidenceBinding,
-        ledger_entry: LedgerJournalEntry, damaged_zones: Sequence[dict],
+        ledger_entry: LedgerJournalEntry, localization_observations: Sequence[dict],
         generated_by: str, now_iso: str | None = None,
     ) -> GeneratedDocumentVersion:
         self._verify_consent_and_review(consent, binding, "REPAIR_SHOP_PACKET")
@@ -464,7 +464,7 @@ class FourTierDossierService:
                 "title": "Localized Damage Regions & Human Reviewer Notes",
                 "reviewer_disposition": binding.reviewer_disposition,
                 "reviewer_reason_code": binding.reviewer_reason_code,
-                "damaged_zones": list(damaged_zones),
+                "localization_observations": list(localization_observations),
                 "advisory_only": True,
             },
         )
