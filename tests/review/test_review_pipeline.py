@@ -332,7 +332,11 @@ def test_controlled_demo_end_to_end(tmp_path):
     assert damage_steps and damage_steps[0]["detail"]["matched"] == 1
     assert damage_steps[0]["detail"]["mean_iou"] >= 0.5
     assert damage_steps[0]["detail"]["adoption_gate"].startswith("refused")
-    assert damage_steps[0]["detail"]["physics_input"]["zone"] == "front"
+    observation = damage_steps[0]["detail"]["localization_observation"]
+    assert observation["zone"] == "front"
+    assert observation["epistemic_status"] == "MODEL_LOCALIZATION_UNREVIEWED"
+    assert observation["physical_severity"] == "NOT_ESTABLISHED"
+    assert observation["physical_depth"] == "NOT_MEASURED"
 
 
 def test_demo_evidence_contains_no_payment_or_incentive_language(tmp_path):
