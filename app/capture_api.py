@@ -36,7 +36,7 @@ from app.artifact_storage import (
 )
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
-from backend.app.vehicle_intelligence.vpic import VpicClient
+from app.vehicle_intelligence.vpic import VpicClient
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
 CONFIGURATION_SIZE_LIMIT = 65536

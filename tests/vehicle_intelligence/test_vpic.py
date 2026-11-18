@@ -4,7 +4,7 @@ import hashlib
 import json
 import pytest
 
-from backend.app.vehicle_intelligence.vpic import (
+from app.vehicle_intelligence.vpic import (
     VPIC_ENDPOINT,
     VpicClient,
     VpicDecodeError,

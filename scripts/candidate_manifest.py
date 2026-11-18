@@ -24,8 +24,8 @@ REQUIRED += ['frontend/tests/vpic_transport.test.mjs']
 REQUIRED += [
     'authority_migrations/0022_collision_vehicle_capture_link.sql',
     'authority_migrations/0023_consented_vehicle_profile.sql',
-    'backend/app/vehicle_intelligence/__init__.py',
-    'backend/app/vehicle_intelligence/vpic.py',
+    'app/vehicle_intelligence/__init__.py',
+    'app/vehicle_intelligence/vpic.py',
     'tests/vehicle_intelligence/test_vpic.py',
     'contracts/vehicle-decode-disclosure-v1.json',
     'database/capture_evidence.py',
