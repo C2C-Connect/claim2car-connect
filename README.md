@@ -1,5 +1,12 @@
 # Claim2Car Connect / FAOS - San Antonio pilot
 
+## Governing product premise
+
+Claim2Car is an end-to-end post-accident intelligence and resolution platform. It establishes, documents, explains, and coordinates the truth that can responsibly be established about a collision—from authenticated intake and preserved evidence through vehicle and damage assessment, explainable findings, authorized reporting, driver next steps, and auditable event resolution. The broader objective is to responsibly coordinate the post-accident economy around a trustworthy incident record. Accuracy, provenance, uncertainty disclosure, consent, and accountability are foundational product requirements—not optional enhancements.
+
+The canonical owner-aligned product vision, Post-Accident Truth Standard, end-to-end journey, foundational system responsibilities, accuracy-validation requirements, first vertical slice, and future-agent handoff instructions are in **[Claim2Car Product Premise: Forensic Intelligence, Truth, and Resolution](docs/architecture/PRODUCT_PREMISE_FORENSIC_INTELLIGENCE.md)**. Read it before making product or architecture decisions. It defines the intended product; the acceptance matrix below remains authoritative for what has actually been implemented and verified.
+
+
 Current implementation and release evidence are tracked in the [Acceptance & Release Gate Matrix](docs/acceptance/ACCEPTANCE_MATRIX.md). It distinguishes tested code from field validation and deployment authorization.
 
 ## Canonical product line
