@@ -26,7 +26,7 @@ locals {
 resource "oci_core_network_security_group" "staging" {
   compartment_id = var.compartment_ocid
   vcn_id         = data.oci_core_vcn.existing.id
-  display_name  = "${var.display_name_prefix}-nsg"
+  display_name   = "${var.display_name_prefix}-nsg"
 }
 
 resource "oci_core_network_security_group_security_rule" "ingress" {
@@ -115,17 +115,17 @@ resource "oci_core_volume" "evidence" {
 }
 
 resource "oci_core_volume_attachment" "postgres" {
-  attachment_type                    = "paravirtualized"
-  display_name                       = "${var.display_name_prefix}-postgres-data"
-  instance_id                        = oci_core_instance.staging.id
-  volume_id                          = oci_core_volume.postgres.id
+  attachment_type                     = "paravirtualized"
+  display_name                        = "${var.display_name_prefix}-postgres-data"
+  instance_id                         = oci_core_instance.staging.id
+  volume_id                           = oci_core_volume.postgres.id
   is_pv_encryption_in_transit_enabled = true
 }
 
 resource "oci_core_volume_attachment" "evidence" {
   attachment_type                    = "paravirtualized"
-  display_name                       = "${var.display_name_prefix}-original-evidence"
+  display_name                        = "${var.display_name_prefix}-original-evidence"
   instance_id                        = oci_core_instance.staging.id
-  volume_id                          = oci_core_volume.evidence.id
+  volume_id                           = oci_core_volume.evidence.id
   is_pv_encryption_in_transit_enabled = true
 }
