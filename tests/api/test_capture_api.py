@@ -96,11 +96,11 @@ class CaptureRouteTests(unittest.TestCase):
             'collision_id': collision_id, 'vehicle_id': vehicle_id,
             'relationship': 'INVOLVED', 'linked_by': 'test-actor',
             'linked_at': '2026-11-18T00:00:00+00:00',
-            'vin_hmac_sha256': 'c' * 64,
             'vin_source': 'CONSENTED_CAPTURE_SESSION',
             'vin_validation_status': 'CAPTURE_GATE_VALIDATED',
             'source_session_id': str(UUID(int=63)),
             'source_event_id': 'vehicle:' + str(UUID(int=64)),
+            'source_consent_status': 'ACTIVE',
             'created': True,
         }
         self.collision_store.link_vehicle_from_capture.return_value = linked_vehicle
@@ -122,6 +122,8 @@ class CaptureRouteTests(unittest.TestCase):
         self.assertEqual(linked.status_code, 201, linked.text)
         self.assertEqual(linked.json()['vehicle_id'], vehicle_id)
         self.assertEqual(linked.json()['vin_source'], 'CONSENTED_CAPTURE_SESSION')
+        self.assertEqual(linked.json()['source_consent_status'], 'ACTIVE')
+        self.assertNotIn('vin_hmac_sha256', linked.json())
         self.assertEqual(opened.status_code, 200, opened.text)
         self.assertEqual(opened.json()['vehicles'][0]['vehicle_id'], vehicle_id)
         self.collision_store.link_vehicle_from_capture.assert_called_once()
