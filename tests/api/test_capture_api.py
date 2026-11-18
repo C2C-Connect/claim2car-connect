@@ -26,6 +26,7 @@ class CaptureRouteTests(unittest.TestCase):
         self.store=Mock(spec=CaptureSessionStore)
         self.claim_store=Mock(spec=ClaimCaseStore)
         self.collision_store=Mock(spec=CollisionLifecycleStore)
+        self.collision_store.list_vehicles.return_value=[]
         self.session=CaptureSession(str(UUID(int=2)),str(self.binding.tenant_id),'test-actor','2026-10-22T00:00:00+00:00',True,capture_protocol_version=DEFAULT_CAPTURE_PROTOCOL)
         self.store.create.return_value=self.session
         self.store.get.return_value=replace(self.session,created=False)
@@ -88,6 +89,43 @@ class CaptureRouteTests(unittest.TestCase):
         self.assertEqual(created.headers['cache-control'],'no-store')
         self.collision_store.link_claim.assert_called_once()
 
+
+    def test_collision_vehicle_link_uses_capture_registry_and_is_returned_by_collision_view(self):
+        collision_id, claim_id, vehicle_id = str(UUID(int=60)), str(UUID(int=61)), str(UUID(int=62))
+        linked_vehicle = {
+            'collision_id': collision_id, 'vehicle_id': vehicle_id,
+            'relationship': 'INVOLVED', 'linked_by': 'test-actor',
+            'linked_at': '2026-11-18T00:00:00+00:00',
+            'vin_hmac_sha256': 'c' * 64,
+            'vin_source': 'CONSENTED_CAPTURE_SESSION',
+            'vin_validation_status': 'CAPTURE_GATE_VALIDATED',
+            'source_session_id': str(UUID(int=63)),
+            'source_event_id': 'vehicle:' + str(UUID(int=64)),
+            'created': True,
+        }
+        self.collision_store.link_vehicle_from_capture.return_value = linked_vehicle
+        self.collision_store.get.return_value = CollisionLifecycleRecord(
+            collision_id, str(self.binding.tenant_id), str(UUID(int=65)),
+            'test-actor', '2026-11-18T00:00:00+00:00', 'OPEN', 1, False,
+        )
+        self.collision_store.list_vehicles.return_value = [{**linked_vehicle, 'created': False}]
+        with self.client() as client:
+            linked = client.post(
+                '/v1/collisions/' + collision_id + '/vehicles',
+                headers=self.headers,
+                json={
+                    'claim_id': claim_id, 'vehicle_id': vehicle_id,
+                    'request_id': str(UUID(int=66)), 'relationship': 'INVOLVED',
+                },
+            )
+            opened = client.get('/v1/collisions/' + collision_id, headers=self.headers)
+        self.assertEqual(linked.status_code, 201, linked.text)
+        self.assertEqual(linked.json()['vehicle_id'], vehicle_id)
+        self.assertEqual(linked.json()['vin_source'], 'CONSENTED_CAPTURE_SESSION')
+        self.assertEqual(opened.status_code, 200, opened.text)
+        self.assertEqual(opened.json()['vehicles'][0]['vehicle_id'], vehicle_id)
+        self.collision_store.link_vehicle_from_capture.assert_called_once()
+        self.collision_store.list_vehicles.assert_called_once_with('Bearer ' + self.token, collision_id)
 
     def test_review_collision_returns_verified_manifest_without_copying_original_bytes(self):
         collision_id, claim_id, session_id = str(UUID(int=40)), str(UUID(int=41)), str(UUID(int=42))
