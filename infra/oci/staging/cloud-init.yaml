@@ -23,14 +23,57 @@ write_files:
       fail() { echo "FAIL: $*" >&2; exit 1; }
       command -v podman >/dev/null || fail "podman is not installed"
       command -v findmnt >/dev/null || fail "findmnt is not installed"
+      command -v runuser >/dev/null || fail "runuser is not installed"
+      command -v python3 >/dev/null || fail "python3 is not installed"
       getent passwd 10001 >/dev/null || fail "claim2car UID 10001 is missing"
-      for path in /var/lib/claim2car/postgres /var/lib/claim2car/evidence; do
-        [[ -d "$path" && ! -L "$path" ]] || fail "storage path missing or symlinked: $path"
-        findmnt -rn --mountpoint "$path" >/dev/null || fail "persistent volume is not mounted at $path"
-        [[ "$(stat -c %u "$path")" == "10001" ]] || fail "storage path must be owned by UID 10001: $path"
-      done
-      echo "PASS: host runtime and both persistent storage mountpoints are present"
 
+      postgres_path="/var/lib/claim2car/postgres"
+      evidence_path="/var/lib/claim2car/evidence"
+      postgres_source=""
+      evidence_source=""
+
+      for path in "$postgres_path" "$evidence_path"; do
+        [[ -d "$path" && ! -L "$path" ]] || fail "storage path missing or symlinked: $path"
+        source="$(findmnt -rn -o SOURCE --mountpoint "$path")" || fail "persistent volume is not mounted at $path"
+        [[ -n "$source" ]] || fail "persistent volume source is empty: $path"
+        [[ "$(stat -c %u "$path")" == "10001" ]] || fail "storage path must be owned by UID 10001: $path"
+
+        # Exercise the actual application identity and durable filesystem operations.
+        runuser -u 10001 -- python3 - "$path" <<'PY'
+      import os
+      import sys
+      import tempfile
+
+      root = sys.argv[1]
+      fd, probe = tempfile.mkstemp(prefix=".claim2car-storage-preflight-", dir=root)
+      directory_fd = None
+      try:
+          os.write(fd, b"claim2car-storage-preflight")
+          os.fsync(fd)
+          os.close(fd)
+          fd = -1
+          directory_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+          os.unlink(probe)
+          os.fsync(directory_fd)
+      finally:
+          if fd >= 0:
+              os.close(fd)
+          if os.path.exists(probe):
+              os.unlink(probe)
+          if directory_fd is not None:
+              os.close(directory_fd)
+      PY
+
+        if [[ "$path" == "$postgres_path" ]]; then
+          postgres_source="$source"
+        else
+          evidence_source="$source"
+        fi
+      done
+
+      [[ "$postgres_source" != "$evidence_source" ]] || fail "PostgreSQL and evidence paths resolve to the same mounted source"
+      echo "PASS: private host runtime, distinct persistent volumes, UID 10001 access, and write/fsync/remove probes"
+      
 runcmd:
   - [bash, -lc, "getent group 10001 >/dev/null || groupadd --gid 10001 claim2car"]
   - [bash, -lc, "getent passwd 10001 >/dev/null || useradd --uid 10001 --gid 10001 --system --no-create-home --home-dir /var/lib/claim2car --shell /usr/sbin/nologin claim2car"]
