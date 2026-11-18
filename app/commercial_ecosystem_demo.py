@@ -17,7 +17,7 @@ from backend.app.reports.forensic_pdf import (
     FourTierDossierService,
     SourceEvidenceBinding,
 )
-from backend.app.vision.adapters import GatedVisionPhysicsPipeline, LocalYoloTwoStageDetector
+from backend.app.vision.adapters import GatedDamageLocalizationPipeline, LocalYoloTwoStageDetector
 
 
 def run_full_commercial_ecosystem(output_dir: Path, fixed_now: str = "2026-11-08T22:00:00+00:00") -> dict:
@@ -54,8 +54,8 @@ def run_full_commercial_ecosystem(output_dir: Path, fixed_now: str = "2026-11-08
             region=DamageRegion("front_left", 0.32, 0.32, 0.52, 0.52, "structural_deformation", 1.0),
             annotated_by="synthetic-reviewer-01",
         )
-        vision_pipeline = GatedVisionPhysicsPipeline(candidate_detector=candidate_yolo)
-        advisory_vision = vision_pipeline.evaluate_and_extract_physics(
+        vision_pipeline = GatedDamageLocalizationPipeline(candidate_detector=candidate_yolo)
+        advisory_vision = vision_pipeline.evaluate_localization(
             session_id=session_id,
             slot="front_left",
             grid_fixture=grid,
