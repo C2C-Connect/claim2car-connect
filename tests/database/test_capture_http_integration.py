@@ -196,6 +196,15 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertNotIn("vin", decoded.json())
                     self.assertNotIn("vin_hmac_sha256", decoded.json())
                     self.assertEqual(len(provider_calls), 1)
+                    persisted_profile = self.db.f.seed.execute(
+                        "SELECT provider,decode_status,response_sha256,attributes_json::text "
+                        "FROM faos.vehicle_decode_snapshots WHERE tenant_id=%s AND source_session_id=%s",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()
+                    self.assertEqual(persisted_profile[0:2], ("NHTSA_VPIC", "DECODED"))
+                    self.assertEqual(len(persisted_profile[2]), 64)
+                    self.assertNotIn("1HGCM82633A004352", persisted_profile[3])
+                    self.assertNotIn("rawResult", persisted_profile[3])
 
                     collision_view_with_vehicle = client.get(
                         f"/v1/collisions/{collision_id}",
