@@ -419,7 +419,7 @@ class LocalYoloTwoStageDetector:
             regions.append(DamageRegion(
                 slot=slot, x0=round(x1, 4), y0=round(y1, 4),
                 x1=round(x2, 4), y1=round(y2, 4),
-                damage_class=YOLO_CLASS_TO_CANONICAL_LABEL.get(raw_label, "dent"),
+                damage_class=YOLO_CLASS_TO_CANONICAL_LABEL.get(raw_label, "unknown"),
                 confidence=round(conf, 4), model_version=self.model_version,
             ))
         return regions
