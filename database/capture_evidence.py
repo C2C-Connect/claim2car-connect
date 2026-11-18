@@ -27,6 +27,7 @@ from database.capture_sessions import (
 
 MAX_EVIDENCE_BYTES = 25 * 1024 * 1024
 DISCLOSURE_VERSION = "disclosure-v1"
+VEHICLE_DECODE_DISCLOSURE_VERSION = "vehicle-decode-disclosure-v1"
 
 
 class CaptureEvidenceService:
@@ -113,6 +114,25 @@ class CaptureEvidenceService:
                 return True
         return False
 
+    @staticmethod
+    def _vehicle_decode_consent_state(history, capture_consent):
+        if capture_consent is None:
+            return None
+        events = [(actor, payload) for kind, actor, payload, _ in history
+                  if kind == "VEHICLE_DECODE_CONSENT_RECORDED"]
+        if not events:
+            return None
+        actor, latest = events[-1]
+        required = {"accepted", "owner_actor_id", "disclosure_version", "scope", "request_id"}
+        if (type(latest) is not dict or set(latest) != required
+                or type(latest.get("accepted")) is not bool
+                or latest.get("owner_actor_id") != actor
+                or actor != capture_consent[0]
+                or latest.get("disclosure_version") != VEHICLE_DECODE_DISCLOSURE_VERSION
+                or latest.get("scope") != "nhtsa_vpic_decode"):
+            raise CaptureSessionConflict("UNSUPPORTED_VEHICLE_DECODE_CONSENT_HISTORY")
+        return (actor, latest) if latest["accepted"] is True else None
+
     def evidence_readiness(self, authorization, session_id):
         """Return the server-authoritative consent/VIN gate before local evidence is queued."""
         session_id = self._session_id(session_id)
@@ -190,6 +210,13 @@ class CaptureEvidenceService:
                         "SELECT faos.withdraw_claim_case_incident(%s::uuid,%s::uuid,%s::text)",
                         (actor.tenant_id, _session.claim_id, actor.actor_id),
                     )
+                    conn.execute(
+                        "UPDATE faos.vehicle_decode_snapshots SET decode_status='REVOKED',"
+                        "attributes_json=NULL,revoked_at=clock_timestamp() "
+                        "WHERE tenant_id=%s AND source_session_id=%s "
+                        "AND decode_status IN ('DECODED','PARTIAL','ERROR')",
+                        (actor.tenant_id, session_id),
+                    )
             else:
                 artifacts = []
                 deletion_tenant = actor.tenant_id
@@ -197,6 +224,177 @@ class CaptureEvidenceService:
             ArtifactKey(deletion_tenant, UUID(session_id), UUID(artifact_id)))) for artifact_id in artifacts)
         return {"session_id": session_id, "accepted": accepted, "replayed": replayed,
                 "deleted_original_artifacts": deleted}
+
+    def record_vehicle_decode_consent(self, authorization, session_id, *, request_id, accepted, scope):
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if type(accepted) is not bool or scope != "nhtsa_vpic_decode":
+            raise ValueError("INVALID_VEHICLE_DECODE_CONSENT")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role != "owner":
+                raise CaptureAuthorizationError("OWNER_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=False)
+            capture_consent = self._consent_state(history)
+            if capture_consent is None or capture_consent[0] != actor.actor_id:
+                raise CaptureAuthorizationError("ACTIVE_CAPTURE_OWNER_CONSENT_REQUIRED")
+            event_id = "vehicle-decode-consent:" + request_id
+            payload = {
+                "accepted": accepted,
+                "owner_actor_id": actor.actor_id,
+                "disclosure_version": VEHICLE_DECODE_DISCLOSURE_VERSION,
+                "scope": scope,
+                "request_id": request_id,
+            }
+            replayed = False
+            for kind, _event_actor, old, old_id in history:
+                if old_id == event_id:
+                    if kind == "VEHICLE_DECODE_CONSENT_RECORDED" and old == payload:
+                        replayed = True
+                        break
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+            if not replayed:
+                self._append(
+                    conn, actor, session_id, history, event_id=event_id,
+                    kind="VEHICLE_DECODE_CONSENT_RECORDED",
+                    reason="owner vehicle-decoding consent state recorded",
+                    payload=payload,
+                )
+            if not accepted:
+                conn.execute(
+                    "UPDATE faos.vehicle_decode_snapshots SET decode_status='REVOKED',"
+                    "attributes_json=NULL,revoked_at=clock_timestamp() "
+                    "WHERE tenant_id=%s AND source_session_id=%s "
+                    "AND decode_status IN ('DECODED','PARTIAL','ERROR')",
+                    (actor.tenant_id, session_id),
+                )
+        return {
+            "session_id": session_id, "accepted": accepted,
+            "scope": scope, "disclosure_version": VEHICLE_DECODE_DISCLOSURE_VERSION,
+            "replayed": replayed,
+        }
+
+    def decode_vehicle_profile(self, authorization, session_id, *, request_id, vin, decoder):
+        """Decode only after separate owner opt-in; persist normalized provider data only.
+
+        The keyed VIN digest is checked both before and after the network call.
+        Consent is re-read under the session lock before persistence so a
+        concurrent withdrawal cannot commit a newly returned profile.
+        """
+        from app.vehicle_intelligence.vpic import VpicDecodeError
+
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if not isinstance(vin, str) or not vin.isascii():
+            raise ValueError("INVALID_VIN")
+        validity = validate_vin(vin)
+        if not validity.ok or validity.normalization_changed or validity.vin != vin:
+            raise ValueError("VIN_VALIDATION_FAILED")
+        vin_digest = hmac.new(self._vin_pepper, vin.upper().encode("ascii"), hashlib.sha256).hexdigest()
+
+        def authorized_source(conn, actor, history):
+            capture_consent = self._consent_state(history)
+            decode_consent = self._vehicle_decode_consent_state(history, capture_consent)
+            if capture_consent is None or decode_consent is None:
+                raise CaptureAuthorizationError("ACTIVE_VEHICLE_DECODE_CONSENT_REQUIRED")
+            row = conn.execute(
+                "SELECT vehicle_id FROM faos.vehicle_identity_sources "
+                "WHERE tenant_id=%s AND source_session_id=%s "
+                "AND owner_actor_id=%s AND vin_hmac_sha256=%s AND source_status='ACTIVE'",
+                (actor.tenant_id, session_id, capture_consent[0], vin_digest),
+            ).fetchone()
+            if row is None:
+                raise CaptureSessionConflict("ACTIVE_CONSENTED_VEHICLE_IDENTITY_REQUIRED")
+            return str(row[0])
+
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            vehicle_id = authorized_source(conn, actor, history)
+            prior = conn.execute(
+                "SELECT decode_status,provider,provider_api,requested_at,response_sha256,"
+                "decode_error_code,attributes_json FROM faos.vehicle_decode_snapshots "
+                "WHERE tenant_id=%s AND request_id=%s",
+                (actor.tenant_id, request_id),
+            ).fetchone()
+            if prior is not None:
+                return {
+                    "session_id": session_id, "vehicle_id": vehicle_id,
+                    "status": prior[0], "provider": prior[1], "provider_api": prior[2],
+                    "requested_at": prior[3].isoformat(), "response_sha256": prior[4],
+                    "decode_error_code": prior[5], "attributes": prior[6] or {},
+                    "replayed": True, "physics_input_eligibility": "NOT_ESTABLISHED",
+                }
+
+        try:
+            profile = decoder.decode(vin)
+            profile_data = profile.to_dict()
+        except VpicDecodeError as error:
+            profile_data = {
+                "status": "ERROR", "provider": "NHTSA_VPIC",
+                "provider_api": "DecodeVinValuesExtended",
+                "requested_at": datetime.now(timezone.utc).isoformat(),
+                "response_sha256": None, "decode_error_code": error.code,
+                "attributes": {},
+                "physics_input_eligibility": "NOT_ESTABLISHED",
+            }
+
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            current_vehicle_id = authorized_source(conn, actor, history)
+            if current_vehicle_id != vehicle_id:
+                raise CaptureSessionConflict("VEHICLE_IDENTITY_CHANGED_DURING_DECODE")
+            prior = conn.execute(
+                "SELECT decode_status,provider,provider_api,requested_at,response_sha256,"
+                "decode_error_code,attributes_json FROM faos.vehicle_decode_snapshots "
+                "WHERE tenant_id=%s AND request_id=%s",
+                (actor.tenant_id, request_id),
+            ).fetchone()
+            if prior is not None:
+                return {
+                    "session_id": session_id, "vehicle_id": vehicle_id,
+                    "status": prior[0], "provider": prior[1], "provider_api": prior[2],
+                    "requested_at": prior[3].isoformat(), "response_sha256": prior[4],
+                    "decode_error_code": prior[5], "attributes": prior[6] or {},
+                    "replayed": True, "physics_input_eligibility": "NOT_ESTABLISHED",
+                }
+            requested_at = profile_data["requested_at"]
+            attributes = profile_data.get("attributes") or {}
+            attributes_json = json.dumps(attributes, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            event_id = "vehicle-profile:" + request_id
+            event_payload = {
+                "request_id": request_id, "vehicle_id": vehicle_id,
+                "provider": profile_data["provider"], "provider_api": profile_data["provider_api"],
+                "decode_status": profile_data["status"],
+                "response_sha256": profile_data.get("response_sha256"),
+                "decode_error_code": profile_data.get("decode_error_code"),
+                "disclosure_version": VEHICLE_DECODE_DISCLOSURE_VERSION,
+            }
+            conn.execute(
+                "INSERT INTO faos.vehicle_decode_snapshots("
+                "tenant_id,vehicle_id,source_session_id,request_id,provider,provider_api,"
+                "requested_at,response_sha256,decode_status,decode_error_code,attributes_json,recorded_by"
+                ") VALUES (%s::uuid,%s::uuid,%s,%s::uuid,%s,%s,%s::timestamptz,"
+                "%s,%s,%s,%s::jsonb,%s)",
+                (
+                    actor.tenant_id, vehicle_id, session_id, request_id,
+                    profile_data["provider"], profile_data["provider_api"], requested_at,
+                    profile_data.get("response_sha256"), profile_data["status"],
+                    profile_data.get("decode_error_code"), attributes_json, actor.actor_id,
+                ),
+            )
+            self._append(
+                conn, actor, session_id, history, event_id=event_id,
+                kind="VEHICLE_PROFILE_DECODED",
+                reason="consented NHTSA vPIC vehicle profile result recorded",
+                payload=event_payload,
+            )
+        return {
+            "session_id": session_id, "vehicle_id": vehicle_id,
+            **profile_data, "replayed": False,
+        }
 
     def record_vehicle(self, authorization, session_id, *, request_id, vin):
         session_id = self._session_id(session_id)
