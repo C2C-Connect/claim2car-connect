@@ -174,6 +174,45 @@ These responsibilities must integrate with—not compete with—the established 
 
 Do not introduce duplicate sources of truth for collision identity, evidence, consent, claim state, or financial state. Use explicit links and domain ownership.
 
+### 4.1 The post-accident operating network
+
+The product is not a sequence of disconnected forms, reports, referrals, or provider directories. It is a governed operating network organized around the Collision Lifecycle Record (CLR) and the evidence-backed incident record.
+
+The architecture has four cooperating planes:
+
+1. **Truth plane** — identity, evidence, provenance, observations, measurements, technical assessments, uncertainty, and explainable findings. This plane establishes what the system can responsibly know.
+2. **Orchestration plane** — collision lifecycle, task plans, requirements, approvals, recipient authorization, handoffs, service acceptance, status reconciliation, and event resolution. This plane determines what should happen next, who is authorized to do it, and whether it actually happened.
+3. **Participant network plane** — drivers/owners, field operators, repair facilities, dealerships, insurers, towing and other qualified providers. Each participant acts within a defined role, purpose, capability, service area, consent boundary, and acceptance contract. A directory listing is not a completed handoff; a referral is not provider acceptance; acceptance is not completion.
+4. **Transaction and integration plane** — quotes, estimates, service orders, dispatch, partner messages, invoices, fees, payouts, payment reconciliation, and external system adapters. These workflows are independently authorized, idempotent, auditable, and gated. They consume supported facts and approved decisions; they never rewrite technical findings.
+
+The planes share a common event and identity spine, but retain distinct domain ownership. The CLR identifies the collision; vehicle and participant relationships identify what and who is involved; evidence manifests identify source material; assessment records identify what was concluded and by which method; workflow records identify requested and accepted work; financial records identify obligations and settlement. A single collision may have multiple claims, vehicles, providers, estimates, repair attempts, and financial events. None should be collapsed into one mutable status field.
+
+### 4.2 Lifecycle orchestration is a first-class product capability
+
+The system must model the difference between:
+
+- **recommendation** — the system suggests a qualified next step;
+- **offer / request** — an authorized participant is asked to perform work;
+- **acceptance** — the participant explicitly accepts the scoped work and terms;
+- **execution** — work or service is underway;
+- **completion** — the participant reports completion with required evidence;
+- **verification** — the platform or authorized party validates the completion;
+- **settlement** — any separately authorized financial obligation is reconciled; and
+- **resolution** — the relevant collision-record or downstream workflow meets its own closure criteria.
+
+These are not synonyms and must not be inferred from one another. For example, a shop accepting a vehicle may authorize the next dispatch step under policy, but it does not prove that towing occurred, repairs were completed, an insurer paid, or the collision record is fully resolved.
+
+Orchestration should be expressed as durable, versioned workflows and domain events—not a large collection of fragile synchronous calls. Use the transactional outbox and idempotent consumers for reliable handoffs; persist request, acceptance, rejection, timeout, cancellation, completion, verification, and reconciliation outcomes. External systems are adapters at explicit boundaries, not alternate authorities for the canonical incident record.
+
+### 4.3 Network economics must remain subordinate to trust
+
+The commercial opportunity is to reduce friction and coordinate legitimate services across the post-accident lifecycle. The platform may earn revenue from authorized services, transactions, integrations, or network participation, but commercial incentives must not influence evidence collection, technical findings, safety escalation, recipient disclosure, provider qualification, or decision thresholds.
+
+Provider matching must be explainable and governed by capability, geography, availability, vehicle/brand fit where relevant, service terms, consent, and user choice. Paid placement or referral economics—if ever authorized—must be disclosed and kept separate from technical ranking and safety decisions. The platform must not sell an unverified lead as a verified fact, or represent a provider's acceptance as an endorsement of an assessment.
+
+The strategic moat is the combination of a trustworthy incident record, repeatable intelligence, accountable orchestration, and a qualified participant network. Building the network without the truth plane creates a lead marketplace; building the truth plane without orchestration leaves users with a report and no path forward. Claim2Car must build both, with independent controls and audit trails.
+
+
 ## 5. Truth and accuracy assurance architecture
 
 Every automated or human-assisted assessment should follow a controlled chain:
