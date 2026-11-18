@@ -149,14 +149,20 @@ BEGIN
    WHERE tenant_id=p_tenant AND vin_hmac_sha256=vin_digest
    FOR UPDATE;
   IF resolved_vehicle IS NULL THEN
-   resolved_vehicle := p_requested_vehicle;
    INSERT INTO faos.vehicles(
     tenant_id,vehicle_id,vin_hmac_sha256,vin_source,vin_validation_status,
     source_session_id,created_by
    ) VALUES(
-    p_tenant,resolved_vehicle,vin_digest,'CONSENTED_CAPTURE_SESSION',
+    p_tenant,p_requested_vehicle,vin_digest,'CONSENTED_CAPTURE_SESSION',
     'CAPTURE_GATE_VALIDATED',capture_session,p_actor
-   );
+   ) ON CONFLICT(tenant_id,vin_hmac_sha256)
+     WHERE vin_hmac_sha256 IS NOT NULL DO NOTHING;
+   SELECT vehicle_id INTO resolved_vehicle FROM faos.vehicles
+    WHERE tenant_id=p_tenant AND vin_hmac_sha256=vin_digest
+    FOR UPDATE;
+   IF resolved_vehicle IS NULL THEN
+    RAISE EXCEPTION 'VEHICLE_REGISTRY_READBACK_FAILED';
+   END IF;
   END IF;
   INSERT INTO faos.vehicle_identity_sources(
    tenant_id,vehicle_id,source_session_id,source_event_id,owner_actor_id,vin_hmac_sha256
