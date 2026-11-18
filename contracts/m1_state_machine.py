@@ -52,6 +52,10 @@ TERMINAL_STATES = frozenset({REVIEWED, ABORTED})
 
 # --- Events (extend DomainEvent.KINDS with the abort kind) ---
 SESSION_ABORTED = "SESSION_ABORTED"
+SIDECAR_EVENTS = frozenset({
+    "VEHICLE_DECODE_CONSENT_RECORDED",
+    "VEHICLE_PROFILE_DECODED",
+})
 
 M1_EVENTS = frozenset(
     {
@@ -63,6 +67,7 @@ M1_EVENTS = frozenset(
         "MANIFEST_SEALED",
         "REVIEW_RECORDED",
         SESSION_ABORTED,
+        *SIDECAR_EVENTS,
     }
 )
 
@@ -132,6 +137,12 @@ class M1SessionMachine:
             raise TransitionError("SEQUENCE_CONFLICT")
         if event.kind not in M1_EVENTS:
             raise TransitionError("UNSUPPORTED_EVENT_KIND")
+        if event.kind in SIDECAR_EVENTS:
+            if self._state is None:
+                raise TransitionError("SESSION_NOT_CREATED")
+            self._sequence = event.sequence
+            self._history.append(event)
+            return self._state
 
         key = (self._state, event.kind)
         if key not in TRANSITIONS:
