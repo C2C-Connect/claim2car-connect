@@ -448,6 +448,10 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 _fail(403, 'CAPTURE_AUTHORITY_DENIED')
             except CaptureSessionConflict:
                 _fail(409, 'CAPTURE_SESSION_CONFLICT')
+            except CollisionLifecycleNotFound:
+                _fail(404, 'COLLISION_NOT_FOUND')
+            except CaptureSessionConflict:
+                _fail(409, 'EVIDENCE_HISTORY_INVALID')
             except CaptureSessionNotFound:
                 _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
             except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
@@ -528,6 +532,56 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         @api.get('/v1/review-sessions/{session_id}')
         def review_session_details(session_id: UUID, authorization: str = Depends(authorize)):
             return invoke_evidence(evidence.get_review_details, authorization, session_id)
+
+
+        @api.get('/v1/review-collisions/{collision_id}')
+        def review_collision(collision_id: UUID, authorization: str = Depends(authorize)):
+            if collisions is None or evidence is None:
+                _fail(503, 'COLLISION_EVIDENCE_UNAVAILABLE')
+            try:
+                links = collisions.list_review_claims(authorization, str(collision_id))
+                claims = []
+                for link in links:
+                    try:
+                        details = evidence.get_review_details(authorization, link.capture_session_id)
+                        evidence_status = 'READY'
+                    except CaptureSessionConflict as error:
+                        if str(error) not in (
+                            'ACTIVE_OWNER_CONSENT_REQUIRED',
+                            'SEALED_SESSION_REQUIRED_FOR_REVIEW',
+                            'CAPTURE_SET_INCOMPLETE',
+                        ):
+                            raise
+                        details = None
+                        evidence_status = 'NOT_REVIEWABLE'
+                    claims.append({
+                        'claim_id': link.claim_id,
+                        'capture_session_id': link.capture_session_id,
+                        'capture_protocol_version': link.capture_protocol_version,
+                        'evidence_status': evidence_status,
+                        'evidence': details,
+                    })
+                return JSONResponse(jsonable_encoder({
+                    'collision_id': str(collision_id),
+                    'claims': claims,
+                    'scope': 'independent-collision-evidence-review',
+                }), headers=dict(NO_STORE_HEADERS))
+            except AuthenticationError:
+                _fail(401, 'UNAUTHORIZED')
+            except CaptureAuthorizationError:
+                _fail(403, 'COLLISION_REVIEW_AUTHORITY_DENIED')
+            except CaptureSessionNotFound:
+                _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
+            except CaptureStorageUnavailable:
+                _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+            except ArtifactStorageUnavailable:
+                _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
+            except (ArtifactConflict, ArtifactIntegrityError, ArtifactNotFound):
+                _fail(409, 'EVIDENCE_ARTIFACT_CONFLICT')
+            except ValueError:
+                _fail(422, 'INVALID_COLLISION_REVIEW_REQUEST')
+            except Exception:
+                _fail(500, 'COLLISION_REVIEW_OPERATION_FAILED')
 
         @api.get('/v1/review-sessions/{session_id}/artifacts/{artifact_id}')
         def review_artifact(session_id: UUID, artifact_id: UUID, authorization: str = Depends(authorize)):

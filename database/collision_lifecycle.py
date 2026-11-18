@@ -173,6 +173,37 @@ class CollisionLifecycleStore:
                 linked_by=row[4], linked_at=row[5].isoformat(), created=False,
             ) for row in rows]
 
+
+    def list_review_claims(self, authorization, collision_id):
+        """List only collision-linked capture sessions for an independent reviewer."""
+        collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            collision_exists = conn.execute(
+                "SELECT 1 FROM faos.collision_lifecycle_records "
+                "WHERE tenant_id=%s AND collision_id=%s",
+                (actor.tenant_id, collision_id),
+            ).fetchone()
+            if collision_exists is None:
+                raise CollisionLifecycleNotFound("COLLISION_NOT_FOUND")
+            rows = conn.execute(
+                "SELECT l.collision_id,l.claim_id,c.capture_session_id,s.capture_protocol_version,l.linked_by,l.linked_at "
+                "FROM faos.collision_claim_links l "
+                "JOIN faos.collision_lifecycle_records r ON r.tenant_id=l.tenant_id AND r.collision_id=l.collision_id "
+                "JOIN faos.claim_cases c ON c.tenant_id=l.tenant_id AND c.claim_id=l.claim_id "
+                "JOIN faos.sessions s ON s.tenant_id=c.tenant_id AND s.session_id=c.capture_session_id "
+                "WHERE l.tenant_id=%s AND l.collision_id=%s "
+                "AND r.created_by<>%s AND c.created_by<>%s "
+                "ORDER BY l.linked_at,l.claim_id",
+                (actor.tenant_id, collision_id, actor.actor_id, actor.actor_id),
+            ).fetchall()
+            return [CollisionClaimLink(
+                collision_id=str(row[0]), claim_id=str(row[1]),
+                capture_session_id=str(row[2]), capture_protocol_version=row[3],
+                linked_by=row[4], linked_at=row[5].isoformat(), created=False,
+            ) for row in rows]
+
     def get(self, authorization, collision_id):
         collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
         with self.sessions._authorized(authorization) as (conn, actor):

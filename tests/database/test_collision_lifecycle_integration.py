@@ -25,6 +25,7 @@ class CollisionLifecycleIntegration(unittest.TestCase):
         self.addCleanup(self.f.doCleanups)
         self.f.setUp()
         self.tokens = ["G" * 43, "H" * 43]
+        self.reviewer_tokens = ["I" * 43, "J" * 43]
         credentials = []
         dsns = {}
         for index, role in enumerate(self.f.roles):
@@ -40,12 +41,22 @@ class CollisionLifecycleIntegration(unittest.TestCase):
                 ActorBinding("clr-operator-" + str(index), uuid.UUID(self.f.tenants[index]), role),
                 int(time.time()) + 3600,
             ))
+        for index in range(2):
+            credentials.append(Credential(
+                hashlib.sha256(self.reviewer_tokens[index].encode()).hexdigest(),
+                ActorBinding("clr-reviewer-" + str(index), uuid.UUID(self.f.tenants[index]),
+                             self.f.roles[index], "reviewer"),
+                int(time.time()) + 3600,
+            ))
         sessions = CaptureSessionStore(CredentialResolver(credentials), dsns)
         self.store = CollisionLifecycleStore(sessions)
         self.claims = ClaimCaseStore(sessions)
 
     def auth(self, index=0):
         return "Bearer " + self.tokens[index]
+
+    def reviewer_auth(self, index=0):
+        return "Bearer " + self.reviewer_tokens[index]
 
     def test_collision_identity_is_independent_and_idempotent(self):
         collision_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -146,6 +157,21 @@ class CollisionLifecycleIntegration(unittest.TestCase):
             self.store.link_claim(self.auth(), collision_id=collision_id,
                                   claim_id=other_claim.claim_id, request_id=request_id)
         self.assertEqual(str(conflict.exception), "COLLISION_EVENT_IDEMPOTENCY_CONFLICT")
+
+
+    def test_independent_reviewer_can_discover_collision_linked_capture_sessions(self):
+        collision_id = str(uuid.uuid4())
+        claim_id = str(uuid.uuid4())
+        self.store.create(self.auth(), collision_id=collision_id, request_id=str(uuid.uuid4()))
+        claim = self.claims.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()))
+        self.store.link_claim(self.auth(), collision_id=collision_id,
+                              claim_id=claim_id, request_id=str(uuid.uuid4()))
+        links = self.store.list_review_claims(self.reviewer_auth(), collision_id)
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0].claim_id, claim_id)
+        self.assertEqual(links[0].capture_session_id, claim.capture_session_id)
+        with self.assertRaises(CollisionLifecycleNotFound):
+            self.store.list_review_claims(self.reviewer_auth(1), collision_id)
 
     def test_every_clr_table_forces_rls_and_blocks_direct_application_writes(self):
         tables = (

@@ -88,6 +88,35 @@ class CaptureRouteTests(unittest.TestCase):
         self.assertEqual(created.headers['cache-control'],'no-store')
         self.collision_store.link_claim.assert_called_once()
 
+
+    def test_review_collision_returns_verified_manifest_without_copying_original_bytes(self):
+        collision_id, claim_id, session_id = str(UUID(int=40)), str(UUID(int=41)), str(UUID(int=42))
+        link = CollisionClaimLink(
+            collision_id, claim_id, session_id, DEFAULT_CAPTURE_PROTOCOL, 'operator',
+            '2026-11-18T00:00:00+00:00', False,
+        )
+        manifest = {
+            'session_id': session_id,
+            'manifest_digest': 'a' * 64,
+            'shot_list_version': DEFAULT_CAPTURE_PROTOCOL,
+            'consent_recorded': True,
+            'artifacts': [{'artifact_id': str(UUID(int=43)), 'slot': '00_front_exterior',
+                           'sha256': 'b' * 64, 'byte_length': 123}],
+        }
+        self.collision_store.list_review_claims.return_value = [link]
+        with tempfile.TemporaryDirectory() as root, patch.dict(os.environ, {
+            'C2C_ARTIFACT_STORAGE_ROOT': root, 'C2C_VIN_HMAC_PEPPER': 'P' * 43,
+        }), patch('app.capture_api.CaptureEvidenceService') as service:
+            service.return_value.get_review_details.return_value = manifest
+            with TestClient(create_capture_app(self.runtime, enable_evidence=True)) as client:
+                response = client.get('/v1/review-collisions/'+collision_id, headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()['claims'][0]['evidence_status'],'READY')
+        self.assertEqual(response.json()['claims'][0]['evidence']['manifest_digest'],'a'*64)
+        self.assertNotIn('payload_base64',response.text)
+        self.collision_store.list_review_claims.assert_called_once_with('Bearer '+self.token,collision_id)
+        service.return_value.get_review_details.assert_called_once_with('Bearer '+self.token,session_id)
+
     def test_protocol_registry_is_authenticated_and_exposes_both_executable_versions(self):
         with self.client() as client:
             registry = client.get('/v1/capture-protocols',headers=self.headers)
@@ -263,6 +292,7 @@ class CaptureRouteTests(unittest.TestCase):
             self.assertIn('/v1/capture-sessions/{session_id}/review',paths)
             self.assertIn('/v1/review-queue',paths)
             self.assertIn('/v1/review-sessions/{session_id}/artifacts/{artifact_id}',paths)
+            self.assertIn('/v1/review-collisions/{collision_id}',paths)
 
     def test_child_capture_app_does_not_recursively_mount_integrated_runtime(self):
         with patch.dict(os.environ,{'C2C_RUNTIME_MODE':'integrated'}):
