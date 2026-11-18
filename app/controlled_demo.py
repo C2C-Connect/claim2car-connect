@@ -233,9 +233,10 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     from app.damage_localization import (
         DamageAnnotation,
         DamageLocalizationBenchmark,
+    DamageObservationAdapter,
         DamageRegion,
         HeuristicDamageDetector,
-        PhysicsInputAdapter,
+    
     )
 
     damage_grid = [[90] * 36 for _ in range(36)]
@@ -252,17 +253,22 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     benchmark = DamageLocalizationBenchmark()
     localization_report = benchmark.evaluate(predicted, [annotation])
     adoption = benchmark.adoption_gate(localization_report, localization_report)
-    geometry = PhysicsInputAdapter().to_impact_geometry(predicted[0])
-    step("damage_localization", "measured", {
+    observation = DamageObservationAdapter().to_observation(predicted[0])
+    step("damage_localization", "localized-advisory-only", {
         "baseline_detector": detector.model_version,
         "labeled_samples": localization_report.labeled_samples,
         "matched": localization_report.matched,
         "mean_iou": localization_report.mean_iou,
         "adoption_gate": "refused-no-strict-improvement" if not adoption.adopt else "adopted",
-        "physics_input": {
-            "zone": geometry.zone,
-            "severity_tier": geometry.severity_tier,
-            "area_fraction": geometry.area_fraction,
+        "localization_observation": {
+            "zone": observation.zone,
+            "normalized_region_area_fraction": observation.normalized_region_area_fraction,
+            "damage_class": observation.damage_class,
+            "raw_detector_score": observation.raw_detector_score,
+            "score_semantics": observation.score_semantics,
+            "epistemic_status": "MODEL_LOCALIZATION_UNREVIEWED",
+            "physical_severity": "NOT_ESTABLISHED",
+            "physical_depth": "NOT_MEASURED",
         },
     })
 
