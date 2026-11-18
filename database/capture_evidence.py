@@ -280,7 +280,7 @@ class CaptureEvidenceService:
         Consent is re-read under the session lock before persistence so a
         concurrent withdrawal cannot commit a newly returned profile.
         """
-        from app.vehicle_intelligence.vpic import VpicDecodeError
+        from backend.app.vehicle_intelligence.vpic import VpicDecodeError
 
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
