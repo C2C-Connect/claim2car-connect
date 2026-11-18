@@ -1,4 +1,4 @@
-"""Regression tests for strict 0017-0022 inventory and DB-01/DB-02 acceptance diagnostics."""
+"""Regression tests for strict 0017-0023 inventory and DB-01/DB-02 acceptance diagnostics."""
 import unittest
 
 from scripts.database_authority_diagnostics import validate_authority_migration_inventory
@@ -17,6 +17,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0020_collision_lifecycle_record.sql',
             '0021_collision_claim_link.sql',
             '0022_collision_vehicle_capture_link.sql',
+            '0023_consented_vehicle_profile.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
@@ -145,8 +146,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_rejects_unreviewed_migration_after_0022(self):
-        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0022'):
+    def test_rejects_unreviewed_migration_after_0023(self):
+        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0023'):
             validate_authority_migration_inventory(self.inventory([
                 '0017_event_contract_parity.sql',
                 '0018_capture_protocol_session_binding.sql',
@@ -154,7 +155,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0020_collision_lifecycle_record.sql',
             '0021_collision_claim_link.sql',
                 '0022_collision_vehicle_capture_link.sql',
-                '0023_unreviewed.sql',
+                '0024_unreviewed.sql',
             ]))
 
 
