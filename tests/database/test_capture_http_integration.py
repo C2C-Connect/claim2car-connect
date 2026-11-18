@@ -158,6 +158,17 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(disclosure.status_code, 200, disclosure.text)
                     self.assertEqual(disclosure.json()["disclosure_version"], "vehicle-decode-disclosure-v1")
                     self.assertTrue(any("NHTSA vPIC" in item for item in disclosure.json()["sections"]))
+                    stale_disclosure = client.post(
+                        f"/v1/capture-sessions/{session_id}/vehicle-decode-consent",
+                        headers=owner_headers,
+                        json={
+                            "request_id": str(uuid.uuid4()),
+                            "accepted": True,
+                            "scope": "nhtsa_vpic_decode",
+                            "disclosure_version": "vehicle-decode-disclosure-old",
+                        },
+                    )
+                    self.assertEqual(stale_disclosure.status_code, 422, stale_disclosure.text)
 
                     decode_consent = client.post(
                         f"/v1/capture-sessions/{session_id}/vehicle-decode-consent",
