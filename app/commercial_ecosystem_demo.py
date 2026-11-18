@@ -129,7 +129,7 @@ def run_full_commercial_ecosystem(output_dir: Path, fixed_now: str = "2026-11-08
     )
     shop_packet = dossier_service.generate_repair_shop_packet(
         consent=consent, binding=binding, ledger_entry=shop_entry,
-        damaged_zones=list(advisory_vision.advisory_localizations),
+        localization_observations=list(advisory_vision.advisory_localizations),
         generated_by="dossier-engine", now_iso=fixed_now
     )
     carrier_report = dossier_service.generate_carrier_seven_page_report(
