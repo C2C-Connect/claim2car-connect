@@ -1,5 +1,6 @@
 """PostgreSQL integration tests for the independent CLR identity root."""
 import hashlib
+import psycopg
 import time
 import unittest
 import uuid

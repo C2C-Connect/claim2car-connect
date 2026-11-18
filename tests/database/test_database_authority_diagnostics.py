@@ -44,6 +44,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0018_capture_protocol_session_binding.sql',
                 '0017_event_contract_parity.sql',
                 '0019_manifest_root_protocol_binding.sql',
+                '0020_collision_lifecycle_record.sql',
             ]))
 
     def test_rejects_duplicate_authority_migration_names(self):
@@ -53,6 +54,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0018_capture_protocol_session_binding.sql',
                 '0019_manifest_root_protocol_binding.sql',
                 '0019_manifest_root_protocol_binding.sql',
+                '0020_collision_lifecycle_record.sql',
             ]))
 
     def test_db01_accepts_the_20_migration_synthetic_environment(self):
@@ -112,6 +114,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0015_incident_event_kinds.sql', '0016_claim_case_incident_read_boundary.sql',
             '0017_event_contract_parity.sql', '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
+            '0020_collision_lifecycle_record.sql',
         ]
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
