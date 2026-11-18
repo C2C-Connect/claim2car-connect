@@ -48,3 +48,34 @@ CREATE POLICY writer_tenant ON faos.vehicle_decode_snapshots TO faos_writer
 REVOKE ALL ON faos.vehicle_decode_snapshots FROM PUBLIC,faos_app,faos_writer;
 GRANT SELECT ON faos.vehicle_decode_snapshots TO faos_app;
 GRANT SELECT,INSERT,UPDATE ON faos.vehicle_decode_snapshots TO faos_writer;
+
+CREATE FUNCTION faos.revoke_vehicle_decode_profiles(
+ p_tenant uuid,p_session text,p_owner text
+) RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=pg_catalog,faos,pg_temp
+AS $$
+DECLARE changed integer := 0;
+BEGIN
+ IF faos.tenant_id() IS NULL OR p_tenant IS DISTINCT FROM faos.tenant_id() THEN
+  RAISE EXCEPTION 'TENANT_CONTEXT_MISMATCH';
+ END IF;
+ IF NOT EXISTS(
+  SELECT 1 FROM faos.claim_cases
+  WHERE tenant_id=p_tenant AND capture_session_id=p_session AND owner_actor_id=p_owner
+ ) THEN
+  RAISE EXCEPTION 'VEHICLE_DECODE_CONSENT_OWNER_REQUIRED';
+ END IF;
+ UPDATE faos.vehicle_decode_snapshots
+  SET decode_status='REVOKED',attributes_json=NULL,revoked_at=clock_timestamp()
+  WHERE tenant_id=p_tenant AND source_session_id=p_session
+    AND decode_status IN ('DECODED','PARTIAL','ERROR');
+ GET DIAGNOSTICS changed=ROW_COUNT;
+ RETURN changed;
+END $$;
+
+REVOKE ALL ON FUNCTION faos.revoke_vehicle_decode_profiles(uuid,text,text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION faos.revoke_vehicle_decode_profiles(uuid,text,text) TO faos_app;
+GRANT CREATE ON SCHEMA faos TO faos_writer;
+ALTER FUNCTION faos.revoke_vehicle_decode_profiles(uuid,text,text) OWNER TO faos_writer;
+REVOKE CREATE ON SCHEMA faos FROM faos_writer;
