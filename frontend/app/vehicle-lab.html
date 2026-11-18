@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101a2b">
+  <title>Claim2Car · Vehicle Intelligence Lab</title>
+  <link rel="stylesheet" href="/prototype/styles.css">
+  <link rel="stylesheet" href="/prototype/vehicle-lab.css">
+  <script type="module" src="/prototype/vehicle-lab.mjs"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/prototype/" aria-label="Claim2Car workbench"><span class="brand-mark">C2</span><span><strong>Claim2Car</strong><small>VEHICLE INTELLIGENCE LAB</small></span></a>
+    <a class="button quiet" href="/prototype/">Main workbench</a>
+  </header>
+  <main class="page-shell lab-shell">
+    <section class="hero lab-hero">
+      <div class="eyebrow">OWNER TEST PROTOTYPE · VEHICLE INTELLIGENCE</div>
+      <h1>Know the vehicle.<br><span>Document what happened.</span></h1>
+      <p class="hero-copy">Scan or enter a VIN, retrieve manufacturer-reported vehicle details, document visible condition, and generate a reviewable Claim2Car report.</p>
+      <div class="prototype-notice"><strong>Prototype boundary:</strong> VIN decoding uses the public NHTSA vPIC service after your explicit consent. Damage observations in this build are recorded by you; automated damage recognition and repair-cost prediction are not yet enabled. No case data is uploaded or saved by this lab.</div>
+    </section>
+
+    <section class="panel lab-panel" id="identity-panel">
+      <div class="panel-heading"><div><div class="eyebrow">01 · VEHICLE IDENTITY</div><h2>Identify a vehicle</h2></div><span class="step-index">VIN</span></div>
+      <p class="muted">Use the camera scanner where your browser supports barcode detection, or enter the 17-character VIN printed on the vehicle. A VIN is an identifier, not proof of ownership or physical condition.</p>
+      <div class="scan-actions">
+        <button id="start-camera" class="button secondary" type="button">Open VIN camera scanner</button>
+        <label class="button secondary file-button" for="vin-photo">Photograph VIN plate</label>
+        <input id="vin-photo" type="file" accept="image/*" capture="environment" hidden>
+      </div>
+      <div id="camera-wrap" class="camera-wrap" hidden>
+        <video id="camera-video" playsinline muted></video>
+        <div class="camera-controls"><span id="camera-status" class="inline-status">Starting camera…</span><button id="stop-camera" class="button quiet" type="button">Close camera</button></div>
+      </div>
+      <p id="photo-status" class="fine-print">If barcode scanning is unavailable on this device, the photo can help you read the VIN; enter the characters below. Automatic photo OCR is not included in this prototype.</p>
+      <label for="vin-entry">Vehicle Identification Number</label>
+      <div class="vin-entry-row"><input id="vin-entry" maxlength="17" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="17-character VIN"><button id="decode-vin" class="button primary" type="button">Decode vehicle</button></div>
+      <label class="check-row lab-consent"><input id="decode-consent" type="checkbox"><span>I authorize Claim2Car's prototype to send this VIN to the U.S. National Highway Traffic Safety Administration (NHTSA) vPIC service for vehicle decoding. The lookup is performed from this browser; the VIN is not saved by this lab.</span></label>
+      <label id="checksum-override-row" class="check-row lab-consent" hidden><input id="checksum-override" type="checkbox"><span>The North American check digit does not match. I have rechecked the physical VIN and want to attempt a lookup anyway. The result will remain flagged for manual verification.</span></label>
+      <div id="vin-message" class="inline-status" role="status" aria-live="polite"></div>
+    </section>
+
+    <section id="vehicle-panel" class="panel lab-panel" hidden>
+      <div class="panel-heading"><div><div class="eyebrow">02 · DECODED VEHICLE PROFILE</div><h2 id="vehicle-title">Vehicle profile</h2></div><span id="decode-status" class="step-index">PENDING</span></div>
+      <div id="vehicle-attributes" class="vehicle-attributes"></div>
+      <p id="vehicle-provenance" class="fine-print"></p>
+    </section>
+
+    <section id="inspection-panel" class="panel lab-panel" hidden>
+      <div class="panel-heading"><div><div class="eyebrow">03 · CONDITION RECORD</div><h2>Document vehicle condition</h2></div><span class="step-index">16 VIEWS</span></div>
+      <p class="muted">Capture the 16 target views where safe and accessible. You can add observations about visible damage. Missing, unsafe, or inaccessible views remain missing; do not infer hidden damage from exterior photographs.</p>
+      <div class="capture-caution"><strong>Safety:</strong> Do not enter traffic, crawl beneath an unsupported vehicle, open hazardous compartments, or delay emergency response to complete these views. Mark unavailable views and seek qualified inspection where necessary.</div>
+      <div id="photo-grid" class="lab-photo-grid"></div>
+      <div class="damage-entry">
+        <h3>Visible damage observations</h3>
+        <p class="fine-print">Record only what you can actually see. These are user-entered observations, not AI findings or a professional repair estimate.</p>
+        <div class="damage-form-grid">
+          <label>Area<select id="damage-area"><option value="Front">Front</option><option value="Front-left">Front-left</option><option value="Left side">Left side</option><option value="Rear-left">Rear-left</option><option value="Rear">Rear</option><option value="Rear-right">Rear-right</option><option value="Right side">Right side</option><option value="Front-right">Front-right</option><option value="Roof / pillars">Roof / pillars</option><option value="Wheel / suspension">Wheel / suspension</option><option value="Cabin / restraint">Cabin / restraint</option><option value="Undercarriage">Undercarriage</option></select></label>
+          <label>Visible condition<select id="damage-type"><option value="Dent / deformation">Dent / deformation</option><option value="Scratch / paint transfer">Scratch / paint transfer</option><option value="Crack / broken component">Crack / broken component</option><option value="Missing / detached component">Missing / detached component</option><option value="Glass damage">Glass damage</option><option value="Fluid leak observed">Fluid leak observed</option><option value="Warning indicator illuminated">Warning indicator illuminated</option><option value="No visible damage in this area">No visible damage in this area</option><option value="Unable to determine">Unable to determine</option></select></label>
+          <label>Visual severity (operator judgment)<select id="damage-severity"><option value="Unclassified">Unclassified</option><option value="Minor appearance">Minor appearance</option><option value="Moderate visible deformation">Moderate visible deformation</option><option value="Major visible deformation">Major visible deformation</option><option value="Potential safety concern">Potential safety concern</option></select></label>
+          <label>Supporting photo<select id="damage-photo"><option value="">No linked photo selected</option></select></label>
+        </div>
+        <label for="damage-notes">Observation notes</label>
+        <textarea id="damage-notes" maxlength="1200" rows="3" placeholder="Describe the visible condition, location, and any limitations. Avoid guessing about concealed components."></textarea>
+        <button id="add-observation" class="button secondary" type="button">Add observation</button>
+        <div id="observation-list" class="observation-list"></div>
+      </div>
+    </section>
+
+    <section id="report-panel" class="panel lab-panel" hidden>
+      <div class="panel-heading"><div><div class="eyebrow">04 · CLAIM2CAR REPORT</div><h2>Generate your report</h2></div><span class="step-index">REPORT</span></div>
+      <p class="muted">The report preserves the difference between decoded source data, your observations, missing evidence, and conditions that cannot be determined from photographs.</p>
+      <button id="generate-report" class="button primary" type="button">Build assessment report</button>
+      <div id="report-preview" class="report-preview" hidden></div>
+      <button id="print-report" class="button secondary" type="button" hidden>Print / save report as PDF</button>
+    </section>
+    <footer class="lab-footer-note">Claim2Car prototype · Not an insurance determination, appraisal, roadworthiness certification, ownership check, or repair authorization. Assessment quality must be established through independent validation against qualified inspections and documented outcomes.</footer>
+  </main>
+</body>
+</html>
