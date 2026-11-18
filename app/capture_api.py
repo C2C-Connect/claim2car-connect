@@ -359,9 +359,11 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         try:
             record = collisions.get(authorization, str(collision_id))
             claims = collisions.list_claims(authorization, str(collision_id))
+            vehicles = collisions.list_vehicles(authorization, str(collision_id))
             return JSONResponse(jsonable_encoder({
                 'collision': asdict(record),
                 'claims': [asdict(item) for item in claims],
+                'vehicles': vehicles,
                 'scope': 'collision-lifecycle',
             }), headers=dict(NO_STORE_HEADERS))
         except AuthenticationError:
