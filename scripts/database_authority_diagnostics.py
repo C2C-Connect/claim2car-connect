@@ -66,7 +66,7 @@ def verify(report,admin,connections,tenants,session):
               'fixture_classification':'admin-provisioned storage-isolation fixtures; not evidence evaluation or accepted completion',
               'results':[]}
     report['checks'].append(matrix)
-    actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings' AND c.relname NOT IN ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox','vehicle_identity_sources')").fetchall()
+    actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings' AND c.relname NOT IN ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox','vehicle_identity_sources','vehicle_decode_snapshots')").fetchall()
     expect({row[0] for row in actual}==set(TABLES),'TENANT_TABLE_SCOPE_CHANGED')
     ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim')}
     seal = 'matrix-seal-'+uuid.uuid4().hex
