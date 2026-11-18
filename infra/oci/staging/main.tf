@@ -90,6 +90,10 @@ resource "oci_core_instance" "staging" {
       error_message = "The supplied private subnet must belong to the supplied Claim2Car VCN."
     }
     precondition {
+      condition     = data.oci_core_subnet.existing.prohibit_public_ip_on_vnic
+      error_message = "The supplied subnet must prohibit public IP assignment; choose the private Claim2Car subnet."
+    }
+    precondition {
       condition     = local.volume_total_gbs <= var.block_volume_budget_gbs
       error_message = "Boot, database, and evidence volumes exceed the configured block-volume budget."
     }
