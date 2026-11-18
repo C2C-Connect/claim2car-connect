@@ -488,8 +488,6 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 _fail(409, 'CAPTURE_SESSION_CONFLICT')
             except CollisionLifecycleNotFound:
                 _fail(404, 'COLLISION_NOT_FOUND')
-            except CaptureSessionConflict:
-                _fail(409, 'EVIDENCE_HISTORY_INVALID')
             except CaptureSessionNotFound:
                 _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
             except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
