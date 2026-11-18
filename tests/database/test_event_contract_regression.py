@@ -11,6 +11,11 @@ class EventContractRegression(unittest.TestCase):
             'contract regression', '{}',
         )
 
+    def test_capture_exception_pause_and_resume_kinds_are_valid_contract_events(self):
+        for kind in ('CAPTURE_EXCEPTION_RECORDED','CAPTURE_EXCEPTION_RESOLVED','CAPTURE_SESSION_PAUSED','CAPTURE_SESSION_RESUMED'):
+            with self.subTest(kind=kind):
+                replace(self.event, kind=kind).validate()
+
     def test_valid_history_reconstructs_independent_journal(self):
         second = replace(self.event, event_id='event-2', sequence=2, kind='CONSENT_RECORDED')
         source = [self.event, second]

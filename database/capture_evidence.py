@@ -148,14 +148,194 @@ class CaptureEvidenceService:
             consent = self._consent_state(history)
             vehicle_present = self._has_valid_vehicle_reference(history, consent)
             protocol = require_implemented_protocol(_session.capture_protocol_version)
+            paused = self._capture_paused(history)
+            exceptions = list(self._active_capture_exceptions(history).values())
             return {
                 "session_id": session_id,
                 "capture_protocol_version": _session.capture_protocol_version,
                 "capture_protocol_status": "implemented",
                 "consent_active": consent is not None,
                 "vehicle_reference_present": vehicle_present,
-                "capture_allowed": consent is not None and vehicle_present,
+                "capture_allowed": consent is not None and vehicle_present and not paused,
+                "capture_paused": paused,
+                "active_capture_exceptions": exceptions,
             }
+
+
+    @staticmethod
+    def _capture_paused(history):
+        paused = False
+        for kind, _actor, payload, _event_id in history:
+            if kind not in ("CAPTURE_SESSION_PAUSED", "CAPTURE_SESSION_RESUMED"):
+                continue
+            if type(payload) is not dict or set(payload) != {"request_id", "reason"}:
+                raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_PAUSE_HISTORY")
+            try:
+                UUID(payload["request_id"])
+            except (ValueError, TypeError, AttributeError):
+                raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_PAUSE_HISTORY") from None
+            if not isinstance(payload["reason"], str) or not payload["reason"].strip() or len(payload["reason"]) > 500:
+                raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_PAUSE_HISTORY")
+            if kind == "CAPTURE_SESSION_PAUSED":
+                if paused:
+                    raise CaptureSessionConflict("INVALID_CAPTURE_PAUSE_HISTORY")
+                paused = True
+            else:
+                if not paused:
+                    raise CaptureSessionConflict("INVALID_CAPTURE_PAUSE_HISTORY")
+                paused = False
+        return paused
+
+    @staticmethod
+    def _active_capture_exceptions(history):
+        active = {}
+        reason_codes = {"UNSAFE_TO_APPROACH", "ACCESS_RESTRICTED", "VEHICLE_IN_MOTION",
+                        "WEATHER_HAZARD", "OWNER_DECLINED", "EQUIPMENT_FAILURE", "OTHER"}
+        resolution_codes = {"CAPTURED_AFTER_RETRY", "NO_LONGER_APPLICABLE", "SUPERVISOR_REVIEWED"}
+        for kind, actor, payload, event_id in history:
+            if kind == "CAPTURE_EXCEPTION_RECORDED":
+                required = {"request_id", "slot", "reason_code", "explanation"}
+                if type(payload) is not dict or set(payload) != required:
+                    raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_EXCEPTION_HISTORY")
+                try:
+                    UUID(payload["request_id"])
+                except (ValueError, TypeError, AttributeError):
+                    raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_EXCEPTION_HISTORY") from None
+                if (not isinstance(payload["slot"], str) or not payload["slot"]
+                        or payload["reason_code"] not in reason_codes
+                        or not isinstance(payload["explanation"], str)
+                        or not payload["explanation"].strip() or len(payload["explanation"]) > 500):
+                    raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_EXCEPTION_HISTORY")
+                if payload["slot"] in active:
+                    raise CaptureSessionConflict("INVALID_CAPTURE_EXCEPTION_HISTORY")
+                active[payload["slot"]] = {"slot": payload["slot"], "reason_code": payload["reason_code"],
+                    "explanation": payload["explanation"], "recorded_by": actor, "event_id": event_id}
+            elif kind == "CAPTURE_EXCEPTION_RESOLVED":
+                required = {"request_id", "slot", "exception_event_id", "resolution_code", "explanation"}
+                if type(payload) is not dict or set(payload) != required:
+                    raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_EXCEPTION_HISTORY")
+                try:
+                    UUID(payload["request_id"])
+                except (ValueError, TypeError, AttributeError):
+                    raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_EXCEPTION_HISTORY") from None
+                if (not isinstance(payload["slot"], str) or not payload["slot"]
+                        or payload["resolution_code"] not in resolution_codes
+                        or not isinstance(payload["exception_event_id"], str)
+                        or not isinstance(payload["explanation"], str)
+                        or not payload["explanation"].strip() or len(payload["explanation"]) > 500):
+                    raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_EXCEPTION_HISTORY")
+                current = active.get(payload["slot"])
+                if current is None or current["event_id"] != payload["exception_event_id"]:
+                    raise CaptureSessionConflict("INVALID_CAPTURE_EXCEPTION_HISTORY")
+                del active[payload["slot"]]
+        return active
+
+    def record_capture_exception(self, authorization, session_id, *, request_id, slot, reason_code, explanation):
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        allowed = {"UNSAFE_TO_APPROACH", "ACCESS_RESTRICTED", "VEHICLE_IN_MOTION",
+                   "WEATHER_HAZARD", "OWNER_DECLINED", "EQUIPMENT_FAILURE", "OTHER"}
+        if reason_code not in allowed or not isinstance(explanation, str) or not explanation.strip() or len(explanation) > 500:
+            raise ValueError("INVALID_CAPTURE_EXCEPTION")
+        event_id = "capture-exception:" + request_id
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            session, history = self._history(conn, actor, session_id, creator_required=True)
+            slots = frozenset(require_implemented_protocol(session.capture_protocol_version).slots)
+            if slot not in slots:
+                raise ValueError("INVALID_CAPTURE_SLOT")
+            if self._capture_paused(history):
+                raise CaptureSessionConflict("CAPTURE_SESSION_PAUSED")
+            if any(kind in ("QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for kind, *_ in history):
+                raise CaptureSessionConflict("CAPTURE_SET_ALREADY_QUALITY_CHECKED")
+            consent = self._consent_state(history)
+            if consent is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            if not self._has_valid_vehicle_reference(history, consent):
+                raise CaptureSessionConflict("VEHICLE_REFERENCE_REQUIRED")
+            payload = {"request_id": request_id, "slot": slot, "reason_code": reason_code,
+                       "explanation": explanation.strip()}
+            for kind, _who, old, old_id in history:
+                if old_id == event_id:
+                    if kind == "CAPTURE_EXCEPTION_RECORDED" and old == payload:
+                        return {"session_id": session_id, **payload, "replayed": True}
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+            artifacts = {item[2].get("slot") for item in history if item[0] == "ARTIFACT_REGISTERED" and type(item[2]) is dict}
+            if slot in artifacts:
+                raise CaptureSessionConflict("CAPTURE_SLOT_ALREADY_REGISTERED")
+            if slot in self._active_capture_exceptions(history):
+                raise CaptureSessionConflict("CAPTURE_EXCEPTION_ALREADY_OPEN")
+            self._append(conn, actor, session_id, history, event_id=event_id,
+                         kind="CAPTURE_EXCEPTION_RECORDED", reason="capture exception recorded", payload=payload)
+        return {"session_id": session_id, **payload, "replayed": False}
+
+    def resolve_capture_exception(self, authorization, session_id, *, request_id, slot, resolution_code, explanation):
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if resolution_code not in {"CAPTURED_AFTER_RETRY", "NO_LONGER_APPLICABLE", "SUPERVISOR_REVIEWED"}:
+            raise ValueError("INVALID_CAPTURE_EXCEPTION_RESOLUTION")
+        if not isinstance(explanation, str) or not explanation.strip() or len(explanation) > 500:
+            raise ValueError("INVALID_CAPTURE_EXCEPTION_RESOLUTION")
+        event_id = "capture-exception-resolved:" + request_id
+        payload = None
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            for kind, _who, old, old_id in history:
+                if old_id == event_id:
+                    if kind == "CAPTURE_EXCEPTION_RESOLVED" and type(old) is dict:
+                        return {"session_id": session_id, **old, "replayed": True}
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+            if self._capture_paused(history):
+                raise CaptureSessionConflict("CAPTURE_SESSION_PAUSED")
+            if any(kind in ("QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for kind, *_ in history):
+                raise CaptureSessionConflict("CAPTURE_SET_ALREADY_QUALITY_CHECKED")
+            current = self._active_capture_exceptions(history).get(slot)
+            if current is None:
+                raise CaptureSessionConflict("ACTIVE_CAPTURE_EXCEPTION_REQUIRED")
+            artifacts = {item[2].get("slot") for item in history if item[0] == "ARTIFACT_REGISTERED" and type(item[2]) is dict}
+            if slot not in artifacts and resolution_code != "SUPERVISOR_REVIEWED":
+                raise CaptureSessionConflict("CAPTURE_ARTIFACT_REQUIRED_TO_RESOLVE_EXCEPTION")
+            payload = {"request_id": request_id, "slot": slot, "exception_event_id": current["event_id"],
+                       "resolution_code": resolution_code, "explanation": explanation.strip()}
+            self._append(conn, actor, session_id, history, event_id=event_id,
+                         kind="CAPTURE_EXCEPTION_RESOLVED", reason="capture exception resolution recorded", payload=payload)
+        return {"session_id": session_id, **payload, "replayed": False}
+
+    def pause_capture_session(self, authorization, session_id, *, request_id, reason):
+        return self._set_capture_pause(authorization, session_id, request_id=request_id, reason=reason, pause=True)
+
+    def resume_capture_session(self, authorization, session_id, *, request_id, reason):
+        return self._set_capture_pause(authorization, session_id, request_id=request_id, reason=reason, pause=False)
+
+    def _set_capture_pause(self, authorization, session_id, *, request_id, reason, pause):
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 500:
+            raise ValueError("INVALID_CAPTURE_PAUSE_REASON")
+        kind = "CAPTURE_SESSION_PAUSED" if pause else "CAPTURE_SESSION_RESUMED"
+        prefix = "capture-pause:" if pause else "capture-resume:"
+        event_id = prefix + request_id
+        payload = {"request_id": request_id, "reason": reason.strip()}
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            for old_kind, _who, old, old_id in history:
+                if old_id == event_id:
+                    if old_kind == kind and old == payload:
+                        return {"session_id": session_id, "paused": pause, "replayed": True}
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+            paused = self._capture_paused(history)
+            if paused == pause:
+                raise CaptureSessionConflict("CAPTURE_SESSION_ALREADY_PAUSED" if pause else "CAPTURE_SESSION_NOT_PAUSED")
+            if any(old_kind in ("QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for old_kind, *_ in history):
+                raise CaptureSessionConflict("CAPTURE_SET_ALREADY_QUALITY_CHECKED")
+            self._append(conn, actor, session_id, history, event_id=event_id,
+                         kind=kind, reason="capture session " + ("paused" if pause else "resumed"), payload=payload)
+        return {"session_id": session_id, "paused": pause, "replayed": False}
 
     def record_consent(self, authorization, session_id, *, request_id, accepted, scope):
         session_id = self._session_id(session_id)
@@ -459,6 +639,8 @@ class CaptureEvidenceService:
             slots = frozenset(require_implemented_protocol(_session.capture_protocol_version).slots)
             if slot not in slots:
                 raise ValueError("INVALID_CAPTURE_SLOT")
+            if self._capture_paused(history):
+                raise CaptureSessionConflict("CAPTURE_SESSION_PAUSED")
             consent = self._consent_state(history)
             if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
@@ -540,6 +722,10 @@ class CaptureEvidenceService:
             slots = frozenset(require_implemented_protocol(_session.capture_protocol_version).slots)
             if set(results) != slots:
                 raise ValueError("INVALID_ADVISORY_QUALITY_RESULTS")
+            if self._capture_paused(history):
+                raise CaptureSessionConflict("CAPTURE_SESSION_PAUSED")
+            if self._active_capture_exceptions(history):
+                raise CaptureSessionConflict("UNRESOLVED_CAPTURE_EXCEPTIONS")
             consent = self._consent_state(history)
             if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
@@ -569,6 +755,10 @@ class CaptureEvidenceService:
             if actor.actor_role not in ("operator", "supervisor"):
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=True)
+            if self._capture_paused(history):
+                raise CaptureSessionConflict("CAPTURE_SESSION_PAUSED")
+            if self._active_capture_exceptions(history):
+                raise CaptureSessionConflict("UNRESOLVED_CAPTURE_EXCEPTIONS")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
             for kind, _who, old, old_id in history:
