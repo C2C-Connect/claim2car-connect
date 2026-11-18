@@ -34,7 +34,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(results[-1]["id"], "DB-14")
         self.assertEqual(results[-1]["status"], "NOT AWARDED")
 
-    def test_authority_migration_inventory_requires_all_twenty_ordered_files(self):
+    def test_authority_migration_inventory_requires_all_twenty_one_ordered_files(self):
         names = [
             '0001_tenant_registry.sql',
             '0002_event_journal.sql',

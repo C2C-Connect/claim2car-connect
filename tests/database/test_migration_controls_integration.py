@@ -324,7 +324,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_noncanonical_historical_event_blocks_parity_migration_without_rewrite(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-4])
+        apply(self.conn, plan[:-5])
         tenant = str(uuid.uuid4())
         session = 'reject-history-' + uuid.uuid4().hex
         payload = '{"z":1,"a":2}'
@@ -357,6 +357,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0020_collision_lifecycle_record.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0021_collision_claim_link.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
