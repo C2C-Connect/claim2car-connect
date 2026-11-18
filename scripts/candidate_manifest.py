@@ -19,6 +19,7 @@ REQUIRED += ['frontend/src/modules/capture/vin.mjs','frontend/src/modules/captur
 REQUIRED += ['frontend/src/modules/capture/vpic.mjs','frontend/src/modules/capture/vpic.d.mts','frontend/tests/vpic.test.mjs']
 
 REQUIRED += ['frontend/src/modules/capture/vpic_transport.mjs','frontend/tests/vpic_transport.test.mjs','.github/workflows/vpic-live-lookup.yml']
+REQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','frontend/app/vehicle-lab.mjs']
 
 REQUIRED += ['frontend/tests/vpic_transport.test.mjs']\nREQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','frontend/app/vehicle-lab.mjs']
 REQUIRED += [
