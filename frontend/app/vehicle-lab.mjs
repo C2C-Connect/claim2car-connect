@@ -249,6 +249,8 @@ async function decodeVin() {
   if (!state.captureToken || !state.sessionId || !state.captureConsentRecorded) {
     setMessage("Create an authenticated capture session and record owner capture consent before decoding or collecting evidence.", true); return;
   }
+  if (state.vehicleRecorded && state.vin !== check.vin) { setMessage("This session is already bound to a different vehicle. Start a new capture session to change VIN.", true); return; }
+  if (state.photos.size > 0) { setMessage("This session already contains uploaded evidence. Continue the current inspection; start a new session to restart it.", true); return; }
   const ownerToken = $("decode-owner-token").value.trim();
   if (!ownerToken) { setMessage("Re-enter the owner's token to record separate NHTSA vehicle-decoding consent.", true); return; }
   resetVehicleEvidence(); state.vin = check.vin; $("decode-vin").disabled = true;

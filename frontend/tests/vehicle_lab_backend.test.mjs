@@ -9,5 +9,7 @@ assert.match(source,/crypto\.subtle\.digest\("SHA-256"/);
 assert.match(source,/state\.photos\.get\(slot\)\?\.uploaded === true/);
 assert.match(source,/state\.manifestDigest = sealed\.manifest_digest/);
 assert.doesNotMatch(source,/localStorage|sessionStorage|fetchVpicPayload|parseVpicResponse/);
+assert.match(source,/state\.vehicleRecorded && state\.vin !== check\.vin/);
+assert.match(source,/state\.photos\.size > 0/);
 assert.doesNotMatch(html,/lookup is performed from this browser|not saved by this lab/);
 console.log(JSON.stringify({suite:"vehicle-lab-backend-contract",assertions:ids.length+13,status:"passed"}));
