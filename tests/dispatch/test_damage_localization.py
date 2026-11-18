@@ -1,4 +1,4 @@
-"""CV damage localization tests (Slice 10): input producer + benchmark gate."""
+"""CV damage localization tests: observation boundary + reviewer benchmark gate."""
 from __future__ import annotations
 
 import pytest
