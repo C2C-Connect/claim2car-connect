@@ -46,7 +46,7 @@ FROM pg_roles r WHERE r.rolname=current_user
 def probe_database(url):
     with psycopg.connect(url,autocommit=True,connect_timeout=3,
                          options='-c statement_timeout=2000 -c default_transaction_read_only=on') as conn:
-        return conn.execute(READINESS_SQL).fetchone()==(True,True,True,True)
+        return conn.execute(READINESS_SQL).fetchone()==(True,True,True,True,True)
 
 
 def _evidence_root_is_mountpoint(root):
