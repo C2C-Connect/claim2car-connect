@@ -1,0 +1,39 @@
+#cloud-config
+# Safe, repeatable host baseline. Persistent volumes are intentionally NOT
+# formatted or mounted here; that requires verified OCI volume identity.
+package_update: true
+package_upgrade: false
+packages:
+  - podman
+  - jq
+  - xfsprogs
+  - e2fsprogs
+  - cryptsetup
+  - lvm2
+  - util-linux
+  - python3
+
+write_files:
+  - path: /usr/local/sbin/claim2car-host-preflight
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      fail() { echo "FAIL: $*" >&2; exit 1; }
+      command -v podman >/dev/null || fail "podman is not installed"
+      command -v findmnt >/dev/null || fail "findmnt is not installed"
+      getent passwd 10001 >/dev/null || fail "claim2car UID 10001 is missing"
+      for path in /var/lib/claim2car/postgres /var/lib/claim2car/evidence; do
+        [[ -d "$path" && ! -L "$path" ]] || fail "storage path missing or symlinked: $path"
+        findmnt -rn --mountpoint "$path" >/dev/null || fail "persistent volume is not mounted at $path"
+        [[ "$(stat -c %u "$path")" == "10001" ]] || fail "storage path must be owned by UID 10001: $path"
+      done
+      echo "PASS: host runtime and both persistent storage mountpoints are present"
+
+runcmd:
+  - [bash, -lc, "getent group 10001 >/dev/null || groupadd --gid 10001 claim2car"]
+  - [bash, -lc, "getent passwd 10001 >/dev/null || useradd --uid 10001 --gid 10001 --system --no-create-home --home-dir /var/lib/claim2car --shell /usr/sbin/nologin claim2car"]
+  - [bash, -lc, "install -d -o 10001 -g 10001 -m 0750 /var/lib/claim2car /var/lib/claim2car/postgres /var/lib/claim2car/evidence"]
+  - [bash, -lc, "install -d -o root -g root -m 0750 /opt/claim2car /etc/claim2car"]
+  - [bash, -lc, "systemctl enable podman.socket"]

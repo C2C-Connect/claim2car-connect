@@ -62,3 +62,8 @@ Before provisioning or exposing any compute instance, review the security lists 
 - Complete backup/restore and authenticated restart-persistence rehearsal.
 
 **Current disposition:** NO-GO for integrated staging deployment until the above prerequisites are provisioned and verified. Continue synthetic CI and implementation work without claiming a cloud deployment.
+
+
+## Host bootstrap implementation
+
+The Terraform instance metadata now supplies a cloud-init baseline that installs Podman and disk-inspection tools, creates the dedicated UID/GID 10001 runtime identity and storage mountpoints, and enables the Podman socket. It deliberately does not format or mount either block volume: device discovery must first reconcile the guest device to the exact OCI volume OCID. Once both volumes are mounted and owned by UID 10001, run `claim2car-host-preflight`. A successful cloud-init run alone is not proof that PostgreSQL, evidence persistence, or the application is operational.

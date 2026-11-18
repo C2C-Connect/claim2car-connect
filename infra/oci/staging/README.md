@@ -22,3 +22,8 @@ This stack describes a private OCI compute host and two separate encrypted-in-tr
 6. After creation, format and mount the two attached volumes by stable OCI device identifiers, configure PostgreSQL 16/PostGIS on the database volume, and mount original evidence at `/var/lib/claim2car/evidence` owned by UID 10001. Verify reboot persistence before deploying the integrated container.
 
 The stack is infrastructure code, not evidence of an applied deployment. It does not yet configure PostgreSQL, create Vault secrets, publish an OCIR image, or expose an application endpoint. Those are subsequent controlled deployment steps.
+
+
+## Host bootstrap behavior
+
+The instance receives `cloud-init.yaml` as base64 user data. It installs Podman and storage-inspection utilities, creates the non-login runtime identity UID/GID 10001, prepares the PostgreSQL/evidence mountpoints, and enables the Podman socket. The bootstrap is intentionally non-destructive: it does not partition, format, encrypt, or mount block devices, and it does not install application secrets or start the application. After attaching volumes, identify each device against the OCI volume OCID using the OCI control plane and stable device metadata before any filesystem operation. Then configure persistent mounts, verify ownership, and run `claim2car-host-preflight`; it fails unless both dedicated volumes are mounted at their exact paths.
