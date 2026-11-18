@@ -20,7 +20,7 @@ REQUIRED += ['frontend/src/modules/capture/vpic.mjs','frontend/src/modules/captu
 
 REQUIRED += ['frontend/src/modules/capture/vpic_transport.mjs','frontend/tests/vpic_transport.test.mjs','.github/workflows/vpic-live-lookup.yml']
 
-REQUIRED += ['frontend/tests/vpic_transport.test.mjs']
+REQUIRED += ['frontend/tests/vpic_transport.test.mjs']\nREQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','frontend/app/vehicle-lab.mjs']
 REQUIRED += [
     'authority_migrations/0022_collision_vehicle_capture_link.sql',
     'authority_migrations/0023_consented_vehicle_profile.sql',
