@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID
 
+import psycopg
+
 from database.capture_sessions import CaptureAuthorizationError, CaptureSessionStore
 
 
@@ -113,10 +115,18 @@ class CollisionLifecycleStore:
             raise ValueError("INVALID_COLLISION_TIMESTAMP")
         with self.sessions._authorized(authorization) as (conn, actor):
             self._require_operator(actor)
-            outcome = conn.execute(
-                "SELECT faos.link_collision_claim(%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s::text,%s::timestamptz)",
-                (actor.tenant_id, collision_id, claim_id, request_id, actor.actor_id, occurred_at),
-            ).fetchone()[0]
+            try:
+                outcome = conn.execute(
+                    "SELECT faos.link_collision_claim(%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s::text,%s::timestamptz)",
+                    (actor.tenant_id, collision_id, claim_id, request_id, actor.actor_id, occurred_at),
+                ).fetchone()[0]
+            except psycopg.errors.RaiseException as error:
+                code = error.diag.message_primary
+                if code == "COLLISION_CLAIM_LINK_AUTHORITY_DENIED":
+                    raise CaptureAuthorizationError(code) from None
+                if code in ("COLLISION_EVENT_IDEMPOTENCY_CONFLICT", "COLLISION_CLAIM_LINK_CONFLICT"):
+                    raise CollisionLifecycleConflict(code) from None
+                raise
             if outcome == "CONFLICT":
                 raise CollisionLifecycleConflict("COLLISION_CLAIM_LINK_CONFLICT")
             if outcome not in ("ACCEPTED", "DUPLICATE"):

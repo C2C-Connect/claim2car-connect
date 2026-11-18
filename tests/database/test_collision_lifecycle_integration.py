@@ -9,7 +9,7 @@ from psycopg import sql
 from psycopg.conninfo import make_conninfo
 
 from app.identity import ActorBinding, Credential, CredentialResolver
-from database.capture_sessions import CaptureSessionStore
+from database.capture_sessions import CaptureAuthorizationError, CaptureSessionStore
 from database.claim_cases import ClaimCaseStore
 from database.collision_lifecycle import (
     CollisionLifecycleConflict,
@@ -133,19 +133,19 @@ class CollisionLifecycleIntegration(unittest.TestCase):
         collision_id = str(uuid.uuid4())
         self.store.create(self.auth(), collision_id=collision_id, request_id=str(uuid.uuid4()))
         foreign_claim = self.claims.create(self.auth(1), claim_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()))
-        with self.assertRaises(psycopg.errors.RaiseException) as denied:
+        with self.assertRaises(CaptureAuthorizationError) as denied:
             self.store.link_claim(self.auth(), collision_id=collision_id,
                                   claim_id=foreign_claim.claim_id, request_id=str(uuid.uuid4()))
-        self.assertEqual(denied.exception.diag.message_primary, "COLLISION_CLAIM_LINK_AUTHORITY_DENIED")
+        self.assertEqual(str(denied.exception), "COLLISION_CLAIM_LINK_AUTHORITY_DENIED")
         own_claim = self.claims.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()))
         request_id = str(uuid.uuid4())
         self.store.link_claim(self.auth(), collision_id=collision_id,
                               claim_id=own_claim.claim_id, request_id=request_id)
         other_claim = self.claims.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()))
-        with self.assertRaises(psycopg.errors.RaiseException) as conflict:
+        with self.assertRaises(CollisionLifecycleConflict) as conflict:
             self.store.link_claim(self.auth(), collision_id=collision_id,
                                   claim_id=other_claim.claim_id, request_id=request_id)
-        self.assertEqual(conflict.exception.diag.message_primary, "COLLISION_EVENT_IDEMPOTENCY_CONFLICT")
+        self.assertEqual(str(conflict.exception), "COLLISION_EVENT_IDEMPOTENCY_CONFLICT")
 
     def test_every_clr_table_forces_rls_and_blocks_direct_application_writes(self):
         tables = (
