@@ -32,6 +32,8 @@ CREATE TABLE faos.vehicle_identity_sources (
  PRIMARY KEY(tenant_id,source_session_id),
  FOREIGN KEY(tenant_id,vehicle_id) REFERENCES faos.vehicles(tenant_id,vehicle_id),
  FOREIGN KEY(tenant_id,source_session_id) REFERENCES faos.sessions(tenant_id,session_id),
+ FOREIGN KEY(tenant_id,source_session_id,source_event_id)
+   REFERENCES faos.events(tenant_id,session_id,event_id),
  CHECK((source_status='ACTIVE' AND revoked_at IS NULL AND vin_hmac_sha256 IS NOT NULL)
     OR (source_status='REVOKED' AND revoked_at IS NOT NULL AND vin_hmac_sha256 IS NULL))
 );
@@ -50,7 +52,12 @@ ALTER TABLE faos.collision_vehicle_links
  ADD COLUMN source_session_id text,
  ADD COLUMN source_event_id text,
  ADD CONSTRAINT collision_vehicle_source_session_fk
-   FOREIGN KEY(tenant_id,source_session_id) REFERENCES faos.sessions(tenant_id,session_id);
+   FOREIGN KEY(tenant_id,source_session_id) REFERENCES faos.sessions(tenant_id,session_id),
+ ADD CONSTRAINT collision_vehicle_source_event_fk
+   FOREIGN KEY(tenant_id,source_session_id,source_event_id)
+   REFERENCES faos.events(tenant_id,session_id,event_id),
+ ADD CONSTRAINT collision_vehicle_source_pair_ck
+   CHECK((source_session_id IS NULL)=(source_event_id IS NULL));
 
 CREATE UNIQUE INDEX collision_vehicle_request_uq
  ON faos.collision_vehicle_links(tenant_id,collision_id,request_id)
