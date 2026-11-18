@@ -235,7 +235,7 @@ class CaptureEvidenceService:
         request_id = self._request_id(request_id)
         allowed = {"UNSAFE_TO_APPROACH", "ACCESS_RESTRICTED", "VEHICLE_IN_MOTION",
                    "WEATHER_HAZARD", "OWNER_DECLINED", "EQUIPMENT_FAILURE", "OTHER"}
-        if reason_code not in allowed or not isinstance(explanation, str) or not explanation.strip() or len(explanation) > 500:
+        if not isinstance(reason_code, str) or reason_code not in allowed or not isinstance(explanation, str) or not explanation.strip() or len(explanation) > 500:
             raise ValueError("INVALID_CAPTURE_EXCEPTION")
         event_id = "capture-exception:" + request_id
         with self.sessions._authorized(authorization) as (conn, actor):
@@ -243,8 +243,15 @@ class CaptureEvidenceService:
                 raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
             session, history = self._history(conn, actor, session_id, creator_required=True)
             slots = frozenset(require_implemented_protocol(session.capture_protocol_version).slots)
-            if slot not in slots:
+            if not isinstance(slot, str) or slot not in slots:
                 raise ValueError("INVALID_CAPTURE_SLOT")
+            payload = {"request_id": request_id, "slot": slot, "reason_code": reason_code,
+                       "explanation": explanation.strip()}
+            for kind, _who, old, old_id in history:
+                if old_id == event_id:
+                    if kind == "CAPTURE_EXCEPTION_RECORDED" and old == payload:
+                        return {"session_id": session_id, **payload, "replayed": True}
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             if self._capture_paused(history):
                 raise CaptureSessionConflict("CAPTURE_SESSION_PAUSED")
             if any(kind in ("QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for kind, *_ in history):
@@ -254,13 +261,6 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
             if not self._has_valid_vehicle_reference(history, consent):
                 raise CaptureSessionConflict("VEHICLE_REFERENCE_REQUIRED")
-            payload = {"request_id": request_id, "slot": slot, "reason_code": reason_code,
-                       "explanation": explanation.strip()}
-            for kind, _who, old, old_id in history:
-                if old_id == event_id:
-                    if kind == "CAPTURE_EXCEPTION_RECORDED" and old == payload:
-                        return {"session_id": session_id, **payload, "replayed": True}
-                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             artifacts = {item[2].get("slot") for item in history if item[0] == "ARTIFACT_REGISTERED" and type(item[2]) is dict}
             if slot in artifacts:
                 raise CaptureSessionConflict("CAPTURE_SLOT_ALREADY_REGISTERED")
