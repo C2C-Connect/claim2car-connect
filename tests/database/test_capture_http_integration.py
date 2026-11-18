@@ -251,6 +251,17 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["source_consent_status"], "REVOKED")
                     self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["vin_source"], "UNVERIFIED")
                     self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["vin_validation_status"], "UNVERIFIED")
+                    relink_after_withdrawal = restarted.post(
+                        f"/v1/collisions/{collision_id}/vehicles",
+                        headers={"Authorization": self.db.auth()},
+                        json={
+                            "claim_id": claim_id,
+                            "vehicle_id": str(uuid.uuid4()),
+                            "request_id": str(uuid.uuid4()),
+                            "relationship": "INVOLVED",
+                        },
+                    )
+                    self.assertEqual(relink_after_withdrawal.status_code, 403, relink_after_withdrawal.text)
                     after_withdrawal = restarted.get(
                         f"/v1/review-sessions/{session_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
