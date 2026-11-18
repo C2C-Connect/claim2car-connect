@@ -183,6 +183,7 @@ class VpicClient:
             return response.status, response.headers.get("Content-Type", ""), response.read(MAX_RESPONSE_BYTES + 1)
 
     def decode(self, vin: str, *, requested_at: str | None = None) -> VpicProfile:
+        requested_at = requested_at or datetime.now(timezone.utc).isoformat()
         validation = validate_vin(vin)
         if not validation.ok or validation.normalization_changed or validation.vin != vin:
             raise VpicDecodeError("VIN_VALIDATION_FAILED")
