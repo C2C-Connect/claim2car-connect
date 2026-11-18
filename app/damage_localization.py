@@ -25,7 +25,7 @@ from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTO
 MODEL_VERSION = "damage-localization-v1"
 ANNOTATION_VERSION = "damage-annotation-v1"
 
-DAMAGE_CLASSES = frozenset({"scratch", "dent", "glass_damage", "structural_deformation"})
+DAMAGE_CLASSES = frozenset({"scratch", "dent", "glass_damage", "structural_deformation", "unknown"})
 # Matches the physics engine's ZoneInput vocabulary.
 IMPACT_ZONES = frozenset({"front", "rear", "side", "roof", "underbody"})
 ZONE_BY_SLOT_PREFIX = (
@@ -227,7 +227,7 @@ class HeuristicDamageDetector:
         return (DamageRegion(
             slot=slot, x0=round(x0, 4), y0=round(y0, 4),
             x1=round(min(x1, 1.0), 4), y1=round(min(y1, 1.0), 4),
-            damage_class="dent", confidence=round(min(len(flagged) / 16.0, 1.0), 4),
+            damage_class="unknown", confidence=round(min(len(flagged) / 16.0, 1.0), 4),
             model_version=self.model_version,
             protocol_version=protocol_version,
         ),)
