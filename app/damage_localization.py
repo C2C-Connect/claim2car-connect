@@ -152,7 +152,7 @@ class LocalizedDamageObservation:
     slot: str
     zone: str
     normalized_region_area_fraction: float
-    damage_class: str
+    predicted_damage_class: str
     raw_detector_score: float
     score_semantics: str
     model_version: str
@@ -173,7 +173,7 @@ class DamageObservationAdapter:
             slot=region.slot,
             zone=zone,
             normalized_region_area_fraction=round(region.area_fraction, 6),
-            damage_class=region.damage_class,
+            predicted_damage_class=region.damage_class,
             raw_detector_score=float(region.confidence),
             score_semantics=region.score_semantics,
             model_version=region.model_version,
