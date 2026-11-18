@@ -7,7 +7,7 @@ from pathlib import Path
 from app.damage_localization import DamageAnnotation, DamageRegion
 from backend.app.vision.adapters import (
     AdvisoryVisionAnalysis,
-    GatedVisionPhysicsPipeline,
+    GatedDamageLocalizationPipeline,
     LocalYoloTwoStageDetector,
     VisionAdapterError,
     compute_weight_provenance,
@@ -46,8 +46,8 @@ class InHouseVisionAdapterTests(unittest.TestCase):
                 {"x1": 0.32, "y1": 0.32, "x2": 0.52, "y2": 0.52, "label": "major_dent", "confidence": 0.95}
             ]
         )
-        output = GatedVisionPhysicsPipeline(candidate_detector=detector).evaluate_and_extract_physics(
-            session_id="session-1", slot="front_left", grid_fixture=[[90] * 36 for _ in range(36)],
+        output = GatedDamageLocalizationPipeline(candidate_detector=detector).evaluate_localization(
+            session_id="session-1", slot="front_left", grid_fixture=[[230 if 12 <= y < 20 and 15 <= x < 22 else 90 for x in range(36)] for y in range(36)],
             ground_truth_annotations=[annotation],
         )
         self.assertFalse(output.promoted_over_baseline)
