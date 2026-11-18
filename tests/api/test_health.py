@@ -81,6 +81,8 @@ class HealthTests(unittest.TestCase):
             self.assertIn("'" + table + "'",READINESS_SQL)
         self.assertIn("faos.create_collision_lifecycle_record(uuid,uuid,uuid,text,timestamptz)",READINESS_SQL)
         self.assertIn("faos.append_collision_event(uuid,uuid,uuid,text,text,text,timestamptz,jsonb,uuid,uuid)",READINESS_SQL)
+        self.assertIn("faos.link_collision_claim(uuid,uuid,uuid,uuid,text,timestamptz)",READINESS_SQL)
+        self.assertIn('count(*)=3',READINESS_SQL)
         self.assertIn("pg_get_userbyid(p.proowner)='faos_writer'",READINESS_SQL)
         self.assertIn('c.relrowsecurity AND c.relforcerowsecurity',READINESS_SQL)
 

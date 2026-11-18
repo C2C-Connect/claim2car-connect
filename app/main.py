@@ -34,11 +34,12 @@ SELECT NOT r.rolsuper AND NOT r.rolbypassrls
                          'collision_lifecycle_records','vehicles','collision_vehicle_links',
                          'collision_participants','collision_claim_links','collision_events',
                          'collision_outbox')),
-       (SELECT count(*)=2 AND bool_and(p.prosecdef AND pg_get_userbyid(p.proowner)='faos_writer')
+       (SELECT count(*)=3 AND bool_and(p.prosecdef AND pg_get_userbyid(p.proowner)='faos_writer')
         FROM pg_proc p
         WHERE p.oid IN (
           to_regprocedure('faos.create_collision_lifecycle_record(uuid,uuid,uuid,text,timestamptz)'),
-          to_regprocedure('faos.append_collision_event(uuid,uuid,uuid,text,text,text,timestamptz,jsonb,uuid,uuid)')
+          to_regprocedure('faos.append_collision_event(uuid,uuid,uuid,text,text,text,timestamptz,jsonb,uuid,uuid)'),
+          to_regprocedure('faos.link_collision_claim(uuid,uuid,uuid,uuid,text,timestamptz)')
         ))
 FROM pg_roles r WHERE r.rolname=current_user
 """
