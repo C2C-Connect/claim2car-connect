@@ -27,6 +27,7 @@ jobs:
         run: |
           mkdir -p output/frontend-vin
           python scripts/candidate_manifest.py capture output/frontend-vin/before.json
+          node --check frontend/app/vehicle-lab.mjs
           node frontend/tests/vin.test.mjs > output/frontend-vin/vin-tests.json
           node frontend/tests/vpic.test.mjs > output/frontend-vin/vpic-tests.json
           node frontend/tests/vpic_transport.test.mjs > output/frontend-vin/transport-tests.json

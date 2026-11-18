@@ -16,11 +16,17 @@ function mass(value) {
     ? {curbWeightStatus:'reported',curbWeightLb:lb,curbWeightKg:kg}
     : {curbWeightStatus:'invalid',curbWeightLb:null,curbWeightKg:null};
 }
-export function parseVpicResponse(requestedVin,payload) {
+function positiveNumber(value,maximum) {
+  const raw=typeof value==='string'?value.trim():'';
+  const number=/^\d+(?:\.\d+)?$/.test(raw)?Number(raw):NaN;
+  return Number.isFinite(number)&&number>0&&number<=maximum?number:null;
+}
+export function parseVpicResponse(requestedVin,payload,{allowCheckDigitMismatch=false}={}) {
   let rawResult=null,decodeErrorCode=null,suggestedVin=null;
   const blocked=reason=>Object.freeze({status:'blocked',reason,scope:SCOPE,profile:null,rawResult,decodeErrorCode,suggestedVin,physicsReady:false,massBoundsConfigured:false});
   const validation=validateVin(requestedVin);
-  if (!validation.ok) return blocked('INVALID_REQUEST_VIN');
+  const mismatchOverride=allowCheckDigitMismatch===true&&validation.reason==='CHECKSUM_MISMATCH';
+  if (!validation.ok&&!mismatchOverride) return blocked('INVALID_REQUEST_VIN');
   try {
     if (!payload || typeof payload!=='object' || JSON.stringify(payload).length>262144
         || payload.Count!==1 || !Array.isArray(payload.Results) || payload.Results.length!==1)
@@ -39,7 +45,16 @@ export function parseVpicResponse(requestedVin,payload) {
     const make=text(row.Make),model=text(row.Model),bodyClass=text(row.BodyClass),yearText=text(row.ModelYear);
     const modelYear=yearText && /^[1-9]\d{3}$/.test(yearText) ? Number(yearText) : null;
     if (!make || !model || !bodyClass || modelYear===null) return blocked('INCOMPLETE_PROFILE');
-    const profile=Object.freeze({vin:validation.vin,make,model,modelYear,bodyClass,...mass(row.CurbWeightLB)});
+    const profile=Object.freeze({
+      vin:validation.vin,make,model,modelYear,bodyClass,
+      trim:text(row.Trim),series:text(row.Series),driveType:text(row.DriveType),
+      engineCylinders:positiveNumber(row.EngineCylinders,16),
+      displacementL:positiveNumber(row.DisplacementL,20),
+      fuelType:text(row.FuelTypePrimary),transmission:text(row.TransmissionStyle),
+      plantCountry:text(row.PlantCountry),
+      checkDigitStatus:mismatchOverride?'MISMATCH_OVERRIDE':'MATCH',
+      ...mass(row.CurbWeightLB)
+    });
     return Object.freeze({status:'parsed',reason:null,scope:SCOPE,profile,rawResult,decodeErrorCode,suggestedVin,physicsReady:false,massBoundsConfigured:false});
   } catch {
     return blocked('INVALID_RESPONSE');

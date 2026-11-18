@@ -121,6 +121,27 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert '<script type="module" src="/prototype/app.mjs"></script>' in prototype.text
                 assert client.get("/prototype/app.mjs").status_code == 200
                 assert client.get("/prototype/styles.css").status_code == 200
+                # The owner-testable Vehicle Intelligence Lab is a real static
+                # route, with its modules resolved from the shared frontend source mount.
+                lab_page = client.get("/prototype/vehicle-lab.html")
+                assert lab_page.status_code == 200
+                assert "Vehicle Intelligence Lab" in lab_page.text
+                lab_script = client.get("/prototype/vehicle-lab.mjs")
+                assert lab_script.status_code == 200
+                assert client.get("/prototype/vehicle-lab.css").status_code == 200
+                assert client.get("/src/modules/capture/vpic_transport.mjs").status_code == 200
+                lab_script_ids = set(re.findall(r'\$\("([^"]+)"\)', lab_script.text))
+                lab_document_ids = set(re.findall(r'\bid="([^"]+)"', lab_page.text))
+                assert lab_script_ids <= lab_document_ids, (
+                    "Vehicle Lab references missing from its HTML: "
+                    + ", ".join(sorted(lab_script_ids - lab_document_ids))
+                )
+                capture_contract = json.loads(
+                    (Path(__file__).resolve().parents[2] / "contracts/shot-list-16-v1.json").read_text(encoding="utf-8")
+                )
+                lab_slots = re.findall(r'\["(\d{2}_[a-z0-9_]+)","', lab_script.text)
+                assert lab_slots == capture_contract["required_angles"]
+                assert len(lab_slots) == 16
                 assert client.get("/app.mjs").status_code == 404
                 assert client.get("/styles.css").status_code == 404
                 assert client.get("/src/modules/capture/vin.mjs").status_code == 200

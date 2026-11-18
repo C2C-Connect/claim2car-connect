@@ -4,6 +4,15 @@ export interface VpicProfile {
   readonly model: string;
   readonly modelYear: number;
   readonly bodyClass: string;
+  readonly trim: string | null;
+  readonly series: string | null;
+  readonly driveType: string | null;
+  readonly engineCylinders: number | null;
+  readonly displacementL: number | null;
+  readonly fuelType: string | null;
+  readonly transmission: string | null;
+  readonly plantCountry: string | null;
+  readonly checkDigitStatus: 'MATCH' | 'MISMATCH_OVERRIDE';
   readonly curbWeightStatus: 'reported' | 'unavailable' | 'invalid';
   readonly curbWeightLb: number | null;
   readonly curbWeightKg: number | null;
@@ -26,4 +35,4 @@ export interface VpicBlocked extends VpicBase {
   readonly reason: 'INVALID_REQUEST_VIN' | 'INVALID_RESPONSE' | 'VIN_MISMATCH' | 'DECODE_STATUS_UNRESOLVED' | 'SUGGESTED_VIN_REQUIRES_REVIEW' | 'INCOMPLETE_PROFILE';
   readonly profile: null;
 }
-export function parseVpicResponse(requestedVin: unknown, payload: unknown): VpicParsed | VpicBlocked;
+export function parseVpicResponse(requestedVin: unknown, payload: unknown, options?: {allowCheckDigitMismatch?: boolean}): VpicParsed | VpicBlocked;
