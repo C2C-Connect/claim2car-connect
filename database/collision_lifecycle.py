@@ -32,6 +32,17 @@ class CollisionLifecycleRecord:
     created: bool
 
 
+@dataclass(frozen=True)
+class CollisionClaimLink:
+    collision_id: str
+    claim_id: str
+    capture_session_id: str
+    capture_protocol_version: str
+    linked_by: str
+    linked_at: str
+    created: bool
+
+
 class CollisionLifecycleStore:
     """Tenant-authorized CLR identity operations over the PostgreSQL authority DB."""
 
@@ -91,6 +102,66 @@ class CollisionLifecycleStore:
             if row is None or str(row[0]) != collision_id:
                 raise CollisionLifecycleConflict("COLLISION_RECORD_READBACK_MISMATCH")
             return self._record(row, created=(outcome == "ACCEPTED"))
+
+
+    def link_claim(self, authorization, *, collision_id, claim_id, request_id, occurred_at=None):
+        collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
+        claim_id = self._uuid(claim_id, "INVALID_CLAIM_CASE_ID")
+        request_id = self._uuid(request_id, "INVALID_COLLISION_LINK_REQUEST_ID")
+        occurred_at = occurred_at or datetime.now(timezone.utc).isoformat()
+        if not isinstance(occurred_at, str) or not occurred_at.strip():
+            raise ValueError("INVALID_COLLISION_TIMESTAMP")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            self._require_operator(actor)
+            outcome = conn.execute(
+                "SELECT faos.link_collision_claim(%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s::text,%s::timestamptz)",
+                (actor.tenant_id, collision_id, claim_id, request_id, actor.actor_id, occurred_at),
+            ).fetchone()[0]
+            if outcome == "CONFLICT":
+                raise CollisionLifecycleConflict("COLLISION_CLAIM_LINK_CONFLICT")
+            if outcome not in ("ACCEPTED", "DUPLICATE"):
+                raise CollisionLifecycleConflict("COLLISION_CLAIM_LINK_NOT_ACCEPTED")
+            row = conn.execute(
+                "SELECT l.collision_id,l.claim_id,c.capture_session_id,s.capture_protocol_version,l.linked_by,l.linked_at "
+                "FROM faos.collision_claim_links l "
+                "JOIN faos.collision_lifecycle_records r ON r.tenant_id=l.tenant_id AND r.collision_id=l.collision_id "
+                "JOIN faos.claim_cases c ON c.tenant_id=l.tenant_id AND c.claim_id=l.claim_id "
+                "JOIN faos.sessions s ON s.tenant_id=c.tenant_id AND s.session_id=c.capture_session_id "
+                "WHERE l.tenant_id=%s AND l.collision_id=%s AND l.claim_id=%s "
+                "AND r.created_by=%s AND c.created_by=%s",
+                (actor.tenant_id, collision_id, claim_id, actor.actor_id, actor.actor_id),
+            ).fetchone()
+            if row is None:
+                raise CollisionLifecycleConflict("COLLISION_CLAIM_LINK_READBACK_MISMATCH")
+            return CollisionClaimLink(
+                collision_id=str(row[0]), claim_id=str(row[1]),
+                capture_session_id=str(row[2]), capture_protocol_version=row[3],
+                linked_by=row[4], linked_at=row[5].isoformat(),
+                created=(outcome == "ACCEPTED"),
+            )
+
+    def list_claims(self, authorization, collision_id):
+        collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            self._require_operator(actor)
+            rows = conn.execute(
+                "SELECT l.collision_id,l.claim_id,c.capture_session_id,s.capture_protocol_version,l.linked_by,l.linked_at "
+                "FROM faos.collision_claim_links l "
+                "JOIN faos.collision_lifecycle_records r ON r.tenant_id=l.tenant_id AND r.collision_id=l.collision_id "
+                "JOIN faos.claim_cases c ON c.tenant_id=l.tenant_id AND c.claim_id=l.claim_id "
+                "JOIN faos.sessions s ON s.tenant_id=c.tenant_id AND s.session_id=c.capture_session_id "
+                "WHERE l.tenant_id=%s AND l.collision_id=%s "
+                "AND (r.created_by=%s OR %s='supervisor') "
+                "AND (c.created_by=%s OR %s='supervisor') "
+                "ORDER BY l.linked_at,l.claim_id",
+                (actor.tenant_id, collision_id, actor.actor_id, actor.actor_role,
+                 actor.actor_id, actor.actor_role),
+            ).fetchall()
+            return [CollisionClaimLink(
+                collision_id=str(row[0]), claim_id=str(row[1]),
+                capture_session_id=str(row[2]), capture_protocol_version=row[3],
+                linked_by=row[4], linked_at=row[5].isoformat(), created=False,
+            ) for row in rows]
 
     def get(self, authorization, collision_id):
         collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")

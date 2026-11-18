@@ -74,7 +74,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0020_collision_lifecycle_record.sql')
+        self.assertEqual(plan[-1].name,'0021_collision_claim_link.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -89,13 +89,13 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql'))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql','0021_collision_claim_link.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
     def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-3])
+        apply(self.conn, plan[:-4])
         tenant = str(uuid.uuid4())
         legacy_session = 'legacy-' + uuid.uuid4().hex
         new_session = 'new-' + uuid.uuid4().hex
@@ -108,7 +108,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                           (tenant,'protocol migration fixture'))
             admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                           (tenant,legacy_session))
-            self.assertEqual(apply(self.conn,plan[:-2]),(plan[-3].name,))
+            self.assertEqual(apply(self.conn,plan[:-3]),(plan[-4].name,))
             legacy_version = admin.execute(
                 'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
                 (tenant,legacy_session)).fetchone()[0]

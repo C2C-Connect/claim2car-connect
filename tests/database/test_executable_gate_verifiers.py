@@ -56,6 +56,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
+            '0021_collision_claim_link.sql',
         ]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_added_migration_detected',

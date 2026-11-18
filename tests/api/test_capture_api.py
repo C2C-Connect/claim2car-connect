@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from app.capture_api import CaptureRuntime, create_capture_app, load_runtime
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL
 from database.claim_cases import ClaimCase, ClaimCaseStore
+from database.collision_lifecycle import CollisionLifecycleRecord, CollisionClaimLink, CollisionLifecycleStore
 from app.identity import ActorBinding, Credential, CredentialResolver
 from app.main import Settings
 from database.capture_sessions import CaptureAuthorizationError, CaptureSession, CaptureSessionConflict, CaptureSessionNotFound, CaptureSessionStore, CaptureStorageUnavailable
@@ -24,10 +25,11 @@ class CaptureRouteTests(unittest.TestCase):
         self.credential=Credential(hashlib.sha256(self.token.encode()).hexdigest(),self.binding,int(time.time())+3600)
         self.store=Mock(spec=CaptureSessionStore)
         self.claim_store=Mock(spec=ClaimCaseStore)
+        self.collision_store=Mock(spec=CollisionLifecycleStore)
         self.session=CaptureSession(str(UUID(int=2)),str(self.binding.tenant_id),'test-actor','2026-10-22T00:00:00+00:00',True,capture_protocol_version=DEFAULT_CAPTURE_PROTOCOL)
         self.store.create.return_value=self.session
         self.store.get.return_value=replace(self.session,created=False)
-        self.runtime=CaptureRuntime(CredentialResolver([self.credential]),self.store,Settings(),self.claim_store)
+        self.runtime=CaptureRuntime(CredentialResolver([self.credential]),self.store,Settings(),self.claim_store,self.collision_store)
         self.headers={'Authorization':'Bearer '+self.token}
 
     def client(self,runtime=None):
@@ -56,6 +58,35 @@ class CaptureRouteTests(unittest.TestCase):
         self.claim_store.create.assert_called_once()
         self.claim_store.list_owned.assert_called_once_with('Bearer '+self.token,limit=25)
         self.claim_store.get.assert_called_once_with('Bearer '+self.token,claim_id=record.claim_id)
+
+
+    def test_collision_root_and_claim_link_expose_capture_session_reference(self):
+        collision_id, claim_id, session_id = str(UUID(int=30)), str(UUID(int=31)), str(UUID(int=32))
+        record = CollisionLifecycleRecord(
+            collision_id, str(self.binding.tenant_id), str(UUID(int=33)), 'test-actor',
+            '2026-11-18T00:00:00+00:00', 'OPEN', 1, True,
+        )
+        link = CollisionClaimLink(
+            collision_id, claim_id, session_id, DEFAULT_CAPTURE_PROTOCOL, 'test-actor',
+            '2026-11-18T00:00:00+00:00', True,
+        )
+        self.collision_store.create.return_value = record
+        self.collision_store.link_claim.return_value = link
+        self.collision_store.get.return_value = record
+        self.collision_store.list_claims.return_value = [replace(link, created=False)]
+        with self.client() as client:
+            created = client.post('/v1/collisions', headers=self.headers,
+                json={'collision_id':collision_id,'request_id':str(UUID(int=34))})
+            linked = client.post('/v1/collisions/'+collision_id+'/claims', headers=self.headers,
+                json={'claim_id':claim_id,'request_id':str(UUID(int=35))})
+            opened = client.get('/v1/collisions/'+collision_id, headers=self.headers)
+        self.assertEqual(created.status_code,201,created.text)
+        self.assertEqual(linked.status_code,201,linked.text)
+        self.assertEqual(opened.status_code,200,opened.text)
+        self.assertEqual(opened.json()['claims'][0]['capture_session_id'],session_id)
+        self.assertEqual(opened.json()['claims'][0]['claim_id'],claim_id)
+        self.assertEqual(created.headers['cache-control'],'no-store')
+        self.collision_store.link_claim.assert_called_once()
 
     def test_protocol_registry_is_authenticated_and_exposes_both_executable_versions(self):
         with self.client() as client:

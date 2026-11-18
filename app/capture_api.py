@@ -24,6 +24,7 @@ from psycopg.conninfo import conninfo_to_dict
 from app.identity import ActorBinding, AuthenticationError, Credential, CredentialResolver
 from app.main import Settings, create_app
 from database.claim_cases import ClaimCaseConflict, ClaimCaseNotFound, ClaimCaseStore
+from database.collision_lifecycle import CollisionLifecycleConflict, CollisionLifecycleNotFound, CollisionLifecycleStore
 from database.incident_intake import IncidentIntakeService
 from database.capture_sessions import (
     CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound,
@@ -46,11 +47,24 @@ class CaptureRuntime:
     store: CaptureSessionStore = field(repr=False)
     health_settings: Settings = field(repr=False)
     claim_store: ClaimCaseStore | None = field(default=None, repr=False)
+    collision_store: CollisionLifecycleStore | None = field(default=None, repr=False)
 
 class ClaimCaseRequest(BaseModel):
     claim_id: UUID
     request_id: UUID
     capture_protocol_version: StrictStr = DEFAULT_CAPTURE_PROTOCOL
+    class Config:
+        extra = 'forbid'
+
+class CollisionRecordRequest(BaseModel):
+    collision_id: UUID
+    request_id: UUID
+    class Config:
+        extra = 'forbid'
+
+class CollisionClaimLinkRequest(BaseModel):
+    claim_id: UUID
+    request_id: UUID
     class Config:
         extra = 'forbid'
 
@@ -210,6 +224,9 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
     api = create_app(runtime.health_settings, runtime_mode='restricted_staging')
     api.state.health_settings = runtime.health_settings
     claim_cases = getattr(runtime, 'claim_store', None)
+    collisions = getattr(runtime, 'collision_store', None)
+    if collisions is None and isinstance(runtime.store, CaptureSessionStore):
+        collisions = CollisionLifecycleStore(runtime.store)
     if claim_cases is None and isinstance(runtime.store, CaptureSessionStore):
         claim_cases = ClaimCaseStore(runtime.store)
     evidence = None
@@ -297,6 +314,67 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             "default_protocol_version": DEFAULT_CAPTURE_PROTOCOL,
             "protocols": protocols,
         }, headers=dict(NO_STORE_HEADERS))
+
+    def invoke_collision(action, authorization, **kwargs):
+        try:
+            result = action(authorization, **kwargs)
+            payload = {**asdict(result), 'scope': 'collision-lifecycle'}
+            return JSONResponse(jsonable_encoder(payload), status_code=201 if getattr(result, 'created', False) else 200,
+                                headers=dict(NO_STORE_HEADERS))
+        except AuthenticationError:
+            _fail(401, 'UNAUTHORIZED')
+        except CaptureAuthorizationError:
+            _fail(403, 'COLLISION_AUTHORITY_DENIED')
+        except CollisionLifecycleNotFound:
+            _fail(404, 'COLLISION_NOT_FOUND')
+        except CollisionLifecycleConflict:
+            _fail(409, 'COLLISION_LIFECYCLE_CONFLICT')
+        except CaptureStorageUnavailable:
+            _fail(503, 'COLLISION_STORAGE_UNAVAILABLE')
+        except ValueError:
+            _fail(422, 'INVALID_COLLISION_REQUEST')
+        except Exception:
+            _fail(500, 'COLLISION_OPERATION_FAILED')
+
+    @api.post('/v1/collisions')
+    def create_collision(body: CollisionRecordRequest, authorization: str = Depends(authorize)):
+        if collisions is None:
+            _fail(503, 'COLLISION_STORAGE_UNAVAILABLE')
+        return invoke_collision(collisions.create, authorization,
+                                collision_id=str(body.collision_id), request_id=str(body.request_id))
+
+    @api.get('/v1/collisions/{collision_id}')
+    def get_collision(collision_id: UUID, authorization: str = Depends(authorize)):
+        if collisions is None:
+            _fail(503, 'COLLISION_STORAGE_UNAVAILABLE')
+        try:
+            record = collisions.get(authorization, str(collision_id))
+            claims = collisions.list_claims(authorization, str(collision_id))
+            return JSONResponse(jsonable_encoder({
+                'collision': asdict(record),
+                'claims': [asdict(item) for item in claims],
+                'scope': 'collision-lifecycle',
+            }), headers=dict(NO_STORE_HEADERS))
+        except AuthenticationError:
+            _fail(401, 'UNAUTHORIZED')
+        except CaptureAuthorizationError:
+            _fail(403, 'COLLISION_AUTHORITY_DENIED')
+        except CollisionLifecycleNotFound:
+            _fail(404, 'COLLISION_NOT_FOUND')
+        except ValueError:
+            _fail(422, 'INVALID_COLLISION_REQUEST')
+        except Exception:
+            _fail(500, 'COLLISION_OPERATION_FAILED')
+
+    @api.post('/v1/collisions/{collision_id}/claims')
+    def link_collision_claim(collision_id: UUID, body: CollisionClaimLinkRequest,
+                             authorization: str = Depends(authorize)):
+        if collisions is None:
+            _fail(503, 'COLLISION_STORAGE_UNAVAILABLE')
+        return invoke_collision(collisions.link_claim, authorization,
+                                collision_id=str(collision_id), claim_id=str(body.claim_id),
+                                request_id=str(body.request_id))
+
     @api.post('/v1/claim-cases')
     def create_claim_case(body: ClaimCaseRequest, authorization: str = Depends(authorize)):
         if claim_cases is None:

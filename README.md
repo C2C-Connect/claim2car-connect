@@ -60,7 +60,7 @@ python -m database.migrate  # identical rerun must have no pending migrations
 ```
 
 The default plan includes both migrations/ and authority_migrations/, ordered and
-validated together, currently through authority migration 0020_collision_lifecycle_record.sql. Migration 0020 introduces the independent Collision Lifecycle Record (CLR), tenant-scoped vehicle and participant relationships, claim links, an append-only lifecycle event stream, and a transactional database outbox. The 0010–0013 increments add the tenant-scoped claim-case register, least-privilege idempotent creation, and owner-bound capture-session association; 0014 adds separately deletable, owner-consented structured incident details under RLS. Existing
+validated together, currently through authority migration 0021_collision_claim_link.sql. Migration 0020 introduces the independent Collision Lifecycle Record (CLR), tenant-scoped vehicle and participant relationships, claim links, an append-only lifecycle event stream, and a transactional database outbox. Migration 0021 adds the authorized, idempotent collision-to-claim association path, with event/outbox emission and capture-session discoverability. The 0010–0013 increments add the tenant-scoped claim-case register, least-privilege idempotent creation, and owner-bound capture-session association; 0014 adds separately deletable, owner-consented structured incident details under RLS. Existing
 ledger checksums, migration locking and transactional application remain in force.
 python -m database.authority_migrate is a compatibility alias for the same plan.
 No synthetic connection URL is used as a fallback by the normal migration command.
