@@ -6,7 +6,7 @@ on:
       - "infra/oci/**"
       - ".github/workflows/oci-infrastructure-validate.yml"
   push:
-    branches: [main]
+    branches: [main, "infra/**"]
     paths:
       - "infra/oci/**"
       - ".github/workflows/oci-infrastructure-validate.yml"
