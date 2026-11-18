@@ -105,9 +105,13 @@ def _attribute_value(name, raw):
         except ValueError:
             return None
         return number if 0 < number <= 20 else None
-    if name in ("gvwr", "curb_weight_lb"):
-        # Preserve the provider's unit and value. Never relabel GVWR as curb
-        # mass or promote either value into a physics input in this adapter.
+    if name == "gvwr":
+        # NHTSA commonly reports GVWR as a regulatory class/range, not a
+        # measured mass. Preserve that provider wording and provenance.
+        return value[:200]
+    if name == "curb_weight_lb":
+        # Curb weight is accepted only when the provider supplies a numeric
+        # value in its explicit lb field. It remains descriptive, not physics input.
         try:
             number = float(value.replace(",", ""))
         except ValueError:
