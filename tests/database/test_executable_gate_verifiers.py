@@ -13,6 +13,7 @@ from verify_gates import (
     verify_db_06,
     verify_db_07,
     verify_db_10,
+    verify_db_14,
 )
 
 
@@ -89,6 +90,41 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         context = {'diagnostics': diagnostics, 'counted_tests': counted, 'environment_is_synthetic': True}
         self.assertEqual(verify_db_01(context)['status'], 'PASS')
         self.assertEqual(verify_db_02(context)['status'], 'PASS')
+
+    def test_db14_requires_complete_23_migration_same_run_evidence(self):
+        selectors = (
+            "test_counted_runner.CountedRunnerTests.test_passing_case_is_recorded",
+            "test_evidence_finalizer.EvidenceFinalizerTests.test_success_verifies_checksums",
+        )
+        counted = {
+            "discovered": 2, "executed": 2, "failures": 0, "errors": 0,
+            "skipped": 0, "expected_failures": 0, "unexpected_successes": 0,
+            "successful": True,
+            "tests": [{"id": value, "outcome": "passed"} for value in selectors],
+        }
+        diagnostics = {
+            "diagnostics_successful": True,
+            "commit": "candidate",
+            "candidate_commit": "candidate",
+            "tested_checkout_commit": "checkout",
+            "migration_inventory": [
+                (f"{number:04d}_migration.sql", "0" * 64)
+                for number in range(1, 24)
+            ],
+        }
+        context = {
+            "diagnostics": diagnostics,
+            "counted_tests": counted,
+            "prior_gate_results": [{"status": "PASS"} for _ in range(13)],
+        }
+        self.assertEqual(verify_db_14(context)["status"], "PASS")
+        diagnostics["migration_inventory"].pop()
+        failed = verify_db_14(context)
+        self.assertEqual(failed["status"], "FAIL")
+        self.assertIn(
+            "SAME_RUN_COMPLETE_GATE_EVIDENCE_AND_FAILURE_ACCOUNTING",
+            failed["failed_sql_checks"],
+        )
 
     def test_manifest_root_gate_requires_16_v1_session_binding_integration(self):
         required = "test_migration_controls_integration.MigrationControlsIntegration.test_manifest_root_protocol_binding_accepts_16_and_rejects_mismatch"
