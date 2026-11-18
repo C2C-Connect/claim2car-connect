@@ -7,7 +7,6 @@ hosting acceptance.
 import base64
 import hashlib
 import json
-import json
 import os
 import tempfile
 import time
