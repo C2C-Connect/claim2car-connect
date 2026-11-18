@@ -3,7 +3,7 @@ import { fetchVpicPayload } from "../src/modules/capture/vpic_transport.mjs";
 import { parseVpicResponse } from "../src/modules/capture/vpic.mjs";
 
 const $ = (id) => document.getElementById(id);
-const state = { profile:null, vin:null, photos:new Map(), observations:[], stream:null, detector:null, scanFrame:null };
+const state = { profile:null, vin:null, retrievedAt:null, photos:new Map(), observations:[], stream:null, detector:null, scanFrame:null };
 const slots = [
   ["00_front_exterior","Front exterior"],
   ["01_front_right_exterior","Front-right 45°"],
@@ -124,7 +124,7 @@ function renderProfile() {
     grid.append(item);
   }
   $("vehicle-provenance").textContent =
-    "Source: NHTSA vPIC DecodeVinValuesExtended · Retrieved " + now() +
+    "Source: NHTSA vPIC DecodeVinValuesExtended · Retrieved " + (state.retrievedAt ? new Date(state.retrievedAt).toLocaleString() : now()) +
     ". Parsed response is format-checked but the source is not independently authenticated. Missing fields remain missing. " +
     "VIN check digit status: " + p.checkDigitStatus + ". Vehicle identity decoding does not establish ownership, history, condition, roadworthiness, or safety.";
   renderPhotoSlots();
@@ -132,13 +132,28 @@ function renderProfile() {
   show("vehicle-panel");
   show("inspection-panel");
 }
+function resetVehicleEvidence() {
+  for (const photo of state.photos.values()) if (photo.url) URL.revokeObjectURL(photo.url);
+  state.photos.clear();
+  state.observations = [];
+  state.profile = null;
+  state.retrievedAt = null;
+  $("observation-list").replaceChildren();
+  $("damage-notes").value = "";
+  $("damage-photo").replaceChildren(new Option("No linked photo selected",""));
+  show("vehicle-panel",false);
+  show("inspection-panel",false);
+  show("report-panel",false);
+  show("report-preview",false);
+  show("print-report",false);
+}
 async function decodeVin() {
   const raw = $("vin-entry").value.trim();
   const check = validateVin(raw);
   const mismatchOverride = check.reason === "CHECKSUM_MISMATCH";
   if ((!check.ok && !mismatchOverride) || check.normalizationChanged) {
     setMessage(check.reason === "CHECKSUM_MISMATCH"
-      ? "The North American VIN check digit does not match. Recheck the VIN plate; this prototype currently supports VINs that pass the North American check-digit rule."
+      ? "The North American VIN check digit does not match. If the physical VIN is verified and the vehicle is from a market where this rule does not apply, use the explicit override below; the report will remain flagged."
       : "Enter the exact 17-character VIN using permitted VIN characters, without spaces or punctuation.", true);
     return;
   }
@@ -152,6 +167,7 @@ async function decodeVin() {
     setMessage("Explicit consent is required before sending the VIN to NHTSA vPIC.",true);
     return;
   }
+  resetVehicleEvidence();
   state.vin = check.vin;
   $("decode-vin").disabled = true;
   setMessage("Requesting a bounded vehicle decode from NHTSA vPIC…");
@@ -161,6 +177,7 @@ async function decodeVin() {
     const parsed = parseVpicResponse(check.vin,transport.payload,{allowCheckDigitMismatch:mismatchOverride});
     if (parsed.status !== "parsed") throw new Error("Vehicle decode was blocked: " + parsed.reason);
     state.profile = parsed.profile;
+    state.retrievedAt = new Date().toISOString();
     renderProfile();
     setMessage("Vehicle description decoded. Review the reported fields; no damage or ownership assessment has been performed.");
   } catch (error) {
@@ -278,7 +295,10 @@ function reportHtml() {
   });
   const rows = [
     ["VIN",state.vin],["Model year",p.modelYear],["Make",p.make],["Model",p.model],
-    ["Body class",p.bodyClass],["Curb weight",p.curbWeightStatus === "reported" ? p.curbWeightLb + " lb / " + p.curbWeightKg.toFixed(1) + " kg" : "Not reported (" + p.curbWeightStatus + ")"]
+    ["Body class",p.bodyClass],["Trim",p.trim],["Series",p.series],["Drive type",p.driveType],
+    ["Engine cylinders",p.engineCylinders],["Displacement (L)",p.displacementL],["Fuel type",p.fuelType],
+    ["Transmission",p.transmission],["Plant country",p.plantCountry],
+    ["Curb weight",p.curbWeightStatus === "reported" ? p.curbWeightLb + " lb / " + p.curbWeightKg.toFixed(1) + " kg" : "Not reported (" + p.curbWeightStatus + ")"]
   ];
   const table = rows.map(([k,v]) => "<tr><th>" + escapeHtml(k) + "</th><td>" + escapeHtml(v) + "</td></tr>").join("");
   const observations = state.observations.length ? state.observations.map((x,i) =>
@@ -289,7 +309,7 @@ function reportHtml() {
   const images = [...state.photos.values()].map(x =>
     "<div><strong>" + escapeHtml(x.label) + "</strong><br><img src='" + x.url + "' alt='" + escapeHtml(x.label) + "'></div>"
   ).join("");
-  return "<h2>Claim2Car Vehicle &amp; Condition Report</h2><p>Prototype report · Generated " + escapeHtml(now()) +
+  return "<h2>Claim2Car Vehicle &amp; Condition Report</h2><p>Prototype report · Generated " + escapeHtml(now()) + " · VIN decoded " + escapeHtml(state.retrievedAt ? new Date(state.retrievedAt).toLocaleString() : "time unavailable") +
     "</p><p class='report-warning'><strong>Scope limitation:</strong> This is a documentation prototype, not an appraisal, insurance decision, ownership verification, roadworthiness inspection, or professional repair estimate. Damage observations were entered by the operator. No automated damage assessment or repair-cost model ran.</p>" +
     "<h3>1. Vehicle identity</h3><p>Source: NHTSA vPIC. VIN check digit status: " + escapeHtml(p.checkDigitStatus) + ". A mismatch override is not proof of VIN authenticity or vehicle identity.</p><table>" + table + "</table>" +
     "<h3>2. Capture completeness</h3><p>" + state.photos.size + " of 16 contract views recorded in this browser session.</p><p>Views not captured: " +
