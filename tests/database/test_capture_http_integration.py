@@ -93,6 +93,8 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(collision_view.status_code, 200, collision_view.text)
                     self.assertEqual(collision_view.json()["claims"][0]["capture_session_id"], session_id)
                     self.assertEqual(collision_view.json()["claims"][0]["claim_id"], claim_id)
+                    self.assertEqual(collision_view.json()["vehicles"][0]["vehicle_id"], vehicle_id)
+                    self.assertEqual(collision_view.json()["vehicles"][0]["source_consent_status"], "ACTIVE")
 
                     owner_headers = {"Authorization": self.db.owner_auth()}
                     operator_headers = {"Authorization": self.db.auth()}
@@ -110,6 +112,23 @@ class CaptureHttpIntegration(unittest.TestCase):
                         json={"request_id": str(uuid.uuid4()), "vin": "1HGCM82633A004352"},
                     )
                     self.assertEqual(vehicle.status_code, 200, vehicle.text)
+
+                    vehicle_id = str(uuid.uuid4())
+                    collision_vehicle = client.post(
+                        f"/v1/collisions/{collision_id}/vehicles",
+                        headers=operator_headers,
+                        json={
+                            "claim_id": claim_id,
+                            "vehicle_id": vehicle_id,
+                            "request_id": str(uuid.uuid4()),
+                            "relationship": "INVOLVED",
+                        },
+                    )
+                    self.assertEqual(collision_vehicle.status_code, 201, collision_vehicle.text)
+                    self.assertEqual(collision_vehicle.json()["vehicle_id"], vehicle_id)
+                    self.assertEqual(collision_vehicle.json()["vin_source"], "CONSENTED_CAPTURE_SESSION")
+                    self.assertEqual(collision_vehicle.json()["source_consent_status"], "ACTIVE")
+                    self.assertNotIn("vin_hmac_sha256", collision_vehicle.json())
 
                     originals = {}
                     for slot in CANONICAL_SLOTS:
@@ -180,6 +199,13 @@ class CaptureHttpIntegration(unittest.TestCase):
                         collision_evidence.json()["claims"][0]["evidence"]["manifest_digest"],
                         manifest_digest,
                     )
+                    collision_view_after_restart = restarted.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers={"Authorization": self.db.auth()},
+                    )
+                    self.assertEqual(collision_view_after_restart.status_code, 200, collision_view_after_restart.text)
+                    self.assertEqual(collision_view_after_restart.json()["vehicles"][0]["vehicle_id"], vehicle_id)
+                    self.assertEqual(collision_view_after_restart.json()["vehicles"][0]["source_consent_status"], "ACTIVE")
 
                     first_artifact_id, first_bytes = next(iter(originals.items()))
                     retrieved = restarted.get(
@@ -212,6 +238,14 @@ class CaptureHttpIntegration(unittest.TestCase):
                     )
                     self.assertEqual(withdrawn.status_code, 200, withdrawn.text)
                     self.assertFalse(stored_path.exists())
+                    vehicle_after_withdrawal = restarted.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers={"Authorization": self.db.auth()},
+                    )
+                    self.assertEqual(vehicle_after_withdrawal.status_code, 200, vehicle_after_withdrawal.text)
+                    self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["source_consent_status"], "REVOKED")
+                    self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["vin_source"], "UNVERIFIED")
+                    self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["vin_validation_status"], "UNVERIFIED")
                     after_withdrawal = restarted.get(
                         f"/v1/review-sessions/{session_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
