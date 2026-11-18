@@ -312,17 +312,19 @@ class CaptureEvidenceService:
             _session, history = self._history(conn, actor, session_id, creator_required=True)
             vehicle_id = authorized_source(conn, actor, history)
             prior = conn.execute(
-                "SELECT decode_status,provider,provider_api,requested_at,response_sha256,"
-                "decode_error_code,attributes_json FROM faos.vehicle_decode_snapshots "
+                "SELECT vehicle_id,source_session_id,decode_status,provider,provider_api,requested_at,"
+                "response_sha256,decode_error_code,attributes_json FROM faos.vehicle_decode_snapshots "
                 "WHERE tenant_id=%s AND request_id=%s",
                 (actor.tenant_id, request_id),
             ).fetchone()
             if prior is not None:
+                if str(prior[0]) != vehicle_id or prior[1] != session_id:
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
                 return {
                     "session_id": session_id, "vehicle_id": vehicle_id,
-                    "status": prior[0], "provider": prior[1], "provider_api": prior[2],
-                    "requested_at": prior[3].isoformat(), "response_sha256": prior[4],
-                    "decode_error_code": prior[5], "attributes": prior[6] or {},
+                    "status": prior[2], "provider": prior[3], "provider_api": prior[4],
+                    "requested_at": prior[5].isoformat(), "response_sha256": prior[6],
+                    "decode_error_code": prior[7], "attributes": prior[8] or {},
                     "replayed": True, "physics_input_eligibility": "NOT_ESTABLISHED",
                 }
 
@@ -347,17 +349,19 @@ class CaptureEvidenceService:
             if current_vehicle_id != vehicle_id:
                 raise CaptureSessionConflict("VEHICLE_IDENTITY_CHANGED_DURING_DECODE")
             prior = conn.execute(
-                "SELECT decode_status,provider,provider_api,requested_at,response_sha256,"
-                "decode_error_code,attributes_json FROM faos.vehicle_decode_snapshots "
+                "SELECT vehicle_id,source_session_id,decode_status,provider,provider_api,requested_at,"
+                "response_sha256,decode_error_code,attributes_json FROM faos.vehicle_decode_snapshots "
                 "WHERE tenant_id=%s AND request_id=%s",
                 (actor.tenant_id, request_id),
             ).fetchone()
             if prior is not None:
+                if str(prior[0]) != vehicle_id or prior[1] != session_id:
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
                 return {
                     "session_id": session_id, "vehicle_id": vehicle_id,
-                    "status": prior[0], "provider": prior[1], "provider_api": prior[2],
-                    "requested_at": prior[3].isoformat(), "response_sha256": prior[4],
-                    "decode_error_code": prior[5], "attributes": prior[6] or {},
+                    "status": prior[2], "provider": prior[3], "provider_api": prior[4],
+                    "requested_at": prior[5].isoformat(), "response_sha256": prior[6],
+                    "decode_error_code": prior[7], "attributes": prior[8] or {},
                     "replayed": True, "physics_input_eligibility": "NOT_ESTABLISHED",
                 }
             requested_at = profile_data["requested_at"]
