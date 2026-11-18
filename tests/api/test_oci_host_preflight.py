@@ -71,10 +71,10 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_cloud_init_preflight_checks_distinct_writable_durable_volumes(self):
         cloud_init = (ROOT / "infra" / "oci" / "staging" / "cloud-init.yaml").read_text()
-        marker = "    content: |\\n"
+        marker = "    content: |\n"
         self.assertIn(marker, cloud_init)
         script_start = cloud_init.index(marker) + len(marker)
-        script_end = cloud_init.index("\\nruncmd:", script_start)
+        script_end = cloud_init.index("\nruncmd:", script_start)
         script = textwrap.dedent(cloud_init[script_start:script_end])
 
         self.assertIn('findmnt -rn -o SOURCE --mountpoint "$path"', script)
@@ -85,7 +85,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         self.assertIn("os.unlink(probe)", script)
         subprocess.run(["bash", "-n"], input=script, text=True, check=True)
 
-        python_probe = script.split("<<'PY'\\n", 1)[1].split("\\nPY", 1)[0]
+        python_probe = script.split("<<'PY'\n", 1)[1].split("\nPY", 1)[0]
         compile(python_probe, "claim2car-host-preflight-python-probe", "exec")
 
 
