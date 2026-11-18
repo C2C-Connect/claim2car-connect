@@ -32,9 +32,10 @@ def validate_authority_migration_inventory(inventory):
     expect('0020_collision_lifecycle_record.sql' in names,'COLLISION_LIFECYCLE_MIGRATION_REQUIRED')
     expect('0021_collision_claim_link.sql' in names,'COLLISION_CLAIM_LINK_MIGRATION_REQUIRED')
     expect('0022_collision_vehicle_capture_link.sql' in names,'COLLISION_VEHICLE_CAPTURE_LINK_MIGRATION_REQUIRED')
-    expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql') < names.index('0020_collision_lifecycle_record.sql') < names.index('0021_collision_claim_link.sql') < names.index('0022_collision_vehicle_capture_link.sql'),
+    expect('0023_consented_vehicle_profile.sql' in names,'CONSENTED_VEHICLE_PROFILE_MIGRATION_REQUIRED')
+    expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql') < names.index('0020_collision_lifecycle_record.sql') < names.index('0021_collision_claim_link.sql') < names.index('0022_collision_vehicle_capture_link.sql') < names.index('0023_consented_vehicle_profile.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names[-1]=='0022_collision_vehicle_capture_link.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0022')
+    expect(names[-1]=='0023_consented_vehicle_profile.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0023')
 
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
