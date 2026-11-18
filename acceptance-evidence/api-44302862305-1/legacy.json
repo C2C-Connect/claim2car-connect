@@ -1,0 +1,21 @@
+{
+  "classification": "live-http-and-database-prerequisite-checks-not-business-acceptance",
+  "commit": "074b8b8d635f34d9b6c446e062427165a8a97d34",
+  "stage": "legacy",
+  "checks": [
+    {
+      "id": "LIVENESS",
+      "status": "PASS"
+    },
+    {
+      "id": "READINESS-legacy",
+      "status": "PASS",
+      "expected_http_status": 503
+    },
+    {
+      "id": "NO-BUSINESS-WRITE-ROUTE",
+      "status": "PASS"
+    }
+  ],
+  "successful": true
+}
