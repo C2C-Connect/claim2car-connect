@@ -64,6 +64,14 @@ class CaptureHttpIntegration(unittest.TestCase):
             runtime = CaptureRuntime(resolver, store, Settings(), claim_cases)
             with patch.dict(os.environ, environment, clear=False):
                 with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
+                    collision_id = str(uuid.uuid4())
+                    collision_created = client.post(
+                        "/v1/collisions",
+                        headers={"Authorization": self.db.auth()},
+                        json={"collision_id": collision_id, "request_id": str(uuid.uuid4())},
+                    )
+                    self.assertEqual(collision_created.status_code, 201, collision_created.text)
+
                     claim_id = str(uuid.uuid4())
                     created = client.post(
                         "/v1/claim-cases",
@@ -72,6 +80,19 @@ class CaptureHttpIntegration(unittest.TestCase):
                     )
                     self.assertEqual(created.status_code, 201, created.text)
                     session_id = created.json()["capture_session_id"]
+                    linked = client.post(
+                        f"/v1/collisions/{collision_id}/claims",
+                        headers={"Authorization": self.db.auth()},
+                        json={"claim_id": claim_id, "request_id": str(uuid.uuid4())},
+                    )
+                    self.assertEqual(linked.status_code, 201, linked.text)
+                    collision_view = client.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers={"Authorization": self.db.auth()},
+                    )
+                    self.assertEqual(collision_view.status_code, 200, collision_view.text)
+                    self.assertEqual(collision_view.json()["claims"][0]["capture_session_id"], session_id)
+                    self.assertEqual(collision_view.json()["claims"][0]["claim_id"], claim_id)
 
                     owner_headers = {"Authorization": self.db.owner_auth()}
                     operator_headers = {"Authorization": self.db.auth()}

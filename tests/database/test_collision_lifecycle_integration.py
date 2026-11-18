@@ -9,7 +9,8 @@ from psycopg import sql
 from psycopg.conninfo import make_conninfo
 
 from app.identity import ActorBinding, Credential, CredentialResolver
-from database.capture_sessions import CaptureSessionStore
+from database.capture_sessions import CaptureAuthorizationError, CaptureSessionStore
+from database.claim_cases import ClaimCaseStore
 from database.collision_lifecycle import (
     CollisionLifecycleConflict,
     CollisionLifecycleNotFound,
@@ -39,9 +40,9 @@ class CollisionLifecycleIntegration(unittest.TestCase):
                 ActorBinding("clr-operator-" + str(index), uuid.UUID(self.f.tenants[index]), role),
                 int(time.time()) + 3600,
             ))
-        self.store = CollisionLifecycleStore(
-            CaptureSessionStore(CredentialResolver(credentials), dsns)
-        )
+        sessions = CaptureSessionStore(CredentialResolver(credentials), dsns)
+        self.store = CollisionLifecycleStore(sessions)
+        self.claims = ClaimCaseStore(sessions)
 
     def auth(self, index=0):
         return "Bearer " + self.tokens[index]
@@ -93,6 +94,58 @@ class CollisionLifecycleIntegration(unittest.TestCase):
             "SELECT count(*) FROM faos.collision_lifecycle_records WHERE tenant_id=%s",
             (self.f.tenants[0],),
         ).fetchone()[0], 1)
+
+
+    def test_claim_link_is_atomic_audited_and_resolves_capture_session(self):
+        collision_id = str(uuid.uuid4())
+        claim_id = str(uuid.uuid4())
+        self.store.create(self.auth(), collision_id=collision_id, request_id=str(uuid.uuid4()))
+        claim = self.claims.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()))
+        request_id = str(uuid.uuid4())
+        linked = self.store.link_claim(
+            self.auth(), collision_id=collision_id, claim_id=claim_id, request_id=request_id
+        )
+        retry = self.store.link_claim(
+            self.auth(), collision_id=collision_id, claim_id=claim_id, request_id=request_id
+        )
+        self.assertTrue(linked.created)
+        self.assertFalse(retry.created)
+        self.assertEqual(linked.capture_session_id, claim.capture_session_id)
+        self.assertEqual(linked.capture_protocol_version, claim.capture_protocol_version)
+        self.assertEqual(self.store.list_claims(self.auth(), collision_id)[0].claim_id, claim_id)
+        event = self.f.seed.execute(
+            "SELECT event_type,payload FROM faos.collision_events "
+            "WHERE tenant_id=%s AND collision_id=%s AND idempotency_key=%s",
+            (self.f.tenants[0], collision_id, request_id),
+        ).fetchone()
+        self.assertEqual(event[0], "claim_linked")
+        self.assertEqual(event[1]["claim_id"], claim_id)
+        self.assertEqual(self.f.seed.execute(
+            "SELECT count(*) FROM faos.collision_outbox WHERE tenant_id=%s AND collision_id=%s",
+            (self.f.tenants[0], collision_id),
+        ).fetchone()[0], 2)
+        self.assertEqual(self.f.seed.execute(
+            "SELECT count(*) FROM faos.collision_claim_links WHERE tenant_id=%s AND collision_id=%s",
+            (self.f.tenants[0], collision_id),
+        ).fetchone()[0], 1)
+
+    def test_claim_link_rejects_cross_tenant_claim_and_reused_request_conflict(self):
+        collision_id = str(uuid.uuid4())
+        self.store.create(self.auth(), collision_id=collision_id, request_id=str(uuid.uuid4()))
+        foreign_claim = self.claims.create(self.auth(1), claim_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()))
+        with self.assertRaises(CaptureAuthorizationError) as denied:
+            self.store.link_claim(self.auth(), collision_id=collision_id,
+                                  claim_id=foreign_claim.claim_id, request_id=str(uuid.uuid4()))
+        self.assertEqual(str(denied.exception), "COLLISION_CLAIM_LINK_AUTHORITY_DENIED")
+        own_claim = self.claims.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()))
+        request_id = str(uuid.uuid4())
+        self.store.link_claim(self.auth(), collision_id=collision_id,
+                              claim_id=own_claim.claim_id, request_id=request_id)
+        other_claim = self.claims.create(self.auth(), claim_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()))
+        with self.assertRaises(CollisionLifecycleConflict) as conflict:
+            self.store.link_claim(self.auth(), collision_id=collision_id,
+                                  claim_id=other_claim.claim_id, request_id=request_id)
+        self.assertEqual(str(conflict.exception), "COLLISION_EVENT_IDEMPOTENCY_CONFLICT")
 
     def test_every_clr_table_forces_rls_and_blocks_direct_application_writes(self):
         tables = (

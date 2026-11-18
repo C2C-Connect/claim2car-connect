@@ -15,6 +15,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
+            '0021_collision_claim_link.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
@@ -45,6 +46,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0017_event_contract_parity.sql',
                 '0019_manifest_root_protocol_binding.sql',
                 '0020_collision_lifecycle_record.sql',
+            '0021_collision_claim_link.sql',
             ]))
 
     def test_rejects_duplicate_authority_migration_names(self):
@@ -55,9 +57,10 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0019_manifest_root_protocol_binding.sql',
                 '0019_manifest_root_protocol_binding.sql',
                 '0020_collision_lifecycle_record.sql',
+            '0021_collision_claim_link.sql',
             ]))
 
-    def test_db01_accepts_the_20_migration_synthetic_environment(self):
+    def test_db01_accepts_the_21_migration_synthetic_environment(self):
         names = [f'{number:04d}_' + suffix for number, suffix in enumerate((
             'tenant_registry.sql', 'event_journal.sql', 'completion_lock.sql',
             'manifest_roots.sql', 'completion_receipts.sql',
@@ -67,7 +70,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             'claim_case_retry_without_update_lock.sql', 'claim_case_capture_session.sql',
             'claim_case_incident_intake.sql', 'incident_event_kinds.sql',
             'claim_case_incident_read_boundary.sql', 'event_contract_parity.sql',
-            'capture_protocol_session_binding.sql', 'manifest_root_protocol_binding.sql', 'collision_lifecycle_record.sql',
+            'capture_protocol_session_binding.sql', 'manifest_root_protocol_binding.sql', 'collision_lifecycle_record.sql', 'collision_claim_link.sql',
         ), start=1)]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_unchanged_candidate_compares',
@@ -102,7 +105,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_db02_accepts_the_complete_20_migration_inventory(self):
+    def test_db02_accepts_the_complete_21_migration_inventory(self):
         names = [
             '0001_tenant_registry.sql', '0002_event_journal.sql',
             '0003_completion_lock.sql', '0004_manifest_roots.sql',
@@ -115,6 +118,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0017_event_contract_parity.sql', '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
+            '0021_collision_claim_link.sql',
         ]
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
@@ -138,14 +142,15 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_rejects_unreviewed_migration_after_0020(self):
-        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0020'):
+    def test_rejects_unreviewed_migration_after_0021(self):
+        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0021'):
             validate_authority_migration_inventory(self.inventory([
                 '0017_event_contract_parity.sql',
                 '0018_capture_protocol_session_binding.sql',
                 '0019_manifest_root_protocol_binding.sql',
                 '0020_collision_lifecycle_record.sql',
-                '0021_unreviewed.sql',
+            '0021_collision_claim_link.sql',
+                '0022_unreviewed.sql',
             ]))
 
 
