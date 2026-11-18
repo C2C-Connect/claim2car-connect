@@ -246,7 +246,7 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     predicted = detector.detect("front_left", damage_grid)
     annotation = DamageAnnotation(
         session_id=session_id, slot="front_left",
-        region=DamageRegion("front_left", 0.32, 0.32, 0.52, 0.52, "unknown", 1.0),
+        region=DamageRegion("front_left", 0.3333, 0.3333, 0.6667, 0.6667, "unknown", 1.0),
         annotated_by="synthetic-reviewer-01",
     )
     benchmark = DamageLocalizationBenchmark()
