@@ -105,6 +105,7 @@ class TestObservationBoundary:
     def test_raw_detector_score_is_not_a_calibrated_probability(self):
         observed = self.adapter.to_observation(region(conf=0.93))
         assert observed.raw_detector_score == 0.93
+        assert observed.predicted_damage_class == "dent"
         assert observed.score_semantics == "uncalibrated_detector_score"
 
 
