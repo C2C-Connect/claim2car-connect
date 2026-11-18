@@ -93,7 +93,7 @@ class HealthTests(unittest.TestCase):
                     conn.execute.return_value.fetchone.return_value=row
                     self.assertEqual(probe_database('configured-target'),row==(True,True,True,True,True))
         self.assertEqual(connect.call_args.kwargs,{'autocommit':True,'connect_timeout':3,'options':'-c statement_timeout=2000 -c default_transaction_read_only=on'})
-        self.assertEqual(conn.__exit__.call_count,6)
+        self.assertEqual(conn.__exit__.call_count,7)
 
 
     def test_build_health_endpoint_reports_revision_and_runtime_mode(self):
