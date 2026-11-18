@@ -226,7 +226,7 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
         "monitor_version": drift_report["monitor_version"],
     })
 
-    # 8d. CV damage localization as a physics-engine input producer (Slice 10):
+    # 8d. CV damage localization as an unreviewed image-space observation (Slice 10):
     # baseline detector + reviewer-labeled annotation + benchmark evaluation.
     # The adoption gate refuses any candidate that does not strictly beat the
     # baseline on the labeled set — nothing is adopted here.
@@ -263,7 +263,7 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
         "localization_observation": {
             "zone": observation.zone,
             "normalized_region_area_fraction": observation.normalized_region_area_fraction,
-            "damage_class": observation.damage_class,
+            "predicted_damage_class": observation.predicted_damage_class,
             "raw_detector_score": observation.raw_detector_score,
             "score_semantics": observation.score_semantics,
             "epistemic_status": "MODEL_LOCALIZATION_UNREVIEWED",
