@@ -74,6 +74,13 @@ class CollisionLifecycleIntegration(unittest.TestCase):
             "WHERE tenant_id=%s AND collision_id=%s",
             (self.f.tenants[0], collision_id),
         ).fetchone()[0], 1)
+        with self.assertRaises(psycopg.errors.RaiseException) as raised:
+            self.f.seed.execute(
+                "UPDATE faos.collision_events SET payload=%s::jsonb "
+                "WHERE tenant_id=%s AND collision_id=%s",
+                ("{}", self.f.tenants[0], collision_id),
+            )
+        self.assertEqual(raised.exception.diag.message_primary, "COLLISION_EVENT_IMMUTABLE")
 
     def test_idempotency_conflict_does_not_create_second_collision(self):
         request_id = str(uuid.uuid4())
@@ -85,6 +92,33 @@ class CollisionLifecycleIntegration(unittest.TestCase):
             "SELECT count(*) FROM faos.collision_lifecycle_records WHERE tenant_id=%s",
             (self.f.tenants[0],),
         ).fetchone()[0], 1)
+
+    def test_every_clr_table_forces_rls_and_blocks_direct_application_writes(self):
+        tables = (
+            "collision_lifecycle_records", "vehicles", "collision_vehicle_links",
+            "collision_participants", "collision_claim_links", "collision_events",
+            "collision_outbox",
+        )
+        with self.store.sessions._authorized(self.auth()) as (conn, actor):
+            for table in tables:
+                with self.subTest(table=table):
+                    row = conn.execute(
+                        "SELECT c.relrowsecurity,c.relforcerowsecurity,"
+                        "EXISTS(SELECT 1 FROM pg_policies p WHERE p.schemaname=%s "
+                        "AND p.tablename=c.relname AND p.policyname=%s),"
+                        "has_table_privilege(current_user,%s,'SELECT'),"
+                        "has_table_privilege(current_user,%s,'INSERT'),"
+                        "has_table_privilege(current_user,%s,'UPDATE'),"
+                        "has_table_privilege(current_user,%s,'DELETE') "
+                        "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+                        "WHERE n.nspname=%s AND c.relname=%s",
+                        ("faos", "app_tenant", "faos."+table, "faos."+table,
+                         "faos."+table, "faos."+table, "faos", table),
+                    ).fetchone()
+                    self.assertIsNotNone(row)
+                    self.assertEqual(row[:3], (True, True, True))
+                    self.assertEqual(row[3], table != "collision_outbox")
+                    self.assertEqual(row[4:], (False, False, False))
 
     def test_tenant_boundary_hides_other_tenant_collision(self):
         collision_id = str(uuid.uuid4())
