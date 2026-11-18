@@ -104,6 +104,7 @@ class CaptureRouteTests(unittest.TestCase):
             'created': True,
         }
         self.collision_store.link_vehicle_from_capture.return_value = linked_vehicle
+        self.collision_store.list_claims.return_value = []
         self.collision_store.get.return_value = CollisionLifecycleRecord(
             collision_id, str(self.binding.tenant_id), str(UUID(int=65)),
             'test-actor', '2026-11-18T00:00:00+00:00', 'OPEN', 1, False,
