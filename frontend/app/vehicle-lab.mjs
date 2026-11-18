@@ -1,9 +1,9 @@
 import { validateVin } from "../src/modules/capture/vin.mjs";
-import { fetchVpicPayload } from "../src/modules/capture/vpic_transport.mjs";
-import { parseVpicResponse } from "../src/modules/capture/vpic.mjs";
 
 const $ = (id) => document.getElementById(id);
-const state = { profile:null, vin:null, retrievedAt:null, photos:new Map(), observations:[], stream:null, detector:null, scanFrame:null };
+const API = "/api";
+const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
+const state = { profile:null, vin:null, retrievedAt:null, photos:new Map(), qualities:new Map(), observations:[], stream:null, detector:null, scanFrame:null, captureToken:null, sessionId:null, captureConsentRecorded:false, vehicleRecorded:false, sealed:false, manifestDigest:null };
 const slots = [
   ["00_front_exterior","Front exterior"],
   ["01_front_right_exterior","Front-right 45°"],
@@ -28,6 +28,64 @@ const setMessage = (value, error=false) => {
   $("vin-message").classList.toggle("error", error);
 };
 const now = () => new Date().toLocaleString();
+const uuid = () => crypto.randomUUID();
+async function captureApi(path, token, options={}) {
+  const headers = new Headers(options.headers || {});
+  headers.set("Authorization", "Bearer " + token);
+  headers.set("Cache-Control", "no-store");
+  if (options.body !== undefined) headers.set("Content-Type", "application/json");
+  const response = await fetch(API + path, {...options, headers, cache:"no-store"});
+  if (!response.ok) {
+    let detail = "REQUEST_FAILED_" + response.status;
+    try { const body = await response.json(); if (typeof body.detail === "string") detail = body.detail; } catch {}
+    throw new Error(detail);
+  }
+  return response.status === 204 ? null : response.json();
+}
+function bytesToBase64(bytes) {
+  let binary = "";
+  for (let offset=0; offset<bytes.length; offset+=0x8000) binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset+0x8000,bytes.length)));
+  return btoa(binary);
+}
+async function sha256Hex(buffer) {
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2,"0")).join("");
+}
+function backendStatus(value, error=false) {
+  $("backend-status").textContent = value;
+  $("backend-status").classList.toggle("error", error);
+}
+$("create-capture-session").addEventListener("click", async () => {
+  const token = $("capture-operator-token").value.trim();
+  if (!/^[A-Za-z0-9_-]{43,128}$/.test(token)) { backendStatus("Enter a valid operator credential.", true); return; }
+  const button = $("create-capture-session"); button.disabled = true;
+  try {
+    const sessionId = uuid();
+    await captureApi("/v1/capture-sessions", token, {method:"POST", body:JSON.stringify({session_id:sessionId})});
+    state.captureToken = token; state.sessionId = sessionId;
+    $("capture-operator-token").value = "";
+    $("create-capture-session").textContent = "Session created";
+    $("create-capture-session").disabled = true; $("capture-operator-token").disabled = true;
+    $("owner-consent-panel").hidden = false;
+    backendStatus("Authenticated capture session created · " + sessionId + " · Awaiting owner consent.");
+  } catch (error) { backendStatus(error.message, true); button.disabled = false; }
+});
+$("record-capture-consent").addEventListener("click", async () => {
+  const ownerToken = $("owner-capture-token").value.trim();
+  if (!state.sessionId || !ownerToken || !$("owner-capture-consent").checked) {
+    backendStatus("Owner token and explicit capture consent are required.", true); return;
+  }
+  const button = $("record-capture-consent"); button.disabled = true;
+  try {
+    await captureApi("/v1/capture-sessions/" + state.sessionId + "/consent", ownerToken, {
+      method:"POST", body:JSON.stringify({request_id:uuid(),accepted:true,scope:"capture_review"})
+    });
+    $("owner-capture-token").value = ""; $("owner-capture-token").disabled = true;
+    $("owner-capture-consent").disabled = true; state.captureConsentRecorded = true;
+    backendStatus("Owner capture consent recorded by the server · VIN acquisition is enabled.");
+  } catch (error) { backendStatus(error.message, true); button.disabled = false; }
+});
+
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
@@ -51,41 +109,40 @@ function renderPhotoSlots() {
     const preview = document.createElement("img");
     preview.alt = label;
     preview.hidden = true;
-    const exception = document.createElement("select");
-    exception.setAttribute("aria-label", "Capture status for " + label);
-    for (const [value,text] of [["","Capture status"],["unsafe","Unsafe to capture"],["inaccessible","Inaccessible"],["not_applicable","Not applicable"]]) {
-      exception.add(new Option(text,value));
-    }
-    exception.addEventListener("change", () => {
-      const photo = state.photos.get(slot);
-      if (photo?.url) URL.revokeObjectURL(photo.url);
-      state.photos.delete(slot);
-      preview.removeAttribute("src");
-      preview.hidden = true;
-      input.value = "";
-      stateText.textContent = exception.value ? "Not captured · " + exception.options[exception.selectedIndex].text : "Not captured";
-      updateReportAvailability();
-    });
-    input.addEventListener("change", () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      if (!file.type.startsWith("image/") || file.size <= 0 || file.size > 20*1024*1024) {
-        stateText.textContent = "Choose a non-empty image under 20 MiB.";
-        input.value = "";
-        return;
+    const quality = document.createElement("select");
+    quality.setAttribute("aria-label", "Quality review for " + label);
+    quality.disabled = true;
+    quality.add(new Option("Quality review pending",""));
+    quality.add(new Option("Usable","usable"));
+    quality.add(new Option("Needs retake","retake"));
+    quality.addEventListener("change", () => { state.qualities.set(slot, quality.value); updateSealAvailability(); });
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0]; if (!file) return;
+      if (!file.type.startsWith("image/") || file.size <= 0 || file.size > MAX_EVIDENCE_BYTES) {
+        stateText.textContent = "Choose a non-empty image no larger than 25 MiB."; input.value = ""; return;
       }
-      const old = state.photos.get(slot);
-      if (old?.url) URL.revokeObjectURL(old.url);
-      const url = URL.createObjectURL(file);
-      state.photos.set(slot,{file,url,label});
-      exception.value = "";
-      preview.src = url;
-      preview.hidden = false;
-      stateText.textContent = "Captured in this browser · " + Math.round(file.size/1024) + " KB";
-      updateReportAvailability();
-      syncPhotoSelect();
+      if (!state.captureToken || !state.sessionId || !state.captureConsentRecorded || !state.vehicleRecorded) {
+        stateText.textContent = "Connect a session, record owner consent, and decode the vehicle before upload."; input.value = ""; return;
+      }
+      input.disabled = true; stateText.textContent = "Hashing and uploading original bytes…"; stateText.classList.remove("error");
+      try {
+        const buffer = await file.arrayBuffer(), digest = await sha256Hex(buffer), artifactId = uuid();
+        await captureApi("/v1/capture-sessions/" + state.sessionId + "/artifacts", state.captureToken, {
+          method:"POST", body:JSON.stringify({request_id:uuid(),artifact_id:artifactId,slot,payload_base64:bytesToBase64(new Uint8Array(buffer)),sha256:digest})
+        });
+        const old = state.photos.get(slot); if (old?.url) URL.revokeObjectURL(old.url);
+        const url = URL.createObjectURL(file);
+        state.photos.set(slot,{file,url,label,artifactId,sha256:digest,uploaded:true,byteLength:file.size});
+        state.qualities.delete(slot); quality.disabled = false; quality.value = "";
+        preview.src = url; preview.hidden = false;
+        stateText.textContent = "Original uploaded · " + file.size.toLocaleString() + " bytes · SHA-256 verified";
+        updateReportAvailability(); syncPhotoSelect(); updateSealAvailability();
+      } catch (error) {
+        stateText.textContent = "Upload failed · " + error.message + " · Select the image again to retry.";
+        stateText.classList.add("error"); input.value = "";
+      } finally { input.disabled = false; }
     });
-    card.append(title,input,exception,stateText,preview);
+    card.append(title,input,quality,stateText,preview);
     grid.append(card);
   }
 }
@@ -96,6 +153,29 @@ function syncPhotoSelect() {
   for (const [slot,label] of slots) if (state.photos.has(slot)) select.add(new Option(label,slot));
   if (state.photos.has(selected)) select.value = selected;
 }
+function updateSealAvailability() {
+  const complete = slots.every(([slot]) => state.photos.get(slot)?.uploaded === true && state.qualities.get(slot) === "usable");
+  $("seal-evidence").disabled = !complete || state.sealed || !state.sessionId;
+}
+$("seal-evidence").addEventListener("click", async () => {
+  const button = $("seal-evidence"); button.disabled = true;
+  try {
+    const results = Object.fromEntries(slots.map(([slot]) => [slot, state.qualities.get(slot) === "usable"]));
+    await captureApi("/v1/capture-sessions/" + state.sessionId + "/quality", state.captureToken, {
+      method:"POST", body:JSON.stringify({request_id:uuid(),results})
+    });
+    const sealed = await captureApi("/v1/capture-sessions/" + state.sessionId + "/seal", state.captureToken, {
+      method:"POST", body:JSON.stringify({request_id:uuid()})
+    });
+    state.sealed = true; state.manifestDigest = sealed.manifest_digest;
+    $("seal-status").textContent = "Evidence sealed · Manifest SHA-256: " + sealed.manifest_digest;
+    button.textContent = "Evidence sealed";
+    backendStatus("All 16 original images uploaded, hash-verified, quality-reviewed, and sealed by the evidence service.");
+  } catch (error) {
+    $("seal-status").textContent = "Seal not completed · " + error.message;
+    $("seal-status").classList.add("error"); updateSealAvailability();
+  }
+});
 function updateReportAvailability() {
   show("report-panel", Boolean(state.profile));
 }
@@ -135,6 +215,11 @@ function renderProfile() {
 function resetVehicleEvidence() {
   for (const photo of state.photos.values()) if (photo.url) URL.revokeObjectURL(photo.url);
   state.photos.clear();
+  state.qualities.clear();
+  state.sealed = false;
+  state.manifestDigest = null;
+  $("seal-evidence").disabled = true;
+  $("seal-status").textContent = "";
   state.observations = [];
   state.profile = null;
   state.retrievedAt = null;
@@ -152,43 +237,59 @@ async function decodeVin() {
   const check = validateVin(raw);
   const mismatchOverride = check.reason === "CHECKSUM_MISMATCH";
   if ((!check.ok && !mismatchOverride) || check.normalizationChanged) {
-    setMessage(check.reason === "CHECKSUM_MISMATCH"
-      ? "The North American VIN check digit does not match. If the physical VIN is verified and the vehicle is from a market where this rule does not apply, use the explicit override below; the report will remain flagged."
-      : "Enter the exact 17-character VIN using permitted VIN characters, without spaces or punctuation.", true);
+    setMessage(check.reason === "CHECKSUM_MISMATCH" ? "The North American VIN check digit does not match. Recheck the physical VIN before continuing." : "Enter the exact 17-character VIN using permitted VIN characters, without spaces or punctuation.", true);
     return;
   }
-  if (mismatchOverride && !$("checksum-override").checked) {
+  if (mismatchOverride) {
     show("checksum-override-row");
-    setMessage("The North American check digit does not match. Recheck the physical VIN; only use the override if the physical plate is verified and the vehicle market does not require this check digit.",true);
+    setMessage("This server-authoritative capture route requires a VIN that passes its check-digit validation. The manual override is not accepted for a persisted vehicle profile.", true);
     return;
   }
-  if (!mismatchOverride) show("checksum-override-row",false);
-  if (!$("decode-consent").checked) {
-    setMessage("Explicit consent is required before sending the VIN to NHTSA vPIC.",true);
-    return;
+  if (!$("decode-consent").checked) { setMessage("Explicit consent is required before sending the VIN to NHTSA vPIC.", true); return; }
+  if (!state.captureToken || !state.sessionId || !state.captureConsentRecorded) {
+    setMessage("Create an authenticated capture session and record owner capture consent before decoding or collecting evidence.", true); return;
   }
-  resetVehicleEvidence();
-  state.vin = check.vin;
-  $("decode-vin").disabled = true;
-  setMessage("Requesting a bounded vehicle decode from NHTSA vPIC…");
+  if (state.vehicleRecorded && state.vin !== check.vin) { setMessage("This session is already bound to a different vehicle. Start a new capture session to change VIN.", true); return; }
+  if (state.photos.size > 0) { setMessage("This session already contains uploaded evidence. Continue the current inspection; start a new session to restart it.", true); return; }
+  const ownerToken = $("decode-owner-token").value.trim();
+  if (!ownerToken) { setMessage("Re-enter the owner's token to record separate NHTSA vehicle-decoding consent.", true); return; }
+  resetVehicleEvidence(); state.vin = check.vin; $("decode-vin").disabled = true;
+  setMessage("Recording keyed vehicle reference and separate owner decode consent…");
   try {
-    const transport = await fetchVpicPayload(check.vin,{allowCheckDigitMismatch:mismatchOverride});
-    if (transport.status !== "response_received") throw new Error("NHTSA lookup unavailable: " + transport.reason);
-    const parsed = parseVpicResponse(check.vin,transport.payload,{allowCheckDigitMismatch:mismatchOverride});
-    if (parsed.status !== "parsed") throw new Error("Vehicle decode was blocked: " + parsed.reason);
-    state.profile = parsed.profile;
-    state.retrievedAt = new Date().toISOString();
-    renderProfile();
-    setMessage("Vehicle description decoded. Review the reported fields; no damage or ownership assessment has been performed.");
+    if (!state.vehicleRecorded) {
+      await captureApi("/v1/capture-sessions/" + state.sessionId + "/vehicle-reference", state.captureToken, {
+        method:"POST", body:JSON.stringify({request_id:uuid(),vin:check.vin})
+      });
+      state.vehicleRecorded = true;
+    }
+    const disclosure = await captureApi("/v1/vehicle-decode-disclosure", state.captureToken);
+    await captureApi("/v1/capture-sessions/" + state.sessionId + "/vehicle-decode-consent", ownerToken, {
+      method:"POST", body:JSON.stringify({request_id:uuid(),accepted:true,scope:"nhtsa_vpic_decode",disclosure_version:disclosure.disclosure_version})
+    });
+    $("decode-owner-token").value = "";
+    const profile = await captureApi("/v1/capture-sessions/" + state.sessionId + "/vehicle-profile", state.captureToken, {
+      method:"POST", body:JSON.stringify({request_id:uuid(),vin:check.vin})
+    });
+    if (!["DECODED","PARTIAL"].includes(profile.status)) throw new Error(profile.decode_error_code || "VEHICLE_DECODE_UNRESOLVED");
+    const attrs = profile.attributes || {}, value = key => attrs[key]?.value ?? null;
+    state.profile = {
+      modelYear:value("model_year"), make:value("make"), model:value("model"), bodyClass:value("body_class"),
+      trim:value("trim"), series:value("series"), driveType:value("drive_type"),
+      engineCylinders:value("engine_cylinders"), displacementL:value("displacement_l"),
+      fuelType:value("fuel_type_primary"), transmission:null, plantCountry:null,
+      curbWeightLb:value("curb_weight_lb"),
+      curbWeightKg:value("curb_weight_lb") == null ? null : value("curb_weight_lb") * 0.45359237,
+      curbWeightStatus:value("curb_weight_lb") == null ? "not_reported" : "reported",
+      checkDigitStatus:"VALID", providerStatus:profile.status, provider:profile.provider,
+      responseSha256:profile.response_sha256, physicsInputEligibility:profile.physics_input_eligibility
+    };
+    state.retrievedAt = profile.requested_at; renderProfile();
+    setMessage("Vehicle profile decoded and recorded by the authenticated evidence service. Attributes remain provider-reported; no ownership or condition finding is implied.");
+    backendStatus("Capture session active · Vehicle identity recorded · NHTSA profile snapshot stored.");
   } catch (error) {
-    state.profile = null;
-    show("vehicle-panel",false);
-    show("inspection-panel",false);
-    show("report-panel",false);
-    setMessage("Decode unavailable: " + error.message + ". Verify the VIN and retry.",true);
-  } finally {
-    $("decode-vin").disabled = false;
-  }
+    state.profile = null; show("vehicle-panel",false); show("inspection-panel",false); show("report-panel",false);
+    setMessage("Server-authoritative vehicle decode unavailable: " + error.message + ". Verify consent and retry.", true);
+  } finally { $("decode-vin").disabled = false; }
 }
 $("decode-vin").addEventListener("click",decodeVin);
 $("checksum-override").addEventListener("change",() => {
@@ -312,12 +413,12 @@ function reportHtml() {
   return "<h2>Claim2Car Vehicle &amp; Condition Report</h2><p>Prototype report · Generated " + escapeHtml(now()) + " · VIN decoded " + escapeHtml(state.retrievedAt ? new Date(state.retrievedAt).toLocaleString() : "time unavailable") +
     "</p><p class='report-warning'><strong>Scope limitation:</strong> This is a documentation prototype, not an appraisal, insurance decision, ownership verification, roadworthiness inspection, or professional repair estimate. Damage observations were entered by the operator. No automated damage assessment or repair-cost model ran.</p>" +
     "<h3>1. Vehicle identity</h3><p>Source: NHTSA vPIC. VIN check digit status: " + escapeHtml(p.checkDigitStatus) + ". A mismatch override is not proof of VIN authenticity or vehicle identity.</p><table>" + table + "</table>" +
-    "<h3>2. Capture completeness</h3><p>" + state.photos.size + " of 16 contract views recorded in this browser session.</p><p>Views not captured: " +
+    "<h3>2. Capture completeness</h3><p>" + [...state.photos.values()].filter(x => x.uploaded).length + " of 16 original views uploaded to the authenticated evidence service. Session: " + escapeHtml(state.sessionId || "not connected") + ".</p>" + (state.sealed ? "<p><strong>Sealed manifest SHA-256:</strong> " + escapeHtml(state.manifestDigest) + "</p>" : "<p><strong>Evidence status:</strong> Not sealed.</p>") + "<p>Views not captured: " +
     (missing.length ? missing.map(escapeHtml).join(", ") : "None") + ". Missing views are unknown, not evidence of no damage.</p><div class='report-images'>" + images + "</div>" +
     "<h3>3. Visible condition observations</h3><ul>" + observations + "</ul>" +
     "<h3>4. Unresolved questions</h3><ul><li>Concealed structure and components have not been assessed.</li><li>No collision causation, fault, liability, coverage, total-loss status, repair scope, or repair price is determined.</li><li>Severity labels are qualitative operator judgments, not calibrated probabilities or verified engineering classifications.</li><li>Qualified physical inspection and diagnostic procedures may be required.</li></ul>" +
     "<h3>5. Disposition</h3><p><strong>LIMITED DOCUMENTATION ONLY — NOT ADJUDICATED.</strong> This report is not clearance to drive or repair authorization.</p>" +
-    "<p>Method: NHTSA vPIC vehicle description; user-provided photographs and observations; local browser report formatter. No automated damage model was used. Evidence has not been uploaded or sealed by this lab.</p>";
+    "<p>Method: server-recorded NHTSA vPIC vehicle description; user-provided photographs and observations. " + (state.sealed ? "Original evidence bytes are stored and the 16-view manifest is sealed." : "Evidence remains unsealed; no final evidence package is asserted.") + " No automated damage model was used.</p>";
 }
 $("generate-report").addEventListener("click",() => {
   if (!state.profile) {
