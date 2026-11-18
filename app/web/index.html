@@ -61,6 +61,10 @@
         <h4>Vehicle reference</h4>
         <label for="vin">VIN</label><input id="vin" maxlength="17" autocomplete="off" placeholder="17-character VIN">
         <button id="save-vin" class="secondary">Validate and record VIN</button>
+        <h4>Optional vehicle description</h4>
+        <p class="fine">The operator may request an NHTSA vPIC description only after the owner separately accepts the current VIN-lookup disclosure. This is not part of capture consent and does not establish vehicle ownership, physical condition, damage, or roadworthiness.</p>
+        <button id="decode-vehicle-profile" class="secondary">Request NHTSA vPIC vehicle description</button>
+        <div id="vehicle-profile-result" class="vehicle-profile-result" aria-live="polite"></div>
         <div class="rule"></div>
         <h4>Original evidence capture</h4>
         <p class="fine">Choose a photo for each slot. On supported mobile devices, the file picker can open the camera. Original file bytes are first saved in this browser's IndexedDB queue, then uploaded unchanged in FIFO order. Pending originals can be retried after connectivity returns or the page is reopened on a supported browser. Browser storage is not an encrypted vault, WORM store, or field-qualified durability guarantee; this remains a controlled test surface. Review each image yourself and check its quality box only when the required view is clear and usable; this is an advisory operator attestation, not an automated image-quality assessment.</p>
@@ -88,6 +92,15 @@
         <label class="consent"><input id="consent-accepted" type="checkbox"> I voluntarily consent to the capture and human review described above.</label>
         <button id="record-consent" class="primary">Record my consent</button>
         <button id="withdraw-capture-consent" class="quiet">Withdraw capture consent and delete originals on this device</button>
+        <div class="rule"></div>
+        <h4>Optional NHTSA VIN description lookup</h4>
+        <p class="fine">This is a separate, optional choice. Accepting capture consent or supplemental incident consent does not authorize a VIN lookup. If you accept, the VIN you provided will be sent to NHTSA vPIC for manufacturer-reported vehicle-description attributes. This controlled workbench is not approved for real-participant use.</p>
+        <button id="load-vehicle-decode-disclosure" class="secondary">Load current NHTSA lookup disclosure</button>
+        <div id="vehicle-decode-disclosure" class="disclosure" aria-live="polite" hidden></div>
+        <label id="vehicle-decode-consent-label" class="consent" hidden><input id="vehicle-decode-consent-accepted" type="checkbox"> I separately and voluntarily consent to sending the VIN I provided to NHTSA vPIC for vehicle-description lookup.</label>
+        <button id="record-vehicle-decode-consent" class="secondary" hidden>Accept optional VIN lookup</button>
+        <button id="withdraw-vehicle-decode-consent" class="quiet" hidden>Withdraw optional VIN lookup consent and clear profile attributes</button>
+        <p id="vehicle-decode-consent-message" class="message" role="status"></p>
         <div class="rule"></div>
         <h4>Supplemental incident details</h4>
         <p class="fine">Separate optional consent. This draft collects only incident date/time, category, city, state, and ZIP code. It does not collect a street address, narrative, claimant contact details, or policy number. The supplemental notice is pending counsel review; this feature remains disabled unless explicitly enabled for an authorized test environment.</p>

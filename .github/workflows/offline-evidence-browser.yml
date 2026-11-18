@@ -38,3 +38,17 @@ jobs:
           exit 1
       - name: Verify actual IndexedDB offline queue persistence and recovery
         run: node frontend/tests/browser/offline_evidence_queue.browser.test.mjs
+      - name: Serve integrated workbench for owner/operator browser verification
+        run: |
+          python -m http.server 4174 --bind 127.0.0.1 --directory app/web >/tmp/c2c-workbench-http.log 2>&1 &
+          echo $! >/tmp/c2c-workbench-http.pid
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:4174/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/c2c-workbench-http.log
+          exit 1
+      - name: Verify separately consented NHTSA vehicle-profile workbench journey
+        run: node app/web/tests/vehicle_decode_workbench.browser.test.mjs

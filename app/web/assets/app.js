@@ -6,6 +6,9 @@ let identity = null;
 let activeSession = null;
 let activeProtocolVersion = "claims2car-16-v1";
 let activeReadiness = null;
+let vehicleDecodeDisclosure = null;
+let vehicleDecodeDisclosureSessionId = null;
+let pendingVehicleProfileRequest = null;
 let pendingClaimCase = null;
 let claimCaseRequestInFlight = false;
 let evidenceQueue = null;
@@ -92,6 +95,10 @@ async function loadCaptureProtocols() {
 }
 function disconnect() {
   token = null; identity = null; activeSession = null; activeReadiness = null;
+  vehicleDecodeDisclosure = null; vehicleDecodeDisclosureSessionId = null;
+  pendingVehicleProfileRequest = null;
+  if ($("vehicle-decode-disclosure")) clearVehicleDecodeDisclosure();
+  if ($("vehicle-profile-result")) $("vehicle-profile-result").replaceChildren();
   activeProtocolVersion = "claims2car-16-v1";
   applyProtocolCaptureState();
   $("access-token").value = "";
@@ -242,6 +249,85 @@ async function recordConsent() {
     message("owner-message",result.replayed ? "Consent record confirmed." : "Consent recorded for this case.");
   } catch (error) { message("owner-message",error.message,true); }
 }
+function clearVehicleDecodeDisclosure() {
+  vehicleDecodeDisclosure = null;
+  vehicleDecodeDisclosureSessionId = null;
+  $("vehicle-decode-disclosure").replaceChildren();
+  $("vehicle-decode-disclosure").hidden = true;
+  $("vehicle-decode-consent-label").hidden = true;
+  $("record-vehicle-decode-consent").hidden = true;
+  $("withdraw-vehicle-decode-consent").hidden = true;
+  $("vehicle-decode-consent-accepted").checked = false;
+}
+async function loadVehicleDecodeDisclosure() {
+  const id = $("owner-session-id").value.trim();
+  if (!id) return message("vehicle-decode-consent-message","Enter the case/session ID before loading the optional lookup disclosure.",true);
+  clearVehicleDecodeDisclosure();
+  try {
+    const disclosure = await api("/api/v1/vehicle-decode-disclosure");
+    if (!disclosure || typeof disclosure.disclosure_version !== "string" ||
+        !disclosure.disclosure_version || !Array.isArray(disclosure.sections)) {
+      throw new Error("VEHICLE_DECODE_DISCLOSURE_INVALID");
+    }
+    vehicleDecodeDisclosure = disclosure;
+    vehicleDecodeDisclosureSessionId = id;
+    const root = $("vehicle-decode-disclosure");
+    const purpose = document.createElement("p");
+    purpose.textContent = disclosure.purpose || "Optional VIN description lookup through NHTSA vPIC.";
+    root.append(purpose);
+    for (const section of disclosure.sections) {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = String(section);
+      root.append(paragraph);
+    }
+    const version = document.createElement("p");
+    version.className = "fine";
+    version.textContent = "Disclosure version: " + disclosure.disclosure_version;
+    root.append(version);
+    root.hidden = false;
+    $("vehicle-decode-consent-label").hidden = false;
+    $("record-vehicle-decode-consent").hidden = false;
+    $("withdraw-vehicle-decode-consent").hidden = false;
+    message("vehicle-decode-consent-message","Review this optional disclosure separately from capture consent. No VIN lookup has been requested.");
+  } catch (error) {
+    clearVehicleDecodeDisclosure();
+    message("vehicle-decode-consent-message",error.message,true);
+  }
+}
+async function recordVehicleDecodeConsent(accepted = true) {
+  const id = $("owner-session-id").value.trim();
+  if (!id || !vehicleDecodeDisclosure || vehicleDecodeDisclosureSessionId !== id) {
+    return message("vehicle-decode-consent-message","Load the current NHTSA disclosure for this session before recording or withdrawing optional consent.",true);
+  }
+  if (accepted && !$("vehicle-decode-consent-accepted").checked) {
+    return message("vehicle-decode-consent-message","Check the separate optional-consent box before accepting the NHTSA lookup.",true);
+  }
+  try {
+    const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/vehicle-decode-consent`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        request_id:uuid(),
+        accepted,
+        scope:"nhtsa_vpic_decode",
+        disclosure_version:vehicleDecodeDisclosure.disclosure_version
+      })
+    });
+    if (!accepted) $("vehicle-decode-consent-accepted").checked = false;
+    message(
+      "vehicle-decode-consent-message",
+      accepted
+        ? "Separate NHTSA vPIC lookup consent recorded. Capture consent remains a separate choice."
+        : "Optional NHTSA lookup consent withdrawn. Active vehicle-profile attributes have been cleared."
+    );
+    return result;
+  } catch (error) {
+    message("vehicle-decode-consent-message",error.message,true);
+    return null;
+  }
+}
+async function withdrawVehicleDecodeConsent() {
+  return recordVehicleDecodeConsent(false);
+}
 async function withdrawCaptureConsent() {
   const id = $("owner-session-id").value.trim();
   if (!id) return message("owner-message","Enter the case ID before withdrawing consent.",true);
@@ -298,6 +384,85 @@ async function recordVin() {
     });
     setCase(id); message("operator-message","Vehicle reference validated and stored as a keyed reference.");
   } catch (error) { message("operator-message",error.message,true); }
+}
+function renderVehicleProfile(profile) {
+  const root = $("vehicle-profile-result");
+  root.replaceChildren();
+  const heading = document.createElement("p");
+  heading.className = "fine";
+  heading.textContent = `Status: ${profile.status || "UNKNOWN"} · Provider: ${profile.provider || "Unknown"} · Requested: ${profile.requested_at || "Unknown"}`;
+  root.append(heading);
+  const warning = document.createElement("p");
+  warning.className = "profile-warning";
+  warning.textContent = "Provider-reported vehicle description only. It is not proof of ownership, authenticity, physical condition, damage, curb weight, safety, or roadworthiness, and is not eligible as a physics input.";
+  root.append(warning);
+  if (profile.decode_error_code) {
+    const error = document.createElement("p");
+    error.className = "error fine";
+    error.textContent = "Provider lookup result: " + profile.decode_error_code;
+    root.append(error);
+  }
+  const attributes = profile.attributes && typeof profile.attributes === "object" ? profile.attributes : {};
+  const table = document.createElement("table");
+  table.className = "vehicle-profile-table";
+  for (const [name, detail] of Object.entries(attributes)) {
+    const row = document.createElement("tr");
+    const label = document.createElement("th");
+    label.scope = "row";
+    label.textContent = name.replaceAll("_"," ");
+    const value = document.createElement("td");
+    const rawValue = detail && Object.prototype.hasOwnProperty.call(detail,"value") ? detail.value : null;
+    value.textContent = rawValue === null || rawValue === undefined || rawValue === ""
+      ? "Not reported"
+      : String(rawValue);
+    const source = document.createElement("td");
+    source.className = "fine";
+    source.textContent = detail && detail.source
+      ? detail.source + (detail.source_field ? " · " + detail.source_field : "") + (detail.unit ? " · " + detail.unit : "")
+      : "Source unavailable";
+    row.append(label,value,source);
+    table.append(row);
+  }
+  if (table.rows.length) root.append(table);
+  const eligibility = document.createElement("p");
+  eligibility.className = "fine";
+  eligibility.textContent = "Physics input eligibility: " + (profile.physics_input_eligibility || "NOT_ESTABLISHED");
+  root.append(eligibility);
+}
+async function decodeVehicleProfile() {
+  const id = $("session-id").value.trim();
+  const vin = $("vin").value.trim().toUpperCase();
+  if (!id || vin.length !== 17) {
+    return message("operator-message","Open a persistent claim session and enter the 17-character VIN before requesting a vehicle profile.",true);
+  }
+  if (!pendingVehicleProfileRequest ||
+      pendingVehicleProfileRequest.sessionId !== id ||
+      pendingVehicleProfileRequest.vin !== vin) {
+    pendingVehicleProfileRequest = {sessionId:id,vin,requestId:uuid()};
+  }
+  const button = $("decode-vehicle-profile");
+  button.disabled = true;
+  try {
+    const profile = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/vehicle-profile`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({request_id:pendingVehicleProfileRequest.requestId,vin})
+    });
+    renderVehicleProfile(profile);
+    pendingVehicleProfileRequest = null;
+    message("operator-message",profile.replayed
+      ? "Existing consented vehicle profile retrieved."
+      : "Provider-reported vehicle description retrieved and attributed. No physical condition finding was made.");
+  } catch (error) {
+    const root = $("vehicle-profile-result");
+    root.replaceChildren();
+    const failure = document.createElement("p");
+    failure.className = "error fine";
+    failure.textContent = error.message;
+    root.append(failure);
+    message("operator-message",error.message,true);
+  } finally {
+    button.disabled = false;
+  }
 }
 function base64(bytes) {
   let binary = "";
@@ -546,6 +711,15 @@ $("new-case").addEventListener("click",createCase);
 $("create-claim-case").addEventListener("click",createClaimCase);
 $("resume-case").addEventListener("click",resumeCase);
 $("refresh-sessions").addEventListener("click",refreshOwnedSessions);
+$("load-vehicle-decode-disclosure").addEventListener("click",loadVehicleDecodeDisclosure);
+$("record-vehicle-decode-consent").addEventListener("click",()=>recordVehicleDecodeConsent(true));
+$("withdraw-vehicle-decode-consent").addEventListener("click",withdrawVehicleDecodeConsent);
+$("owner-session-id").addEventListener("input",()=>{
+  if (vehicleDecodeDisclosureSessionId && vehicleDecodeDisclosureSessionId !== $("owner-session-id").value.trim()) {
+    clearVehicleDecodeDisclosure();
+    message("vehicle-decode-consent-message","Session changed. Load the disclosure again before recording consent.");
+  }
+});
 $("record-consent").addEventListener("click",recordConsent);
 $("withdraw-capture-consent").addEventListener("click",withdrawCaptureConsent);
 $("load-incident-details").addEventListener("click",refreshIncidentDetails);
@@ -553,6 +727,7 @@ $("record-incident-consent").addEventListener("click",()=>recordIncidentConsent(
 $("withdraw-incident-consent").addEventListener("click",()=>recordIncidentConsent(false));
 $("submit-incident-intake").addEventListener("click",submitIncidentIntake);
 $("save-vin").addEventListener("click",recordVin);
+$("decode-vehicle-profile").addEventListener("click",decodeVehicleProfile);
 $("record-quality").addEventListener("click",recordQuality);
 $("seal-case").addEventListener("click",sealCase);
 $("sync-pending-evidence").addEventListener("click",()=>{ void retryPendingEvidence(); });
