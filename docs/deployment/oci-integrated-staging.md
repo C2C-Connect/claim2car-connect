@@ -22,7 +22,7 @@ Before provisioning or exposing any compute instance, review the security lists 
 
 - **Compute:** one private OCI Compute instance for the first controlled staging slice. Use an Always Free-eligible shape only if the account/region confirms eligibility and capacity. Do not silently substitute a paid shape.
 - **Application:** build the integrated image from `Dockerfile.integrated`; run as non-root UID 10001.
-- **Database:** PostgreSQL 16 with PostGIS, separate migration and least-privilege runtime identities, RLS/forced policies, and the accepted migration inventory through 0019. Add pgRouting only where the routing subsystem requires it; dispatch remains disabled.
+- **Database:** PostgreSQL 16 with PostGIS, separate migration and least-privilege runtime identities, RLS/forced policies, and the accepted migration inventory through 0023. Add pgRouting only where the routing subsystem requires it; dispatch remains disabled.
 - **Evidence storage:** a dedicated persistent block volume mounted exactly at `/var/lib/claim2car/evidence`, owned by UID 10001 and not shared across replicas. The integrated readiness probe requires this exact root to be a mount point and to pass a write/fsync/remove/directory-fsync probe.
 - **Database storage:** persistent database data volume, separate from the evidence volume.
 - **Secrets:** OCI Vault or an approved secret manager for database credentials, runtime actor tokens, VIN pepper, internal service token, and OCIR credentials. Never put raw tokens, private keys, or OCIDs in source files.
