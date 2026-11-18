@@ -247,6 +247,34 @@ class CollisionLifecycleStore:
             ) for row in rows]
 
 
+    def list_vehicles(self, authorization, collision_id):
+        """List tenant-authorized vehicle identities linked to a collision."""
+        collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            self._require_operator(actor)
+            rows = conn.execute(
+                "SELECT l.collision_id,l.vehicle_id,l.relationship,l.linked_by,l.linked_at,"
+                "v.vin_hmac_sha256,v.vin_source,v.vin_validation_status,"
+                "l.source_session_id,l.source_event_id "
+                "FROM faos.collision_vehicle_links l "
+                "JOIN faos.collision_lifecycle_records r "
+                "ON r.tenant_id=l.tenant_id AND r.collision_id=l.collision_id "
+                "JOIN faos.vehicles v "
+                "ON v.tenant_id=l.tenant_id AND v.vehicle_id=l.vehicle_id "
+                "WHERE l.tenant_id=%s AND l.collision_id=%s "
+                "AND (r.created_by=%s OR %s='supervisor') "
+                "ORDER BY l.linked_at,l.vehicle_id",
+                (actor.tenant_id, collision_id, actor.actor_id, actor.actor_role),
+            ).fetchall()
+            return [{
+                "collision_id": str(row[0]), "vehicle_id": str(row[1]),
+                "relationship": row[2], "linked_by": row[3],
+                "linked_at": row[4].isoformat(), "vin_hmac_sha256": row[5],
+                "vin_source": row[6], "vin_validation_status": row[7],
+                "source_session_id": row[8], "source_event_id": row[9],
+                "created": False,
+            } for row in rows]
+
     def list_review_claims(self, authorization, collision_id):
         """List only collision-linked capture sessions for an independent reviewer."""
         collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
