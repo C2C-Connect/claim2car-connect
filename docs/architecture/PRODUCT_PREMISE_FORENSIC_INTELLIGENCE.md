@@ -73,6 +73,10 @@ For example, an exterior bumper photograph cannot establish the condition of the
 
 Confidence must be calibrated against relevant validation data. An uncalibrated model score must never be presented as a probability of truth or allowed to override missing, contradictory, or insufficient evidence.
 
+## 3. Frontline capture and adjudication reference
+
+The detailed field workflow—from VIN acquisition and vehicle decoding through 16-point AR-guided capture, edge quality gates, offline evidence synchronization, technical adjudication, and recipient-specific reporting—is specified in the [Frontline Capture and Forensic Adjudication Reference Architecture](FRONTLINE_CAPTURE_ADJUDICATION_REFERENCE.md). That document explicitly separates owner-provided target design from verified implementation and identifies the scientific, security, privacy, and operational validation required before thresholds or model outputs can become authoritative.
+
 ## 3. The end-to-end collision journey
 
 The intended product journey is one connected, auditable lifecycle. The stages below describe the target capability; implementation status must be verified separately.
