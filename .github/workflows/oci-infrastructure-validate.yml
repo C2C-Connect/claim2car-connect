@@ -1,0 +1,34 @@
+name: OCI infrastructure validation
+
+on:
+  pull_request:
+    paths:
+      - "infra/oci/**"
+      - ".github/workflows/oci-infrastructure-validate.yml"
+  push:
+    branches: [main, "infra/**"]
+    paths:
+      - "infra/oci/**"
+      - ".github/workflows/oci-infrastructure-validate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra/oci/staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - name: Check Terraform formatting
+        run: terraform fmt -diff -check -recursive
+      - name: Initialize provider without backend
+        run: terraform init -backend=false -input=false
+      - name: Validate infrastructure configuration
+        run: terraform validate -no-color

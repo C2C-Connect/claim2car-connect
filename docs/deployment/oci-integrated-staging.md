@@ -22,7 +22,7 @@ Before provisioning or exposing any compute instance, review the security lists 
 
 - **Compute:** one private OCI Compute instance for the first controlled staging slice. Use an Always Free-eligible shape only if the account/region confirms eligibility and capacity. Do not silently substitute a paid shape.
 - **Application:** build the integrated image from `Dockerfile.integrated`; run as non-root UID 10001.
-- **Database:** PostgreSQL 16 with PostGIS, separate migration and least-privilege runtime identities, RLS/forced policies, and the accepted migration inventory through 0019. Add pgRouting only where the routing subsystem requires it; dispatch remains disabled.
+- **Database:** PostgreSQL 16 with PostGIS, separate migration and least-privilege runtime identities, RLS/forced policies, and the accepted migration inventory through 0023. Add pgRouting only where the routing subsystem requires it; dispatch remains disabled.
 - **Evidence storage:** a dedicated persistent block volume mounted exactly at `/var/lib/claim2car/evidence`, owned by UID 10001 and not shared across replicas. The integrated readiness probe requires this exact root to be a mount point and to pass a write/fsync/remove/directory-fsync probe.
 - **Database storage:** persistent database data volume, separate from the evidence volume.
 - **Secrets:** OCI Vault or an approved secret manager for database credentials, runtime actor tokens, VIN pepper, internal service token, and OCIR credentials. Never put raw tokens, private keys, or OCIDs in source files.
@@ -35,7 +35,7 @@ Before provisioning or exposing any compute instance, review the security lists 
 2. Tighten security-list ingress and confirm the private subnet's NAT/service-gateway routes.
 3. Provision an eligible private compute instance and separate persistent database/evidence volumes. Record OCIDs in OCI-side inventory, not this repository.
 4. Install the container runtime and mount volumes. Verify filesystem ownership and mount persistence across a reboot before starting the app.
-5. Provision PostgreSQL 16/PostGIS; create migration/runtime roles and apply the repository's authoritative migration plan through migration 0019.
+5. Provision PostgreSQL 16/PostGIS; create migration/runtime roles and apply the repository's authoritative migration plan through migration 0023.
 6. Provision runtime credentials through OCI Vault and create a dedicated synthetic staging tenant with distinct operator, owner, and reviewer identities.
 7. Build and push the exact integrated image to OCIR; deploy the same SHA to the private compute host.
 8. Verify `/health/live`, `/health/ready`, and `/health/build`; the readiness endpoint must fail if PostgreSQL or the persistent evidence mount is unavailable.
