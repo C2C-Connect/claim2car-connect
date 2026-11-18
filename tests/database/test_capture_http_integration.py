@@ -7,6 +7,7 @@ hosting acceptance.
 import base64
 import hashlib
 import json
+import json
 import os
 import tempfile
 import time
@@ -129,6 +130,29 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(collision_vehicle.json()["source_consent_status"], "ACTIVE")
                     self.assertNotIn("vin_hmac_sha256", collision_vehicle.json())
 
+                    from app.vehicle_intelligence.vpic import VpicClient
+                    provider_row = {
+                        "VIN": "1HGCM82633A004352", "ErrorCode": "0", "SuggestedVIN": "",
+                        "Make": "HONDA", "Model": "Accord", "ModelYear": "2003",
+                        "Trim": "EX", "BodyClass": "Sedan", "VehicleType": "PASSENGER CAR",
+                        "CurbWeightLB": "", "GVWR": "CLASS 1",
+                    }
+                    provider_calls = []
+                    fake_decoder = VpicClient(fetcher=lambda *args: (
+                        provider_calls.append(args) or (
+                            200, "application/json",
+                            json.dumps({"Count": 1, "Results": [provider_row]}).encode(),
+                        )
+                    ))
+                    with patch("app.capture_api._vpic_client", fake_decoder):
+                        blocked_decode = client.post(
+                            f"/v1/capture-sessions/{session_id}/vehicle-profile",
+                            headers=operator_headers,
+                            json={"request_id": str(uuid.uuid4()), "vin": "1HGCM82633A004352"},
+                        )
+                    self.assertEqual(blocked_decode.status_code, 403, blocked_decode.text)
+                    self.assertEqual(provider_calls, [])
+
                     decode_consent = client.post(
                         f"/v1/capture-sessions/{session_id}/vehicle-decode-consent",
                         headers=owner_headers,
@@ -139,17 +163,6 @@ class CaptureHttpIntegration(unittest.TestCase):
                         },
                     )
                     self.assertEqual(decode_consent.status_code, 200, decode_consent.text)
-                    from app.vehicle_intelligence.vpic import VpicClient
-                    provider_row = {
-                        "VIN": "1HGCM82633A004352", "ErrorCode": "0", "SuggestedVIN": "",
-                        "Make": "HONDA", "Model": "Accord", "ModelYear": "2003",
-                        "Trim": "EX", "BodyClass": "Sedan", "VehicleType": "PASSENGER CAR",
-                        "CurbWeightLB": "", "GVWR": "CLASS 1",
-                    }
-                    fake_decoder = VpicClient(fetcher=lambda *_: (
-                        200, "application/json",
-                        json.dumps({"Count": 1, "Results": [provider_row]}).encode(),
-                    ))
                     with patch("app.capture_api._vpic_client", fake_decoder):
                         decoded = client.post(
                             f"/v1/capture-sessions/{session_id}/vehicle-profile",
@@ -164,6 +177,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(decoded.json()["physics_input_eligibility"], "NOT_ESTABLISHED")
                     self.assertNotIn("vin", decoded.json())
                     self.assertNotIn("vin_hmac_sha256", decoded.json())
+                    self.assertEqual(len(provider_calls), 1)
 
                     collision_view_with_vehicle = client.get(
                         f"/v1/collisions/{collision_id}",
