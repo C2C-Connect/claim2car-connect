@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   CANONICAL_SLOTS,
   LEGACY_CANONICAL_SLOTS,
@@ -44,4 +45,11 @@ const decision = reviewer.recordDecision("priority", {
 assert.equal(decision.reviewerId, "reviewer-a");
 assert.equal(CANONICAL_SLOTS.length, 16);
 assert.equal(LEGACY_CANONICAL_SLOTS.length, 12);
+
+const browserWorkbenchSource = readFileSync(new URL("../app/app.mjs", import.meta.url), "utf8");
+const apiSlotBlock = browserWorkbenchSource.match(/const API_CAPTURE_SLOTS = \[([\s\S]*?)\n\];/);
+assert.ok(apiSlotBlock, "browser workbench must declare its server API capture slots");
+const apiSlots = Array.from(apiSlotBlock[1].matchAll(/\["([a-z0-9_]+)",\s*"[^"]+"\]/g), (match) => match[1]);
+assert.deepEqual(apiSlots, CANONICAL_SLOTS, "browser upload slots must exactly match the server's ordered 16-view protocol");
+
 console.log(JSON.stringify({ suite: "slice2-workbench", assertions: 12, status: "passed" }));
