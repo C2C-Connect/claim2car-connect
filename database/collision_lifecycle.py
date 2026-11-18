@@ -180,6 +180,13 @@ class CollisionLifecycleStore:
         with self.sessions._authorized(authorization) as (conn, actor):
             if actor.actor_role not in ("reviewer", "supervisor"):
                 raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            collision_exists = conn.execute(
+                "SELECT 1 FROM faos.collision_lifecycle_records "
+                "WHERE tenant_id=%s AND collision_id=%s",
+                (actor.tenant_id, collision_id),
+            ).fetchone()
+            if collision_exists is None:
+                raise CollisionLifecycleNotFound("COLLISION_NOT_FOUND")
             rows = conn.execute(
                 "SELECT l.collision_id,l.claim_id,c.capture_session_id,s.capture_protocol_version,l.linked_by,l.linked_at "
                 "FROM faos.collision_claim_links l "

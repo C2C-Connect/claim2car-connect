@@ -170,7 +170,8 @@ class CollisionLifecycleIntegration(unittest.TestCase):
         self.assertEqual(len(links), 1)
         self.assertEqual(links[0].claim_id, claim_id)
         self.assertEqual(links[0].capture_session_id, claim.capture_session_id)
-        self.assertEqual(self.store.list_review_claims(self.reviewer_auth(1), collision_id), [])
+        with self.assertRaises(CollisionLifecycleNotFound):
+            self.store.list_review_claims(self.reviewer_auth(1), collision_id)
 
     def test_every_clr_table_forces_rls_and_blocks_direct_application_writes(self):
         tables = (

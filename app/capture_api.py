@@ -448,6 +448,10 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 _fail(403, 'CAPTURE_AUTHORITY_DENIED')
             except CaptureSessionConflict:
                 _fail(409, 'CAPTURE_SESSION_CONFLICT')
+            except CollisionLifecycleNotFound:
+                _fail(404, 'COLLISION_NOT_FOUND')
+            except CaptureSessionConflict:
+                _fail(409, 'EVIDENCE_HISTORY_INVALID')
             except CaptureSessionNotFound:
                 _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
             except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
@@ -541,7 +545,13 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                     try:
                         details = evidence.get_review_details(authorization, link.capture_session_id)
                         evidence_status = 'READY'
-                    except CaptureSessionConflict:
+                    except CaptureSessionConflict as error:
+                        if str(error) not in (
+                            'ACTIVE_OWNER_CONSENT_REQUIRED',
+                            'SEALED_SESSION_REQUIRED_FOR_REVIEW',
+                            'CAPTURE_SET_INCOMPLETE',
+                        ):
+                            raise
                         details = None
                         evidence_status = 'NOT_REVIEWABLE'
                     claims.append({
