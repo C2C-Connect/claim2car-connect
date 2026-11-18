@@ -74,7 +74,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0021_collision_claim_link.sql')
+        self.assertEqual(plan[-1].name,'0022_collision_vehicle_capture_link.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -95,7 +95,9 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-4])
+        protocol_index = next(i for i, item in enumerate(plan)
+                              if item.name == '0018_capture_protocol_session_binding.sql')
+        apply(self.conn, plan[:protocol_index])
         tenant = str(uuid.uuid4())
         legacy_session = 'legacy-' + uuid.uuid4().hex
         new_session = 'new-' + uuid.uuid4().hex
@@ -108,7 +110,8 @@ class MigrationControlsIntegration(unittest.TestCase):
                           (tenant,'protocol migration fixture'))
             admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',
                           (tenant,legacy_session))
-            self.assertEqual(apply(self.conn,plan[:-3]),(plan[-4].name,))
+            self.assertEqual(apply(self.conn,plan[:protocol_index + 1]),
+                             (plan[protocol_index].name,))
             legacy_version = admin.execute(
                 'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
                 (tenant,legacy_session)).fetchone()[0]
@@ -324,7 +327,9 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_noncanonical_historical_event_blocks_parity_migration_without_rewrite(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-5])
+        parity_index = next(i for i, item in enumerate(plan)
+                            if item.name == '0017_event_contract_parity.sql')
+        apply(self.conn, plan[:parity_index])
         tenant = str(uuid.uuid4())
         session = 'reject-history-' + uuid.uuid4().hex
         payload = '{"z":1,"a":2}'
@@ -357,6 +362,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0021_collision_claim_link.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0022_collision_vehicle_capture_link.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
