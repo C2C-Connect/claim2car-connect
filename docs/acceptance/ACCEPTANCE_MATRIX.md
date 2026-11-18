@@ -1,5 +1,8 @@
 # Claim2Car Connect — Acceptance & Release Gate Matrix
 
+> **Product north star:** [Claim2Car Product Premise: Forensic Intelligence, Truth, and Resolution](../architecture/PRODUCT_PREMISE_FORENSIC_INTELLIGENCE.md) defines the owner-aligned product objective and Post-Accident Truth Standard. This document records implementation, verification, and release evidence; the vision document must not be read as proof that target capabilities are already implemented.
+
+
 **Canonical repository:** `C2C-Connect/claim2car-connect`
 **Current main baseline after PR #47 integration:** `f3ba5b28eede44eff5fef70a6b5fda8b4358757f`
 **Capture protocol:** `claims2car-16-v1` is the new-session default; explicit historical `claims2car-12-v1` compatibility is preserved.
