@@ -155,6 +155,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0020_collision_lifecycle_record.sql',
             '0021_collision_claim_link.sql',
                 '0022_collision_vehicle_capture_link.sql',
+                '0023_consented_vehicle_profile.sql',
                 '0024_unreviewed.sql',
             ]))
 
