@@ -111,6 +111,30 @@ class CaptureHttpIntegration(unittest.TestCase):
                     )
                     self.assertEqual(vehicle.status_code, 200, vehicle.text)
 
+                    vehicle_id = str(uuid.uuid4())
+                    collision_vehicle = client.post(
+                        f"/v1/collisions/{collision_id}/vehicles",
+                        headers=operator_headers,
+                        json={
+                            "claim_id": claim_id,
+                            "vehicle_id": vehicle_id,
+                            "request_id": str(uuid.uuid4()),
+                            "relationship": "INVOLVED",
+                        },
+                    )
+                    self.assertEqual(collision_vehicle.status_code, 201, collision_vehicle.text)
+                    self.assertEqual(collision_vehicle.json()["vehicle_id"], vehicle_id)
+                    self.assertEqual(collision_vehicle.json()["vin_source"], "CONSENTED_CAPTURE_SESSION")
+                    self.assertEqual(collision_vehicle.json()["source_consent_status"], "ACTIVE")
+                    self.assertNotIn("vin_hmac_sha256", collision_vehicle.json())
+                    collision_view_with_vehicle = client.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers=operator_headers,
+                    )
+                    self.assertEqual(collision_view_with_vehicle.status_code, 200, collision_view_with_vehicle.text)
+                    self.assertEqual(collision_view_with_vehicle.json()["vehicles"][0]["vehicle_id"], vehicle_id)
+                    self.assertEqual(collision_view_with_vehicle.json()["vehicles"][0]["source_consent_status"], "ACTIVE")
+
                     originals = {}
                     for slot in CANONICAL_SLOTS:
                         raw = ("synthetic-http-original:" + slot).encode("ascii")
@@ -180,6 +204,13 @@ class CaptureHttpIntegration(unittest.TestCase):
                         collision_evidence.json()["claims"][0]["evidence"]["manifest_digest"],
                         manifest_digest,
                     )
+                    collision_view_after_restart = restarted.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers={"Authorization": self.db.auth()},
+                    )
+                    self.assertEqual(collision_view_after_restart.status_code, 200, collision_view_after_restart.text)
+                    self.assertEqual(collision_view_after_restart.json()["vehicles"][0]["vehicle_id"], vehicle_id)
+                    self.assertEqual(collision_view_after_restart.json()["vehicles"][0]["source_consent_status"], "ACTIVE")
 
                     first_artifact_id, first_bytes = next(iter(originals.items()))
                     retrieved = restarted.get(
@@ -212,6 +243,25 @@ class CaptureHttpIntegration(unittest.TestCase):
                     )
                     self.assertEqual(withdrawn.status_code, 200, withdrawn.text)
                     self.assertFalse(stored_path.exists())
+                    vehicle_after_withdrawal = restarted.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers={"Authorization": self.db.auth()},
+                    )
+                    self.assertEqual(vehicle_after_withdrawal.status_code, 200, vehicle_after_withdrawal.text)
+                    self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["source_consent_status"], "REVOKED")
+                    self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["vin_source"], "UNVERIFIED")
+                    self.assertEqual(vehicle_after_withdrawal.json()["vehicles"][0]["vin_validation_status"], "UNVERIFIED")
+                    relink_after_withdrawal = restarted.post(
+                        f"/v1/collisions/{collision_id}/vehicles",
+                        headers={"Authorization": self.db.auth()},
+                        json={
+                            "claim_id": claim_id,
+                            "vehicle_id": str(uuid.uuid4()),
+                            "request_id": str(uuid.uuid4()),
+                            "relationship": "INVOLVED",
+                        },
+                    )
+                    self.assertEqual(relink_after_withdrawal.status_code, 403, relink_after_withdrawal.text)
                     after_withdrawal = restarted.get(
                         f"/v1/review-sessions/{session_id}",
                         headers={"Authorization": self.db.reviewer_auth()},

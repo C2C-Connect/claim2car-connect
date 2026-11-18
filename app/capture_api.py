@@ -68,6 +68,14 @@ class CollisionClaimLinkRequest(BaseModel):
     class Config:
         extra = 'forbid'
 
+class CollisionVehicleLinkRequest(BaseModel):
+    claim_id: UUID
+    vehicle_id: UUID
+    request_id: UUID
+    relationship: StrictStr = Field(default='INVOLVED', min_length=1, max_length=16)
+    class Config:
+        extra = 'forbid'
+
 class IncidentConsentRequest(BaseModel):
     request_id: UUID
     accepted: StrictBool
@@ -318,8 +326,9 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
     def invoke_collision(action, authorization, **kwargs):
         try:
             result = action(authorization, **kwargs)
-            payload = {**asdict(result), 'scope': 'collision-lifecycle'}
-            return JSONResponse(jsonable_encoder(payload), status_code=201 if getattr(result, 'created', False) else 200,
+            result_data = asdict(result) if hasattr(result, '__dataclass_fields__') else dict(result)
+            payload = {**result_data, 'scope': 'collision-lifecycle'}
+            return JSONResponse(jsonable_encoder(payload), status_code=201 if result_data.get('created', False) else 200,
                                 headers=dict(NO_STORE_HEADERS))
         except AuthenticationError:
             _fail(401, 'UNAUTHORIZED')
@@ -350,9 +359,11 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         try:
             record = collisions.get(authorization, str(collision_id))
             claims = collisions.list_claims(authorization, str(collision_id))
+            vehicles = collisions.list_vehicles(authorization, str(collision_id))
             return JSONResponse(jsonable_encoder({
                 'collision': asdict(record),
                 'claims': [asdict(item) for item in claims],
+                'vehicles': vehicles,
                 'scope': 'collision-lifecycle',
             }), headers=dict(NO_STORE_HEADERS))
         except AuthenticationError:
@@ -374,6 +385,18 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         return invoke_collision(collisions.link_claim, authorization,
                                 collision_id=str(collision_id), claim_id=str(body.claim_id),
                                 request_id=str(body.request_id))
+
+    @api.post('/v1/collisions/{collision_id}/vehicles')
+    def link_collision_vehicle(collision_id: UUID, body: CollisionVehicleLinkRequest,
+                               authorization: str = Depends(authorize)):
+        if collisions is None:
+            _fail(503, 'COLLISION_STORAGE_UNAVAILABLE')
+        return invoke_collision(
+            collisions.link_vehicle_from_capture, authorization,
+            collision_id=str(collision_id), claim_id=str(body.claim_id),
+            vehicle_id=str(body.vehicle_id), request_id=str(body.request_id),
+            relationship=body.relationship,
+        )
 
     @api.post('/v1/claim-cases')
     def create_claim_case(body: ClaimCaseRequest, authorization: str = Depends(authorize)):

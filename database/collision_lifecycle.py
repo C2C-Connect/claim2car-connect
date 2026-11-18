@@ -150,6 +150,89 @@ class CollisionLifecycleStore:
                 created=(outcome == "ACCEPTED"),
             )
 
+    def link_vehicle_from_capture(
+        self, authorization, *, collision_id, claim_id, vehicle_id, request_id,
+        relationship="INVOLVED", occurred_at=None,
+    ):
+        """Bind a collision to the VIN identity already recorded in its consented capture session.
+
+        The raw VIN is never copied into the CLR registry. PostgreSQL reads the
+        keyed VIN digest from the immutable capture event and enforces current
+        consent, claim linkage, actor authority, and tenant scope.
+        """
+        collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
+        claim_id = self._uuid(claim_id, "INVALID_CLAIM_CASE_ID")
+        vehicle_id = self._uuid(vehicle_id, "INVALID_VEHICLE_ID")
+        request_id = self._uuid(request_id, "INVALID_COLLISION_VEHICLE_REQUEST_ID")
+        occurred_at = occurred_at or datetime.now(timezone.utc).isoformat()
+        if not isinstance(occurred_at, str) or not occurred_at.strip():
+            raise ValueError("INVALID_COLLISION_TIMESTAMP")
+        if relationship not in ("INVOLVED", "INSURED", "THIRD_PARTY", "UNKNOWN"):
+            raise ValueError("INVALID_COLLISION_VEHICLE_RELATIONSHIP")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            self._require_operator(actor)
+            try:
+                outcome = conn.execute(
+                    "SELECT faos.link_collision_vehicle_from_capture("
+                    "%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s::text,%s::text,%s::timestamptz)",
+                    (actor.tenant_id, collision_id, claim_id, vehicle_id, request_id,
+                     relationship, actor.actor_id, occurred_at),
+                ).fetchone()[0]
+            except psycopg.errors.RaiseException as error:
+                code = error.diag.message_primary
+                if code in ("COLLISION_VEHICLE_LINK_AUTHORITY_DENIED",
+                            "ACTIVE_CAPTURE_CONSENT_REQUIRED",
+                            "CONSENTED_VEHICLE_REFERENCE_REQUIRED",
+                            "VEHICLE_REFERENCE_SOURCE_INVALID"):
+                    raise CaptureAuthorizationError(code) from None
+                if code in (
+                    "COLLISION_VEHICLE_LINK_CONFLICT",
+                    "COLLISION_EVENT_IDEMPOTENCY_CONFLICT",
+                    "COLLISION_VEHICLE_CLAIM_LINK_REQUIRED",
+                    "VEHICLE_IDENTITY_SOURCE_CONFLICT",
+                    "VEHICLE_REFERENCE_INTEGRITY_INVALID",
+                    "VEHICLE_REGISTRY_READBACK_FAILED",
+                ):
+                    raise CollisionLifecycleConflict(code) from None
+                if code == "INVALID_COLLISION_VEHICLE_LINK":
+                    raise ValueError(code) from None
+                raise
+            if outcome not in ("ACCEPTED", "DUPLICATE"):
+                raise CollisionLifecycleConflict("COLLISION_VEHICLE_LINK_NOT_ACCEPTED")
+            digest_row = conn.execute(
+                "SELECT e.payload_json::jsonb->>'vin_hmac_sha256' "
+                "FROM faos.collision_claim_links l "
+                "JOIN faos.claim_cases c ON c.tenant_id=l.tenant_id AND c.claim_id=l.claim_id "
+                "JOIN faos.events e ON e.tenant_id=c.tenant_id AND e.session_id=c.capture_session_id "
+                "WHERE l.tenant_id=%s AND l.collision_id=%s AND l.claim_id=%s "
+                "AND e.kind='VEHICLE_RECORDED' ORDER BY e.sequence DESC LIMIT 1",
+                (actor.tenant_id, collision_id, claim_id),
+            ).fetchone()
+            if digest_row is None or not digest_row[0]:
+                raise CollisionLifecycleConflict("COLLISION_VEHICLE_LINK_READBACK_MISMATCH")
+            row = conn.execute(
+                "SELECT l.collision_id,l.vehicle_id,l.relationship,l.linked_by,l.linked_at,"
+                "v.vin_source,v.vin_validation_status,l.source_session_id,l.source_event_id,"
+                "COALESCE(src.source_status,'REVOKED') "
+                "FROM faos.collision_vehicle_links l "
+                "JOIN faos.vehicles v ON v.tenant_id=l.tenant_id AND v.vehicle_id=l.vehicle_id "
+                "LEFT JOIN faos.vehicle_identity_sources src ON src.tenant_id=l.tenant_id "
+                "AND src.vehicle_id=l.vehicle_id AND src.source_session_id=l.source_session_id "
+                "AND src.source_event_id=l.source_event_id "
+                "WHERE l.tenant_id=%s AND l.collision_id=%s AND v.vin_hmac_sha256=%s",
+                (actor.tenant_id, collision_id, digest_row[0]),
+            ).fetchone()
+            if row is None:
+                raise CollisionLifecycleConflict("COLLISION_VEHICLE_LINK_READBACK_MISMATCH")
+            return {
+                "collision_id": str(row[0]), "vehicle_id": str(row[1]),
+                "relationship": row[2], "linked_by": row[3],
+                "linked_at": row[4].isoformat(), "vin_source": row[5],
+                "vin_validation_status": row[6], "source_session_id": row[7],
+                "source_event_id": row[8], "source_consent_status": row[9],
+                "created": outcome == "ACCEPTED",
+            }
+
     def list_claims(self, authorization, collision_id):
         collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
         with self.sessions._authorized(authorization) as (conn, actor):
@@ -173,6 +256,37 @@ class CollisionLifecycleStore:
                 linked_by=row[4], linked_at=row[5].isoformat(), created=False,
             ) for row in rows]
 
+
+    def list_vehicles(self, authorization, collision_id):
+        """List tenant-authorized vehicle identities linked to a collision."""
+        collision_id = self._uuid(collision_id, "INVALID_COLLISION_ID")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            self._require_operator(actor)
+            rows = conn.execute(
+                "SELECT l.collision_id,l.vehicle_id,l.relationship,l.linked_by,l.linked_at,"
+                "v.vin_source,v.vin_validation_status,"
+                "l.source_session_id,l.source_event_id,COALESCE(src.source_status,'REVOKED') "
+                "FROM faos.collision_vehicle_links l "
+                "JOIN faos.collision_lifecycle_records r "
+                "ON r.tenant_id=l.tenant_id AND r.collision_id=l.collision_id "
+                "JOIN faos.vehicles v "
+                "ON v.tenant_id=l.tenant_id AND v.vehicle_id=l.vehicle_id "
+                "LEFT JOIN faos.vehicle_identity_sources src ON src.tenant_id=l.tenant_id "
+                "AND src.vehicle_id=l.vehicle_id AND src.source_session_id=l.source_session_id "
+                "AND src.source_event_id=l.source_event_id "
+                "WHERE l.tenant_id=%s AND l.collision_id=%s "
+                "AND (r.created_by=%s OR %s='supervisor') "
+                "ORDER BY l.linked_at,l.vehicle_id",
+                (actor.tenant_id, collision_id, actor.actor_id, actor.actor_role),
+            ).fetchall()
+            return [{
+                "collision_id": str(row[0]), "vehicle_id": str(row[1]),
+                "relationship": row[2], "linked_by": row[3],
+                "linked_at": row[4].isoformat(), "vin_source": row[5],
+                "vin_validation_status": row[6], "source_session_id": row[7],
+                "source_event_id": row[8], "source_consent_status": row[9],
+                "created": False,
+            } for row in rows]
 
     def list_review_claims(self, authorization, collision_id):
         """List only collision-linked capture sessions for an independent reviewer."""
