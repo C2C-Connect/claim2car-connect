@@ -135,8 +135,8 @@ REVOKE CREATE ON SCHEMA faos FROM faos_writer;
   RAISE EXCEPTION 'ACTIVE_CONSENTED_VEHICLE_IDENTITY_REQUIRED';
  END IF;
  IF NOT EXISTS(
-  SELECT 1 FROM faos.sessions
-  WHERE tenant_id=p_tenant AND session_id=p_session AND created_by=p_actor
+  SELECT 1 FROM faos.claim_cases
+  WHERE tenant_id=p_tenant AND capture_session_id=p_session AND created_by=p_actor
  ) THEN
   RAISE EXCEPTION 'CAPTURE_AUTHORITY_DENIED';
  END IF;
