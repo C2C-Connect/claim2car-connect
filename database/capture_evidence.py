@@ -211,11 +211,8 @@ class CaptureEvidenceService:
                         (actor.tenant_id, _session.claim_id, actor.actor_id),
                     )
                     conn.execute(
-                        "UPDATE faos.vehicle_decode_snapshots SET decode_status='REVOKED',"
-                        "attributes_json=NULL,revoked_at=clock_timestamp() "
-                        "WHERE tenant_id=%s AND source_session_id=%s "
-                        "AND decode_status IN ('DECODED','PARTIAL','ERROR')",
-                        (actor.tenant_id, session_id),
+                        "SELECT faos.revoke_vehicle_decode_profiles(%s::uuid,%s::text,%s::text)",
+                        (actor.tenant_id, session_id, actor.actor_id),
                     )
             else:
                 artifacts = []
@@ -261,11 +258,8 @@ class CaptureEvidenceService:
                 )
             if not accepted:
                 conn.execute(
-                    "UPDATE faos.vehicle_decode_snapshots SET decode_status='REVOKED',"
-                    "attributes_json=NULL,revoked_at=clock_timestamp() "
-                    "WHERE tenant_id=%s AND source_session_id=%s "
-                    "AND decode_status IN ('DECODED','PARTIAL','ERROR')",
-                    (actor.tenant_id, session_id),
+                    "SELECT faos.revoke_vehicle_decode_profiles(%s::uuid,%s::text,%s::text)",
+                    (actor.tenant_id, session_id, actor.actor_id),
                 )
         return {
             "session_id": session_id, "accepted": accepted,
