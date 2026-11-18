@@ -292,6 +292,8 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("CAPTURE_SESSION_PAUSED")
             if any(kind in ("QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for kind, *_ in history):
                 raise CaptureSessionConflict("CAPTURE_SET_ALREADY_QUALITY_CHECKED")
+            if resolution_code == "SUPERVISOR_REVIEWED" and actor.actor_role != "supervisor":
+                raise CaptureAuthorizationError("SUPERVISOR_IDENTITY_REQUIRED")
             current = self._active_capture_exceptions(history).get(slot)
             if current is None:
                 raise CaptureSessionConflict("ACTIVE_CAPTURE_EXCEPTION_REQUIRED")

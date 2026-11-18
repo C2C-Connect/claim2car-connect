@@ -331,6 +331,12 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
             artifact_id=UUID(int=999), slot=missing, payload_base64=base64.b64encode(raw).decode(),
             sha256_hex=hashlib.sha256(raw).hexdigest())
         with self.assertRaisesRegex(CaptureSessionConflict, "UNRESOLVED_CAPTURE_EXCEPTIONS"):
+            service.seal_capture("operator-token", self.session_id, request_id=UUID(int=898))
+        with self.assertRaisesRegex(CaptureAuthorizationError, "SUPERVISOR_IDENTITY_REQUIRED"):
+            service.resolve_capture_exception("operator-token", self.session_id,
+                request_id=UUID(int=897), slot=missing, resolution_code="SUPERVISOR_REVIEWED",
+                explanation="Operator cannot attest a supervisor review.")
+        with self.assertRaisesRegex(CaptureSessionConflict, "UNRESOLVED_CAPTURE_EXCEPTIONS"):
             service.record_quality("operator-token", self.session_id, request_id=UUID(int=900),
                                         results={slot: True for slot in slots})
         resolved = service.resolve_capture_exception("operator-token", self.session_id,
