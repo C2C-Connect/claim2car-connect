@@ -5,11 +5,14 @@ import {validateVin} from './vin.mjs';
 class TransportFailure extends Error { constructor(reason){super(reason);this.reason=reason;} }
 export async function fetchVpicPayload(input,options={}) {
   const validation=validateVin(input);
+  const mismatchOverride=Boolean(options&&typeof options==='object'&&!Array.isArray(options)&&options.allowCheckDigitMismatch===true&&validation.reason==='CHECKSUM_MISMATCH');
   let httpStatus=null;
-  const fail=reason=>Object.freeze({status:'transport_error',reason,scope:'transport-only',vin:validation.ok?validation.vin:null,httpStatus,payload:null});
-  if(!validation.ok)return fail('INVALID_VIN');
-  if(!options||typeof options!=='object'||Array.isArray(options)||Object.keys(options).some(k=>!['fetchImpl','signal','timeoutMs','maxBytes'].includes(k)))return fail('INVALID_OPTIONS');
-  const {fetchImpl=globalThis.fetch,signal,timeoutMs=10000,maxBytes=262144}=options;
+  const fail=reason=>Object.freeze({status:'transport_error',reason,scope:'transport-only',vin:validation.ok||mismatchOverride?validation.vin:null,httpStatus,payload:null});
+  if(!validation.ok&&!mismatchOverride)return fail('INVALID_VIN');
+  if(!options||typeof options!=='object'||Array.isArray(options)||Object.keys(options).some(k=>!['fetchImpl','signal','timeoutMs','maxBytes','allowCheckDigitMismatch'].includes(k)))return fail('INVALID_OPTIONS');
+  const {fetchImpl=globalThis.fetch,signal,timeoutMs=10000,maxBytes=262144,allowCheckDigitMismatch=false}=options;
+  if(typeof allowCheckDigitMismatch!=='boolean')return fail('INVALID_OPTIONS');
+  if(!validation.ok&&!mismatchOverride)return fail('INVALID_VIN');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>30000||!Number.isInteger(maxBytes)||maxBytes<1||maxBytes>1048576)return fail('INVALID_OPTIONS');
   if(typeof fetchImpl!=='function')return fail('FETCH_UNAVAILABLE');
   if(signal&&(typeof signal.aborted!=='boolean'||typeof signal.addEventListener!=='function'||typeof signal.removeEventListener!=='function'))return fail('INVALID_OPTIONS');

@@ -105,6 +105,8 @@ function renderProfile() {
   $("decode-status").textContent = "DECODED";
   const attrs = [
     ["Model year",p.modelYear],["Make",p.make],["Model",p.model],["Body class",p.bodyClass],
+    ["Trim",p.trim],["Series",p.series],["Drive type",p.driveType],["Engine cylinders",p.engineCylinders],
+    ["Displacement (L)",p.displacementL],["Fuel type",p.fuelType],["Transmission",p.transmission],["Plant country",p.plantCountry],
     ["Curb weight (lb)",p.curbWeightStatus === "reported" ? p.curbWeightLb : null],
     ["Curb weight (kg)",p.curbWeightStatus === "reported" ? p.curbWeightKg.toFixed(1) : null],
     ["Curb weight status",p.curbWeightStatus]
@@ -124,7 +126,7 @@ function renderProfile() {
   $("vehicle-provenance").textContent =
     "Source: NHTSA vPIC DecodeVinValuesExtended · Retrieved " + now() +
     ". Parsed response is format-checked but the source is not independently authenticated. Missing fields remain missing. " +
-    "VIN check digit matched. Vehicle identity decoding does not establish ownership, history, condition, roadworthiness, or safety.";
+    "VIN check digit status: " + p.checkDigitStatus + ". Vehicle identity decoding does not establish ownership, history, condition, roadworthiness, or safety.";
   renderPhotoSlots();
   updateReportAvailability();
   show("vehicle-panel");
@@ -133,12 +135,19 @@ function renderProfile() {
 async function decodeVin() {
   const raw = $("vin-entry").value.trim();
   const check = validateVin(raw);
-  if (!check.ok || check.normalizationChanged) {
+  const mismatchOverride = check.reason === "CHECKSUM_MISMATCH";
+  if ((!check.ok && !mismatchOverride) || check.normalizationChanged) {
     setMessage(check.reason === "CHECKSUM_MISMATCH"
       ? "The North American VIN check digit does not match. Recheck the VIN plate; this prototype currently supports VINs that pass the North American check-digit rule."
       : "Enter the exact 17-character VIN using permitted VIN characters, without spaces or punctuation.", true);
     return;
   }
+  if (mismatchOverride && !$("checksum-override").checked) {
+    show("checksum-override-row");
+    setMessage("The North American check digit does not match. Recheck the physical VIN; only use the override if the physical plate is verified and the vehicle market does not require this check digit.",true);
+    return;
+  }
+  if (!mismatchOverride) show("checksum-override-row",false);
   if (!$("decode-consent").checked) {
     setMessage("Explicit consent is required before sending the VIN to NHTSA vPIC.",true);
     return;
@@ -147,9 +156,9 @@ async function decodeVin() {
   $("decode-vin").disabled = true;
   setMessage("Requesting a bounded vehicle decode from NHTSA vPIC…");
   try {
-    const transport = await fetchVpicPayload(check.vin);
+    const transport = await fetchVpicPayload(check.vin,{allowCheckDigitMismatch:mismatchOverride});
     if (transport.status !== "response_received") throw new Error("NHTSA lookup unavailable: " + transport.reason);
-    const parsed = parseVpicResponse(check.vin,transport.payload);
+    const parsed = parseVpicResponse(check.vin,transport.payload,{allowCheckDigitMismatch:mismatchOverride});
     if (parsed.status !== "parsed") throw new Error("Vehicle decode was blocked: " + parsed.reason);
     state.profile = parsed.profile;
     renderProfile();
@@ -165,10 +174,14 @@ async function decodeVin() {
   }
 }
 $("decode-vin").addEventListener("click",decodeVin);
+$("checksum-override").addEventListener("change",() => {
+  if ($("checksum-override").checked) setMessage("Override acknowledged. The VIN remains flagged for manual verification; this is not proof of vehicle identity.");
+});
 $("vin-entry").addEventListener("input",() => {
   const value = $("vin-entry").value;
   const result = validateVin(value);
-  if (result.reason !== "CHECKSUM_MISMATCH") setMessage("");
+  show("checksum-override-row", result.reason === "CHECKSUM_MISMATCH");
+  if (result.reason !== "CHECKSUM_MISMATCH") { $("checksum-override").checked = false; setMessage(""); }
 });
 async function startCamera() {
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -278,7 +291,7 @@ function reportHtml() {
   ).join("");
   return "<h2>Claim2Car Vehicle &amp; Condition Report</h2><p>Prototype report · Generated " + escapeHtml(now()) +
     "</p><p class='report-warning'><strong>Scope limitation:</strong> This is a documentation prototype, not an appraisal, insurance decision, ownership verification, roadworthiness inspection, or professional repair estimate. Damage observations were entered by the operator. No automated damage assessment or repair-cost model ran.</p>" +
-    "<h3>1. Vehicle identity</h3><p>Source: NHTSA vPIC. North American VIN check digit matched. This does not authenticate the physical vehicle or establish ownership.</p><table>" + table + "</table>" +
+    "<h3>1. Vehicle identity</h3><p>Source: NHTSA vPIC. VIN check digit status: " + escapeHtml(p.checkDigitStatus) + ". A mismatch override is not proof of VIN authenticity or vehicle identity.</p><table>" + table + "</table>" +
     "<h3>2. Capture completeness</h3><p>" + state.photos.size + " of 16 contract views recorded in this browser session.</p><p>Views not captured: " +
     (missing.length ? missing.map(escapeHtml).join(", ") : "None") + ". Missing views are unknown, not evidence of no damage.</p><div class='report-images'>" + images + "</div>" +
     "<h3>3. Visible condition observations</h3><ul>" + observations + "</ul>" +

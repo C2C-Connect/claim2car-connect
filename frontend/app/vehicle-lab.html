@@ -38,7 +38,7 @@
       <label for="vin-entry">Vehicle Identification Number</label>
       <div class="vin-entry-row"><input id="vin-entry" maxlength="17" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="17-character VIN"><button id="decode-vin" class="button primary" type="button">Decode vehicle</button></div>
       <label class="check-row lab-consent"><input id="decode-consent" type="checkbox"><span>I authorize Claim2Car's prototype to send this VIN to the U.S. National Highway Traffic Safety Administration (NHTSA) vPIC service for vehicle decoding. The lookup is performed from this browser; the VIN is not saved by this lab.</span></label>
-      <label id="checksum-override-row" class="check-row lab-consent" hidden><input id="checksum-override" type="checkbox"><span>The North American check digit does not match. I have rechecked the physical VIN and want to attempt a lookup anyway. The result will remain flagged for manual verification.</span></label>
+      <label id="checksum-override-row" class="check-row lab-consent" hidden><input id="checksum-override" type="checkbox"><span>The check digit does not match the North American rule. I have verified the VIN directly from the physical plate and confirm this vehicle may be from a market where that rule does not apply. Keep the result flagged for manual verification.</span></label>
       <div id="vin-message" class="inline-status" role="status" aria-live="polite"></div>
     </section>
 

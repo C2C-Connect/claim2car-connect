@@ -22,7 +22,6 @@ REQUIRED += ['frontend/src/modules/capture/vpic_transport.mjs','frontend/tests/v
 REQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','frontend/app/vehicle-lab.mjs']
 
 REQUIRED += ['frontend/tests/vpic_transport.test.mjs']
-REQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','frontend/app/vehicle-lab.mjs']
 REQUIRED += [
     'authority_migrations/0022_collision_vehicle_capture_link.sql',
     'authority_migrations/0023_consented_vehicle_profile.sql',
