@@ -52,6 +52,10 @@ class InHouseVisionAdapterTests(unittest.TestCase):
         )
         self.assertFalse(output.promoted_over_baseline)
         self.assertTrue(output.advisory_only)
+        self.assertEqual(len(output.advisory_localizations), 1)
+        self.assertEqual(output.advisory_localizations[0]["epistemic_status"], "MODEL_LOCALIZATION_UNREVIEWED")
+        self.assertNotIn("severity_tier", output.advisory_localizations[0])
+        self.assertNotIn("depth_cm", output.advisory_localizations[0])
         with self.assertRaises(VisionAdapterError):
             output.assert_advisory_boundary("trigger_live_dispatch")
         output.assert_advisory_boundary("store_human_review_summary")
