@@ -222,10 +222,11 @@ class CaptureEvidenceService:
         return {"session_id": session_id, "accepted": accepted, "replayed": replayed,
                 "deleted_original_artifacts": deleted}
 
-    def record_vehicle_decode_consent(self, authorization, session_id, *, request_id, accepted, scope):
+    def record_vehicle_decode_consent(self, authorization, session_id, *, request_id, accepted, scope, disclosure_version):
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
-        if type(accepted) is not bool or scope != "nhtsa_vpic_decode":
+        if (type(accepted) is not bool or scope != "nhtsa_vpic_decode"
+                or disclosure_version != VEHICLE_DECODE_DISCLOSURE_VERSION):
             raise ValueError("INVALID_VEHICLE_DECODE_CONSENT")
         with self.sessions._authorized(authorization) as (conn, actor):
             if actor.actor_role != "owner":
