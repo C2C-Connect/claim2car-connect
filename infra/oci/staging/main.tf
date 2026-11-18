@@ -78,9 +78,14 @@ resource "oci_core_instance" "staging" {
     boot_volume_size_in_gbs = var.boot_volume_size_gbs
   }
 
-  metadata = var.ssh_authorized_keys == "" ? {} : {
-    ssh_authorized_keys = var.ssh_authorized_keys
-  }
+  metadata = merge(
+    var.ssh_authorized_keys == "" ? {} : {
+      ssh_authorized_keys = var.ssh_authorized_keys
+    },
+    {
+      user_data = base64encode(file("${path.module}/cloud-init.yaml"))
+    }
+  )
 
   preserve_boot_volume = true
 
