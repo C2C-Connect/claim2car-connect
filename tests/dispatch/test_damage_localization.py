@@ -57,7 +57,7 @@ class TestDamageRegion:
             region(conf=1.5)
 
     def test_damage_classes_are_the_provisional_set(self):
-        assert DAMAGE_CLASSES == {"scratch", "dent", "glass_damage", "structural_deformation"}
+        assert DAMAGE_CLASSES == {"scratch", "dent", "glass_damage", "structural_deformation", "unknown"}
 
 
 class TestIoU:
@@ -125,6 +125,7 @@ class TestHeuristicBaseline:
         r = found[0]
         assert 0.2 < r.x0 < 0.7 and 0.2 < r.y0 < 0.7
         assert r.model_version.endswith("heuristic-baseline")
+        assert r.damage_class == "unknown"  # contrast is not a damage taxonomy
 
     def test_uniform_frame_yields_no_regions(self):
         assert self.detector.detect("front_left", [[128] * 36 for _ in range(36)]) == ()
