@@ -19,7 +19,21 @@
       <div class="eyebrow">OWNER TEST PROTOTYPE · VEHICLE INTELLIGENCE</div>
       <h1>Know the vehicle.<br><span>Document what happened.</span></h1>
       <p class="hero-copy">Scan or enter a VIN, retrieve manufacturer-reported vehicle details, document visible condition, and generate a reviewable Claim2Car report.</p>
-      <div class="prototype-notice"><strong>Prototype boundary:</strong> VIN decoding uses the public NHTSA vPIC service after your explicit consent. Damage observations in this build are recorded by you; automated damage recognition and repair-cost prediction are not yet enabled. No case data is uploaded or saved by this lab.</div>
+      <div class="prototype-notice"><strong>Prototype boundary:</strong> VIN decoding uses the public NHTSA vPIC service after your explicit consent. Damage observations in this build are recorded by you; automated damage recognition and repair-cost prediction are not yet enabled. A connected session uploads original evidence bytes to the authenticated Claim2Car evidence service only after owner consent. Without a connected session, this lab cannot proceed with vehicle decoding or evidence capture.</div>
+    </section>
+
+    <section class="panel lab-panel" id="backend-panel">
+      <div class="panel-heading"><div><div class="eyebrow">00 · SECURE CASE SESSION</div><h2>Connect to the evidence system</h2></div><span class="step-index">API</span></div>
+      <p class="muted">Create an authenticated capture session before recording a vehicle. The operator credential authorizes case actions; the owner separately authorizes evidence capture. Credentials are held only in this page's memory and are not stored in browser storage.</p>
+      <label for="capture-operator-token">Operator access token</label>
+      <div class="vin-entry-row"><input id="capture-operator-token" type="password" autocomplete="off" placeholder="Operator token"><button id="create-capture-session" class="button primary" type="button">Create secure session</button></div>
+      <div id="backend-status" class="inline-status" role="status" aria-live="polite">Not connected · No evidence has been uploaded.</div>
+      <div id="owner-consent-panel" hidden>
+        <label for="owner-capture-token">Owner consent token</label>
+        <input id="owner-capture-token" type="password" autocomplete="off" placeholder="Owner token issued for this case">
+        <label class="check-row lab-consent"><input id="owner-capture-consent" type="checkbox"><span>I authorize this capture session to record vehicle photographs and related condition evidence for review. This consent is distinct from optional VIN decoding consent.</span></label>
+        <button id="record-capture-consent" class="button secondary" type="button">Record owner capture consent</button>
+      </div>
     </section>
 
     <section class="panel lab-panel" id="identity-panel">
@@ -37,7 +51,9 @@
       <p id="photo-status" class="fine-print">If barcode scanning is unavailable on this device, the photo can help you read the VIN; enter the characters below. Automatic photo OCR is not included in this prototype.</p>
       <label for="vin-entry">Vehicle Identification Number</label>
       <div class="vin-entry-row"><input id="vin-entry" maxlength="17" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="17-character VIN"><button id="decode-vin" class="button primary" type="button">Decode vehicle</button></div>
-      <label class="check-row lab-consent"><input id="decode-consent" type="checkbox"><span>I authorize Claim2Car's prototype to send this VIN to the U.S. National Highway Traffic Safety Administration (NHTSA) vPIC service for vehicle decoding. The lookup is performed from this browser; the VIN is not saved by this lab.</span></label>
+      <label class="check-row lab-consent"><input id="decode-consent" type="checkbox"><span>I authorize Claim2Car's prototype to send this VIN to the U.S. National Highway Traffic Safety Administration (NHTSA) vPIC service for vehicle decoding. The lookup is performed by the authenticated Claim2Car service after separate owner authorization. The service stores a keyed VIN reference and normalized provider attributes, not the raw VIN or raw provider response.</span></label>
+      <label for="decode-owner-token">Owner token for separate NHTSA decode consent</label>
+      <input id="decode-owner-token" type="password" autocomplete="off" placeholder="Re-enter owner token to authorize VIN decoding">
       <label id="checksum-override-row" class="check-row lab-consent" hidden><input id="checksum-override" type="checkbox"><span>The check digit does not match the North American rule. I have verified the VIN directly from the physical plate and confirm this vehicle may be from a market where that rule does not apply. Keep the result flagged for manual verification.</span></label>
       <div id="vin-message" class="inline-status" role="status" aria-live="polite"></div>
     </section>
@@ -53,6 +69,9 @@
       <p class="muted">Capture the 16 target views where safe and accessible. You can add observations about visible damage. Missing, unsafe, or inaccessible views remain missing; do not infer hidden damage from exterior photographs.</p>
       <div class="capture-caution"><strong>Safety:</strong> Do not enter traffic, crawl beneath an unsupported vehicle, open hazardous compartments, or delay emergency response to complete these views. Mark unavailable views and seek qualified inspection where necessary.</div>
       <div id="photo-grid" class="lab-photo-grid"></div>
+      <div class="capture-caution">Each image is uploaded as original bytes and hash-verified by the server. Evidence can be sealed only when all 16 required views are uploaded and marked usable. Unsafe or inaccessible views remain incomplete; this version does not yet record audited exception events.</div>
+      <button id="seal-evidence" class="button primary" type="button" disabled>Seal verified 16-view evidence</button>
+      <div id="seal-status" class="inline-status" role="status" aria-live="polite"></div>
       <div class="damage-entry">
         <h3>Visible damage observations</h3>
         <p class="fine-print">Record only what you can actually see. These are user-entered observations, not AI findings or a professional repair estimate.</p>
