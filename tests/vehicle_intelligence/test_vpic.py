@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import pytest
 
@@ -53,6 +54,13 @@ def test_valid_response_is_source_attributed_and_never_physics_ready():
     assert profile.physics_input_eligibility == "NOT_ESTABLISHED"
     assert "vin" not in profile.to_dict()
     assert len(profile.response_sha256) == 64
+    redacted = {
+        "Count": 1,
+        "Results": [{key: value for key, value in provider_row().items()
+                     if key not in ("VIN", "SuggestedVIN")}],
+    }
+    canonical = json.dumps(redacted, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    assert profile.response_sha256 == hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def test_missing_fields_are_unknown_not_filled_from_defaults():
