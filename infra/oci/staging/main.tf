@@ -26,7 +26,7 @@ locals {
 resource "oci_core_network_security_group" "staging" {
   compartment_id = var.compartment_ocid
   vcn_id         = data.oci_core_vcn.existing.id
-  display_name   = "${var.display_name_prefix}-nsg"
+  display_name                        = "${var.display_name_prefix}-nsg"
 }
 
 resource "oci_core_network_security_group_security_rule" "ingress" {
@@ -58,7 +58,7 @@ resource "oci_core_network_security_group_security_rule" "egress" {
 resource "oci_core_instance" "staging" {
   availability_domain = local.availability_domain
   compartment_id      = var.compartment_ocid
-  display_name        = "${var.display_name_prefix}-compute"
+  display_name                        = "${var.display_name_prefix}-compute"
   shape               = var.shape
 
   shape_config {
@@ -103,14 +103,14 @@ resource "oci_core_instance" "staging" {
 resource "oci_core_volume" "postgres" {
   availability_domain = local.availability_domain
   compartment_id      = var.compartment_ocid
-  display_name        = "${var.display_name_prefix}-postgres-data"
+  display_name                        = "${var.display_name_prefix}-postgres-data"
   size_in_gbs         = var.database_volume_size_gbs
 }
 
 resource "oci_core_volume" "evidence" {
   availability_domain = local.availability_domain
   compartment_id      = var.compartment_ocid
-  display_name        = "${var.display_name_prefix}-original-evidence"
+  display_name                        = "${var.display_name_prefix}-original-evidence"
   size_in_gbs         = var.evidence_volume_size_gbs
 }
 
@@ -123,9 +123,9 @@ resource "oci_core_volume_attachment" "postgres" {
 }
 
 resource "oci_core_volume_attachment" "evidence" {
-  attachment_type                    = "paravirtualized"
+  attachment_type                     = "paravirtualized"
   display_name                        = "${var.display_name_prefix}-original-evidence"
-  instance_id                        = oci_core_instance.staging.id
+  instance_id                         = oci_core_instance.staging.id
   volume_id                           = oci_core_volume.evidence.id
   is_pv_encryption_in_transit_enabled = true
 }
