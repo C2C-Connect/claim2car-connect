@@ -370,19 +370,20 @@ class CaptureEvidenceService:
                 "decode_error_code": profile_data.get("decode_error_code"),
                 "disclosure_version": VEHICLE_DECODE_DISCLOSURE_VERSION,
             }
-            conn.execute(
-                "INSERT INTO faos.vehicle_decode_snapshots("
-                "tenant_id,vehicle_id,source_session_id,request_id,provider,provider_api,"
-                "requested_at,response_sha256,decode_status,decode_error_code,attributes_json,recorded_by"
-                ") VALUES (%s::uuid,%s::uuid,%s,%s::uuid,%s,%s,%s::timestamptz,"
-                "%s,%s,%s,%s::jsonb,%s)",
+            outcome = conn.execute(
+                "SELECT faos.record_vehicle_decode_snapshot("
+                "%s::uuid,%s::uuid,%s::text,%s::uuid,%s::text,%s::text,%s::timestamptz,"
+                "%s::text,%s::text,%s::text,%s::jsonb,%s::text,%s::text)",
                 (
                     actor.tenant_id, vehicle_id, session_id, request_id,
                     profile_data["provider"], profile_data["provider_api"], requested_at,
                     profile_data.get("response_sha256"), profile_data["status"],
                     profile_data.get("decode_error_code"), attributes_json, actor.actor_id,
+                    vin_digest,
                 ),
-            )
+            ).fetchone()[0]
+            if outcome != "ACCEPTED":
+                raise CaptureSessionConflict("VEHICLE_PROFILE_SNAPSHOT_NOT_ACCEPTED")
             self._append(
                 conn, actor, session_id, history, event_id=event_id,
                 kind="VEHICLE_PROFILE_DECODED",
