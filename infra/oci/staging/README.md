@@ -1,0 +1,24 @@
+# Claim2Car OCI private staging foundation
+
+This stack describes a private OCI compute host and two separate encrypted-in-transit block-volume attachments for PostgreSQL data and original evidence. It uses the existing Claim2Car VCN/private subnet and never assigns a public IP.
+
+## Deliberate safety boundaries
+
+- The stack permits only `VM.Standard.A1.Flex`, defaulting to 1 OCPU and 6 GB RAM. OCI Always Free eligibility, regional capacity, tenancy quotas, and aggregate free-tier usage must still be confirmed in the OCI Console before apply. A shape name is not a price guarantee.
+- Default storage is 50 GB boot + 50 GB PostgreSQL + 100 GB evidence, bounded by a 200 GB stack budget. Existing tenancy volumes may consume part of the free allowance; inspect billing/usage before apply.
+- No ingress rule is created by default. Supply only verified Bastion/VPN source CIDRs and private application ingress CIDRs. Never use `0.0.0.0/0` for SSH or the application.
+- The existing subnet's security lists are separate from this instance NSG. Audit and remove any broad ingress rules from the subnet security lists before treating the host as secure; an NSG does not cancel permissive subnet security-list rules.
+- The image OCID, compartment, VCN, and subnet are explicit inputs. No tenancy identifiers or credentials are stored in this repository.
+- OCI provider authentication is supplied out-of-band through the standard OCI SDK configuration or workload identity. Do not commit API keys, private keys, state files, or real `terraform.tfvars`.
+- No Terraform apply runs in GitHub Actions. CI performs formatting, initialization, and static validation only.
+
+## Use
+
+1. Confirm the private subnet, NAT/service-gateway routes, security lists, Bastion/VPN path, image compatibility, regional A1 capacity, free-tier usage, and billing estimate in OCI.
+2. Copy `terraform.tfvars.example` to `terraform.tfvars` and enter the verified OCIDs locally.
+3. Authenticate with the OCI CLI/SDK using a local profile or an approved workload identity.
+4. Run `terraform init`, `terraform fmt -check -recursive`, `terraform validate`, and `terraform plan`.
+5. Review the plan and tenancy cost/quotas before a separately controlled apply. Do not apply from a pull-request workflow.
+6. After creation, format and mount the two attached volumes by stable OCI device identifiers, configure PostgreSQL 16/PostGIS on the database volume, and mount original evidence at `/var/lib/claim2car/evidence` owned by UID 10001. Verify reboot persistence before deploying the integrated container.
+
+The stack is infrastructure code, not evidence of an applied deployment. It does not yet configure PostgreSQL, create Vault secrets, publish an OCIR image, or expose an application endpoint. Those are subsequent controlled deployment steps.

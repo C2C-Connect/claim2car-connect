@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars locally. Never commit real OCIDs, credentials, or private keys.
+region             = "us-chicago-1"
+compartment_ocid   = "ocid1.compartment.oc1..REPLACE"
+vcn_ocid           = "ocid1.vcn.oc1..REPLACE"
+private_subnet_ocid = "ocid1.subnet.oc1..REPLACE"
+image_ocid         = "ocid1.image.oc1..REPLACE"
+
+# Empty lists intentionally create no inbound NSG rules. Add only verified
+# Bastion/VPN and private application ingress CIDRs.
+admin_ingress_cidrs = []
+app_ingress_cidrs   = []
+
+# Cost-guarded initial footprint: 1 A1 OCPU / 6 GB, 50 GB boot + 50 GB DB + 100 GB evidence.
+ocpus                    = 1
+memory_in_gbs            = 6
+boot_volume_size_gbs     = 50
+database_volume_size_gbs = 50
+evidence_volume_size_gbs = 100
+block_volume_budget_gbs  = 200
