@@ -206,9 +206,13 @@ class CollisionLifecycleStore:
                 raise CollisionLifecycleConflict("COLLISION_VEHICLE_LINK_READBACK_MISMATCH")
             row = conn.execute(
                 "SELECT l.collision_id,l.vehicle_id,l.relationship,l.linked_by,l.linked_at,"
-                "v.vin_hmac_sha256,v.vin_source,v.vin_validation_status,l.source_session_id,l.source_event_id "
+                "v.vin_source,v.vin_validation_status,l.source_session_id,l.source_event_id,"
+                "COALESCE(src.source_status,'REVOKED') "
                 "FROM faos.collision_vehicle_links l "
                 "JOIN faos.vehicles v ON v.tenant_id=l.tenant_id AND v.vehicle_id=l.vehicle_id "
+                "LEFT JOIN faos.vehicle_identity_sources src ON src.tenant_id=l.tenant_id "
+                "AND src.vehicle_id=l.vehicle_id AND src.source_session_id=l.source_session_id "
+                "AND src.source_event_id=l.source_event_id "
                 "WHERE l.tenant_id=%s AND l.collision_id=%s AND v.vin_hmac_sha256=%s",
                 (actor.tenant_id, collision_id, digest_row[0]),
             ).fetchone()
@@ -217,9 +221,9 @@ class CollisionLifecycleStore:
             return {
                 "collision_id": str(row[0]), "vehicle_id": str(row[1]),
                 "relationship": row[2], "linked_by": row[3],
-                "linked_at": row[4].isoformat(), "vin_hmac_sha256": row[5],
-                "vin_source": row[6], "vin_validation_status": row[7],
-                "source_session_id": row[8], "source_event_id": row[9],
+                "linked_at": row[4].isoformat(), "vin_source": row[5],
+                "vin_validation_status": row[6], "source_session_id": row[7],
+                "source_event_id": row[8], "source_consent_status": row[9],
                 "created": outcome == "ACCEPTED",
             }
 
@@ -254,13 +258,16 @@ class CollisionLifecycleStore:
             self._require_operator(actor)
             rows = conn.execute(
                 "SELECT l.collision_id,l.vehicle_id,l.relationship,l.linked_by,l.linked_at,"
-                "v.vin_hmac_sha256,v.vin_source,v.vin_validation_status,"
-                "l.source_session_id,l.source_event_id "
+                "v.vin_source,v.vin_validation_status,"
+                "l.source_session_id,l.source_event_id,COALESCE(src.source_status,'REVOKED') "
                 "FROM faos.collision_vehicle_links l "
                 "JOIN faos.collision_lifecycle_records r "
                 "ON r.tenant_id=l.tenant_id AND r.collision_id=l.collision_id "
                 "JOIN faos.vehicles v "
                 "ON v.tenant_id=l.tenant_id AND v.vehicle_id=l.vehicle_id "
+                "LEFT JOIN faos.vehicle_identity_sources src ON src.tenant_id=l.tenant_id "
+                "AND src.vehicle_id=l.vehicle_id AND src.source_session_id=l.source_session_id "
+                "AND src.source_event_id=l.source_event_id "
                 "WHERE l.tenant_id=%s AND l.collision_id=%s "
                 "AND (r.created_by=%s OR %s='supervisor') "
                 "ORDER BY l.linked_at,l.vehicle_id",
@@ -269,9 +276,9 @@ class CollisionLifecycleStore:
             return [{
                 "collision_id": str(row[0]), "vehicle_id": str(row[1]),
                 "relationship": row[2], "linked_by": row[3],
-                "linked_at": row[4].isoformat(), "vin_hmac_sha256": row[5],
-                "vin_source": row[6], "vin_validation_status": row[7],
-                "source_session_id": row[8], "source_event_id": row[9],
+                "linked_at": row[4].isoformat(), "vin_source": row[5],
+                "vin_validation_status": row[6], "source_session_id": row[7],
+                "source_event_id": row[8], "source_consent_status": row[9],
                 "created": False,
             } for row in rows]
 
