@@ -93,8 +93,6 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(collision_view.status_code, 200, collision_view.text)
                     self.assertEqual(collision_view.json()["claims"][0]["capture_session_id"], session_id)
                     self.assertEqual(collision_view.json()["claims"][0]["claim_id"], claim_id)
-                    self.assertEqual(collision_view.json()["vehicles"][0]["vehicle_id"], vehicle_id)
-                    self.assertEqual(collision_view.json()["vehicles"][0]["source_consent_status"], "ACTIVE")
 
                     owner_headers = {"Authorization": self.db.owner_auth()}
                     operator_headers = {"Authorization": self.db.auth()}
@@ -129,6 +127,13 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(collision_vehicle.json()["vin_source"], "CONSENTED_CAPTURE_SESSION")
                     self.assertEqual(collision_vehicle.json()["source_consent_status"], "ACTIVE")
                     self.assertNotIn("vin_hmac_sha256", collision_vehicle.json())
+                    collision_view_with_vehicle = client.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers=operator_headers,
+                    )
+                    self.assertEqual(collision_view_with_vehicle.status_code, 200, collision_view_with_vehicle.text)
+                    self.assertEqual(collision_view_with_vehicle.json()["vehicles"][0]["vehicle_id"], vehicle_id)
+                    self.assertEqual(collision_view_with_vehicle.json()["vehicles"][0]["source_consent_status"], "ACTIVE")
 
                     originals = {}
                     for slot in CANONICAL_SLOTS:
