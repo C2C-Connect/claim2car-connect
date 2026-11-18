@@ -278,7 +278,60 @@ This is a point-in-time code inspection, not an acceptance declaration:
 
 Future agents must refresh this snapshot against the current default branch and exact commit before relying on it.
 
-## 10. Implementation sequence and acceptance gates
+## 10. Product-level architecture: from evidence to coordinated resolution
+
+The frontline capture workflow is the entry point to a larger operating platform. It must connect to the existing Collision Lifecycle Record and the platform's durable event spine; it must not become a standalone photo application or a parallel source of collision truth.
+
+The target end-to-end architecture is:
+
+1. **Field experience** — authenticated operator/driver intake, vehicle identity, versioned capture, quality guidance, consent, and offline recovery.
+2. **Evidence and identity services** — original artifact storage, manifest verification, source lineage, vehicle registry, participant relationships, and collision association.
+3. **Intelligence services** — evidence sufficiency, vehicle configuration, visible-damage observations, measurements, technical analysis, uncertainty, human review, and explainable findings.
+4. **Decision and policy services** — versioned rules, authorization, safety escalation, evidence requirements, and approved dispositions. A model output is an input, never an authorization by itself.
+5. **Workflow orchestration** — durable task plans, provider requests, acceptance/rejection, dispatch handoffs, completion evidence, verification, recipient delivery, and collision-event resolution.
+6. **Participant and partner network** — drivers, operators, repair facilities, dealerships, insurers, towing and other qualified providers, accessed through role- and purpose-limited interfaces.
+7. **Transaction and integration services** — quotes, service orders, estimates, invoices, fees, payouts, payment reconciliation, partner adapters, and external delivery. These remain separate state machines with explicit release gates.
+
+The Collision Lifecycle Record remains the collision identity and event boundary. Claims, repair orders, provider engagements, dispatches, reports, deliveries, and financial obligations are linked domain records with their own authority and lifecycle. Do not overload a single status column to represent the whole post-accident journey.
+
+### 10.1 Handoff semantics
+
+Every consequential handoff must persist at least the requesting actor and tenant, purpose/authority, target participant, scoped work, terms/version, idempotency key, request time, response, and resulting state. Model recommendation, request, acceptance, execution, completion, verification, and settlement as distinct events. A timeout is not a rejection; a sent message is not delivery; delivery is not acknowledgment; acceptance is not completion; completion is not verification; and a verified service is not necessarily financial settlement.
+
+Use transactional outbox delivery and idempotent consumers. External providers and integrations are adapters, not alternate sources of truth. Preserve retries, cancellations, corrections, and disputes as auditable events rather than rewriting history.
+
+### 10.2 Independent domain state machines
+
+At minimum, keep these lifecycles separately governed and linked by explicit identifiers/events:
+
+- collision event and resolution;
+- vehicle identity and collision association;
+- capture session and protocol version;
+- evidence artifact, manifest, and sufficiency review;
+- consent, disclosure authority, and revocation;
+- technical assessment and human review;
+- provider engagement and service acceptance;
+- dispatch and physical custody transfer;
+- repair/inspection work and completion verification;
+- report generation, recipient delivery, and acknowledgment; and
+- financial obligation, invoice, payout, payment, and reconciliation.
+
+The list is a domain boundary guide, not a requirement to create a microservice or a new database table for every bullet. Implement cohesive modules in the existing modular monolith, with PostgreSQL as the authority and background workers for durable asynchronous work. Split services only when measured scaling, isolation, or operational requirements justify it.
+
+### 10.3 What the platform must never infer
+
+- A VIN decode does not prove vehicle ownership or collision involvement.
+- A complete capture sequence does not prove every technical question can be answered.
+- A model score does not establish a total loss, roadworthiness, liability, repair authorization, or provider eligibility.
+- A provider recommendation does not establish provider acceptance.
+- Provider acceptance does not establish service completion or quality.
+- A dispatch request does not establish pickup, custody transfer, or delivery.
+- A report generated or sent does not establish receipt, acknowledgment, or legal acceptance.
+- A service completion does not establish payment; a payment event does not establish collision-record resolution.
+
+Each transition requires its own evidence, authority, and acceptance criteria.
+
+## 11. Implementation sequence and acceptance gates
 
 Build a vertical slice in this order, reusing existing platform boundaries:
 
@@ -301,7 +354,7 @@ Every stage must have:
 
 No hard-coded threshold, probability, safety verdict, or total-loss rule becomes authoritative merely because a test fixture passes. Define its applicability domain, validation dataset, acceptance threshold, owner, version, and review process first.
 
-## 11. Engineering rules for future agents
+## 12. Engineering rules for future agents
 
 1. Read this document and the governing Product Premise before changing the frontline workflow.
 2. Inspect the current repository, active PRs, exact default-branch SHA, migrations, and workflow results; this document is not a substitute for live repo inspection.
@@ -312,7 +365,7 @@ No hard-coded threshold, probability, safety verdict, or total-loss rule becomes
 7. Do not claim WORM, cryptographic authenticity, chain of custody, ACORD conformance, legal admissibility, accuracy, or production readiness without the corresponding evidence.
 8. Continue with small, integrated, tested vertical slices; do not create placeholder services to make an architecture diagram appear complete.
 
-## 12. Governing principle
+## 13. Governing principle
 
 The field workflow should make it easier to collect better evidence, not make weak evidence look conclusive. The backend should turn validated evidence into reproducible, explainable findings—not turn model scores into unquestionable verdicts. Reports should tell each authorized recipient exactly what is known, how it is known, what remains uncertain, and what action is justified.
 
