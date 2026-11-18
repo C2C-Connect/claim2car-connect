@@ -33,7 +33,7 @@ function renderPhotoSlots(){
     card.append(title,input,stateText,preview);grid.append(card);
   }
 }
-function updateReportAvailability(){show("report-panel",Boolean(state.profile));}
+function syncPhotoSelect(){\n  const select=$("damage-photo"),selected=select.value;select.replaceChildren(new Option("No linked photo selected",""));\n  for(const [slot,label] of slots)if(state.photos.has(slot))select.add(new Option(label,slot));\n  if(state.photos.has(selected))select.value=selected;\n}\nfunction updateReportAvailability(){show("report-panel",Boolean(state.profile));}
 function renderProfile(){
   const profile=state.profile.profile;
   $("vehicle-title").textContent=[profile.modelYear,profile.make,profile.model].filter(Boolean).join(" ");
