@@ -36,10 +36,12 @@ from app.artifact_storage import (
 )
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
+from app.vehicle_intelligence.vpic import VpicClient
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
 CONFIGURATION_SIZE_LIMIT = 65536
 MAX_CREDENTIALS = 128
+_vpic_client = VpicClient()
 
 @dataclass(frozen=True)
 class CaptureRuntime:
@@ -106,6 +108,20 @@ class ConsentRequest(BaseModel):
         extra = 'forbid'
 
 class VehicleReferenceRequest(BaseModel):
+    request_id: UUID
+    vin: StrictStr = Field(min_length=17, max_length=17)
+    class Config:
+        extra = 'forbid'
+
+class VehicleDecodeConsentRequest(BaseModel):
+    request_id: UUID
+    accepted: StrictBool
+    scope: StrictStr = Field(min_length=1, max_length=64)
+    disclosure_version: StrictStr = Field(min_length=1, max_length=64)
+    class Config:
+        extra = 'forbid'
+
+class VehicleProfileRequest(BaseModel):
     request_id: UUID
     vin: StrictStr = Field(min_length=17, max_length=17)
     class Config:
@@ -473,8 +489,6 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 _fail(409, 'CAPTURE_SESSION_CONFLICT')
             except CollisionLifecycleNotFound:
                 _fail(404, 'COLLISION_NOT_FOUND')
-            except CaptureSessionConflict:
-                _fail(409, 'EVIDENCE_HISTORY_INVALID')
             except CaptureSessionNotFound:
                 _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
             except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
@@ -522,6 +536,32 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         def record_vehicle(session_id: UUID, body: VehicleReferenceRequest, authorization: str = Depends(authorize)):
             return invoke_evidence(evidence.record_vehicle, authorization, session_id,
                                    request_id=body.request_id, vin=body.vin)
+
+        @api.post('/v1/capture-sessions/{session_id}/vehicle-decode-consent')
+        def record_vehicle_decode_consent(session_id: UUID, body: VehicleDecodeConsentRequest,
+                                           authorization: str = Depends(authorize)):
+            return invoke_evidence(
+                evidence.record_vehicle_decode_consent, authorization, session_id,
+                request_id=body.request_id, accepted=body.accepted, scope=body.scope,
+                disclosure_version=body.disclosure_version,
+            )
+
+        @api.get('/v1/vehicle-decode-disclosure')
+        def vehicle_decode_disclosure(authorization: str = Depends(authorize)):
+            path = Path(__file__).resolve().parents[1] / 'contracts' / 'vehicle-decode-disclosure-v1.json'
+            try:
+                disclosure = json.loads(path.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                _fail(503, 'VEHICLE_DECODE_DISCLOSURE_UNAVAILABLE')
+            return JSONResponse(disclosure, headers=dict(NO_STORE_HEADERS))
+
+        @api.post('/v1/capture-sessions/{session_id}/vehicle-profile')
+        def decode_vehicle_profile(session_id: UUID, body: VehicleProfileRequest,
+                                   authorization: str = Depends(authorize)):
+            return invoke_evidence(
+                evidence.decode_vehicle_profile, authorization, session_id,
+                request_id=body.request_id, vin=body.vin, decoder=_vpic_client,
+            )
 
         @api.post('/v1/capture-sessions/{session_id}/artifacts')
         def register_artifact(session_id: UUID, body: EvidenceArtifactRequest, authorization: str = Depends(authorize)):

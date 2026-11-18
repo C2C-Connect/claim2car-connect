@@ -87,6 +87,24 @@ class TestPositivePath:
         m2 = M1SessionMachine.reconstruct(sid, m1.history)
         assert m2.state == m1.state == REVIEWED
 
+    def test_vehicle_intelligence_sidecar_events_preserve_capture_state_and_replay(self):
+        sid = "session-contract-vehicle-sidecar"
+        events = [
+            make_event(sid, "SESSION_CREATED", 1),
+            make_event(sid, "CONSENT_RECORDED", 2),
+            make_event(sid, "VEHICLE_RECORDED", 3),
+            make_event(sid, "VEHICLE_DECODE_CONSENT_RECORDED", 4),
+            make_event(sid, "VEHICLE_PROFILE_DECODED", 5),
+            make_event(sid, "ARTIFACT_REGISTERED", 6),
+        ]
+        machine = M1SessionMachine(sid)
+        states = [machine.apply(event) for event in events]
+        assert states[2] == states[3] == states[4] == VEHICLE_IDENTIFIED
+        assert states[5] == EVIDENCE_CAPTURED
+        replayed = M1SessionMachine.reconstruct(sid, machine.history)
+        assert replayed.state == machine.state
+        assert replayed.history == machine.history
+
     def test_retake_before_quality(self):
         sid = "session-contract-4"
         m = M1SessionMachine(sid)

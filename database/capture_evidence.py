@@ -27,6 +27,7 @@ from database.capture_sessions import (
 
 MAX_EVIDENCE_BYTES = 25 * 1024 * 1024
 DISCLOSURE_VERSION = "disclosure-v1"
+VEHICLE_DECODE_DISCLOSURE_VERSION = "vehicle-decode-disclosure-v1"
 
 
 class CaptureEvidenceService:
@@ -113,6 +114,30 @@ class CaptureEvidenceService:
                 return True
         return False
 
+    @staticmethod
+    def _last_capture_event(history):
+        sidecar = {"VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED"}
+        return next((item for item in reversed(history) if item[0] not in sidecar), None)
+
+    @staticmethod
+    def _vehicle_decode_consent_state(history, capture_consent):
+        if capture_consent is None:
+            return None
+        events = [(actor, payload) for kind, actor, payload, _ in history
+                  if kind == "VEHICLE_DECODE_CONSENT_RECORDED"]
+        if not events:
+            return None
+        actor, latest = events[-1]
+        required = {"accepted", "owner_actor_id", "disclosure_version", "scope", "request_id"}
+        if (type(latest) is not dict or set(latest) != required
+                or type(latest.get("accepted")) is not bool
+                or latest.get("owner_actor_id") != actor
+                or actor != capture_consent[0]
+                or latest.get("disclosure_version") != VEHICLE_DECODE_DISCLOSURE_VERSION
+                or latest.get("scope") != "nhtsa_vpic_decode"):
+            raise CaptureSessionConflict("UNSUPPORTED_VEHICLE_DECODE_CONSENT_HISTORY")
+        return (actor, latest) if latest["accepted"] is True else None
+
     def evidence_readiness(self, authorization, session_id):
         """Return the server-authoritative consent/VIN gate before local evidence is queued."""
         session_id = self._session_id(session_id)
@@ -190,6 +215,10 @@ class CaptureEvidenceService:
                         "SELECT faos.withdraw_claim_case_incident(%s::uuid,%s::uuid,%s::text)",
                         (actor.tenant_id, _session.claim_id, actor.actor_id),
                     )
+                    conn.execute(
+                        "SELECT faos.revoke_vehicle_decode_profiles(%s::uuid,%s::text,%s::text)",
+                        (actor.tenant_id, session_id, actor.actor_id),
+                    )
             else:
                 artifacts = []
                 deletion_tenant = actor.tenant_id
@@ -197,6 +226,180 @@ class CaptureEvidenceService:
             ArtifactKey(deletion_tenant, UUID(session_id), UUID(artifact_id)))) for artifact_id in artifacts)
         return {"session_id": session_id, "accepted": accepted, "replayed": replayed,
                 "deleted_original_artifacts": deleted}
+
+    def record_vehicle_decode_consent(self, authorization, session_id, *, request_id, accepted, scope, disclosure_version):
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if (type(accepted) is not bool or scope != "nhtsa_vpic_decode"
+                or disclosure_version != VEHICLE_DECODE_DISCLOSURE_VERSION):
+            raise ValueError("INVALID_VEHICLE_DECODE_CONSENT")
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role != "owner":
+                raise CaptureAuthorizationError("OWNER_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=False)
+            capture_consent = self._consent_state(history)
+            if capture_consent is None or capture_consent[0] != actor.actor_id:
+                raise CaptureAuthorizationError("ACTIVE_CAPTURE_OWNER_CONSENT_REQUIRED")
+            event_id = "vehicle-decode-consent:" + request_id
+            payload = {
+                "accepted": accepted,
+                "owner_actor_id": actor.actor_id,
+                "disclosure_version": VEHICLE_DECODE_DISCLOSURE_VERSION,
+                "scope": scope,
+                "request_id": request_id,
+            }
+            replayed = False
+            for kind, _event_actor, old, old_id in history:
+                if old_id == event_id:
+                    if kind == "VEHICLE_DECODE_CONSENT_RECORDED" and old == payload:
+                        replayed = True
+                        break
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+            if not replayed:
+                self._append(
+                    conn, actor, session_id, history, event_id=event_id,
+                    kind="VEHICLE_DECODE_CONSENT_RECORDED",
+                    reason="owner vehicle-decoding consent state recorded",
+                    payload=payload,
+                )
+            if not accepted:
+                conn.execute(
+                    "SELECT faos.revoke_vehicle_decode_profiles(%s::uuid,%s::text,%s::text)",
+                    (actor.tenant_id, session_id, actor.actor_id),
+                )
+        return {
+            "session_id": session_id, "accepted": accepted,
+            "scope": scope, "disclosure_version": VEHICLE_DECODE_DISCLOSURE_VERSION,
+            "replayed": replayed,
+        }
+
+    def decode_vehicle_profile(self, authorization, session_id, *, request_id, vin, decoder):
+        """Decode only after separate owner opt-in; persist normalized provider data only.
+
+        The keyed VIN digest is checked both before and after the network call.
+        Consent is re-read under the session lock before persistence so a
+        concurrent withdrawal cannot commit a newly returned profile.
+        """
+        from app.vehicle_intelligence.vpic import VpicDecodeError
+
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if not isinstance(vin, str) or not vin.isascii():
+            raise ValueError("INVALID_VIN")
+        validity = validate_vin(vin)
+        if not validity.ok or validity.normalization_changed or validity.vin != vin:
+            raise ValueError("VIN_VALIDATION_FAILED")
+        vin_digest = hmac.new(self._vin_pepper, vin.upper().encode("ascii"), hashlib.sha256).hexdigest()
+
+        def authorized_source(conn, actor, history):
+            capture_consent = self._consent_state(history)
+            decode_consent = self._vehicle_decode_consent_state(history, capture_consent)
+            if capture_consent is None or decode_consent is None:
+                raise CaptureAuthorizationError("ACTIVE_VEHICLE_DECODE_CONSENT_REQUIRED")
+            row = conn.execute(
+                "SELECT vehicle_id FROM faos.vehicle_identity_sources "
+                "WHERE tenant_id=%s AND source_session_id=%s "
+                "AND owner_actor_id=%s AND vin_hmac_sha256=%s AND source_status='ACTIVE'",
+                (actor.tenant_id, session_id, capture_consent[0], vin_digest),
+            ).fetchone()
+            if row is None:
+                raise CaptureSessionConflict("ACTIVE_CONSENTED_VEHICLE_IDENTITY_REQUIRED")
+            return str(row[0])
+
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            vehicle_id = authorized_source(conn, actor, history)
+            prior = conn.execute(
+                "SELECT vehicle_id,source_session_id,decode_status,provider,provider_api,requested_at,"
+                "response_sha256,decode_error_code,attributes_json FROM faos.vehicle_decode_snapshots "
+                "WHERE tenant_id=%s AND request_id=%s",
+                (actor.tenant_id, request_id),
+            ).fetchone()
+            if prior is not None:
+                if str(prior[0]) != vehicle_id or prior[1] != session_id:
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+                return {
+                    "session_id": session_id, "vehicle_id": vehicle_id,
+                    "status": prior[2], "provider": prior[3], "provider_api": prior[4],
+                    "requested_at": prior[5].isoformat(), "response_sha256": prior[6],
+                    "decode_error_code": prior[7], "attributes": prior[8] or {},
+                    "replayed": True, "physics_input_eligibility": "NOT_ESTABLISHED",
+                }
+
+        try:
+            profile = decoder.decode(vin)
+            profile_data = profile.to_dict()
+        except VpicDecodeError as error:
+            profile_data = {
+                "status": "ERROR", "provider": "NHTSA_VPIC",
+                "provider_api": "DecodeVinValuesExtended",
+                "requested_at": datetime.now(timezone.utc).isoformat(),
+                "response_sha256": None, "decode_error_code": error.code,
+                "attributes": {},
+                "physics_input_eligibility": "NOT_ESTABLISHED",
+            }
+
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("operator", "supervisor"):
+                raise CaptureAuthorizationError("OPERATOR_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=True)
+            current_vehicle_id = authorized_source(conn, actor, history)
+            if current_vehicle_id != vehicle_id:
+                raise CaptureSessionConflict("VEHICLE_IDENTITY_CHANGED_DURING_DECODE")
+            prior = conn.execute(
+                "SELECT vehicle_id,source_session_id,decode_status,provider,provider_api,requested_at,"
+                "response_sha256,decode_error_code,attributes_json FROM faos.vehicle_decode_snapshots "
+                "WHERE tenant_id=%s AND request_id=%s",
+                (actor.tenant_id, request_id),
+            ).fetchone()
+            if prior is not None:
+                if str(prior[0]) != vehicle_id or prior[1] != session_id:
+                    raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+                return {
+                    "session_id": session_id, "vehicle_id": vehicle_id,
+                    "status": prior[2], "provider": prior[3], "provider_api": prior[4],
+                    "requested_at": prior[5].isoformat(), "response_sha256": prior[6],
+                    "decode_error_code": prior[7], "attributes": prior[8] or {},
+                    "replayed": True, "physics_input_eligibility": "NOT_ESTABLISHED",
+                }
+            requested_at = profile_data["requested_at"]
+            attributes = profile_data.get("attributes") or {}
+            attributes_json = json.dumps(attributes, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            event_id = "vehicle-profile:" + request_id
+            event_payload = {
+                "request_id": request_id, "vehicle_id": vehicle_id,
+                "provider": profile_data["provider"], "provider_api": profile_data["provider_api"],
+                "decode_status": profile_data["status"],
+                "response_sha256": profile_data.get("response_sha256"),
+                "decode_error_code": profile_data.get("decode_error_code"),
+                "disclosure_version": VEHICLE_DECODE_DISCLOSURE_VERSION,
+            }
+            outcome = conn.execute(
+                "SELECT faos.record_vehicle_decode_snapshot("
+                "%s::uuid,%s::uuid,%s::text,%s::uuid,%s::text,%s::text,%s::timestamptz,"
+                "%s::text,%s::text,%s::text,%s::jsonb,%s::text,%s::text)",
+                (
+                    actor.tenant_id, vehicle_id, session_id, request_id,
+                    profile_data["provider"], profile_data["provider_api"], requested_at,
+                    profile_data.get("response_sha256"), profile_data["status"],
+                    profile_data.get("decode_error_code"), attributes_json, actor.actor_id,
+                    vin_digest,
+                ),
+            ).fetchone()[0]
+            if outcome != "ACCEPTED":
+                raise CaptureSessionConflict("VEHICLE_PROFILE_SNAPSHOT_NOT_ACCEPTED")
+            self._append(
+                conn, actor, session_id, history, event_id=event_id,
+                kind="VEHICLE_PROFILE_DECODED",
+                reason="consented NHTSA vPIC vehicle profile result recorded",
+                payload=event_payload,
+            )
+        return {
+            "session_id": session_id, "vehicle_id": vehicle_id,
+            **profile_data, "replayed": False,
+        }
 
     def record_vehicle(self, authorization, session_id, *, request_id, vin):
         session_id = self._session_id(session_id)
@@ -373,7 +576,8 @@ class CaptureEvidenceService:
                     if kind == "MANIFEST_SEALED" and type(old) is dict:
                         return {"session_id": session_id, **old, "replayed": True}
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
-            if not history or history[-1][0] != "QUALITY_RECORDED":
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "QUALITY_RECORDED":
                 raise CaptureSessionConflict("QUALITY_REVIEW_REQUIRED_BEFORE_SEAL")
             manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
             payload = {
@@ -409,10 +613,11 @@ class CaptureEvidenceService:
                     if kind == "REVIEW_RECORDED" and type(old) is dict and old.get("disposition") == disposition and old.get("reason") == reason:
                         return {"session_id": session_id, **old, "replayed": True}
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
-            if not history or history[-1][0] != "MANIFEST_SEALED":
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
-            seal = history[-1][2]
+            seal = last_capture_event[2]
             if seal.get("manifest_digest") != manifest.digest():
                 raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
             payload = {
@@ -437,6 +642,7 @@ class CaptureEvidenceService:
                 "SELECT s.session_id FROM faos.sessions s "
                 "JOIN LATERAL (SELECT kind,occurred_at FROM faos.events e "
                 "WHERE e.tenant_id=s.tenant_id AND e.session_id=s.session_id "
+                "AND e.kind NOT IN ('VEHICLE_DECODE_CONSENT_RECORDED','VEHICLE_PROFILE_DECODED') "
                 "ORDER BY sequence DESC LIMIT 1) last_event ON last_event.kind='MANIFEST_SEALED' "
                 "WHERE s.tenant_id=%s ORDER BY last_event.occurred_at,s.session_id LIMIT %s",
                 (actor.tenant_id, limit),
@@ -444,9 +650,10 @@ class CaptureEvidenceService:
             for (session_id,) in rows:
                 session_id = self._session_id(session_id)
                 _session, history = self._history(conn, actor, session_id, creator_required=False)
-                if not history or history[-1][0] != "MANIFEST_SEALED" or self._consent_state(history) is None:
+                last_capture_event = self._last_capture_event(history)
+                if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED" or self._consent_state(history) is None:
                     continue
-                seal_payload = history[-1][2]
+                seal_payload = last_capture_event[2]
                 if (type(seal_payload) is not dict
                         or set(seal_payload) != {"schema_version", "request_id", "manifest_digest", "shot_list_version", "artifact_ids"}
                         or not isinstance(seal_payload.get("manifest_digest"), str)):
@@ -492,7 +699,8 @@ class CaptureEvidenceService:
                 raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            if not history or history[-1][0] != "MANIFEST_SEALED":
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
             latest = self._artifact_set(history, session.capture_protocol_version)
@@ -523,7 +731,8 @@ class CaptureEvidenceService:
                 raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            if not history or history[-1][0] != "MANIFEST_SEALED":
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
             entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)

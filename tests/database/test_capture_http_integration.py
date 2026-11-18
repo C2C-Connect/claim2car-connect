@@ -6,6 +6,7 @@ hosting acceptance.
 """
 import base64
 import hashlib
+import json
 import os
 import tempfile
 import time
@@ -127,6 +128,92 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(collision_vehicle.json()["vin_source"], "CONSENTED_CAPTURE_SESSION")
                     self.assertEqual(collision_vehicle.json()["source_consent_status"], "ACTIVE")
                     self.assertNotIn("vin_hmac_sha256", collision_vehicle.json())
+
+                    from app.vehicle_intelligence.vpic import VpicClient
+                    provider_row = {
+                        "VIN": "1HGCM82633A004352", "ErrorCode": "0", "SuggestedVIN": "",
+                        "Make": "HONDA", "Model": "Accord", "ModelYear": "2003",
+                        "Trim": "EX", "BodyClass": "Sedan", "VehicleType": "PASSENGER CAR",
+                        "CurbWeightLB": "", "GVWR": "CLASS 1",
+                    }
+                    provider_calls = []
+                    fake_decoder = VpicClient(fetcher=lambda *args: (
+                        provider_calls.append(args) or (
+                            200, "application/json",
+                            json.dumps({"Count": 1, "Results": [provider_row]}).encode(),
+                        )
+                    ))
+                    with patch("app.capture_api._vpic_client", fake_decoder):
+                        blocked_decode = client.post(
+                            f"/v1/capture-sessions/{session_id}/vehicle-profile",
+                            headers=operator_headers,
+                            json={"request_id": str(uuid.uuid4()), "vin": "1HGCM82633A004352"},
+                        )
+                    self.assertEqual(blocked_decode.status_code, 403, blocked_decode.text)
+                    self.assertEqual(provider_calls, [])
+                    disclosure = client.get(
+                        "/v1/vehicle-decode-disclosure",
+                        headers=owner_headers,
+                    )
+                    self.assertEqual(disclosure.status_code, 200, disclosure.text)
+                    self.assertEqual(disclosure.json()["disclosure_version"], "vehicle-decode-disclosure-v1")
+                    self.assertTrue(any("NHTSA vPIC" in item for item in disclosure.json()["sections"]))
+                    stale_disclosure = client.post(
+                        f"/v1/capture-sessions/{session_id}/vehicle-decode-consent",
+                        headers=owner_headers,
+                        json={
+                            "request_id": str(uuid.uuid4()),
+                            "accepted": True,
+                            "scope": "nhtsa_vpic_decode",
+                            "disclosure_version": "vehicle-decode-disclosure-old",
+                        },
+                    )
+                    self.assertEqual(stale_disclosure.status_code, 422, stale_disclosure.text)
+
+                    decode_consent = client.post(
+                        f"/v1/capture-sessions/{session_id}/vehicle-decode-consent",
+                        headers=owner_headers,
+                        json={
+                            "request_id": str(uuid.uuid4()),
+                            "accepted": True,
+                            "scope": "nhtsa_vpic_decode",
+                            "disclosure_version": "vehicle-decode-disclosure-v1",
+                        },
+                    )
+                    self.assertEqual(decode_consent.status_code, 200, decode_consent.text)
+                    profile_request_id = str(uuid.uuid4())
+                    with patch("app.capture_api._vpic_client", fake_decoder):
+                        decoded = client.post(
+                            f"/v1/capture-sessions/{session_id}/vehicle-profile",
+                            headers=operator_headers,
+                            json={"request_id": profile_request_id, "vin": "1HGCM82633A004352"},
+                        )
+                        decoded_retry = client.post(
+                            f"/v1/capture-sessions/{session_id}/vehicle-profile",
+                            headers=operator_headers,
+                            json={"request_id": profile_request_id, "vin": "1HGCM82633A004352"},
+                        )
+                    self.assertEqual(decoded.status_code, 200, decoded.text)
+                    self.assertEqual(decoded_retry.status_code, 200, decoded_retry.text)
+                    self.assertTrue(decoded_retry.json()["replayed"])
+                    self.assertEqual(decoded.json()["status"], "DECODED")
+                    self.assertEqual(decoded.json()["provider"], "NHTSA_VPIC")
+                    self.assertEqual(decoded.json()["attributes"]["make"]["value"], "HONDA")
+                    self.assertEqual(decoded.json()["attributes"]["model_year"]["value"], 2003)
+                    self.assertEqual(decoded.json()["physics_input_eligibility"], "NOT_ESTABLISHED")
+                    self.assertNotIn("vin", decoded.json())
+                    self.assertNotIn("vin_hmac_sha256", decoded.json())
+                    self.assertEqual(len(provider_calls), 1)
+                    persisted_profile = self.db.f.seed.execute(
+                        "SELECT provider,decode_status,response_sha256,attributes_json::text "
+                        "FROM faos.vehicle_decode_snapshots WHERE tenant_id=%s AND source_session_id=%s",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()
+                    self.assertEqual(persisted_profile[0:2], ("NHTSA_VPIC", "DECODED"))
+                    self.assertEqual(len(persisted_profile[2]), 64)
+                    self.assertNotIn("1HGCM82633A004352", persisted_profile[3])
+                    self.assertNotIn("rawResult", persisted_profile[3])
+
                     collision_view_with_vehicle = client.get(
                         f"/v1/collisions/{collision_id}",
                         headers=operator_headers,
@@ -211,6 +298,30 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(collision_view_after_restart.status_code, 200, collision_view_after_restart.text)
                     self.assertEqual(collision_view_after_restart.json()["vehicles"][0]["vehicle_id"], vehicle_id)
                     self.assertEqual(collision_view_after_restart.json()["vehicles"][0]["source_consent_status"], "ACTIVE")
+                    self.assertEqual(collision_view_after_restart.json()["vehicles"][0]["vehicle_profile_status"], "DECODED")
+                    self.assertEqual(
+                        collision_view_after_restart.json()["vehicles"][0]["vehicle_profile"]["make"]["value"],
+                        "HONDA",
+                    )
+
+                    decode_withdrawn = restarted.post(
+                        f"/v1/capture-sessions/{session_id}/vehicle-decode-consent",
+                        headers={"Authorization": self.db.owner_auth()},
+                        json={
+                            "request_id": str(uuid.uuid4()),
+                            "accepted": False,
+                            "scope": "nhtsa_vpic_decode",
+                            "disclosure_version": "vehicle-decode-disclosure-v1",
+                        },
+                    )
+                    self.assertEqual(decode_withdrawn.status_code, 200, decode_withdrawn.text)
+                    profile_after_decode_withdrawal = restarted.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers={"Authorization": self.db.auth()},
+                    )
+                    self.assertEqual(profile_after_decode_withdrawal.status_code, 200)
+                    self.assertEqual(profile_after_decode_withdrawal.json()["vehicles"][0]["vehicle_profile_status"], "REVOKED")
+                    self.assertIsNone(profile_after_decode_withdrawal.json()["vehicles"][0]["vehicle_profile"])
 
                     first_artifact_id, first_bytes = next(iter(originals.items()))
                     retrieved = restarted.get(

@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "disclosure_version": "vehicle-decode-disclosure-v1",
+  "requires_explicit_acceptance": true,
+  "purpose": "Decode a VIN through the United States National Highway Traffic Safety Administration vPIC service to retrieve manufacturer-reported vehicle description attributes.",
+  "sections": [
+    "This optional step sends the VIN you provided to the NHTSA vPIC vehicle information service for decoding.",
+    "The lookup may return manufacturer-reported make, model, model year, body class, trim, and other available attributes. Some fields may be unavailable, incomplete, or inaccurate.",
+    "Claim2Car records the normalized returned attributes, the provider name, lookup time, and a digest of the provider response. Claim2Car does not retain the raw VIN or the raw provider response in the vehicle profile record.",
+    "A decoded profile is not proof of ownership, vehicle authenticity, physical condition, damage, curb weight, or roadworthiness. It is not by itself an input eligible for crash physics or damage conclusions.",
+    "You may decline this optional lookup without blocking ordinary evidence capture. You may withdraw this permission; retained profile attributes will then be cleared from the active vehicle profile.",
+    "The lookup is performed only after you explicitly accept this separate disclosure. It is distinct from consent to capture photographs and vehicle condition evidence."
+  ]
+}

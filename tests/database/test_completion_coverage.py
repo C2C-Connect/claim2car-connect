@@ -50,6 +50,21 @@ class CompletionCoverage(unittest.TestCase):
         before=tuple(e)
         check_completion('synthetic-s',e,b,d)
         self.assertEqual(e,before)
+    def test_vehicle_intelligence_sidecar_events_do_not_change_evidence_eligibility(self):
+        events, byte_map, digest = self.fixture()
+        consent_event = replace(self.event(4, 'VEHICLE_DECODE_CONSENT_RECORDED', {
+            'accepted': True, 'scope': 'nhtsa_vpic_decode',
+        }), event_id='vehicle-decode-consent')
+        profile_event = replace(self.event(5, 'VEHICLE_PROFILE_DECODED', {
+            'provider': 'NHTSA_VPIC', 'decode_status': 'DECODED',
+        }), event_id='vehicle-profile-decoded')
+        combined = events[:3] + (consent_event, profile_event) + events[3:]
+        combined = tuple(replace(event, sequence=index) for index, event in enumerate(combined, 1))
+        state = reconstruct('synthetic-s', combined)
+        self.assertEqual(len(state.artifacts), len(byte_map))
+        decision = check_completion('synthetic-s', combined, byte_map, digest)
+        self.assertEqual(decision.status, 'ELIGIBLE')
+        self.assertEqual(decision.event_count, len(combined))
     def test_every_missing_slot_blocks(self):
         for slot in LEGACY_CANONICAL_SLOTS:
             with self.subTest(slot=slot):

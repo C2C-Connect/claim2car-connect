@@ -21,6 +21,31 @@ REQUIRED += ['frontend/src/modules/capture/vpic.mjs','frontend/src/modules/captu
 REQUIRED += ['frontend/src/modules/capture/vpic_transport.mjs','frontend/tests/vpic_transport.test.mjs','.github/workflows/vpic-live-lookup.yml']
 
 REQUIRED += ['frontend/tests/vpic_transport.test.mjs']
+REQUIRED += [
+    'authority_migrations/0022_collision_vehicle_capture_link.sql',
+    'authority_migrations/0023_consented_vehicle_profile.sql',
+    'app/vehicle_intelligence/__init__.py',
+    'app/vehicle_intelligence/vpic.py',
+    'tests/vehicle_intelligence/test_vpic.py',
+    'contracts/vehicle-decode-disclosure-v1.json',
+    'database/capture_evidence.py',
+    'database/collision_lifecycle.py',
+    'tests/database/test_capture_http_integration.py',
+    'tests/database/test_collision_lifecycle_integration.py',
+    'tests/database/test_database_authority_diagnostics.py',
+    'tests/database/test_executable_gate_verifiers.py',
+    'tests/database/test_migration_controls_integration.py',
+    'tests/database/verify_gates.py',
+    'scripts/database_authority_diagnostics.py',
+    'contracts/m1_state_machine.py',
+    'tests/contracts/test_m1_state_machine.py',
+    'tests/database/test_completion_coverage.py',
+    'app/capture_api.py',
+    'app/domain_events.py',
+    'app/synthetic_evidence.py',
+    'docs/api-foundation.md',
+    'README.md',
+]
 
 def snapshot():
     root = Path(subprocess.check_output(['git','rev-parse','--show-toplevel']).decode().strip()).resolve()

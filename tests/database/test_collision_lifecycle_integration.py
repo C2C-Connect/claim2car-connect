@@ -177,7 +177,7 @@ class CollisionLifecycleIntegration(unittest.TestCase):
         tables = (
             "collision_lifecycle_records", "vehicles", "collision_vehicle_links",
             "collision_participants", "collision_claim_links", "collision_events",
-            "collision_outbox", "vehicle_identity_sources",
+            "collision_outbox", "vehicle_identity_sources", "vehicle_decode_snapshots",
         )
         with self.store.sessions._authorized(self.auth()) as (conn, actor):
             for table in tables:

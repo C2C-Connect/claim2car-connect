@@ -4,11 +4,28 @@
 
 
 **Canonical repository:** `C2C-Connect/claim2car-connect`
-**Current main baseline after PR #47 integration:** `f3ba5b28eede44eff5fef70a6b5fda8b4358757f`
+**Current main baseline before PR #64 integration:** `1898259e64548f38020877c2c6e80237b81eeac5`
 **Capture protocol:** `claims2car-16-v1` is the new-session default; explicit historical `claims2car-12-v1` compatibility is preserved.
 **Database contract:** `C2C-DB-AC-001 v1.0` owner-adopted; independent review waived (not performed); post-adoption DB-01–DB-14 acceptance completed with 14/14 formal awards and overall `ACCEPTED` on synthetic PostgreSQL evidence.
 
-## Current verification snapshot — 2026-11-17
+## Latest candidate verification — PR #64 (2026-11-18)
+
+**Status:** Verified candidate; PR remains draft/open until final review and merge.
+
+- PR: [#64 — Add separately consented, provenance-aware vehicle profiles](https://github.com/C2C-Connect/claim2car-connect/pull/64)
+- Candidate head: `5c97be791e3612f97170b8110434f8a4167222fa`
+- Base `main`: `1898259e64548f38020877c2c6e80237b81eeac5`; this candidate is not yet merged.
+- Full repository pytest: **803 passed, 196 subtests passed, 28 warnings** — full-suite run [44301345481](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44301345481).
+- PR workflow runs: **13/13 successful** on this candidate. The browser IndexedDB job succeeded on its second attempt after a runner package-install failure; the successful attempt is recorded under [run 44301345353](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44301345353).
+- PostgreSQL authority run: **329/329 counted database tests passed**, zero failures/errors/skips; **DB-01 through DB-14: 14/14 PASS and 14 formal awards**; `overall_acceptance: ACCEPTED` — [run 44301345760](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44301345760).
+- The authority evidence is checksum-bound to **23 migrations**, on isolated synthetic PostgreSQL 16.4, with **280/280 tenant-isolation assertions** across 14 tenant-scoped tables.
+- Migration 0023 adds separately consented NHTSA vPIC vehicle-profile snapshots. The integration journey verifies that lookup is blocked before separate owner consent, disclosure versions are enforced, normalized attributes and field provenance persist across runtime restart, retries are idempotent, raw VIN/provider response are not persisted, and consent withdrawal clears active profile attributes.
+- vPIC output remains descriptive manufacturer/provider data only. It is not proof of ownership, physical condition, damage, curb weight, structural status, or roadworthiness; raw detector or provider values are not promoted into physics inputs.
+- **Limitations remain:** the optional consent flow is API-integrated but not yet surfaced in the browser workbench; vPIC unit/integration tests use controlled provider fixtures and do not establish live provider availability or field accuracy. No real-participant pilot, production deployment, legal acceptance, or field validation is claimed.
+
+The historical sections below record earlier milestones and must not be treated as the current branch or deployment status.
+
+## Historical verification snapshot — 2026-11-17
 
 ### PR #41 — capture protocol 16-v1
 
@@ -19,7 +36,7 @@ PR #41 is merged into `main`.
 - Full pytest on that merged source: **758 passed, 200 subtests passed**.
 - The 13 PR workflows passed before merge.
 
-### DB-01 through DB-14 — executable criteria implemented and evaluated
+### Historical pre-adoption DB-01 through DB-14 implementation snapshot
 
 PR #43 implemented and merged the 14 gate verifier functions, per-gate test selectors, direct PostgreSQL evidence requirements, and the fail-closed counted-test runner. PR #44 corrected the structured evidence JSON publisher.
 
@@ -36,7 +53,7 @@ PR #43 implemented and merged the 14 gate verifier functions, per-gate test sele
 - All 14 gate criteria evaluated `PASS` in the post-cutover authority report.
 - The structured evidence artifact was successfully published after PR #44.
 
-**Formal gate award remains 0/14.** The source contract is still `PROPOSED_PENDING_OWNER_ADOPTION`; accordingly, each gate is reported as `NOT AWARDED` with `criteria_result: PASS`, and `overall_acceptance` remains `NOT ACCEPTED`. This is intentional and fail-closed. The contract requires independent review and formal owner adoption before any gate status is awarded.
+**At this historical snapshot, formal gate award remained 0/14.** The source contract was then `PROPOSED_PENDING_OWNER_ADOPTION`; each gate was reported as `NOT AWARDED` with `criteria_result: PASS`. This state was superseded by the post-adoption PR #47 evidence below.
 
 ### Issue disposition
 
@@ -65,7 +82,7 @@ Migration 0019 is not a replacement for event-contract parity. It adds a separat
 
 ### Remaining acceptance and release boundaries
 
-- The 14 criteria passing in synthetic PostgreSQL does not constitute formal database acceptance until contract adoption is complete.
+- Historical synthetic results were not formal acceptance until contract adoption; the later post-adoption result is recorded above and in the PR #47 section.
 - Synthetic acceptance does not establish production readiness, real participant/field acceptance, legal admissibility, measurement accuracy, or complete commercial deployment.
 - Live Square settlement, external carrier/partner delivery, and live dispatch remain disabled unless separately authorized and verified.
 
