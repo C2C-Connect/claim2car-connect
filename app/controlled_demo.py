@@ -233,10 +233,9 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     from app.damage_localization import (
         DamageAnnotation,
         DamageLocalizationBenchmark,
-    DamageObservationAdapter,
+        DamageObservationAdapter,
         DamageRegion,
         HeuristicDamageDetector,
-    
     )
 
     damage_grid = [[90] * 36 for _ in range(36)]
