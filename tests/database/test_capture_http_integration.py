@@ -129,7 +129,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(collision_vehicle.json()["source_consent_status"], "ACTIVE")
                     self.assertNotIn("vin_hmac_sha256", collision_vehicle.json())
 
-                    from app.vehicle_intelligence.vpic import VpicClient
+                    from backend.app.vehicle_intelligence.vpic import VpicClient
                     provider_row = {
                         "VIN": "1HGCM82633A004352", "ErrorCode": "0", "SuggestedVIN": "",
                         "Make": "HONDA", "Model": "Accord", "ModelYear": "2003",
