@@ -21,7 +21,7 @@ variable "vcn_ocid" {
 }
 
 variable "private_subnet_ocid" {
-  description = "Existing private subnet OCID. Must have NAT/service-gateway egress and no public IP assignment."
+  description = "Existing private subnet OCID. Must prohibit public IP assignment and have NAT/service-gateway egress."
   type        = string
   sensitive   = true
 }
@@ -101,15 +101,23 @@ variable "block_volume_budget_gbs" {
 }
 
 variable "admin_ingress_cidrs" {
-  description = "Explicit Bastion/VPN egress CIDRs permitted to reach SSH. Empty means no SSH ingress rule is created."
+  description = "Explicit Bastion/VPN source CIDRs permitted to reach SSH. Empty means no SSH ingress rule is created."
   type        = list(string)
   default     = []
+  validation {
+    condition     = alltrue([for cidr in var.admin_ingress_cidrs : can(cidrhost(cidr, 0)) && cidr != "0.0.0.0/0" && cidr != "::/0"])
+    error_message = "Each admin ingress CIDR must be valid and must not allow the entire IPv4 or IPv6 internet."
+  }
 }
 
 variable "app_ingress_cidrs" {
   description = "Explicit private ingress CIDRs permitted to reach the app on TCP/8000. Empty means no app ingress rule is created."
   type        = list(string)
   default     = []
+  validation {
+    condition     = alltrue([for cidr in var.app_ingress_cidrs : can(cidrhost(cidr, 0)) && cidr != "0.0.0.0/0" && cidr != "::/0"])
+    error_message = "Each app ingress CIDR must be valid and must not allow the entire IPv4 or IPv6 internet."
+  }
 }
 
 variable "ssh_authorized_keys" {
