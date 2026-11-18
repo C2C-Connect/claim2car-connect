@@ -167,6 +167,20 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(details.json()["manifest_digest"], manifest_digest)
                     self.assertEqual(len(details.json()["artifacts"]), len(CANONICAL_SLOTS))
 
+                    collision_evidence = restarted.get(
+                        f"/v1/review-collisions/{collision_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(collision_evidence.status_code, 200, collision_evidence.text)
+                    self.assertEqual(len(collision_evidence.json()["claims"]), 1)
+                    self.assertEqual(collision_evidence.json()["claims"][0]["claim_id"], claim_id)
+                    self.assertEqual(collision_evidence.json()["claims"][0]["capture_session_id"], session_id)
+                    self.assertEqual(collision_evidence.json()["claims"][0]["evidence_status"], "READY")
+                    self.assertEqual(
+                        collision_evidence.json()["claims"][0]["evidence"]["manifest_digest"],
+                        manifest_digest,
+                    )
+
                     first_artifact_id, first_bytes = next(iter(originals.items()))
                     retrieved = restarted.get(
                         f"/v1/review-sessions/{session_id}/artifacts/{first_artifact_id}",
