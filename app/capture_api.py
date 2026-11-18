@@ -117,6 +117,7 @@ class VehicleDecodeConsentRequest(BaseModel):
     request_id: UUID
     accepted: StrictBool
     scope: StrictStr = Field(min_length=1, max_length=64)
+    disclosure_version: StrictStr = Field(min_length=1, max_length=64)
     class Config:
         extra = 'forbid'
 
@@ -542,7 +543,17 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             return invoke_evidence(
                 evidence.record_vehicle_decode_consent, authorization, session_id,
                 request_id=body.request_id, accepted=body.accepted, scope=body.scope,
+                disclosure_version=body.disclosure_version,
             )
+
+        @api.get('/v1/vehicle-decode-disclosure')
+        def vehicle_decode_disclosure(authorization: str = Depends(authorize)):
+            path = Path(__file__).resolve().parents[1] / 'contracts' / 'vehicle-decode-disclosure-v1.json'
+            try:
+                disclosure = json.loads(path.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                _fail(503, 'VEHICLE_DECODE_DISCLOSURE_UNAVAILABLE')
+            return JSONResponse(disclosure, headers=dict(NO_STORE_HEADERS))
 
         @api.post('/v1/capture-sessions/{session_id}/vehicle-profile')
         def decode_vehicle_profile(session_id: UUID, body: VehicleProfileRequest,
