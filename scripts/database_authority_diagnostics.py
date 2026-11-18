@@ -31,9 +31,10 @@ def validate_authority_migration_inventory(inventory):
     expect('0019_manifest_root_protocol_binding.sql' in names,'MANIFEST_ROOT_PROTOCOL_BINDING_MIGRATION_REQUIRED')
     expect('0020_collision_lifecycle_record.sql' in names,'COLLISION_LIFECYCLE_MIGRATION_REQUIRED')
     expect('0021_collision_claim_link.sql' in names,'COLLISION_CLAIM_LINK_MIGRATION_REQUIRED')
+    expect('0022_collision_vehicle_capture_link.sql' in names,'COLLISION_VEHICLE_CAPTURE_LINK_MIGRATION_REQUIRED')
     expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql') < names.index('0020_collision_lifecycle_record.sql') < names.index('0021_collision_claim_link.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names[-1]=='0021_collision_claim_link.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0021')
+    expect(names[-1]=='0022_collision_vehicle_capture_link.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0022')
 
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
@@ -64,7 +65,7 @@ def verify(report,admin,connections,tenants,session):
               'fixture_classification':'admin-provisioned storage-isolation fixtures; not evidence evaluation or accepted completion',
               'results':[]}
     report['checks'].append(matrix)
-    actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings' AND c.relname NOT IN ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox')").fetchall()
+    actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings' AND c.relname NOT IN ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox','vehicle_identity_sources')").fetchall()
     expect({row[0] for row in actual}==set(TABLES),'TENANT_TABLE_SCOPE_CHANGED')
     ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim')}
     seal = 'matrix-seal-'+uuid.uuid4().hex
