@@ -21,7 +21,7 @@ test('request_normalization_uses_the_same_vin_guard',()=>assert.equal(parseVpicR
 test('raw_fields_are_retained_without_aliasing_input',()=>{const payload=fixture({AdditionalVariable:'fixture-extra'});const r=parseVpicResponse(vin,payload);payload.Results[0].Make='changed';assert.equal(r.rawResult.Make,'FIXTURE MAKE');assert.equal(r.rawResult.AdditionalVariable,'fixture-extra');assert.throws(()=>{r.profile.make='changed';},TypeError);});
 test('oversized_response_blocks',()=>assert.equal(parseVpicResponse(vin,fixture({Extra:'x'.repeat(262145)})).reason,'INVALID_RESPONSE'));
 test('unknown_profile_sentinel_is_not_treated_as_identity',()=>assert.equal(parseVpicResponse(vin,fixture({Make:'Unknown'})).reason,'INCOMPLETE_PROFILE'));
-const failures=records.filter(r=>r.outcome!=='passed').length;
+test('non_north_american_check_digit_can_be_explicitly_overridden_but_is_flagged',()=>{const alternate='1HGCM82643A004352';assert.equal(parseVpicResponse(alternate,fixture({VIN:alternate})).reason,'INVALID_REQUEST_VIN');const result=parseVpicResponse(alternate,fixture({VIN:alternate}),{allowCheckDigitMismatch:true});assert.equal(result.status,'parsed');assert.equal(result.profile.checkDigitStatus,'MISMATCH_OVERRIDE');assert.equal(result.physicsReady,false);});\nconst failures=records.filter(r=>r.outcome!=='passed').length;
 const successful=records.length>0&&new Set(records.map(r=>r.id)).size===records.length&&failures===0;
 console.log(JSON.stringify({classification:'offline-synthetic-vpic-response-adapter-not-live-service-validation',commit:process.env.GITHUB_SHA??null,runtime:process.version,executed:records.length,failures,successful,tests:records},null,2));
 process.exitCode=successful?0:1;
