@@ -185,11 +185,17 @@ class CollisionLifecycleStore:
                             "CONSENTED_VEHICLE_REFERENCE_REQUIRED",
                             "VEHICLE_REFERENCE_SOURCE_INVALID"):
                     raise CaptureAuthorizationError(code) from None
-                if code in ("COLLISION_VEHICLE_LINK_CONFLICT",
-                            "COLLISION_EVENT_IDEMPOTENCY_CONFLICT"):
+                if code in (
+                    "COLLISION_VEHICLE_LINK_CONFLICT",
+                    "COLLISION_EVENT_IDEMPOTENCY_CONFLICT",
+                    "COLLISION_VEHICLE_CLAIM_LINK_REQUIRED",
+                    "VEHICLE_IDENTITY_SOURCE_CONFLICT",
+                    "VEHICLE_REFERENCE_INTEGRITY_INVALID",
+                    "VEHICLE_REGISTRY_READBACK_FAILED",
+                ):
                     raise CollisionLifecycleConflict(code) from None
-                if code == "COLLISION_VEHICLE_CLAIM_LINK_REQUIRED":
-                    raise CollisionLifecycleConflict(code) from None
+                if code == "INVALID_COLLISION_VEHICLE_LINK":
+                    raise ValueError(code) from None
                 raise
             if outcome not in ("ACCEPTED", "DUPLICATE"):
                 raise CollisionLifecycleConflict("COLLISION_VEHICLE_LINK_NOT_ACCEPTED")
