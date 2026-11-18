@@ -72,23 +72,28 @@ class HealthTests(unittest.TestCase):
 
     def test_readiness_requires_persistent_claim_case_register_with_forced_rls(self):
         from app.main import READINESS_SQL
-        self.assertIn('count(*)=14',READINESS_SQL)
+        self.assertIn('count(*)=21',READINESS_SQL)
         self.assertIn("'claim_cases'",READINESS_SQL)
         self.assertIn("'claim_case_incident_intake'",READINESS_SQL)
         self.assertIn("'financial_ledger_entries'",READINESS_SQL)
         self.assertIn("'financial_ledger_postings'",READINESS_SQL)
+        for table in ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox'):
+            self.assertIn("'" + table + "'",READINESS_SQL)
+        self.assertIn("faos.create_collision_lifecycle_record(uuid,uuid,uuid,text,timestamptz)",READINESS_SQL)
+        self.assertIn("faos.append_collision_event(uuid,uuid,uuid,text,text,text,timestamptz,jsonb,uuid,uuid)",READINESS_SQL)
+        self.assertIn("pg_get_userbyid(p.proowner)='faos_writer'",READINESS_SQL)
         self.assertIn('c.relrowsecurity AND c.relforcerowsecurity',READINESS_SQL)
 
     def test_probe_checks_all_prerequisites_with_read_only_timeouts(self):
         conn=MagicMock()
         conn.__enter__.return_value=conn
         with patch('app.main.psycopg.connect',return_value=conn) as connect:
-            for row in ((True,True,True,True),(False,True,True,True),(True,False,True,True),(True,True,False,True),(True,True,True,False),None):
+            for row in ((True,True,True,True,True),(False,True,True,True,True),(True,False,True,True,True),(True,True,False,True,True),(True,True,True,False,True),(True,True,True,True,False),None):
                 with self.subTest(row=row):
                     conn.execute.return_value.fetchone.return_value=row
-                    self.assertEqual(probe_database('configured-target'),row==(True,True,True,True))
+                    self.assertEqual(probe_database('configured-target'),row==(True,True,True,True,True))
         self.assertEqual(connect.call_args.kwargs,{'autocommit':True,'connect_timeout':3,'options':'-c statement_timeout=2000 -c default_transaction_read_only=on'})
-        self.assertEqual(conn.__exit__.call_count,6)
+        self.assertEqual(conn.__exit__.call_count,7)
 
 
     def test_build_health_endpoint_reports_revision_and_runtime_mode(self):
