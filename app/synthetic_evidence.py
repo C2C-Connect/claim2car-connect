@@ -147,6 +147,10 @@ def reconstruct(session_id,events):
                     or type(item.passed) is not bool or item.method!='synthetic-fixture'):
                 raise ValueError('INVALID_SYNTHETIC_QUALITY')
             state=replace(state,quality=tuple(q for q in state.quality if q.artifact_id!=item.artifact_id)+(item,))
+        elif event.kind in ('VEHICLE_DECODE_CONSENT_RECORDED','VEHICLE_PROFILE_DECODED'):
+            # Vehicle intelligence is a sidecar projection; it must not alter
+            # the frozen evidence-capture state or block restart reconstruction.
+            continue
         elif event.kind=='REVIEW_RECORDED':
             if (set(p)!={'disposition','artifact_ids','schema_version'} or p['schema_version']!=VERSION
                     or p['disposition'] not in ('NOTE_ONLY','HUMAN_QC_REQUIRED')):
