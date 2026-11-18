@@ -269,6 +269,24 @@ class CaptureHttpIntegration(unittest.TestCase):
                         "HONDA",
                     )
 
+                    decode_withdrawn = restarted.post(
+                        f"/v1/capture-sessions/{session_id}/vehicle-decode-consent",
+                        headers={"Authorization": self.db.owner_auth()},
+                        json={
+                            "request_id": str(uuid.uuid4()),
+                            "accepted": False,
+                            "scope": "nhtsa_vpic_decode",
+                        },
+                    )
+                    self.assertEqual(decode_withdrawn.status_code, 200, decode_withdrawn.text)
+                    profile_after_decode_withdrawal = restarted.get(
+                        f"/v1/collisions/{collision_id}",
+                        headers={"Authorization": self.db.auth()},
+                    )
+                    self.assertEqual(profile_after_decode_withdrawal.status_code, 200)
+                    self.assertEqual(profile_after_decode_withdrawal.json()["vehicles"][0]["vehicle_profile_status"], "REVOKED")
+                    self.assertIsNone(profile_after_decode_withdrawal.json()["vehicles"][0]["vehicle_profile"])
+
                     first_artifact_id, first_bytes = next(iter(originals.items()))
                     retrieved = restarted.get(
                         f"/v1/review-sessions/{session_id}/artifacts/{first_artifact_id}",
