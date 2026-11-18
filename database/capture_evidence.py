@@ -183,6 +183,10 @@ class CaptureEvidenceService:
                 deletion_tenant = actor.tenant_id
                 if _session.scope == "persistent-claim-case" and _session.claim_id:
                     conn.execute(
+                        "SELECT faos.revoke_collision_vehicle_source(%s::uuid,%s::text,%s::text)",
+                        (actor.tenant_id, session_id, actor.actor_id),
+                    )
+                    conn.execute(
                         "SELECT faos.withdraw_claim_case_incident(%s::uuid,%s::uuid,%s::text)",
                         (actor.tenant_id, _session.claim_id, actor.actor_id),
                     )
