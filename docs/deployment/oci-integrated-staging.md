@@ -35,7 +35,7 @@ Before provisioning or exposing any compute instance, review the security lists 
 2. Tighten security-list ingress and confirm the private subnet's NAT/service-gateway routes.
 3. Provision an eligible private compute instance and separate persistent database/evidence volumes. Record OCIDs in OCI-side inventory, not this repository.
 4. Install the container runtime and mount volumes. Verify filesystem ownership and mount persistence across a reboot before starting the app.
-5. Provision PostgreSQL 16/PostGIS; create migration/runtime roles and apply the repository's authoritative migration plan through migration 0019.
+5. Provision PostgreSQL 16/PostGIS; create migration/runtime roles and apply the repository's authoritative migration plan through migration 0023.
 6. Provision runtime credentials through OCI Vault and create a dedicated synthetic staging tenant with distinct operator, owner, and reviewer identities.
 7. Build and push the exact integrated image to OCIR; deploy the same SHA to the private compute host.
 8. Verify `/health/live`, `/health/ready`, and `/health/build`; the readiness endpoint must fail if PostgreSQL or the persistent evidence mount is unavailable.
