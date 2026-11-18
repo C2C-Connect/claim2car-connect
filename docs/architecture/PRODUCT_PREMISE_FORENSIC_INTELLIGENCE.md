@@ -112,6 +112,10 @@ The intended product journey is one connected, auditable lifecycle. The stages b
 - Preserve model/version, input references, output, confidence calibration basis, limitations, and human review/override history.
 - Escalate safety-critical or ambiguous cases rather than allowing an automated workflow to issue an unsupported clearance.
 
+- Treat normalized image coordinates and bounding-box area as image-space observations only; never convert them directly into physical area, crush depth, structural severity, or repair scope.
+- Treat model class labels as unreviewed hypotheses and raw detector scores as uncalibrated scores unless a separately validated calibration process establishes otherwise.
+- A two-dimensional exterior image cannot establish concealed structural, mechanical, electrical, restraint, cooling, or ADAS condition; require the appropriate measurement, diagnostic procedure, teardown, or qualified physical inspection.
+
 ### 3.5 Evidence-backed evaluation and decision
 - Determine which questions can be answered from the available record and which cannot.
 - Reconcile conflicting sources without silently selecting the convenient one.

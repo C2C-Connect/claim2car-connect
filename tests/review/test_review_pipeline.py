@@ -278,7 +278,7 @@ def test_controlled_demo_end_to_end(tmp_path):
         "reviewer_decision": "reviewed",
         "reviewer_dataset": "labeled",
         "drift_monitor": "measured",
-        "damage_localization": "measured",
+        "damage_localization": "localized-advisory-only",
         "history_replay": "replayed",
         "tow_dispatch": "planned",
         "carrier_messages": "formatted",
@@ -326,13 +326,17 @@ def test_controlled_demo_end_to_end(tmp_path):
     assert drift_steps and drift_steps[0]["detail"]["observations"] == 1
     assert drift_steps[0]["detail"]["baseline_agreement"] == 1.0
     assert drift_steps[0]["detail"]["drift_flagged"] is False
-    # Damage localization: baseline detector matched the reviewer annotation,
-    # physics input produced, adoption gate refused (no strict improvement).
+    # Damage localization: synthetic contrast region is localized only;
+    # no physical severity or depth is inferred, and adoption remains refused.
     damage_steps = [s for s in record["steps"] if s["step"] == "damage_localization"]
     assert damage_steps and damage_steps[0]["detail"]["matched"] == 1
     assert damage_steps[0]["detail"]["mean_iou"] >= 0.5
     assert damage_steps[0]["detail"]["adoption_gate"].startswith("refused")
-    assert damage_steps[0]["detail"]["physics_input"]["zone"] == "front"
+    observation = damage_steps[0]["detail"]["localization_observation"]
+    assert observation["zone"] == "front"
+    assert observation["epistemic_status"] == "MODEL_LOCALIZATION_UNREVIEWED"
+    assert observation["physical_severity"] == "NOT_ESTABLISHED"
+    assert observation["physical_depth"] == "NOT_MEASURED"
 
 
 def test_demo_evidence_contains_no_payment_or_incentive_language(tmp_path):

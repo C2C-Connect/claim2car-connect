@@ -1,13 +1,11 @@
-"""CV damage localization tests (Slice 10): input producer + benchmark gate."""
+"""CV damage localization tests: observation boundary + reviewer benchmark gate."""
 from __future__ import annotations
 
 import pytest
 
 from app.damage_localization import (
     ANNOTATION_VERSION,
-    COSMETIC_AREA_MAX,
     DAMAGE_CLASSES,
-    FUNCTIONAL_AREA_MAX,
     IOU_MATCH_THRESHOLD,
     MIN_LABELED_SAMPLES,
     MODEL_VERSION,
@@ -18,8 +16,7 @@ from app.damage_localization import (
     DamageLocalizationError,
     DamageRegion,
     HeuristicDamageDetector,
-    ImpactGeometry,
-    PhysicsInputAdapter,
+    DamageObservationAdapter,
     iou,
     zone_for_slot,
 )
@@ -60,7 +57,7 @@ class TestDamageRegion:
             region(conf=1.5)
 
     def test_damage_classes_are_the_provisional_set(self):
-        assert DAMAGE_CLASSES == {"scratch", "dent", "glass_damage", "structural_deformation"}
+        assert DAMAGE_CLASSES == {"scratch", "dent", "glass_damage", "structural_deformation", "unknown"}
 
 
 class TestIoU:
@@ -79,8 +76,8 @@ class TestIoU:
         assert 0.0 < iou(a, b) < 1.0
 
 
-class TestPhysicsSeam:
-    adapter = PhysicsInputAdapter()
+class TestObservationBoundary:
+    adapter = DamageObservationAdapter()
 
     def test_exterior_slot_maps_to_zone(self):
         assert zone_for_slot("front_left") == "front"
@@ -92,24 +89,24 @@ class TestPhysicsSeam:
         for slot in ("vin_ocr", "doc_ocr", "interior_front"):
             assert zone_for_slot(slot) is None
             with pytest.raises(DamageLocalizationError, match="NOT_AN_EXTERIOR_SLOT"):
-                self.adapter.to_impact_geometry(region(slot=slot))
+                self.adapter.to_observation(region(slot=slot))
 
-    def test_area_fraction_drives_severity_tier(self):
-        cosmetic = self.adapter.to_impact_geometry(region(x0=0.0, y0=0.0, x1=0.1, y1=0.1))
-        functional = self.adapter.to_impact_geometry(region())
-        structural = self.adapter.to_impact_geometry(region(x0=0.0, y0=0.0, x1=0.9, y1=0.9))
-        assert cosmetic.severity_tier == "cosmetic" and cosmetic.depth_cm == 0.5
-        assert functional.severity_tier == "functional" and functional.depth_cm == 3.0
-        assert structural.severity_tier == "structural" and structural.depth_cm == 12.0
-        assert cosmetic.area_fraction <= COSMETIC_AREA_MAX < functional.area_fraction <= FUNCTIONAL_AREA_MAX
+    def test_image_region_area_is_not_promoted_to_physical_severity_or_depth(self):
+        small = self.adapter.to_observation(region(x0=0.0, y0=0.0, x1=0.1, y1=0.1))
+        large = self.adapter.to_observation(region(x0=0.0, y0=0.0, x1=0.9, y1=0.9))
+        assert small.normalized_region_area_fraction < large.normalized_region_area_fraction
+        assert not hasattr(small, "severity_tier")
+        assert not hasattr(small, "depth_cm")
 
-    def test_zone_input_bridge_is_constructible(self):
-        geometry = self.adapter.to_impact_geometry(region())
-        try:
-            zone_input = geometry.to_zone_input()
-            assert zone_input.zone == "front" and zone_input.material == "mild_steel"
-        except DamageLocalizationError as exc:
-            assert exc.code == "PHYSICS_ENGINE_UNAVAILABLE"
+    def test_physics_conversion_fails_closed_without_physical_measurements(self):
+        with pytest.raises(DamageLocalizationError, match="PHYSICAL_MEASUREMENTS_REQUIRED"):
+            self.adapter.to_impact_geometry(region())
+
+    def test_raw_detector_score_is_not_a_calibrated_probability(self):
+        observed = self.adapter.to_observation(region(conf=0.93))
+        assert observed.raw_detector_score == 0.93
+        assert observed.predicted_damage_class == "dent"
+        assert observed.score_semantics == "uncalibrated_detector_score"
 
 
 class TestHeuristicBaseline:
@@ -128,6 +125,7 @@ class TestHeuristicBaseline:
         r = found[0]
         assert 0.2 < r.x0 < 0.7 and 0.2 < r.y0 < 0.7
         assert r.model_version.endswith("heuristic-baseline")
+        assert r.damage_class == "unknown"  # contrast is not a damage taxonomy
 
     def test_uniform_frame_yields_no_regions(self):
         assert self.detector.detect("front_left", [[128] * 36 for _ in range(36)]) == ()

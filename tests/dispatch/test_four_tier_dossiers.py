@@ -72,7 +72,7 @@ class FourTierDossierTests(unittest.TestCase):
         )
         shop = self.service.generate_repair_shop_packet(
             consent=self.consent, binding=self.binding, ledger_entry=self.ledger_entry("shop"),
-            damaged_zones=[], generated_by="dossier", now_iso=self.consent.recorded_at,
+            localization_observations=[], generated_by="dossier", now_iso=self.consent.recorded_at,
         )
         carrier = self.service.generate_carrier_seven_page_report(
             consent=self.consent, binding=self.binding, generated_by="dossier", now_iso=self.consent.recorded_at

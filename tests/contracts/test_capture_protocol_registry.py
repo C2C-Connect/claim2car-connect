@@ -9,7 +9,7 @@ from app.capture_protocols import (
     LEGACY_CAPTURE_PROTOCOL,
     resolve_capture_protocol,
 )
-from app.damage_localization import DamageLocalizationError, DamageRegion, PhysicsInputAdapter, zone_for_slot
+from app.damage_localization import DamageLocalizationError, DamageRegion, DamageObservationAdapter, zone_for_slot
 from app.evidence_manifest import ManifestEntry, build_manifest, verify_manifest
 from app.capture_workflow import CaptureWorkflow, LocalDraftStore
 
@@ -92,17 +92,17 @@ def test_manifest_digest_and_verification_bind_exact_protocol_version():
         ("07_front_left_exterior", "front"),
     ],
 )
-def test_16_v1_exterior_slots_map_to_physics_zones(slot, zone):
+def test_16_v1_exterior_slots_map_to_vehicle_zones_for_observation(slot, zone):
     assert zone_for_slot(slot, DEFAULT_CAPTURE_PROTOCOL) == zone
     region = DamageRegion(slot, 0.1, 0.1, 0.4, 0.4, "dent", 0.9,
                           protocol_version=DEFAULT_CAPTURE_PROTOCOL)
-    assert PhysicsInputAdapter().to_impact_geometry(region).zone == zone
+    assert DamageObservationAdapter().to_observation(region).zone == zone
 
 
 @pytest.mark.parametrize("slot", EXPECTED_16[8:])
-def test_16_v1_wheel_cabin_odometer_vin_and_documents_are_not_crush_physics(slot):
+def test_16_v1_wheel_cabin_odometer_vin_and_documents_are_not_exterior_damage_views(slot):
     assert zone_for_slot(slot, DEFAULT_CAPTURE_PROTOCOL) is None
     region = DamageRegion(slot, 0.1, 0.1, 0.4, 0.4, "dent", 0.9,
                           protocol_version=DEFAULT_CAPTURE_PROTOCOL)
     with pytest.raises(DamageLocalizationError, match="NOT_AN_EXTERIOR_SLOT"):
-        PhysicsInputAdapter().to_impact_geometry(region)
+        DamageObservationAdapter().to_observation(region)

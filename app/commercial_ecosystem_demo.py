@@ -17,7 +17,7 @@ from backend.app.reports.forensic_pdf import (
     FourTierDossierService,
     SourceEvidenceBinding,
 )
-from backend.app.vision.adapters import GatedVisionPhysicsPipeline, LocalYoloTwoStageDetector
+from backend.app.vision.adapters import GatedDamageLocalizationPipeline, LocalYoloTwoStageDetector
 
 
 def run_full_commercial_ecosystem(output_dir: Path, fixed_now: str = "2026-11-08T22:00:00+00:00") -> dict:
@@ -54,8 +54,8 @@ def run_full_commercial_ecosystem(output_dir: Path, fixed_now: str = "2026-11-08
             region=DamageRegion("front_left", 0.32, 0.32, 0.52, 0.52, "structural_deformation", 1.0),
             annotated_by="synthetic-reviewer-01",
         )
-        vision_pipeline = GatedVisionPhysicsPipeline(candidate_detector=candidate_yolo)
-        advisory_vision = vision_pipeline.evaluate_and_extract_physics(
+        vision_pipeline = GatedDamageLocalizationPipeline(candidate_detector=candidate_yolo)
+        advisory_vision = vision_pipeline.evaluate_localization(
             session_id=session_id,
             slot="front_left",
             grid_fixture=grid,
@@ -116,7 +116,7 @@ def run_full_commercial_ecosystem(output_dir: Path, fixed_now: str = "2026-11-08
                 "promoted_over_baseline": advisory_vision.promoted_over_baseline,
                 "weight_digests": list(advisory_vision.weight_digests),
             },
-            "physics": list(advisory_vision.darci_physics_inputs),
+            "localizations": list(advisory_vision.advisory_localizations),
         },
     )
 
@@ -129,7 +129,7 @@ def run_full_commercial_ecosystem(output_dir: Path, fixed_now: str = "2026-11-08
     )
     shop_packet = dossier_service.generate_repair_shop_packet(
         consent=consent, binding=binding, ledger_entry=shop_entry,
-        damaged_zones=list(advisory_vision.darci_physics_inputs),
+        localization_observations=list(advisory_vision.advisory_localizations),
         generated_by="dossier-engine", now_iso=fixed_now
     )
     carrier_report = dossier_service.generate_carrier_seven_page_report(
@@ -144,7 +144,7 @@ def run_full_commercial_ecosystem(output_dir: Path, fixed_now: str = "2026-11-08
             "model_version": advisory_vision.model_version,
             "promoted_over_baseline": advisory_vision.promoted_over_baseline,
             "advisory_only": advisory_vision.advisory_only,
-            "darci_physics_inputs": list(advisory_vision.darci_physics_inputs),
+            "advisory_localizations": list(advisory_vision.advisory_localizations),
         },
         "financial_ledger": ledger.export_audit_ledger(tenant_id=tenant_uuid),
         "generated_dossiers": {

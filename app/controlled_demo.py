@@ -226,16 +226,16 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
         "monitor_version": drift_report["monitor_version"],
     })
 
-    # 8d. CV damage localization as a physics-engine input producer (Slice 10):
+    # 8d. CV damage localization as an unreviewed image-space observation (Slice 10):
     # baseline detector + reviewer-labeled annotation + benchmark evaluation.
     # The adoption gate refuses any candidate that does not strictly beat the
     # baseline on the labeled set — nothing is adopted here.
     from app.damage_localization import (
         DamageAnnotation,
         DamageLocalizationBenchmark,
+        DamageObservationAdapter,
         DamageRegion,
         HeuristicDamageDetector,
-        PhysicsInputAdapter,
     )
 
     damage_grid = [[90] * 36 for _ in range(36)]
@@ -246,23 +246,28 @@ def run_demo(output_dir: Path, fixed_now: str = "2026-11-06T17:00:00+00:00") -> 
     predicted = detector.detect("front_left", damage_grid)
     annotation = DamageAnnotation(
         session_id=session_id, slot="front_left",
-        region=DamageRegion("front_left", 0.32, 0.32, 0.52, 0.52, "dent", 1.0),
+        region=DamageRegion("front_left", 0.3333, 0.3333, 0.5, 0.5, "unknown", 1.0),
         annotated_by="synthetic-reviewer-01",
     )
     benchmark = DamageLocalizationBenchmark()
     localization_report = benchmark.evaluate(predicted, [annotation])
     adoption = benchmark.adoption_gate(localization_report, localization_report)
-    geometry = PhysicsInputAdapter().to_impact_geometry(predicted[0])
-    step("damage_localization", "measured", {
+    observation = DamageObservationAdapter().to_observation(predicted[0])
+    step("damage_localization", "localized-advisory-only", {
         "baseline_detector": detector.model_version,
         "labeled_samples": localization_report.labeled_samples,
         "matched": localization_report.matched,
         "mean_iou": localization_report.mean_iou,
         "adoption_gate": "refused-no-strict-improvement" if not adoption.adopt else "adopted",
-        "physics_input": {
-            "zone": geometry.zone,
-            "severity_tier": geometry.severity_tier,
-            "area_fraction": geometry.area_fraction,
+        "localization_observation": {
+            "zone": observation.zone,
+            "normalized_region_area_fraction": observation.normalized_region_area_fraction,
+            "predicted_damage_class": observation.predicted_damage_class,
+            "raw_detector_score": observation.raw_detector_score,
+            "score_semantics": observation.score_semantics,
+            "epistemic_status": "MODEL_LOCALIZATION_UNREVIEWED",
+            "physical_severity": "NOT_ESTABLISHED",
+            "physical_depth": "NOT_MEASURED",
         },
     })
 

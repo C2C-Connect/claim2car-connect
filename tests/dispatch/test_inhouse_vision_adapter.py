@@ -7,7 +7,7 @@ from pathlib import Path
 from app.damage_localization import DamageAnnotation, DamageRegion
 from backend.app.vision.adapters import (
     AdvisoryVisionAnalysis,
-    GatedVisionPhysicsPipeline,
+    GatedDamageLocalizationPipeline,
     LocalYoloTwoStageDetector,
     VisionAdapterError,
     compute_weight_provenance,
@@ -33,6 +33,15 @@ class InHouseVisionAdapterTests(unittest.TestCase):
         self.assertEqual(detected[0].damage_class, "structural_deformation")
         self.assertEqual((detected[0].x0, detected[0].y0, detected[0].x1, detected[0].y1), (0.1, 0.2, 0.4, 0.6))
 
+    def test_unknown_detector_label_stays_unknown(self):
+        detector = LocalYoloTwoStageDetector(
+            inference_runner=lambda _slot, _img: [
+                {"x1": 0.1, "y1": 0.2, "x2": 0.4, "y2": 0.6, "label": "unrecognized-class", "confidence": 0.95}
+            ]
+        )
+        detected = detector.detect("front_left", object())
+        self.assertEqual(detected[0].damage_class, "unknown")
+
     def test_candidate_stays_unpromoted_without_minimum_review_labels(self):
         region = DamageRegion(
             slot="front_left", x0=0.32, y0=0.32, x1=0.52, y1=0.52,
@@ -46,12 +55,16 @@ class InHouseVisionAdapterTests(unittest.TestCase):
                 {"x1": 0.32, "y1": 0.32, "x2": 0.52, "y2": 0.52, "label": "major_dent", "confidence": 0.95}
             ]
         )
-        output = GatedVisionPhysicsPipeline(candidate_detector=detector).evaluate_and_extract_physics(
-            session_id="session-1", slot="front_left", grid_fixture=[[90] * 36 for _ in range(36)],
+        output = GatedDamageLocalizationPipeline(candidate_detector=detector).evaluate_localization(
+            session_id="session-1", slot="front_left", grid_fixture=[[230 if 12 <= y < 20 and 15 <= x < 22 else 90 for x in range(36)] for y in range(36)],
             ground_truth_annotations=[annotation],
         )
         self.assertFalse(output.promoted_over_baseline)
         self.assertTrue(output.advisory_only)
+        self.assertEqual(len(output.advisory_localizations), 1)
+        self.assertEqual(output.advisory_localizations[0]["epistemic_status"], "MODEL_LOCALIZATION_UNREVIEWED")
+        self.assertNotIn("severity_tier", output.advisory_localizations[0])
+        self.assertNotIn("depth_cm", output.advisory_localizations[0])
         with self.assertRaises(VisionAdapterError):
             output.assert_advisory_boundary("trigger_live_dispatch")
         output.assert_advisory_boundary("store_human_review_summary")

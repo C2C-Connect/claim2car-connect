@@ -21,7 +21,7 @@ from app.damage_localization import (
     DamageLocalizationBenchmark,
     DamageRegion,
     HeuristicDamageDetector,
-    PhysicsInputAdapter,
+    DamageObservationAdapter,
 )
 from config import forensic_constants as C
 
@@ -280,7 +280,7 @@ class AdvisoryVisionAnalysis:
     model_version: str
     weight_digests: tuple[str, ...]
     regions: tuple[DamageRegion, ...]
-    darci_physics_inputs: tuple[dict, ...]
+    advisory_localizations: tuple[dict, ...]
     promoted_over_baseline: bool
     advisory_only: bool = True
 
@@ -419,26 +419,26 @@ class LocalYoloTwoStageDetector:
             regions.append(DamageRegion(
                 slot=slot, x0=round(x1, 4), y0=round(y1, 4),
                 x1=round(x2, 4), y1=round(y2, 4),
-                damage_class=YOLO_CLASS_TO_CANONICAL_LABEL.get(raw_label, "dent"),
+                damage_class=YOLO_CLASS_TO_CANONICAL_LABEL.get(raw_label, "unknown"),
                 confidence=round(conf, 4), model_version=self.model_version,
             ))
         return regions
 
 
-class GatedVisionPhysicsPipeline:
+class GatedDamageLocalizationPipeline:
     def __init__(
         self,
         baseline_detector: HeuristicDamageDetector | None = None,
         candidate_detector: LocalYoloTwoStageDetector | None = None,
-        physics_adapter: PhysicsInputAdapter | None = None,
+        observation_adapter: DamageObservationAdapter | None = None,
         benchmark: DamageLocalizationBenchmark | None = None,
     ) -> None:
         self.baseline = baseline_detector or HeuristicDamageDetector()
         self.candidate = candidate_detector
-        self.physics_adapter = physics_adapter or PhysicsInputAdapter()
+        self.observation_adapter = observation_adapter or DamageObservationAdapter()
         self.benchmark = benchmark or DamageLocalizationBenchmark()
 
-    def evaluate_and_extract_physics(
+    def evaluate_localization(
         self,
         session_id: str,
         slot: str,
@@ -466,20 +466,24 @@ class GatedVisionPhysicsPipeline:
                     weight_digests = self.candidate.weight_digests
                     promoted = True
 
-        physics_inputs = []
+        localizations = []
         for reg in chosen_regions:
-            geom = self.physics_adapter.to_impact_geometry(reg)
-            physics_inputs.append({
-                "zone": geom.zone,
-                "severity_tier": geom.severity_tier,
-                "area_fraction": geom.area_fraction,
-                "source_label": reg.label,
-                "source_confidence": reg.confidence,
+            observation = self.observation_adapter.to_observation(reg)
+            localizations.append({
+                "slot": observation.slot,
+                "zone": observation.zone,
+                "normalized_region_area_fraction": observation.normalized_region_area_fraction,
+                "predicted_damage_class": observation.predicted_damage_class,
+                "raw_detector_score": observation.raw_detector_score,
+                "score_semantics": observation.score_semantics,
+                "model_version": observation.model_version,
+                "protocol_version": observation.protocol_version,
+                "epistemic_status": "MODEL_LOCALIZATION_UNREVIEWED",
             })
 
         return AdvisoryVisionAnalysis(
             session_id=session_id, slot=slot, model_version=chosen_version,
             weight_digests=weight_digests, regions=tuple(chosen_regions),
-            darci_physics_inputs=tuple(physics_inputs),
+            advisory_localizations=tuple(localizations),
             promoted_over_baseline=promoted, advisory_only=True,
         )
