@@ -119,7 +119,3 @@ financial and dispatch integrations remain disabled.
 Retired prototypes (do not use as canonical): C2C-Connect/C2C and
 claim2car-network/claim2car-faos-core. PR #1 remains Draft pending release review.
 
-
-## Product premise
-
-The owner-aligned product premise is documented in [Forensic Intelligence Product Premise](docs/architecture/PRODUCT_PREMISE_FORENSIC_INTELLIGENCE.md). The frontline implementation target is detailed in [Frontline Capture and Forensic Adjudication Reference Architecture](docs/architecture/FRONTLINE_CAPTURE_ADJUDICATION_REFERENCE.md). These documents describe target direction; the acceptance matrix remains authoritative for what has actually been verified.
