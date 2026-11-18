@@ -181,13 +181,21 @@ class CaptureHttpIntegration(unittest.TestCase):
                         },
                     )
                     self.assertEqual(decode_consent.status_code, 200, decode_consent.text)
+                    profile_request_id = str(uuid.uuid4())
                     with patch("app.capture_api._vpic_client", fake_decoder):
                         decoded = client.post(
                             f"/v1/capture-sessions/{session_id}/vehicle-profile",
                             headers=operator_headers,
-                            json={"request_id": str(uuid.uuid4()), "vin": "1HGCM82633A004352"},
+                            json={"request_id": profile_request_id, "vin": "1HGCM82633A004352"},
+                        )
+                        decoded_retry = client.post(
+                            f"/v1/capture-sessions/{session_id}/vehicle-profile",
+                            headers=operator_headers,
+                            json={"request_id": profile_request_id, "vin": "1HGCM82633A004352"},
                         )
                     self.assertEqual(decoded.status_code, 200, decoded.text)
+                    self.assertEqual(decoded_retry.status_code, 200, decoded_retry.text)
+                    self.assertTrue(decoded_retry.json()["replayed"])
                     self.assertEqual(decoded.json()["status"], "DECODED")
                     self.assertEqual(decoded.json()["provider"], "NHTSA_VPIC")
                     self.assertEqual(decoded.json()["attributes"]["make"]["value"], "HONDA")
