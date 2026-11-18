@@ -1,4 +1,4 @@
-"""Unit tests for 14-gate acceptance, 19 migrations, and 16-v1 root binding."""
+"""Unit tests for 14-gate acceptance, 20 migrations, and 16-v1 root binding."""
 import unittest
 
 from verify_gates import (
@@ -34,7 +34,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(results[-1]["id"], "DB-14")
         self.assertEqual(results[-1]["status"], "NOT AWARDED")
 
-    def test_authority_migration_inventory_requires_all_nineteen_ordered_files(self):
+    def test_authority_migration_inventory_requires_all_twenty_ordered_files(self):
         names = [
             '0001_tenant_registry.sql',
             '0002_event_journal.sql',
@@ -55,6 +55,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             '0017_event_contract_parity.sql',
             '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
+            '0020_collision_lifecycle_record.sql',
         ]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_added_migration_detected',
