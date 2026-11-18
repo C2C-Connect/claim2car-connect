@@ -147,7 +147,13 @@ def parse_vpic_payload(requested_vin: str, payload: dict, *, requested_at: str |
         }
     required = ("make", "model", "model_year")
     status = "DECODED" if all(attributes[key]["value"] is not None for key in required) else "PARTIAL"
-    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    # The provider response contains the raw VIN. Hash a redacted copy so
+    # the retained digest cannot be used as an offline VIN-guessing oracle.
+    redacted_payload = dict(payload)
+    redacted_payload["Results"] = [
+        {key: value for key, value in row.items() if key not in ("VIN", "SuggestedVIN")}
+    ]
+    canonical = json.dumps(redacted_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     timestamp = requested_at or datetime.now(timezone.utc).isoformat()
     return VpicProfile(
         status=status,
