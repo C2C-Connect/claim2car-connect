@@ -115,6 +115,11 @@ class CaptureEvidenceService:
         return False
 
     @staticmethod
+    def _last_capture_event(history):
+        sidecar = {"VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED"}
+        return next((item for item in reversed(history) if item[0] not in sidecar), None)
+
+    @staticmethod
     def _vehicle_decode_consent_state(history, capture_consent):
         if capture_consent is None:
             return None
@@ -571,7 +576,8 @@ class CaptureEvidenceService:
                     if kind == "MANIFEST_SEALED" and type(old) is dict:
                         return {"session_id": session_id, **old, "replayed": True}
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
-            if not history or history[-1][0] != "QUALITY_RECORDED":
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "QUALITY_RECORDED":
                 raise CaptureSessionConflict("QUALITY_REVIEW_REQUIRED_BEFORE_SEAL")
             manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
             payload = {
@@ -607,10 +613,11 @@ class CaptureEvidenceService:
                     if kind == "REVIEW_RECORDED" and type(old) is dict and old.get("disposition") == disposition and old.get("reason") == reason:
                         return {"session_id": session_id, **old, "replayed": True}
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
-            if not history or history[-1][0] != "MANIFEST_SEALED":
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
-            seal = history[-1][2]
+            seal = last_capture_event[2]
             if seal.get("manifest_digest") != manifest.digest():
                 raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
             payload = {
@@ -635,6 +642,7 @@ class CaptureEvidenceService:
                 "SELECT s.session_id FROM faos.sessions s "
                 "JOIN LATERAL (SELECT kind,occurred_at FROM faos.events e "
                 "WHERE e.tenant_id=s.tenant_id AND e.session_id=s.session_id "
+                "AND e.kind NOT IN ('VEHICLE_DECODE_CONSENT_RECORDED','VEHICLE_PROFILE_DECODED') "
                 "ORDER BY sequence DESC LIMIT 1) last_event ON last_event.kind='MANIFEST_SEALED' "
                 "WHERE s.tenant_id=%s ORDER BY last_event.occurred_at,s.session_id LIMIT %s",
                 (actor.tenant_id, limit),
@@ -642,9 +650,10 @@ class CaptureEvidenceService:
             for (session_id,) in rows:
                 session_id = self._session_id(session_id)
                 _session, history = self._history(conn, actor, session_id, creator_required=False)
-                if not history or history[-1][0] != "MANIFEST_SEALED" or self._consent_state(history) is None:
+                last_capture_event = self._last_capture_event(history)
+                if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED" or self._consent_state(history) is None:
                     continue
-                seal_payload = history[-1][2]
+                seal_payload = last_capture_event[2]
                 if (type(seal_payload) is not dict
                         or set(seal_payload) != {"schema_version", "request_id", "manifest_digest", "shot_list_version", "artifact_ids"}
                         or not isinstance(seal_payload.get("manifest_digest"), str)):
@@ -690,7 +699,8 @@ class CaptureEvidenceService:
                 raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            if not history or history[-1][0] != "MANIFEST_SEALED":
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
             latest = self._artifact_set(history, session.capture_protocol_version)
@@ -721,7 +731,8 @@ class CaptureEvidenceService:
                 raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            if not history or history[-1][0] != "MANIFEST_SEALED":
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
             entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
