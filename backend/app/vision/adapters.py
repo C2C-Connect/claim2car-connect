@@ -425,7 +425,7 @@ class LocalYoloTwoStageDetector:
         return regions
 
 
-class GatedVisionPhysicsPipeline:
+class GatedDamageLocalizationPipeline:
     def __init__(
         self,
         baseline_detector: HeuristicDamageDetector | None = None,
@@ -438,7 +438,7 @@ class GatedVisionPhysicsPipeline:
         self.observation_adapter = observation_adapter or DamageObservationAdapter()
         self.benchmark = benchmark or DamageLocalizationBenchmark()
 
-    def evaluate_and_extract_physics(
+    def evaluate_localization(
         self,
         session_id: str,
         slot: str,
@@ -473,7 +473,7 @@ class GatedVisionPhysicsPipeline:
                 "slot": observation.slot,
                 "zone": observation.zone,
                 "normalized_region_area_fraction": observation.normalized_region_area_fraction,
-                "damage_class": observation.damage_class,
+                "predicted_damage_class": observation.predicted_damage_class,
                 "raw_detector_score": observation.raw_detector_score,
                 "score_semantics": observation.score_semantics,
                 "model_version": observation.model_version,
