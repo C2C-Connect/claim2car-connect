@@ -265,7 +265,8 @@ class CollisionLifecycleStore:
             rows = conn.execute(
                 "SELECT l.collision_id,l.vehicle_id,l.relationship,l.linked_by,l.linked_at,"
                 "v.vin_source,v.vin_validation_status,"
-                "l.source_session_id,l.source_event_id,COALESCE(src.source_status,'REVOKED') "
+                "l.source_session_id,l.source_event_id,COALESCE(src.source_status,'REVOKED'),"
+                "profile.decode_status,profile.provider,profile.requested_at,profile.attributes_json "
                 "FROM faos.collision_vehicle_links l "
                 "JOIN faos.collision_lifecycle_records r "
                 "ON r.tenant_id=l.tenant_id AND r.collision_id=l.collision_id "
@@ -274,6 +275,11 @@ class CollisionLifecycleStore:
                 "LEFT JOIN faos.vehicle_identity_sources src ON src.tenant_id=l.tenant_id "
                 "AND src.vehicle_id=l.vehicle_id AND src.source_session_id=l.source_session_id "
                 "AND src.source_event_id=l.source_event_id "
+                "LEFT JOIN LATERAL (SELECT d.decode_status,d.provider,d.requested_at,d.attributes_json "
+                "FROM faos.vehicle_decode_snapshots d "
+                "WHERE d.tenant_id=l.tenant_id AND d.vehicle_id=l.vehicle_id "
+                "AND d.source_session_id=l.source_session_id "
+                "ORDER BY d.recorded_at DESC LIMIT 1) profile ON true "
                 "WHERE l.tenant_id=%s AND l.collision_id=%s "
                 "AND (r.created_by=%s OR %s='supervisor') "
                 "ORDER BY l.linked_at,l.vehicle_id",
@@ -285,6 +291,10 @@ class CollisionLifecycleStore:
                 "linked_at": row[4].isoformat(), "vin_source": row[5],
                 "vin_validation_status": row[6], "source_session_id": row[7],
                 "source_event_id": row[8], "source_consent_status": row[9],
+                "vehicle_profile_status": row[10] or "NOT_DECODED",
+                "vehicle_profile_provider": row[11],
+                "vehicle_profile_decoded_at": row[12].isoformat() if row[12] else None,
+                "vehicle_profile": row[13],
                 "created": False,
             } for row in rows]
 
