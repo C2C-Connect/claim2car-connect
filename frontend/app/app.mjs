@@ -2,11 +2,22 @@ import { validateVin } from "../src/modules/capture/vin.mjs";
 const API = "/api";
 const MAX_BYTES = 25 * 1024 * 1024;
 const API_CAPTURE_SLOTS = [
-  ["vin_ocr", "VIN plate"], ["doc_ocr", "Vehicle documents"], ["front", "Front"],
-  ["front_left", "Front-left corner"], ["driver_side", "Driver side"],
-  ["rear_left", "Rear-left corner"], ["rear", "Rear"], ["rear_right", "Rear-right corner"],
-  ["passenger_side", "Passenger side"], ["front_right", "Front-right corner"],
-  ["interior_front", "Front interior"], ["undercarriage_engine", "Undercarriage / engine"]
+  ["00_front_exterior", "Front exterior"],
+  ["01_front_right_exterior", "Front-right 45° exterior"],
+  ["02_right_side_exterior", "Right-side profile"],
+  ["03_rear_right_exterior", "Rear-right 45° exterior"],
+  ["04_rear_exterior", "Rear exterior"],
+  ["05_rear_left_exterior", "Rear-left 45° exterior"],
+  ["06_left_side_exterior", "Left-side profile"],
+  ["07_front_left_exterior", "Front-left 45° exterior"],
+  ["08_wheel_front_left", "Front-left wheel assembly"],
+  ["09_wheel_front_right", "Front-right wheel assembly"],
+  ["10_wheel_rear_right", "Rear-right wheel assembly"],
+  ["11_wheel_rear_left", "Rear-left wheel assembly"],
+  ["12_cabin_front_airbags", "Front cabin / visible airbag indicators"],
+  ["13_instrument_cluster_odometer", "Instrument cluster / odometer"],
+  ["14_physical_vin", "Physical VIN plate"],
+  ["15_license_and_insurance_docs", "License / insurance documentation"]
 ];
 const state = { token:null, role:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, artifacts:new Map(), previews:new Map() };
 const byId = (id) => document.getElementById(id);
