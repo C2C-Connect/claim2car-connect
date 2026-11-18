@@ -77,7 +77,7 @@ Confidence must be calibrated against relevant validation data. An uncalibrated 
 
 The detailed field workflow—from VIN acquisition and vehicle decoding through 16-point AR-guided capture, edge quality gates, offline evidence synchronization, technical adjudication, and recipient-specific reporting—is specified in the [Frontline Capture and Forensic Adjudication Reference Architecture](FRONTLINE_CAPTURE_ADJUDICATION_REFERENCE.md). That document explicitly separates owner-provided target design from verified implementation and identifies the scientific, security, privacy, and operational validation required before thresholds or model outputs can become authoritative.
 
-## 3. The end-to-end collision journey
+## 4. The end-to-end collision journey
 
 The intended product journey is one connected, auditable lifecycle. The stages below describe the target capability; implementation status must be verified separately.
 
@@ -154,7 +154,7 @@ The driver should be able to understand:
 
 The collision event may be resolved or closed when its defined record, review, communication, and disposition criteria are satisfied. This does **not** mean that downstream insurance adjustment, repair, payment, litigation, or other independently owned processes are complete. Those processes need their own state, actor, authority, and audit trail. Closure must not erase or rewrite the historical record.
 
-## 4. Foundational system responsibilities
+## 5. Foundational system responsibilities
 
 The following are logical responsibilities, not a mandate to create premature microservices. Implement them as cohesive modules within the existing modular-monolith architecture unless measured operational needs justify separation.
 
@@ -213,7 +213,7 @@ Provider matching must be explainable and governed by capability, geography, ava
 The strategic moat is the combination of a trustworthy incident record, repeatable intelligence, accountable orchestration, and a qualified participant network. Building the network without the truth plane creates a lead marketplace; building the truth plane without orchestration leaves users with a report and no path forward. Claim2Car must build both, with independent controls and audit trails.
 
 
-## 5. Truth and accuracy assurance architecture
+## 6. Truth and accuracy assurance architecture
 
 Every automated or human-assisted assessment should follow a controlled chain:
 
@@ -233,7 +233,7 @@ Controls should include:
 
 Cryptographic hashes can help detect byte changes and support integrity checks. They do not prove that a depicted event occurred, that an image came from the claimed camera/time/location, that a person is who they claim to be, or that a technical conclusion is correct. Hashes, signatures, Merkle structures, trusted timestamps, chain-of-custody controls, and blockchain are different mechanisms and must never be described as interchangeable. Do not claim legal admissibility from technical integrity controls alone.
 
-## 6. Accuracy validation is a product requirement
+## 7. Accuracy validation is a product requirement
 
 A functioning API, passing unit tests, synthetic fixtures, or a high model score does not establish real-world assessment accuracy.
 
@@ -250,7 +250,7 @@ Before a capability is represented as field-ready or relied on for consequential
 
 Use independent ground truth, documented inspection methods, representative sampling, blinded review where practical, and explicit acceptance thresholds established before testing. Synthetic data is useful for software contract and adversarial testing but cannot substitute for field accuracy evidence. Until validation exists, label the capability as experimental or decision-support only and require the appropriate human inspection.
 
-## 7. First complete vertical slice
+## 8. First complete vertical slice
 
 The first meaningful implementation target is not another disconnected endpoint or a broad collection of empty abstractions. It is one thin, real, end-to-end vehicle assessment journey through the existing platform boundaries:
 
@@ -269,7 +269,7 @@ A slice is not complete merely because each endpoint exists. It must be integrat
 
 Where actual vehicle analysis is not yet validated, implement the contracts and human-review path honestly. Do not fabricate damage findings or represent placeholder logic as intelligence.
 
-## 8. Acceptance and release discipline
+## 9. Acceptance and release discipline
 
 Every feature must be reported in distinct evidence categories:
 
@@ -285,7 +285,7 @@ Never collapse these into a generic “done” or “production-ready” claim. 
 
 The repository's [Acceptance & Release Gate Matrix](../acceptance/ACCEPTANCE_MATRIX.md) remains the source of truth for current implementation and release evidence. This vision document defines what the product is meant to become; the matrix defines what has actually been demonstrated and what remains blocked.
 
-## 9. Architecture and product guardrails
+## 10. Architecture and product guardrails
 
 - Preserve the existing modular-monolith direction: FastAPI application, PostgreSQL/PostGIS authority, background workers, and React/Capacitor capture experience. Do not introduce a MySQL rewrite or split services without a demonstrated need.
 - Railway is retired as a deployment direction. OCI is the selected integrated-staging target, but do not claim deployment until the actual PostgreSQL/PostGIS, private compute, persistent evidence storage, secrets, backup/restore, and release checks are provisioned and verified.
@@ -296,7 +296,7 @@ The repository's [Acceptance & Release Gate Matrix](../acceptance/ACCEPTANCE_MAT
 - Prefer vertical, executable increments over documentation-only claims, placeholder services, disconnected endpoints, or speculative infrastructure.
 - Keep the owner informed with exact changed files, commit/PR, test evidence, failures, limitations, deployment status, and next action.
 
-## 10. Instructions to future agents
+## 11. Instructions to future agents
 
 When continuing this project:
 1. Read this document before proposing or changing product architecture.
@@ -307,7 +307,7 @@ When continuing this project:
 6. Continue toward the first complete, evidence-backed assessment and resolution vertical slice, then expand coverage across the post-accident lifecycle.
 7. Never claim an assessment, report, delivery, deployment, accuracy level, or release gate has passed without traceable evidence.
 
-## 11. The governing principle
+## 12. The governing principle
 
 Claim2Car should give people a dependable account of what can responsibly be known after a collision—and a clear, accountable path from that knowledge to the next action and eventual resolution.
 
