@@ -151,6 +151,13 @@ class CaptureHttpIntegration(unittest.TestCase):
                         )
                     self.assertEqual(blocked_decode.status_code, 403, blocked_decode.text)
                     self.assertEqual(provider_calls, [])
+                    disclosure = client.get(
+                        "/v1/vehicle-decode-disclosure",
+                        headers=owner_headers,
+                    )
+                    self.assertEqual(disclosure.status_code, 200, disclosure.text)
+                    self.assertEqual(disclosure.json()["disclosure_version"], "vehicle-decode-disclosure-v1")
+                    self.assertTrue(any("NHTSA vPIC" in item for item in disclosure.json()["sections"]))
 
                     decode_consent = client.post(
                         f"/v1/capture-sessions/{session_id}/vehicle-decode-consent",
@@ -159,6 +166,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                             "request_id": str(uuid.uuid4()),
                             "accepted": True,
                             "scope": "nhtsa_vpic_decode",
+                            "disclosure_version": "vehicle-decode-disclosure-v1",
                         },
                     )
                     self.assertEqual(decode_consent.status_code, 200, decode_consent.text)
@@ -275,6 +283,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                             "request_id": str(uuid.uuid4()),
                             "accepted": False,
                             "scope": "nhtsa_vpic_decode",
+                            "disclosure_version": "vehicle-decode-disclosure-v1",
                         },
                     )
                     self.assertEqual(decode_withdrawn.status_code, 200, decode_withdrawn.text)
