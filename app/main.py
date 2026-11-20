@@ -180,6 +180,7 @@ def create_app(settings=None, runtime_mode=None):
         from backend.app.api.analysis import router as analysis_router
         from backend.app.api.triage import router as triage_router
         from backend.app.api.dispatch import router as dispatch_router
+        from backend.app.api.vision import router as vision_router
 
         intake_app = create_intake_app(enable_evidence=True)
         settings = getattr(intake_app.state, 'health_settings', settings)
@@ -187,6 +188,7 @@ def create_app(settings=None, runtime_mode=None):
         _mount_internal_router(api, analysis_router, '/api/v1/analysis', '/internal/v1/analysis')
         _mount_internal_router(api, triage_router, '/api/v1/triage', '/internal/v1/triage')
         _mount_internal_router(api, dispatch_router, '/api/v1/dispatch', '/internal/v1/dispatch')
+        _mount_internal_router(api, vision_router, '/api/v1/vision', '/internal/v1/vision')
 
         # The operator/owner/reviewer shell is served only by the integrated
         # runtime. Restricted staging remains health-only and exposes no UI.
