@@ -99,7 +99,7 @@ try {
   // Upload a real file fixture and exercise the disclosed localization feedback.
   const pngBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/a4sAAAAASUVORK5CYII=","base64");
   await page.getByLabel("Photograph Front exterior").setInputFiles({name:"front.png",mimeType:"image/png",buffer:pngBytes});
-  await page.waitForFunction(() => document.querySelector(".photo-state")?.textContent.includes("Contrast baseline: 1 candidate region"));
+  await page.waitForFunction(() => [...document.querySelectorAll("#photo-grid .lab-photo-card .photo-state")].some(el => el.textContent.includes("Contrast baseline: 1 candidate region")));
   // Exercise the operator-entered worksheet and report calculation in the actual browser.
   await page.locator("#damage-area").selectOption("Front-left");
   await page.locator("#damage-type").selectOption("Dent / deformation");
