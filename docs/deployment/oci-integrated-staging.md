@@ -83,7 +83,7 @@ Set these variables in the protected `oci-staging` GitHub environment:
 | `OCI_STATE_BUCKET` | Existing, versioned Object Storage bucket for Terraform state |
 | `OCI_STATE_NAMESPACE` | OCI Object Storage namespace |
 
-The fixed state key is `claim2car/oci-staging.tfstate`. The plan workflow initializes the OCI backend using the runner's temporary OCI config profile; it does not pass API private-key material into Terraform backend configuration. The workflow still performs a plan only and rejects delete/replace actions. A backend bucket is a prerequisite; no state or infrastructure apply has been performed from this repository.
+The fixed state key is `claim2car/oci-staging.tfstate`. The plan workflow initializes the OCI backend using the runner's temporary key and standard `$HOME/.oci/config` profile; it does not pass API private-key material into Terraform backend configuration. The workflow still performs a plan only and rejects delete/replace actions. A backend bucket is a prerequisite; no state or infrastructure apply has been performed from this repository.
 
 References: [Terraform OCI backend](https://developer.hashicorp.com/terraform/language/backend/oci) and [Oracle Object Storage state guidance](https://docs.oracle.com/en-us/iaas/Content/dev/terraform/object-storage-state.htm).
 
