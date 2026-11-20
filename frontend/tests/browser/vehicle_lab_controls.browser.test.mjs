@@ -14,7 +14,7 @@ try {
   page.on("requestfailed", request => failedRequests.push({url:request.url(),error:request.failure()?.errorText}));
   let paused = false;
   const sessionId = "browser-session-fixture";
-  const claimId = "browser-claim-fixture";
+  let claimId = null;
   const ownerToken = "synthetic-owner-token";
   page.on("pageerror", error => errors.push(error.message));
   await page.route("**/frontend/app/vehicle-lab.html", route => route.fulfill({ status: 200, contentType: "text/html", body: html
@@ -28,7 +28,7 @@ try {
     const request = route.request(), path = new URL(request.url()).pathname;
     requests.push({ method: request.method(), path });
     const json = (status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-    if (path === "/api/v1/claim-cases" && request.method() === "POST") return json(201,{scope:"persistent-claim-case",claim_id:claimId,capture_session_id:sessionId,created:true});
+    if (path === "/api/v1/claim-cases" && request.method() === "POST") { claimId = JSON.parse(request.postData() || "{}").claim_id; return json(201,{scope:"persistent-claim-case",claim_id:claimId,capture_session_id:sessionId,created:true}); }
     if (path.endsWith("/consent") && request.method() === "POST") return json(201,{accepted:true});
     if (path.endsWith("/vehicle-reference") && request.method() === "POST") return json(201,{recorded:true});
     if (path === "/api/v1/vehicle-decode-disclosure" && request.method() === "GET") return json(200,{disclosure_version:"test-disclosure-v1"});
@@ -61,7 +61,7 @@ try {
   assert.equal(requests.filter(x=>x.path.endsWith("/evidence-readiness")).length,1,"readiness queried after persistent case creation");
   assert.equal(requests.filter(x=>x.path === "/api/v1/claim-cases" && x.method === "POST").length,1,"persistent claim case created exactly once");
   assert.equal(requests.some(x=>x.path === "/api/v1/capture-sessions" && x.method === "POST"),false,"controlled-test session route is not used");
-  assert.match(await page.locator("#claim-case-id").textContent(),/browser-claim-fixture.*browser-session-fixture/);
+  assert.match(await page.locator("#claim-case-id").textContent(),new RegExp(claimId+".*browser-session-fixture"));
 
   await page.locator("#capture-pause-reason").fill("Synthetic browser safety-stop test");
   await pause.click();
