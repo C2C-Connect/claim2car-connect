@@ -33,6 +33,11 @@ try {
     if (path.endsWith("/vehicle-reference") && request.method() === "POST") return json(201,{recorded:true});
     if (path === "/api/v1/vehicle-decode-disclosure" && request.method() === "GET") return json(200,{disclosure_version:"test-disclosure-v1"});
     if (path.endsWith("/vehicle-decode-consent") && request.method() === "POST") return json(201,{accepted:true});
+    if (path.endsWith("/artifacts") && request.method() === "POST") {
+      const body=JSON.parse(request.postData()||"{}");
+      return json(200,{request_id:body.request_id,artifact_id:body.artifact_id,slot:body.slot,sha256:body.sha256,byte_length:68,replayed:false,
+        localization:{image:{sha256:body.sha256,byte_length:68,persisted:true},analysis:{status:"COMPLETED",method:"heuristic_contrast_baseline",model_status:"BASELINE_NOT_AI",model_version:"damage-localization-v1/heuristic-baseline",trained_model_inference:false,appraisal:false,physical_measurements:false,note:"heuristic only",observations:[{slot:body.slot,zone:"front",normalized_region_area_fraction:0.04,predicted_damage_class:"unknown",raw_detector_score:0.25,score_semantics:"uncalibrated_detector_score",model_version:"damage-localization-v1/heuristic-baseline",protocol_version:"claims2car-16-v1",bbox_normalized:[0.1,0.2,0.3,0.4]}]}});
+    }
     if (path.endsWith("/vehicle-profile") && request.method() === "POST") return json(200,{
       status:"DECODED",provider:"NHTSA vPIC",requested_at:"2026-11-20T12:00:00Z",response_sha256:"a".repeat(64),
       physics_input_eligibility:"NOT_EVALUATED",attributes:{
@@ -91,6 +96,10 @@ try {
   assert.equal(await pause.isVisible(),true);
   assert.equal(await resume.isVisible(),false);
   assert.equal(requests.filter(x=>x.path.endsWith("/evidence-readiness")).length,4,"readiness refreshed after session, pause, resume, and profile");
+  // Upload a real file fixture and exercise the disclosed localization feedback.
+  const pngBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/a4sAAAAASUVORK5CYII=","base64");
+  await page.getByLabel("Photograph Front exterior").setInputFiles({name:"front.png",mimeType:"image/png",buffer:pngBytes});
+  await page.waitForFunction(() => document.querySelector(".photo-state")?.textContent.includes("Contrast baseline: 1 candidate region"));
   // Exercise the operator-entered worksheet and report calculation in the actual browser.
   await page.locator("#damage-area").selectOption("Front-left");
   await page.locator("#damage-type").selectOption("Dent / deformation");
@@ -108,6 +117,9 @@ try {
   assert.match(await page.locator("#report-preview").textContent(),/Worksheet total/);
   assert.match(await page.locator("#report-preview").textContent(),/\$460\.00/);
   assert.match(await page.locator("#report-preview").textContent(),/operator-entered/);
+  assert.match(await page.locator("#report-preview").textContent(),/Image-space contrast baseline/);
+  assert.match(await page.locator("#report-preview").textContent(),/Candidate 1: unknown/);
+  assert.match(await page.locator("#report-preview").textContent(),/uncalibrated/);
   assert.deepEqual(errors,[]);
   process.stdout.write(JSON.stringify({outcome:"passed",checks:[
     "authenticated session creation",

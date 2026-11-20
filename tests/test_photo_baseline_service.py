@@ -11,6 +11,7 @@ def test_localization_hashes_actual_photo_and_marks_baseline():
  assert r["analysis"]["status"]=="COMPLETED" and r["analysis"]["model_status"]=="BASELINE_NOT_AI"
  assert r["analysis"]["trained_model_inference"] is False and r["analysis"]["physical_measurements"] is False
  assert r["analysis"]["method"]=="heuristic_contrast_baseline"
+ assert all(len(o["bbox_normalized"])==4 for o in r["analysis"]["observations"])
 def test_non_exterior_capture_view_rejected():
  with pytest.raises(PhotoBaselineError) as exc: analyze_photo_bytes(make_image(),"14_physical_vin")
  assert exc.value.code=="LOCALIZATION_REQUIRES_EXTERIOR_SLOT"
