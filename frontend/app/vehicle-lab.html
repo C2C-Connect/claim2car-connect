@@ -24,10 +24,11 @@
 
     <section class="panel lab-panel" id="backend-panel">
       <div class="panel-heading"><div><div class="eyebrow">00 · SECURE CASE SESSION</div><h2>Connect to the evidence system</h2></div><span class="step-index">API</span></div>
-      <p class="muted">Create an authenticated capture session before recording a vehicle. The operator credential authorizes case actions; the owner separately authorizes evidence capture. Credentials are held only in this page's memory and are not stored in browser storage.</p>
+      <p class="muted">Create a persistent claim case backed by the authenticated PostgreSQL authority before recording a vehicle. The operator credential creates the case; the owner separately authorizes evidence capture. Credentials are held only in this page's memory and are not stored in browser storage.</p>
       <label for="capture-operator-token">Operator access token</label>
-      <div class="vin-entry-row"><input id="capture-operator-token" type="password" autocomplete="off" placeholder="Operator token"><button id="create-capture-session" class="button primary" type="button">Create secure session</button></div>
-      <div id="backend-status" class="inline-status" role="status" aria-live="polite">Not connected · No evidence has been uploaded.</div>
+      <div class="vin-entry-row"><input id="capture-operator-token" type="password" autocomplete="off" placeholder="Operator token"><button id="create-claim-case" class="button primary" type="button">Create persistent claim case</button></div>
+      <div id="backend-status" class="inline-status" role="status" aria-live="polite">Not connected · No claim case or evidence has been created.</div>
+      <p id="claim-case-id" class="fine-print" hidden></p>
       <div id="owner-consent-panel" hidden>
         <label for="owner-capture-token">Owner consent token</label>
         <input id="owner-capture-token" type="password" autocomplete="off" placeholder="Owner token issued for this case">
