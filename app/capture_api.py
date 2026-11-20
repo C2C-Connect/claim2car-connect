@@ -39,7 +39,7 @@ from app.artifact_storage import (
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 from app.damage_localization import zone_for_slot
-from backend.app.vision.photo_baseline import PhotoBaselineError, analyze_photo_bytes
+from app.vision.photo_baseline import PhotoBaselineError, analyze_photo_bytes
 from app.vehicle_intelligence.vpic import VpicClient
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}

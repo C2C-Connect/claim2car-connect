@@ -2,7 +2,7 @@
 import hashlib,io
 import pytest
 from PIL import Image,ImageDraw
-from backend.app.vision.photo_baseline import PhotoBaselineError,analyze_photo_bytes
+from app.vision.photo_baseline import PhotoBaselineError,analyze_photo_bytes
 def make_image():
  im=Image.new("RGB",(128,128),(120,120,120));d=ImageDraw.Draw(im);d.rectangle((10,10,50,50),fill=(0,0,0));d.line((60,10,110,110),fill=(255,255,255),width=5);b=io.BytesIO();im.save(b,format="PNG");return b.getvalue()
 def test_localization_hashes_actual_photo_and_marks_baseline():

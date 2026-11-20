@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from fastapi import APIRouter,Depends,File,HTTPException,Query,UploadFile
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL
-from backend.app.vision.photo_baseline import MAX_IMAGE_BYTES,PhotoBaselineError,analyze_photo_bytes
+from app.vision.photo_baseline import MAX_IMAGE_BYTES,PhotoBaselineError,analyze_photo_bytes
 from backend.app.security import require_internal_service
 router=APIRouter(prefix="/api/v1/vision",tags=["vision"])
 @router.post("/localize",dependencies=[Depends(require_internal_service)])
