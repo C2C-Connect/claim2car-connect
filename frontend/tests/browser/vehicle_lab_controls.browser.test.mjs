@@ -4,10 +4,14 @@ import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(new URL("../../app/vehicle-lab.html", import.meta.url), "utf8");
+const moduleSource = readFileSync(new URL("../../app/vehicle-lab.mjs", import.meta.url), "utf8");
+const vinSource = readFileSync(new URL("../../src/modules/capture/vin.mjs", import.meta.url), "utf8");
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
-  const errors = [], requests = [];
+  const errors = [], consoleErrors = [], failedRequests = [], requests = [];
+  page.on("console", msg => { if (msg.type() === "error") consoleErrors.push(msg.text()); });
+  page.on("requestfailed", request => failedRequests.push({url:request.url(),error:request.failure()?.errorText}));
   let paused = false;
   const sessionId = "browser-session-fixture";
   const ownerToken = "synthetic-owner-token";
@@ -17,6 +21,8 @@ try {
     .replace("/prototype/vehicle-lab.css", "/frontend/app/vehicle-lab.css")
     .replace("/prototype/vehicle-lab.mjs", "/frontend/app/vehicle-lab.mjs") }));
   await page.route("**/test-styles.css", route => route.fulfill({ status: 200, contentType: "text/css", body: "" }));
+  await page.route("**/frontend/app/vehicle-lab.mjs", route => route.fulfill({ status: 200, contentType: "text/javascript", body: moduleSource }));
+  await page.route("**/frontend/src/modules/capture/vin.mjs", route => route.fulfill({ status: 200, contentType: "text/javascript", body: vinSource }));
   await page.route("**/api/**", async route => {
     const request = route.request(), path = new URL(request.url()).pathname;
     requests.push({ method: request.method(), path });
@@ -46,7 +52,7 @@ try {
   assert.equal(await resume.isDisabled(),true,"resume starts disabled before authenticated session");
   await page.locator("#capture-operator-token").fill("O".repeat(43));
   await page.locator("#create-capture-session").click();
-  await page.waitForFunction(() => document.querySelector("#owner-consent-panel").hidden === false);
+  try { await page.waitForFunction(() => document.querySelector("#owner-consent-panel").hidden === false, {timeout:10000}); } catch(error) { throw new Error("Session creation UI did not initialize. console: "+JSON.stringify(consoleErrors)+" failed requests: "+JSON.stringify(failedRequests)+"; "+error.message); }
   await page.waitForFunction(() => document.querySelector("#pause-capture").disabled === false);
   assert.equal(await pause.isVisible(),true);
   assert.equal(await resume.isVisible(),false);
@@ -77,7 +83,7 @@ try {
   await page.locator("#decode-owner-token").fill(ownerToken);
   await page.locator("#decode-vin").click();
   try { await page.waitForFunction(() => document.querySelector("#inspection-panel").hidden === false, {timeout:10000}); }
-  catch(error){ throw new Error("Inspection panel did not activate. Backend status: "+await page.locator("#backend-status").textContent()+"; VIN status: "+await page.locator("#vin-message").textContent()+"; requests: "+JSON.stringify(requests)+"; page errors: "+JSON.stringify(errors)+"; "+error.message); }
+  catch(error){ throw new Error("Inspection panel did not activate. Backend status: "+await page.locator("#backend-status").textContent()+"; VIN status: "+await page.locator("#vin-message").textContent()+"; requests: "+JSON.stringify(requests)+"; page errors: "+JSON.stringify(errors)+"; console errors: "+JSON.stringify(consoleErrors)+"; failed requests: "+JSON.stringify(failedRequests)+"; "+error.message); }
   assert.equal(await pause.isVisible(),true);
   assert.equal(await resume.isVisible(),false);
   assert.equal(requests.filter(x=>x.path.endsWith("/evidence-readiness")).length,4,"readiness refreshed after session, pause, resume, and profile");
