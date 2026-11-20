@@ -6,6 +6,7 @@ on:
       - "infra/oci/**"
       - ".github/workflows/oci-infrastructure-validate.yml"
       - ".github/workflows/oci-staging-plan.yml"
+      - ".github/workflows/oci-integrated-image-publish.yml"
   push:
     branches: [main, "infra/**"]
     paths:
@@ -68,8 +69,8 @@ jobs:
           assert "terraform plan" in combined
           assert "terraform apply" not in combined
           assert "Destructive changes detected" in combined
-          for script in scripts:
-              script = re.sub(r"\$\{\{.*?\}}", "SAFE_EXPR", script)
+          for script in scripts + publish_scripts:
+              script = re.sub(r"\\$\\{\\{.*?\\}}", "SAFE_EXPR", script)
               checked = subprocess.run(["bash", "-n"], input=script, text=True, capture_output=True)
               if checked.returncode:
                   raise SystemExit(checked.stderr)
