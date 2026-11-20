@@ -28,6 +28,6 @@ def test_rejects_unknown_protocol():
  assert r.status_code==422 and r.json()["detail"]["code"]=="UNSUPPORTED_CAPTURE_PROTOCOL"
 
 def test_rejects_image_pixel_bomb():
-    im=Image.new("RGB",(6000,6000),(10,10,10));b=io.BytesIO();im.save(b,format="PNG")
+    im=Image.new("1",(6000,6000),0);b=io.BytesIO();im.save(b,format="PNG")
     r=client.post("/api/v1/vision/localize",params={"session_id":"s","slot":"00_front_exterior"},files={"file":("huge.png",b.getvalue(),"image/png")})
     assert r.status_code==413 and r.json()["detail"]["code"]=="IMAGE_PIXEL_LIMIT_EXCEEDED"
