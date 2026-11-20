@@ -279,3 +279,32 @@ def test_integrated_readiness_fails_closed_when_persistent_volume_is_not_ready()
                         ready = client.get("/health/ready")
                         assert ready.status_code == 200
                         assert ready.json()["status"] == "ready"
+
+def test_integrated_runtime_mounts_vision_localization_only_internal():
+    with tempfile.TemporaryDirectory() as directory:
+        environment = _runtime_environment(directory)
+        with patch.dict(os.environ, environment, clear=False):
+            app = create_app(runtime_mode="integrated")
+            with TestClient(app) as client:
+                from PIL import Image
+                import io
+                image = Image.new("RGB", (96, 96), (100, 100, 100))
+                buffer = io.BytesIO()
+                image.save(buffer, format="PNG")
+                raw = buffer.getvalue()
+                params = {"session_id": "capture-session-test", "slot": "00_front_exterior"}
+                files = {"file": ("front.png", raw, "image/png")}
+                assert client.post("/api/v1/vision/localize", params=params, files=files).status_code == 404
+                denied = client.post("/internal/v1/vision/localize", params=params, files=files)
+                assert denied.status_code == 401
+                allowed = client.post(
+                    "/internal/v1/vision/localize",
+                    headers={"Authorization": f"Bearer {SERVICE_TOKEN}"},
+                    params=params,
+                    files=files,
+                )
+                assert allowed.status_code == 200, allowed.text
+                result = allowed.json()
+                assert result["image"]["sha256"] == hashlib.sha256(raw).hexdigest()
+                assert result["analysis"]["model_status"] == "BASELINE_NOT_AI"
+                assert result["analysis"]["trained_model_inference"] is False
