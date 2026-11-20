@@ -71,7 +71,7 @@ class CapturePauseExceptionHttpIntegration(unittest.TestCase):
                               "slot": "00_front_exterior", "payload_base64": base64.b64encode(raw).decode(),
                               "sha256": hashlib.sha256(raw).hexdigest()})
                     self.assertEqual(blocked.status_code, 409, blocked.text)
-                    self.assertEqual(blocked.json()["detail"], "CAPTURE_SESSION_PAUSED")
+                    self.assertEqual(blocked.json()["detail"], "CAPTURE_SESSION_CONFLICT", "HTTP intentionally sanitizes internal capture conflict details")
 
                     resumed = client.post(f"/v1/capture-sessions/{session_id}/resume", headers=operator,
                         json={"request_id": str(uuid.uuid4()), "reason": "synthetic safety stop cleared"})
