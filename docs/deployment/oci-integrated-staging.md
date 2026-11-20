@@ -91,7 +91,7 @@ References: [Terraform OCI backend](https://developer.hashicorp.com/terraform/la
 
 The manual `OCI staging apply (manual, guarded)` workflow requires dispatch from `main` with `confirm_apply=yes`. It creates a plan, rejects any delete/replace actions, uploads the exact saved plan for one day, and only then reaches the `oci-staging-apply` environment gate. The apply job uses that saved plan—not a newly generated plan—and runs `terraform apply tfplan`. The workflow contains no destroy operation.
 
-Configure the `oci-staging-apply` environment with the same required OCI credentials and state-bucket variables as `oci-staging`, and set required reviewers/environment protection before enabling apply. The saved plan artifact is sensitive and must be reviewed before approval. Confirm the plan is only for the approved private network, A1 Flex candidate, and bounded 200 GB aggregate volumes. Account eligibility/capacity and actual OCI pricing remain an owner-side check. No apply has been dispatched from this session.
+Configure the `oci-staging-apply` environment with the same required OCI credentials, Terraform variables, and state-bucket variables as `oci-staging`. Set required reviewers/environment protection there before enabling apply. The plan job also requires the `oci-staging` environment values. The saved plan artifact is sensitive and must be reviewed before approval. Confirm the plan is only for the approved private network, A1 Flex candidate, and bounded 200 GB aggregate volumes. Account eligibility/capacity and actual OCI pricing remain an owner-side check. No apply has been dispatched from this session.
 
 ## 10. Outstanding prerequisites
 
