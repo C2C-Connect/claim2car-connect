@@ -34,6 +34,13 @@
         <label class="check-row lab-consent"><input id="owner-capture-consent" type="checkbox"><span>I authorize this capture session to record vehicle photographs and related condition evidence for review. This consent is distinct from optional VIN decoding consent.</span></label>
         <button id="record-capture-consent" class="button secondary" type="button">Record owner capture consent</button>
       </div>
+      <div class="capture-control-row">
+        <span id="capture-paused-status" class="inline-status">Capture active</span>
+        <label for="capture-pause-reason">Audit reason for pause/resume</label>
+        <input id="capture-pause-reason" maxlength="500" placeholder="Safety hazard, interruption, or resumed condition">
+        <button id="pause-capture" class="button secondary" type="button" disabled>Pause capture</button>
+        <button id="resume-capture" class="button secondary" type="button" hidden disabled>Resume capture</button>
+      </div>
     </section>
 
     <section class="panel lab-panel" id="identity-panel">
@@ -68,13 +75,6 @@
       <div class="panel-heading"><div><div class="eyebrow">03 · CONDITION RECORD</div><h2>Document vehicle condition</h2></div><span class="step-index">16 VIEWS</span></div>
       <p class="muted">Capture the 16 target views where safe and accessible. You can add observations about visible damage. Missing, unsafe, or inaccessible views remain missing; do not infer hidden damage from exterior photographs.</p>
       <div class="capture-caution"><strong>Safety:</strong> Do not enter traffic, crawl beneath an unsupported vehicle, open hazardous compartments, or delay emergency response to complete these views. Mark unavailable views and seek qualified inspection where necessary.</div>
-      <div class="capture-control-row">
-        <span id="capture-paused-status" class="inline-status">Capture active</span>
-        <label for="capture-pause-reason">Audit reason for pause/resume</label>
-        <input id="capture-pause-reason" maxlength="500" placeholder="Safety hazard, interruption, or resumed condition">
-        <button id="pause-capture" class="button secondary" type="button" disabled>Pause capture</button>
-        <button id="resume-capture" class="button secondary" type="button" hidden disabled>Resume capture</button>
-      </div>
       <div id="photo-grid" class="lab-photo-grid"></div>
       <div class="capture-caution">Each image is uploaded as original bytes and hash-verified by the server. Evidence can be sealed only when all 16 required views are uploaded and marked usable. Unsafe or inaccessible views can be recorded as audited exceptions, but exceptions never substitute for original evidence or satisfy the manifest.</div>
       <button id="seal-evidence" class="button primary" type="button" disabled>Seal verified 16-view evidence</button>
