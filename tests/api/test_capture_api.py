@@ -449,7 +449,7 @@ class CaptureRouteTests(unittest.TestCase):
                 response=client.post(f'/v1/capture-sessions/{session_id}/artifacts',headers=self.headers,json=payload)
         self.assertEqual(response.status_code,200,response.text)
         loc=response.json()['localization'];self.assertEqual(loc['analysis']['model_status'],'BASELINE_NOT_AI')
-        self.assertEqual(loc['image']['sha256'],payload['sha256']);self.assertFalse(loc['analysis']['trained_model_inference'])
+        self.assertEqual(loc['image']['sha256'],payload['sha256']);self.assertTrue(loc['image']['persisted']);self.assertFalse(loc['analysis']['trained_model_inference'])
         service.return_value.register_artifact.assert_called_once()
 
 if __name__=='__main__':

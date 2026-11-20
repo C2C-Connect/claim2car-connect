@@ -36,7 +36,7 @@ def analyze_photo_bytes(raw:bytes,slot:str,protocol_version:str=DEFAULT_CAPTURE_
   regions=_detector.detect(slot,pixels,protocol_version=protocol_version)
   observations=[_adapter.to_observation(r).__dict__ for r in regions]
  except DamageLocalizationError as exc: raise PhotoBaselineError(exc.code,422) from exc
- return {"image":{"sha256":hashlib.sha256(raw).hexdigest(),"byte_length":len(raw),"format":fmt,"width":width,"height":height},
+ return {"image":{"sha256":hashlib.sha256(raw).hexdigest(),"byte_length":len(raw),"format":fmt,"width":width,"height":height,"persisted":False},
  "analysis":{"status":"COMPLETED","method":"heuristic_contrast_baseline","model_status":"BASELINE_NOT_AI","model_version":_detector.model_version,
  "trained_model_inference":False,"appraisal":False,"physical_measurements":False,"observations":observations,
  "note":"Image-space contrast candidates only; not damage confirmation, severity, depth, safety, repair scope, or estimate."}}
