@@ -22,3 +22,6 @@ console.log(JSON.stringify({suite:"vehicle-lab-backend-contract",assertions:ids.
 
 assert.match(source,/pause-capture\"\)\.disabled = !state\.captureToken \|\| !state\.sessionId \|\| state\.capturePaused/);
 assert.match(source,/resume-capture\"\)\.disabled = !state\.captureToken \|\| !state\.sessionId \|\| !state\.capturePaused/);
+
+assert.match(html,/<button id="pause-capture"[^>]*disabled/);
+assert.match(html,/<button id="resume-capture"[^>]*hidden[^>]*disabled/);

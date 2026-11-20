@@ -72,8 +72,8 @@
         <span id="capture-paused-status" class="inline-status">Capture active</span>
         <label for="capture-pause-reason">Audit reason for pause/resume</label>
         <input id="capture-pause-reason" maxlength="500" placeholder="Safety hazard, interruption, or resumed condition">
-        <button id="pause-capture" class="button secondary" type="button">Pause capture</button>
-        <button id="resume-capture" class="button secondary" type="button" hidden>Resume capture</button>
+        <button id="pause-capture" class="button secondary" type="button" disabled>Pause capture</button>
+        <button id="resume-capture" class="button secondary" type="button" hidden disabled>Resume capture</button>
       </div>
       <div id="photo-grid" class="lab-photo-grid"></div>
       <div class="capture-caution">Each image is uploaded as original bytes and hash-verified by the server. Evidence can be sealed only when all 16 required views are uploaded and marked usable. Unsafe or inaccessible views can be recorded as audited exceptions, but exceptions never substitute for original evidence or satisfy the manifest.</div>
