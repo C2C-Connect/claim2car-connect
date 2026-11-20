@@ -46,7 +46,7 @@ jobs:
           assert "terraform apply" not in combined
           assert "Destructive changes detected" in combined
           for script in scripts:
-              script = re.sub(r"\\$\\{\\{.*?\\}\\}", "SAFE_EXPR", script)
+              script = re.sub(r"\$\{\{.*?\}}", "SAFE_EXPR", script)
               checked = subprocess.run(["bash", "-n"], input=script, text=True, capture_output=True)
               if checked.returncode:
                   raise SystemExit(checked.stderr)
