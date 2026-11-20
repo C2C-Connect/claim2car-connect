@@ -15,6 +15,7 @@ on:
       - "infra/oci/**"
       - ".github/workflows/oci-infrastructure-validate.yml"
       - ".github/workflows/oci-staging-plan.yml"
+      - ".github/workflows/oci-staging-apply.yml"
       - ".github/workflows/oci-integrated-image-publish.yml"
       - ".github/workflows/integrated-container-smoke.yml"
 
@@ -33,7 +34,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.12.0"
-      - name: Lint the two OCI workflows with pinned actionlint
+      - name: Lint the OCI workflows with pinned actionlint
         working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
