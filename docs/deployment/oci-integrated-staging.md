@@ -50,7 +50,11 @@ Before provisioning or exposing any compute instance, review the security lists 
 - The existing MySQL DB System must not be used as a PostgreSQL substitute.
 - Do not expose the integrated service publicly until identity proofing, TLS, network ingress, security review, backup/restore, legal disclosure, and incident response controls pass.
 
-## Integrated-image publication (implemented; not a deployment)
+## 6. Host bootstrap implementation
+
+The Terraform instance metadata now supplies a cloud-init baseline that installs Podman and disk-inspection tools, creates the dedicated UID/GID 10001 runtime identity and storage mountpoints, and enables the Podman socket. It deliberately does not format or mount either block volume: device discovery must first reconcile the guest device to the exact OCI volume OCID. Once both volumes are mounted and owned by UID 10001, run `claim2car-host-preflight`. A successful cloud-init run alone is not proof that PostgreSQL, evidence persistence, or the application is operational.
+
+## 7. Integrated-image publication (implemented; not a deployment)
 
 A protected manual workflow is available at **Actions → Publish integrated Claim2Car image to OCIR (manual)**. It runs only from `main`, requires the explicit `confirm_publish=yes` input, and uses the protected `oci-staging` environment. It builds the integrated runtime from `Dockerfile.integrated` for `linux/arm64`, pushes an immutable commit-SHA tag to OCIR, and emits the image digest plus provenance/SBOM. The workflow does not create OCI resources, alter the private host, or deploy/run the image.
 
@@ -68,7 +72,7 @@ Create the OCIR repository first and ensure the registry user has only the neede
 
 The image publish workflow is verified by the OCI infrastructure validation job. Publishing alone does not satisfy the staging deployment gates.
 
-## 7. Outstanding prerequisites
+## 8. Outstanding prerequisites
 
 - Confirm exact compartment, VCN, subnet, image, and OCIDs inside OCI.
 - Confirm Always Free compute and block-volume capacity in the selected region; otherwise obtain explicit cost approval.
@@ -82,6 +86,3 @@ The image publish workflow is verified by the OCI infrastructure validation job.
 **Current disposition:** NO-GO for integrated staging deployment until the above prerequisites are provisioned and verified. Continue synthetic CI and implementation work without claiming a cloud deployment.
 
 
-## Host bootstrap implementation
-
-The Terraform instance metadata now supplies a cloud-init baseline that installs Podman and disk-inspection tools, creates the dedicated UID/GID 10001 runtime identity and storage mountpoints, and enables the Podman socket. It deliberately does not format or mount either block volume: device discovery must first reconcile the guest device to the exact OCI volume OCID. Once both volumes are mounted and owned by UID 10001, run `claim2car-host-preflight`. A successful cloud-init run alone is not proof that PostgreSQL, evidence persistence, or the application is operational.
