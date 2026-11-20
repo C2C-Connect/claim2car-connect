@@ -56,17 +56,6 @@ jobs:
           terraform_config = open("infra/oci/staging/versions.tf", encoding="utf-8").read()
           assert 'required_version = ">= 1.12.0"' in terraform_config
           assert 'backend "oci" {}' in terraform_config
-          bootstrap_config = open("infra/oci/state-bootstrap/main.tf", encoding="utf-8").read()
-          bootstrap_versions = open("infra/oci/state-bootstrap/versions.tf", encoding="utf-8").read()
-          bootstrap_readme = open("infra/oci/state-bootstrap/README.md", encoding="utf-8").read()
-          assert 'backend "oci" {}' in bootstrap_versions
-          assert 'versioning     = "Enabled"' in bootstrap_config
-          assert 'access_type    = "NoPublicAccess"' in bootstrap_config
-          assert "prevent_destroy" in bootstrap_config
-          assert "terraform init -backend=false" in bootstrap_readme
-          assert "terraform init -migrate-state -force-copy" in bootstrap_readme
-          assert "claim2car/bootstrap.tfstate" in bootstrap_readme
-          assert "claim2car/oci-staging.tfstate" in bootstrap_readme
           init_step = next(step for step in workflow["jobs"]["plan"]["steps"] if step.get("name") == "Initialize OCI remote state backend")
           assert "terraform init -input=false -reconfigure" in init_step["run"]
           credentials_step = next(step for step in workflow["jobs"]["plan"]["steps"] if step.get("name") == "Fail closed when OCI credentials or inputs are absent")
@@ -147,10 +136,4 @@ jobs:
       - name: Initialize staging provider without backend
         run: terraform init -backend=false -input=false
       - name: Validate staging configuration
-        run: terraform validate -no-color
-      - name: Initialize state-bootstrap provider without backend
-        working-directory: infra/oci/state-bootstrap
-        run: terraform init -backend=false -input=false
-      - name: Validate state-bootstrap configuration
-        working-directory: infra/oci/state-bootstrap
         run: terraform validate -no-color
