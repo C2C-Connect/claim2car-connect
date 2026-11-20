@@ -200,13 +200,23 @@ function renderPhotoSlots() {
         state.qualities.delete(slot); quality.disabled = false; quality.value = "";
         preview.src = url; preview.hidden = false;
         stateText.textContent = "Original uploaded · " + file.size.toLocaleString() + " bytes · SHA-256 verified";
-        updateReportAvailability(); syncPhotoSelect(); updateSealAvailability();\n        await refreshEvidenceReadiness();
+        updateReportAvailability(); syncPhotoSelect(); updateSealAvailability();
+        await refreshEvidenceReadiness();
       } catch (error) {
         stateText.textContent = "Upload failed · " + error.message + " · Select the image again to retry.";
         stateText.classList.add("error"); input.value = "";
       } finally { input.disabled = false; }
     });
-    input.disabled = state.capturePaused || state.sealed;\n    card.append(title,input,quality,exceptionControls,stateText,preview);
+    const existingPhoto = state.photos.get(slot);
+    if (existingPhoto?.uploaded) {
+      quality.disabled = false;
+      quality.value = state.qualities.get(slot) || "";
+      preview.src = existingPhoto.url;
+      preview.hidden = false;
+      stateText.textContent = "Original uploaded · " + existingPhoto.byteLength.toLocaleString() + " bytes · SHA-256 verified";
+    }
+    input.disabled = state.capturePaused || state.sealed;
+    card.append(title,input,quality,exceptionControls,stateText,preview);
     grid.append(card);
   }
 }
@@ -375,7 +385,8 @@ async function decodeVin() {
     };
     state.retrievedAt = profile.requested_at; renderProfile();
     setMessage("Vehicle profile decoded and recorded by the authenticated evidence service. Attributes remain provider-reported; no ownership or condition finding is implied.");
-    backendStatus("Capture session active · Vehicle identity recorded · NHTSA profile snapshot stored.");\n    await refreshEvidenceReadiness();
+    backendStatus("Capture session active · Vehicle identity recorded · NHTSA profile snapshot stored.");
+    await refreshEvidenceReadiness();
   } catch (error) {
     state.profile = null; show("vehicle-panel",false); show("inspection-panel",false); show("report-panel",false);
     setMessage("Server-authoritative vehicle decode unavailable: " + error.message + ". Verify consent and retry.", true);
