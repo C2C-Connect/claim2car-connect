@@ -107,8 +107,10 @@ jobs:
         id: plan
         run: |
           set -euo pipefail
+          set +e
           terraform plan -input=false -no-color -detailed-exitcode -out=tfplan > plan-output.txt 2>&1
           rc=$?
+          set -e
           if [[ "${rc}" -ne 0 && "${rc}" -ne 2 ]]; then
             echo "Terraform plan failed; details withheld from summary."
             exit "${rc}"
