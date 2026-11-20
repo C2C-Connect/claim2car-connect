@@ -258,11 +258,16 @@ class MigrationControlsIntegration(unittest.TestCase):
             ]
             for index, (event_id, _valid_placeholder, payload) in enumerate(probes):
                 timestamp = invalid_timestamps[index] if index < len(invalid_timestamps) else '2026-01-01T00:00:00Z'
+                expected_constraint = ('event_timestamp_input_valid' if timestamp == '2026-02-30T00:00:00Z'
+                                      else 'event_timestamp_rfc3339' if timestamp != '2026-01-01T00:00:00Z'
+                                      else 'event_payload_compact' if payload.startswith('{ ')
+                                      else 'event_payload_python_canonical')
                 with self.subTest(event_id=event_id):
                     with tenant_transaction(app, tenant):
-                        with self.assertRaises(psycopg.errors.CheckViolation):
+                        with self.assertRaises(psycopg.errors.CheckViolation) as rejected:
                             with app.transaction():
                                 append(event_id, 2, 'SESSION_CREATED', timestamp, payload)
+                        self.assertEqual(rejected.exception.diag.constraint_name, expected_constraint)
                         count = app.execute(
                             'SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s',
                             (tenant, session),

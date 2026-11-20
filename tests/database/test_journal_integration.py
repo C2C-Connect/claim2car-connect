@@ -76,6 +76,7 @@ class TestJournalIntegration(unittest.TestCase):
         self.assertEqual(after[1][0:2], ('event-2', 2))
 
 
+
 class TestConcurrentJournal(unittest.TestCase):
     """Two synchronized connection attempts, not exhaustive concurrency or crash proof."""
     def setUp(self):
