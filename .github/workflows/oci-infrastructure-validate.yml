@@ -36,8 +36,8 @@ jobs:
           curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz" -o "$archive"
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum -c
           tar -xzf "$archive" -C "$RUNNER_TEMP"
-          "$RUNNER_TEMP/actionlint" .github/workflows/oci-staging-plan.yml .github/workflows/oci-infrastructure-validate.yml
-      - name: Validate manual OCI plan workflow YAML and shell
+          "$RUNNER_TEMP/actionlint" .github/workflows/oci-staging-plan.yml .github/workflows/oci-integrated-image-publish.yml .github/workflows/oci-infrastructure-validate.yml
+      - name: Validate manual OCI plan and image publish workflow YAML and shell
         working-directory: ${{ github.workspace }}
         run: |
           python -m pip install --quiet PyYAML
@@ -45,6 +45,20 @@ jobs:
           import re, subprocess, yaml
           path = ".github/workflows/oci-staging-plan.yml"
           workflow = yaml.safe_load(open(path))
+          publish_path = ".github/workflows/oci-integrated-image-publish.yml"
+          publish = yaml.safe_load(open(publish_path))
+          publish_trigger = publish.get("on", publish.get(True))
+          assert isinstance(publish_trigger, dict) and set(publish_trigger) == {"workflow_dispatch"}
+          publish_job = publish["jobs"]["publish"]
+          assert publish_job["environment"] == "oci-staging"
+          assert "refs/heads/main" in publish_job["if"] and "confirm_publish == 'yes'" in publish_job["if"]
+          publish_steps = publish_job["steps"]
+          assert any(step.get("id") == "validate" and "GITHUB_OUTPUT" in step.get("run", "") for step in publish_steps)
+          assert any(step.get("uses", "").startswith("docker/login-action@") for step in publish_steps)
+          builder = next(step for step in publish_steps if step.get("uses", "").startswith("docker/build-push-action@"))
+          assert builder["with"]["file"] == "Dockerfile.integrated" and builder["with"]["platforms"] == "linux/arm64" and builder["with"]["push"] is True
+          assert "terraform apply" not in "\\n".join(step.get("run", "") for step in publish_steps)
+          publish_scripts = [step["run"] for step in publish_steps if "run" in step]
           trigger = workflow.get("on", workflow.get(True))
           assert isinstance(trigger, dict) and set(trigger) == {"workflow_dispatch"}
           plan = workflow["jobs"]["plan"]
