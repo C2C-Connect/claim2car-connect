@@ -434,5 +434,23 @@ class CaptureRouteTests(unittest.TestCase):
         service.pause_capture_session.assert_called_once()
         service.resume_capture_session.assert_called_once()
 
+    def test_artifact_upload_returns_disclosed_baseline_for_exterior_photo(self):
+        import base64, io
+        from PIL import Image, ImageDraw
+        im=Image.new('RGB',(128,128),(100,100,100));ImageDraw.Draw(im).rectangle((10,10,45,45),fill=(0,0,0))
+        buf=io.BytesIO();im.save(buf,format='PNG');raw=buf.getvalue()
+        session_id=str(UUID(int=2))
+        payload={'request_id':str(UUID(int=70)),'artifact_id':str(UUID(int=71)),'slot':'00_front_exterior',
+                 'payload_base64':base64.b64encode(raw).decode(),'sha256':hashlib.sha256(raw).hexdigest()}
+        receipt={k:payload[k] for k in ('request_id','artifact_id','slot','sha256')};receipt.update(byte_length=len(raw),replayed=False)
+        with tempfile.TemporaryDirectory() as root, patch.dict(os.environ,{'C2C_ARTIFACT_STORAGE_ROOT':root,'C2C_VIN_HMAC_PEPPER':'P'*43}), patch('app.capture_api.CaptureEvidenceService') as service:
+            service.return_value.register_artifact.return_value=receipt
+            with TestClient(create_capture_app(self.runtime,enable_evidence=True)) as client:
+                response=client.post(f'/v1/capture-sessions/{session_id}/artifacts',headers=self.headers,json=payload)
+        self.assertEqual(response.status_code,200,response.text)
+        loc=response.json()['localization'];self.assertEqual(loc['analysis']['model_status'],'BASELINE_NOT_AI')
+        self.assertEqual(loc['image']['sha256'],payload['sha256']);self.assertTrue(loc['image']['persisted']);self.assertFalse(loc['analysis']['trained_model_inference'])
+        service.return_value.register_artifact.assert_called_once()
+
 if __name__=='__main__':
     unittest.main()
