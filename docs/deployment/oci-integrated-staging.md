@@ -87,7 +87,13 @@ The fixed state key is `claim2car/oci-staging.tfstate`. The plan workflow initia
 
 References: [Terraform OCI backend](https://developer.hashicorp.com/terraform/language/backend/oci) and [Oracle Object Storage state guidance](https://docs.oracle.com/en-us/iaas/Content/dev/terraform/object-storage-state.htm).
 
-## 9. Outstanding prerequisites
+## 9. Guarded infrastructure apply (implemented; not executed)
+
+The manual `OCI staging apply (manual, guarded)` workflow requires dispatch from `main` with `confirm_apply=yes`. It creates a plan, rejects any delete/replace actions, uploads the exact saved plan for one day, and only then reaches the `oci-staging-apply` environment gate. The apply job uses that saved plan—not a newly generated plan—and runs `terraform apply tfplan`. The workflow contains no destroy operation.
+
+Configure the `oci-staging-apply` environment with the same required OCI credentials, Terraform variables, and state-bucket variables as `oci-staging`. Set required reviewers/environment protection there before enabling apply. The plan job also requires the `oci-staging` environment values. The saved plan artifact is sensitive and must be reviewed before approval. Confirm the plan is only for the approved private network, A1 Flex candidate, and bounded 200 GB aggregate volumes. Account eligibility/capacity and actual OCI pricing remain an owner-side check. No apply has been dispatched from this session.
+
+## 10. Outstanding prerequisites
 
 - Confirm exact compartment, VCN, subnet, image, and OCIDs inside OCI.
 - Confirm Always Free compute and block-volume capacity in the selected region; otherwise obtain explicit cost approval.
@@ -96,7 +102,7 @@ References: [Terraform OCI backend](https://developer.hashicorp.com/terraform/la
 - Confirm or create OCIR repository and configure OCI/GitHub deployment credentials.
 - Choose and configure private administration access (Bastion/VPN).
 - Configure Vault secrets and synthetic owner/operator/reviewer credentials.
-- The manual OCI integrated-image publishing workflow is implemented; the actual host deployment, PostgreSQL/PostGIS initialization, and private-network rollout workflow are still not implemented.
+- Manual OCI integrated-image publishing and guarded infrastructure apply workflows are implemented. The host deployment, PostgreSQL/PostGIS initialization, and private-network rollout workflow are still not implemented.
 - Complete backup/restore and authenticated restart-persistence rehearsal.
 
 **Current disposition:** NO-GO for integrated staging deployment until the above prerequisites are provisioned and verified. Continue synthetic CI and implementation work without claiming a cloud deployment.
