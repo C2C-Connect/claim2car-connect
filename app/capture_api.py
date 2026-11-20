@@ -599,7 +599,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             if not isinstance(registered, JSONResponse) or registered.status_code != 200:
                 return registered
             result = json.loads(registered.body)
-            localization = {"status": "NOT_APPLICABLE", "reason": "capture_slot_not_exterior", "image": {"sha256": body.sha256_hex, "byte_length": result.get("byte_length", 0), "persisted": True}}
+            localization = {"status": "NOT_APPLICABLE", "reason": "capture_slot_not_exterior", "image": {"sha256": body.sha256, "byte_length": result.get("byte_length", 0), "persisted": True}}
             protocol_version = next(
                 (version for version in (DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL)
                  if body.slot in resolve_capture_protocol(version).slots and zone_for_slot(body.slot, version)),
