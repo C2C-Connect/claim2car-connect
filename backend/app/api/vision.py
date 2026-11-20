@@ -9,6 +9,7 @@ from app.damage_localization import DamageLocalizationError, DamageObservationAd
 from backend.app.security import require_internal_service
 router=APIRouter(prefix="/api/v1/vision",tags=["vision"])
 MAX_IMAGE_BYTES=10*1024*1024
+MAX_IMAGE_PIXELS=25_000_000
 ALLOWED_FORMATS={"JPEG","PNG","WEBP"}
 _detector=HeuristicDamageDetector()
 _observation_adapter=DamageObservationAdapter()
@@ -29,6 +30,7 @@ async def localize_photo(session_id:str=Query(...,min_length=1,max_length=128),s
             image.verify()
         with Image.open(io.BytesIO(raw)) as image:
             width,height=image.size
+            if width*height>MAX_IMAGE_PIXELS: raise HTTPException(413,detail={"code":"IMAGE_PIXEL_LIMIT_EXCEEDED"})
             if width<32 or height<32: raise HTTPException(422,detail={"code":"IMAGE_DIMENSIONS_TOO_SMALL"})
             gray=image.convert("L").resize((64,64),Image.Resampling.LANCZOS)
             data=list(gray.getdata())
