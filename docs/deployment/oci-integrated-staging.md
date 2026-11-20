@@ -35,7 +35,7 @@ Before provisioning or exposing any compute instance, review the security lists 
 2. Tighten security-list ingress and confirm the private subnet's NAT/service-gateway routes.
 3. Provision an eligible private compute instance and separate persistent database/evidence volumes. Record OCIDs in OCI-side inventory, not this repository.
 4. Install the container runtime and mount volumes. Verify filesystem ownership and mount persistence across a reboot before starting the app.
-5. Provision PostgreSQL 16/PostGIS; create migration/runtime roles and apply the repository's authoritative migration plan through migration 0023.
+5. Provision PostgreSQL 16/PostGIS; create migration/runtime roles and apply the repository's authoritative migration plan through migration 0024.
 6. Provision runtime credentials through OCI Vault and create a dedicated synthetic staging tenant with distinct operator, owner, and reviewer identities.
 7. Build and push the exact integrated image to OCIR; deploy the same SHA to the private compute host.
 8. Verify `/health/live`, `/health/ready`, and `/health/build`; the readiness endpoint must fail if PostgreSQL or the persistent evidence mount is unavailable.
@@ -50,7 +50,25 @@ Before provisioning or exposing any compute instance, review the security lists 
 - The existing MySQL DB System must not be used as a PostgreSQL substitute.
 - Do not expose the integrated service publicly until identity proofing, TLS, network ingress, security review, backup/restore, legal disclosure, and incident response controls pass.
 
-## 6. Outstanding prerequisites
+## Integrated-image publication (implemented; not a deployment)
+
+A protected manual workflow is available at **Actions → Publish integrated Claim2Car image to OCIR (manual)**. It runs only from `main`, requires the explicit `confirm_publish=yes` input, and uses the protected `oci-staging` environment. It builds the integrated runtime from `Dockerfile.integrated` for `linux/arm64`, pushes an immutable commit-SHA tag to OCIR, and emits the image digest plus provenance/SBOM. The workflow does not create OCI resources, alter the private host, or deploy/run the image.
+
+Configure the following environment values in GitHub's protected `oci-staging` environment before manually publishing:
+
+| Type | Name | Purpose |
+|---|---|---|
+| Variable | `OCI_REGION` | OCI region (defaults to `us-chicago-1`) |
+| Variable | `OCIR_NAMESPACE` | Registry tenancy namespace |
+| Variable | `OCIR_REPOSITORY` | Existing OCIR repository path, e.g. `claim2car/staging-integrated` |
+| Secret | `OCIR_USERNAME` | OCI registry login user in the exact OCI-required format |
+| Secret | `OCIR_AUTH_TOKEN` | OCI registry auth token |
+
+Create the OCIR repository first and ensure the registry user has only the needed repository push permissions. Do not use an OCI API private key or general tenancy administrator credential as the registry password. Configure environment protection/required approval for publishing. The workflow output is the immutable image reference/digest; deployment must pin the digest, not a mutable tag.
+
+The image publish workflow is verified by the OCI infrastructure validation job. Publishing alone does not satisfy the staging deployment gates.
+
+## 7. Outstanding prerequisites
 
 - Confirm exact compartment, VCN, subnet, image, and OCIDs inside OCI.
 - Confirm Always Free compute and block-volume capacity in the selected region; otherwise obtain explicit cost approval.
@@ -58,7 +76,7 @@ Before provisioning or exposing any compute instance, review the security lists 
 - Confirm or create OCIR repository and configure OCI/GitHub deployment credentials.
 - Choose and configure private administration access (Bastion/VPN).
 - Configure Vault secrets and synthetic owner/operator/reviewer credentials.
-- Implement and verify the OCI deployment workflow; no OCI deployment workflow is currently present.
+- The manual OCI integrated-image publishing workflow is implemented; the actual host deployment, PostgreSQL/PostGIS initialization, and private-network rollout workflow are still not implemented.
 - Complete backup/restore and authenticated restart-persistence rehearsal.
 
 **Current disposition:** NO-GO for integrated staging deployment until the above prerequisites are provisioned and verified. Continue synthetic CI and implementation work without claiming a cloud deployment.
