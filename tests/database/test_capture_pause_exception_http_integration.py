@@ -93,6 +93,11 @@ class CapturePauseExceptionHttpIntegration(unittest.TestCase):
                     readiness = client.get(f"/v1/capture-sessions/{session_id}/evidence-readiness", headers=operator)
                     self.assertEqual([item["slot"] for item in readiness.json()["active_capture_exceptions"]],
                                      ["01_front_right_exterior"])
+                    retry_without_artifact = client.post(f"/v1/capture-sessions/{session_id}/exceptions/resolve", headers=operator,
+                        json={"request_id": str(uuid.uuid4()), "slot": "01_front_right_exterior",
+                              "resolution_code": "CAPTURED_AFTER_RETRY", "explanation": "synthetic retry without artifact"})
+                    self.assertEqual(retry_without_artifact.status_code, 409, retry_without_artifact.text)
+
                     resolved = client.post(f"/v1/capture-sessions/{session_id}/exceptions/resolve", headers=operator,
                         json={"request_id": str(uuid.uuid4()), "slot": "01_front_right_exterior",
                               "resolution_code": "NO_LONGER_APPLICABLE", "explanation": "synthetic exception resolved"})
