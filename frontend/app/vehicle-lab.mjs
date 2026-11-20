@@ -68,6 +68,9 @@ $("create-capture-session").addEventListener("click", async () => {
     $("create-capture-session").disabled = true; $("capture-operator-token").disabled = true;
     $("owner-consent-panel").hidden = false;
     backendStatus("Authenticated capture session created · " + sessionId + " · Awaiting owner consent.");
+    // Refresh readiness immediately so session-scoped safety controls become usable.
+    try { await refreshEvidenceReadiness(); }
+    catch (error) { backendStatus("Session created, but server readiness is unavailable · " + error.message, true); }
   } catch (error) { backendStatus(error.message, true); button.disabled = false; }
 });
 $("record-capture-consent").addEventListener("click", async () => {
