@@ -1,3 +1,13 @@
+## Current OCI apply-workflow milestone — PR #86 (2026-11-20)
+
+**Status:** merged to `main`; all 14 workflow checks passed.
+
+- PR: [#86 — Add guarded OCI staging infrastructure apply](https://github.com/C2C-Connect/claim2car-connect/pull/86)
+- Merge commit: `bbee7003adb14d53c83e3eb60295ee379209bb7b`.
+- Manual-only, main-only, explicit confirmation, remote-state plan, delete/replace guard, one-day saved-plan artifact, and separate reviewer-gated apply environment are implemented.
+- OCI infrastructure validation, Terraform validation, full suite, DB authority, browser, and integrated ARM64 container checks passed.
+- **No apply has been run and no OCI resources have been created.** The state bucket, environment secrets/variables, and required reviewer configuration are still prerequisites.
+
 ## Current Terraform remote-state milestone — PR #85 (2026-11-20)
 
 **Status:** merged to `main`; 14/14 workflow runs successful.
