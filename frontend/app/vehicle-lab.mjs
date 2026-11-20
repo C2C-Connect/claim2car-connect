@@ -3,7 +3,7 @@ import { validateVin } from "../src/modules/capture/vin.mjs";
 const $ = (id) => document.getElementById(id);
 const API = "/api";
 const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
-const state = { profile:null, vin:null, retrievedAt:null, photos:new Map(), qualities:new Map(), observations:[], stream:null, detector:null, scanFrame:null, captureToken:null, sessionId:null, captureConsentRecorded:false, vehicleRecorded:false, sealed:false, manifestDigest:null, capturePaused:false, activeExceptions:new Map() };
+const state = { profile:null, vin:null, retrievedAt:null, photos:new Map(), qualities:new Map(), observations:[], stream:null, detector:null, scanFrame:null, captureToken:null, claimId:null, claimRequestId:null, sessionId:null, captureConsentRecorded:false, vehicleRecorded:false, sealed:false, manifestDigest:null, capturePaused:false, activeExceptions:new Map() };
 const slots = [
   ["00_front_exterior","Front exterior"],
   ["01_front_right_exterior","Front-right 45°"],
@@ -55,22 +55,30 @@ function backendStatus(value, error=false) {
   $("backend-status").textContent = value;
   $("backend-status").classList.toggle("error", error);
 }
-$("create-capture-session").addEventListener("click", async () => {
+$("create-claim-case").addEventListener("click", async () => {
   const token = $("capture-operator-token").value.trim();
   if (!/^[A-Za-z0-9_-]{43,128}$/.test(token)) { backendStatus("Enter a valid operator credential.", true); return; }
-  const button = $("create-capture-session"); button.disabled = true;
+  const button = $("create-claim-case"); button.disabled = true;
   try {
-    const sessionId = uuid();
-    await captureApi("/v1/capture-sessions", token, {method:"POST", body:JSON.stringify({session_id:sessionId})});
-    state.captureToken = token; state.sessionId = sessionId;
+    // Keep identifiers stable across a retry after an ambiguous network failure.
+    state.claimId ||= uuid();
+    state.claimRequestId ||= uuid();
+    const created = await captureApi("/v1/claim-cases", token, {
+      method:"POST", body:JSON.stringify({claim_id:state.claimId,request_id:state.claimRequestId})
+    });
+    if (!created || created.scope !== "persistent-claim-case" || created.claim_id !== state.claimId || !created.capture_session_id) {
+      throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
+    }
+    state.captureToken = token; state.sessionId = created.capture_session_id;
     $("capture-operator-token").value = "";
-    $("create-capture-session").textContent = "Session created";
-    $("create-capture-session").disabled = true; $("capture-operator-token").disabled = true;
+    button.textContent = "Persistent case created";
+    button.disabled = true; $("capture-operator-token").disabled = true;
+    $("claim-case-id").textContent = "CLAIM CASE  " + created.claim_id + "  ·  CAPTURE SESSION  " + created.capture_session_id;
+    $("claim-case-id").hidden = false;
     $("owner-consent-panel").hidden = false;
-    backendStatus("Authenticated capture session created · " + sessionId + " · Awaiting owner consent.");
-    // Refresh readiness immediately so session-scoped safety controls become usable.
+    backendStatus("Persistent claim case created by the authenticated PostgreSQL authority · Awaiting owner consent.");
     try { await refreshEvidenceReadiness(); }
-    catch (error) { backendStatus("Session created, but server readiness is unavailable · " + error.message, true); }
+    catch (error) { backendStatus("Persistent case created, but server readiness is unavailable · " + error.message, true); }
   } catch (error) { backendStatus(error.message, true); button.disabled = false; }
 });
 $("record-capture-consent").addEventListener("click", async () => {
