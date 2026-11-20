@@ -67,7 +67,6 @@ jobs:
           assert "terraform init -migrate-state -force-copy" in bootstrap_readme
           assert "claim2car/bootstrap.tfstate" in bootstrap_readme
           assert "claim2car/oci-staging.tfstate" in bootstrap_readme
-          assert "terraform apply" not in bootstrap_readme or "terraform apply" in bootstrap_readme
           init_step = next(step for step in workflow["jobs"]["plan"]["steps"] if step.get("name") == "Initialize OCI remote state backend")
           assert "terraform init -input=false -reconfigure" in init_step["run"]
           credentials_step = next(step for step in workflow["jobs"]["plan"]["steps"] if step.get("name") == "Fail closed when OCI credentials or inputs are absent")
