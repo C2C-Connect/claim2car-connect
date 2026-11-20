@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.app.api.analysis import router as analysis_router
 from backend.app.api.triage import router as triage_router
 from backend.app.api.dispatch import router as dispatch_router
+from backend.app.api.vision import router as vision_router
 from config import forensic_constants as C
 
 # Explicit origin allowlist only (no wildcard with credentials).
@@ -39,6 +40,7 @@ app.add_middleware(
 app.include_router(analysis_router)
 app.include_router(triage_router)
 app.include_router(dispatch_router)
+app.include_router(vision_router)
 
 
 @app.get("/health/live")
