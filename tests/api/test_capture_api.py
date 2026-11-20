@@ -395,5 +395,44 @@ class CaptureRouteTests(unittest.TestCase):
         service_type.return_value.record_incident.assert_not_called()
         service_type.return_value.get_incident.assert_called_once()
 
+    def test_audited_capture_exception_and_pause_resume_http_routes(self):
+        session_id = str(UUID(int=2))
+        with tempfile.TemporaryDirectory() as root, patch.dict(os.environ, {
+            'C2C_ARTIFACT_STORAGE_ROOT': root, 'C2C_VIN_HMAC_PEPPER': 'P'*43,
+        }), patch('app.capture_api.CaptureEvidenceService') as evidence_type:
+            service = evidence_type.return_value
+            service.evidence_readiness.return_value = {
+                'session_id': session_id, 'capture_paused': False, 'active_capture_exceptions': [],
+            }
+            service.record_capture_exception.return_value = {'session_id': session_id, 'slot': '00_front_exterior', 'replayed': False}
+            service.resolve_capture_exception.return_value = {'session_id': session_id, 'slot': '00_front_exterior', 'replayed': False}
+            service.pause_capture_session.return_value = {'session_id': session_id, 'paused': True, 'replayed': False}
+            service.resume_capture_session.return_value = {'session_id': session_id, 'paused': False, 'replayed': False}
+            app = create_capture_app(self.runtime, enable_evidence=True)
+            with TestClient(app) as client:
+                unauthenticated = client.post(f'/v1/capture-sessions/{session_id}/pause',
+                    json={'request_id':str(UUID(int=10)), 'reason':'Safety stop'})
+                readiness = client.get(f'/v1/capture-sessions/{session_id}/evidence-readiness',headers=self.headers)
+                recorded = client.post(f'/v1/capture-sessions/{session_id}/exceptions',
+                    json={'request_id':str(UUID(int=11)), 'slot':'00_front_exterior',
+                          'reason_code':'UNSAFE_TO_APPROACH', 'explanation':'Traffic hazard'},headers=self.headers)
+                resolved = client.post(f'/v1/capture-sessions/{session_id}/exceptions/resolve',
+                    json={'request_id':str(UUID(int=12)), 'slot':'00_front_exterior',
+                          'resolution_code':'CAPTURED_AFTER_RETRY', 'explanation':'Captured after safe access'},headers=self.headers)
+                paused = client.post(f'/v1/capture-sessions/{session_id}/pause',
+                    json={'request_id':str(UUID(int=13)), 'reason':'Operator safety stop'},headers=self.headers)
+                resumed = client.post(f'/v1/capture-sessions/{session_id}/resume',
+                    json={'request_id':str(UUID(int=14)), 'reason':'Hazard cleared'},headers=self.headers)
+        self.assertEqual(unauthenticated.status_code,401)
+        self.assertEqual(readiness.status_code,200)
+        self.assertEqual(readiness.json()['capture_paused'],False)
+        for response in (recorded,resolved,paused,resumed):
+            self.assertEqual(response.status_code,200,response.text)
+        service.evidence_readiness.assert_called_once_with(self.headers['Authorization'],session_id)
+        service.record_capture_exception.assert_called_once()
+        service.resolve_capture_exception.assert_called_once()
+        service.pause_capture_session.assert_called_once()
+        service.resume_capture_session.assert_called_once()
+
 if __name__=='__main__':
     unittest.main()
