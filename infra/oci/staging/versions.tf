@@ -1,5 +1,7 @@
 terraform {
-  required_version = ">= 1.8.0"
+  required_version = ">= 1.12.0"
+
+  backend "oci" {}
 
   required_providers {
     oci = {
