@@ -72,11 +72,27 @@ Create the OCIR repository first and ensure the registry user has only the neede
 
 The image publish workflow is verified by the OCI infrastructure validation job. Publishing alone does not satisfy the staging deployment gates.
 
-## 8. Outstanding prerequisites
+## 8. Terraform remote state (required before any apply)
+
+The OCI staging stack uses Terraform's native OCI Object Storage backend. Create a dedicated state bucket in the same tenancy before running the plan workflow. Enable bucket versioning, restrict the bucket to the automation identity, and grant only the object permissions needed to read/write state and lock objects. The backend uses state locking; state files may contain sensitive resource data.
+
+Set these variables in the protected `oci-staging` GitHub environment:
+
+| Variable | Purpose |
+|---|---|
+| `OCI_STATE_BUCKET` | Existing, versioned Object Storage bucket for Terraform state |
+| `OCI_STATE_NAMESPACE` | OCI Object Storage namespace |
+
+The fixed state key is `claim2car/oci-staging.tfstate`. The plan workflow initializes the OCI backend using the runner's temporary key and standard `$HOME/.oci/config` profile; it does not pass API private-key material into Terraform backend configuration. The workflow still performs a plan only and rejects delete/replace actions. A backend bucket is a prerequisite; no state or infrastructure apply has been performed from this repository.
+
+References: [Terraform OCI backend](https://developer.hashicorp.com/terraform/language/backend/oci) and [Oracle Object Storage state guidance](https://docs.oracle.com/en-us/iaas/Content/dev/terraform/object-storage-state.htm).
+
+## 9. Outstanding prerequisites
 
 - Confirm exact compartment, VCN, subnet, image, and OCIDs inside OCI.
 - Confirm Always Free compute and block-volume capacity in the selected region; otherwise obtain explicit cost approval.
 - Provision PostgreSQL/PostGIS and persistent database/evidence volumes.
+- Create and version the OCI Terraform state bucket; configure the state-bucket variables and narrowly scoped IAM access.
 - Confirm or create OCIR repository and configure OCI/GitHub deployment credentials.
 - Choose and configure private administration access (Bastion/VPN).
 - Configure Vault secrets and synthetic owner/operator/reviewer credentials.

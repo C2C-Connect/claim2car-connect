@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.12.0"
       - name: Lint the two OCI workflows with pinned actionlint
         working-directory: ${{ github.workspace }}
         run: |
@@ -49,6 +49,14 @@ jobs:
           import re, subprocess, yaml
           path = ".github/workflows/oci-staging-plan.yml"
           workflow = yaml.safe_load(open(path))
+          terraform_config = open("infra/oci/staging/versions.tf", encoding="utf-8").read()
+          assert 'required_version = ">= 1.12.0"' in terraform_config
+          assert 'backend "oci" {}' in terraform_config
+          init_step = next(step for step in workflow["jobs"]["plan"]["steps"] if step.get("name") == "Initialize OCI remote state backend")
+          assert "terraform init -input=false -reconfigure" in init_step["run"]
+          credentials_step = next(step for step in workflow["jobs"]["plan"]["steps"] if step.get("name") == "Fail closed when OCI credentials or inputs are absent")
+          assert 'config_path="$HOME/.oci/config"' in credentials_step["run"]
+          assert "OCI_CONFIG_FILE" not in credentials_step["run"]
           publish_path = ".github/workflows/oci-integrated-image-publish.yml"
           publish = yaml.safe_load(open(publish_path))
           publish_trigger = publish.get("on", publish.get(True))
@@ -72,6 +80,10 @@ jobs:
           combined = "\\n".join(scripts)
           assert "terraform plan" in combined
           assert "terraform apply" not in combined
+          assert "backend-config=" in combined
+          assert "OCI_STATE_BUCKET" in workflow["jobs"]["plan"]["env"]
+          assert "OCI_STATE_NAMESPACE" in workflow["jobs"]["plan"]["env"]
+          assert "-backend=false" not in combined
           assert "Destructive changes detected" in combined
           for script in scripts + publish_scripts:
               script = re.sub(r"\$\{\{.*?\}\}", "SAFE_EXPR", script)

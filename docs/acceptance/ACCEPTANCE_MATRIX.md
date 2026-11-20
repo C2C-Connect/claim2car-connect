@@ -1,3 +1,17 @@
+## Current infrastructure automation milestone — PR #84 (2026-11-20)
+
+**Status:** merged to `main`; CI green on exact PR head.
+
+- PR: [#84 — Add protected manual integrated-image publication to OCIR](https://github.com/C2C-Connect/claim2car-connect/pull/84)
+- Merge commit: `9e462a83e18432d8a2831bb60c75e8a666f478cf`.
+- **19/19 workflow runs successful**; no failures.
+- Full suite: **859 passed, 208 subtests passed, 31 warnings** — run [44783729668](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44783729668).
+- PostgreSQL authority: **357/357 counted tests passed**, **14/14 DB gates awarded**, overall `ACCEPTED` — run [44783729938](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44783729938).
+- OCI workflow lint/validation passed — run [44783708964](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44783708964).
+- Integrated runtime native container smoke passed and the OCI ARM64 cross-build/export completed successfully — run [44783708409](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44783708409).
+- Added a manual, environment-scoped OCIR publishing workflow: explicit confirmation, `main` only, immutable source-SHA image, provenance/SBOM. No image was pushed and no deployment was executed because OCI registry variables/credentials are not configured from this session.
+- **Still no staging deployment:** compute, PostgreSQL/PostGIS, persistent volumes, secrets, private host rollout, backups/restore and end-to-end persistence remain unverified.
+
 ## Current verified implementation milestone — PR #83 (2026-11-20)
 
 **Status:** merged into `main`; synthetic CI passed on the exact candidate head before merge.
