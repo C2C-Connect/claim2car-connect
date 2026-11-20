@@ -54,6 +54,9 @@ jobs:
           assert 'backend "oci" {}' in terraform_config
           init_step = next(step for step in workflow["jobs"]["plan"]["steps"] if step.get("name") == "Initialize OCI remote state backend")
           assert "terraform init -input=false -reconfigure" in init_step["run"]
+          credentials_step = next(step for step in workflow["jobs"]["plan"]["steps"] if step.get("name") == "Fail closed when OCI credentials or inputs are absent")
+          assert 'config_path="$HOME/.oci/config"' in credentials_step["run"]
+          assert "OCI_CONFIG_FILE" not in credentials_step["run"]
           publish_path = ".github/workflows/oci-integrated-image-publish.yml"
           publish = yaml.safe_load(open(publish_path))
           publish_trigger = publish.get("on", publish.get(True))
