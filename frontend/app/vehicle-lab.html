@@ -88,11 +88,24 @@
           <label>Visible condition<select id="damage-type"><option value="Dent / deformation">Dent / deformation</option><option value="Scratch / paint transfer">Scratch / paint transfer</option><option value="Crack / broken component">Crack / broken component</option><option value="Missing / detached component">Missing / detached component</option><option value="Glass damage">Glass damage</option><option value="Fluid leak observed">Fluid leak observed</option><option value="Warning indicator illuminated">Warning indicator illuminated</option><option value="No visible damage in this area">No visible damage in this area</option><option value="Unable to determine">Unable to determine</option></select></label>
           <label>Visual severity (operator judgment)<select id="damage-severity"><option value="Unclassified">Unclassified</option><option value="Minor appearance">Minor appearance</option><option value="Moderate visible deformation">Moderate visible deformation</option><option value="Major visible deformation">Major visible deformation</option><option value="Potential safety concern">Potential safety concern</option></select></label>
           <label>Supporting photo<select id="damage-photo"><option value="">No linked photo selected</option></select></label>
+          <label>Repair approach (operator estimate)<select id="estimate-action"><option value="Not assessed">Not assessed</option><option value="Repair">Repair</option><option value="Paint / refinish">Paint / refinish</option><option value="Replace">Replace</option><option value="PDR candidate">PDR candidate · confirm qualified technician</option><option value="Inspect / diagnose">Inspect / diagnose</option></select></label>
+          <label>Estimated labor hours<input id="estimate-hours" type="number" min="0" max="1000" step="0.1" value="0"></label>
+          <label>Parts cost ($)<input id="estimate-parts" type="number" min="0" max="1000000" step="0.01" value="0"></label>
+          <label>Materials / sublet cost ($)<input id="estimate-materials" type="number" min="0" max="1000000" step="0.01" value="0"></label>
         </div>
         <label for="damage-notes">Observation notes</label>
         <textarea id="damage-notes" maxlength="1200" rows="3" placeholder="Describe the visible condition, location, and any limitations. Avoid guessing about concealed components."></textarea>
         <button id="add-observation" class="button secondary" type="button">Add observation</button>
         <div id="observation-list" class="observation-list"></div>
+        <div class="estimate-worksheet">
+          <h3>Preliminary repair-cost worksheet</h3>
+          <p class="fine-print">This is a transparent, operator-entered worksheet—not AI appraisal. Enter only costs supported by a shop quote, pricing source, or clearly stated assumption. Unpriced items remain unpriced; zero is not a claim that repairs cost nothing.</p>
+          <div class="damage-form-grid">
+            <label>Labor rate ($/hour)<input id="estimate-labor-rate" type="number" min="0" max="1000" step="0.01" value="85"></label>
+            <label>Tax rate (%)<input id="estimate-tax-rate" type="number" min="0" max="25" step="0.01" value="0"></label>
+          </div>
+          <div id="estimate-summary" class="estimate-summary" aria-live="polite">No estimate line items yet.</div>
+        </div>
       </div>
     </section>
 

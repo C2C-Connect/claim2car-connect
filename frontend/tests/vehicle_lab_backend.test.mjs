@@ -33,3 +33,12 @@ assert.match(source,/resume-capture\"\)\.disabled = !state\.captureToken \|\| !s
 
 assert.match(html,/<button id="pause-capture"[^>]*disabled/);
 assert.match(html,/<button id="resume-capture"[^>]*hidden[^>]*disabled/);
+
+// Transparent estimate worksheet is strictly operator-entered, with live math and report inclusion.
+for (const id of ["estimate-action","estimate-hours","estimate-parts","estimate-materials","estimate-labor-rate","estimate-tax-rate","estimate-summary"]) assert.match(html,new RegExp('id="'+id+'"'));
+assert.match(source,/function estimateLineSubtotal/);
+assert.match(source,/function estimateTotals/);
+assert.match(source,/operator-entered/);
+assert.match(source,/worksheet total/i);
+assert.match(source,/state\.observations\.push\(observation\)/);
+assert.match(source,/estimateHtml/);

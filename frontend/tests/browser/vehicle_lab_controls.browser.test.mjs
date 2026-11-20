@@ -91,6 +91,23 @@ try {
   assert.equal(await pause.isVisible(),true);
   assert.equal(await resume.isVisible(),false);
   assert.equal(requests.filter(x=>x.path.endsWith("/evidence-readiness")).length,4,"readiness refreshed after session, pause, resume, and profile");
+  // Exercise the operator-entered worksheet and report calculation in the actual browser.
+  await page.locator("#damage-area").selectOption("Front-left");
+  await page.locator("#damage-type").selectOption("Dent / deformation");
+  await page.locator("#damage-severity").selectOption("Moderate visible deformation");
+  await page.locator("#damage-notes").fill("Synthetic fixture: visible panel dent");
+  await page.locator("#estimate-action").selectOption("Repair");
+  await page.locator("#estimate-hours").fill("2");
+  await page.locator("#estimate-parts").fill("250");
+  await page.locator("#estimate-materials").fill("40");
+  await page.locator("#estimate-labor-rate").fill("85");
+  await page.locator("#estimate-tax-rate").fill("0");
+  await page.locator("#add-observation").click();
+  assert.match(await page.locator("#estimate-summary").textContent(),/Worksheet total \$460\.00/);
+  await page.locator("#generate-report").click();
+  assert.match(await page.locator("#report-preview").textContent(),/Worksheet total/);
+  assert.match(await page.locator("#report-preview").textContent(),/\$460\.00/);
+  assert.match(await page.locator("#report-preview").textContent(),/operator-entered/);
   assert.deepEqual(errors,[]);
   process.stdout.write(JSON.stringify({outcome:"passed",checks:[
     "authenticated session creation",

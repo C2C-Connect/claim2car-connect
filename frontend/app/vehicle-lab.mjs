@@ -485,9 +485,22 @@ $("add-observation").addEventListener("click",() => {
     setMessage("Add a factual note describing what you observed.",true);
     return;
   }
+  const estimateAction = $("estimate-action").value;
+  const laborHours = Number($("estimate-hours").value);
+  const partsCost = Number($("estimate-parts").value);
+  const materialsCost = Number($("estimate-materials").value);
+  if (![laborHours,partsCost,materialsCost].every(Number.isFinite) || laborHours < 0 || partsCost < 0 || materialsCost < 0) {
+    setMessage("Estimate inputs must be non-negative numeric values.",true); return;
+  }
+  observation.estimate = {action:estimateAction,laborHours,partsCost,materialsCost};
   state.observations.push(observation);
   $("damage-notes").value = "";
+  $("estimate-hours").value = "0";
+  $("estimate-parts").value = "0";
+  $("estimate-materials").value = "0";
+  $("estimate-action").value = "Not assessed";
   renderObservations();
+  renderEstimateSummary();
 });
 function renderObservations() {
   const list = $("observation-list");
@@ -499,10 +512,41 @@ function renderObservations() {
     title.textContent = (index+1) + ". " + item.area + " · " + item.type;
     const detail = document.createElement("div");
     detail.textContent = item.severity + (item.photo ? " · Photo: " + slots.find(x => x[0] === item.photo)?.[1] : "") + (item.notes ? " · " + item.notes : "");
-    row.append(title,detail);
+    const estimate = document.createElement("div");
+    estimate.className = "observation-estimate";
+    const e = item.estimate || {};
+    const rate = getEstimateRate();
+    estimate.textContent = "Worksheet: " + (e.action || "Not assessed") + " · " + Number(e.laborHours || 0).toFixed(1) + " hr × $" + rate.toFixed(2) + " · Parts $" + Number(e.partsCost || 0).toFixed(2) + " · Materials/sublet $" + Number(e.materialsCost || 0).toFixed(2) + " · Subtotal $" + estimateLineSubtotal(e,rate).toFixed(2);
+    row.append(title,detail,estimate);
     list.append(row);
   });
+  renderEstimateSummary();
 }
+function getEstimateRate() {
+  const rate = Number($("estimate-labor-rate").value);
+  return Number.isFinite(rate) && rate >= 0 ? rate : 0;
+}
+function estimateLineSubtotal(line, rate) {
+  return Number(line?.laborHours || 0) * rate + Number(line?.partsCost || 0) + Number(line?.materialsCost || 0);
+}
+function estimateTotals() {
+  const rate=getEstimateRate(), taxRate=Number($("estimate-tax-rate").value);
+  const normalizedTaxRate=Number.isFinite(taxRate) && taxRate >= 0 ? taxRate : 0;
+  const labor=state.observations.reduce((sum,x)=>sum+Number(x.estimate?.laborHours||0)*rate,0);
+  const parts=state.observations.reduce((sum,x)=>sum+Number(x.estimate?.partsCost||0),0);
+  const materials=state.observations.reduce((sum,x)=>sum+Number(x.estimate?.materialsCost||0),0);
+  const subtotal=labor+parts+materials, tax=subtotal*normalizedTaxRate/100;
+  return {rate,taxRate:normalizedTaxRate,labor,parts,materials,subtotal,tax,total:subtotal+tax};
+}
+function renderEstimateSummary() {
+  const node=$("estimate-summary");
+  if(!node) return;
+  if(!state.observations.length){node.textContent="No estimate line items yet.";return;}
+  const t=estimateTotals();
+  node.textContent="Labor $" + t.labor.toFixed(2) + " · Parts $" + t.parts.toFixed(2) + " · Materials/sublet $" + t.materials.toFixed(2) + " · Subtotal $" + t.subtotal.toFixed(2) + " · Tax $" + t.tax.toFixed(2) + " · Worksheet total $" + t.total.toFixed(2);
+}
+$("estimate-labor-rate").addEventListener("input",renderObservations);
+$("estimate-tax-rate").addEventListener("input",renderEstimateSummary);
 function reportHtml() {
   const p = state.profile;
   const missing = slots.filter(([slot]) => !state.photos.has(slot)).map(([slot,label]) => {
@@ -525,14 +569,20 @@ function reportHtml() {
   const images = [...state.photos.values()].map(x =>
     "<div><strong>" + escapeHtml(x.label) + "</strong><br><img src='" + x.url + "' alt='" + escapeHtml(x.label) + "'></div>"
   ).join("");
+  const estimate = estimateTotals();
+  const estimateRows = state.observations.map((x,i) => {
+    const e=x.estimate||{}, subtotal=estimateLineSubtotal(e,estimate.rate);
+    return "<tr><td>" + (i+1) + ". " + escapeHtml(x.area) + " · " + escapeHtml(x.type) + "</td><td>" + escapeHtml(e.action||"Not assessed") + "</td><td>" + Number(e.laborHours||0).toFixed(1) + "</td><td>$" + Number(e.partsCost||0).toFixed(2) + "</td><td>$" + Number(e.materialsCost||0).toFixed(2) + "</td><td>$" + subtotal.toFixed(2) + "</td></tr>";
+  }).join("");
+  const estimateHtml = "<h3>4. Preliminary repair-cost worksheet (operator-entered)</h3><p>Labor rate: $" + estimate.rate.toFixed(2) + "/hour · Tax rate: " + estimate.taxRate.toFixed(2) + "% · These values are user-entered assumptions, not an AI appraisal or verified shop quote.</p><table><thead><tr><th>Observed item</th><th>Action</th><th>Hours</th><th>Parts</th><th>Materials / sublet</th><th>Subtotal</th></tr></thead><tbody>" + (estimateRows || "<tr><td colspan='6'>No worksheet line items.</td></tr>") + "</tbody><tfoot><tr><th colspan='5'>Labor</th><td>$" + estimate.labor.toFixed(2) + "</td></tr><tr><th colspan='5'>Parts</th><td>$" + estimate.parts.toFixed(2) + "</td></tr><tr><th colspan='5'>Materials / sublet</th><td>$" + estimate.materials.toFixed(2) + "</td></tr><tr><th colspan='5'>Subtotal</th><td>$" + estimate.subtotal.toFixed(2) + "</td></tr><tr><th colspan='5'>Tax (operator-selected)</th><td>$" + estimate.tax.toFixed(2) + "</td></tr><tr><th colspan='5'>Worksheet total</th><td><strong>$" + estimate.total.toFixed(2) + "</strong></td></tr></tfoot></table><p>Excluded unless explicitly entered: hidden damage, diagnostics, ADAS calibration, towing, storage, supplements, fees, and insurer-specific pricing. This worksheet does not establish repairability, safety, total-loss status, or authorization.</p>";
   return "<h2>Claim2Car Vehicle &amp; Condition Report</h2><p>Prototype report · Generated " + escapeHtml(now()) + " · VIN decoded " + escapeHtml(state.retrievedAt ? new Date(state.retrievedAt).toLocaleString() : "time unavailable") +
     "</p><p class='report-warning'><strong>Scope limitation:</strong> This is a documentation prototype, not an appraisal, insurance decision, ownership verification, roadworthiness inspection, or professional repair estimate. Damage observations were entered by the operator. No automated damage assessment or repair-cost model ran.</p>" +
     "<h3>1. Vehicle identity</h3><p>Source: NHTSA vPIC. VIN check digit status: " + escapeHtml(p.checkDigitStatus) + ". A mismatch override is not proof of VIN authenticity or vehicle identity.</p><table>" + table + "</table>" +
     "<h3>2. Capture completeness</h3><p>" + [...state.photos.values()].filter(x => x.uploaded).length + " of 16 original views uploaded to the authenticated evidence service. Session: " + escapeHtml(state.sessionId || "not connected") + ".</p>" + (state.sealed ? "<p><strong>Sealed manifest SHA-256:</strong> " + escapeHtml(state.manifestDigest) + "</p>" : "<p><strong>Evidence status:</strong> Not sealed.</p>") + "<p>Views not captured: " +
     (missing.length ? missing.map(escapeHtml).join(", ") : "None") + ". Missing views are unknown, not evidence of no damage.</p><div class='report-images'>" + images + "</div>" +
     "<h3>3. Visible condition observations</h3><ul>" + observations + "</ul>" +
-    "<h3>4. Unresolved questions</h3><ul><li>Concealed structure and components have not been assessed.</li><li>No collision causation, fault, liability, coverage, total-loss status, repair scope, or repair price is determined.</li><li>Severity labels are qualitative operator judgments, not calibrated probabilities or verified engineering classifications.</li><li>Qualified physical inspection and diagnostic procedures may be required.</li></ul>" +
-    "<h3>5. Disposition</h3><p><strong>LIMITED DOCUMENTATION ONLY — NOT ADJUDICATED.</strong> This report is not clearance to drive or repair authorization.</p>" +
+    estimateHtml + "<h3>5. Unresolved questions</h3><ul><li>Concealed structure and components have not been assessed.</li><li>No collision causation, fault, liability, coverage, total-loss status, repair scope, or repair price is determined.</li><li>Severity labels are qualitative operator judgments, not calibrated probabilities or verified engineering classifications.</li><li>Qualified physical inspection and diagnostic procedures may be required.</li></ul>" +
+    "<h3>6. Disposition</h3><p><strong>LIMITED DOCUMENTATION ONLY — NOT ADJUDICATED.</strong> This report is not clearance to drive or repair authorization.</p>" +
     "<p>Method: server-recorded NHTSA vPIC vehicle description; user-provided photographs and observations. " + (state.sealed ? "Original evidence bytes are stored and the 16-view manifest is sealed." : "Evidence remains unsealed; no final evidence package is asserted.") + " No automated damage model was used.</p>";
 }
 $("generate-report").addEventListener("click",() => {
