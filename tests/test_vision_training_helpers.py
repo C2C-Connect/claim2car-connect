@@ -10,5 +10,5 @@ def test_parser_rejects_unmapped_class_and_bad_bounds():
   except ValueError as exc:assert expected in str(exc)
   else:raise AssertionError("invalid labels accepted")
 def test_metrics_at_iou_threshold():
- p=[{"boxes":[[0,0,10,10],[20,20,30,30]],"labels":[1,1],"scores":[.9,.2]}];t=[{"boxes":[[0,0,10,10]],"labels":[1]}]
+ p=[{"boxes":[[0,0,10,10],[20,20,30,30]],"labels":[1,1],"scores":[.9,.6]}];t=[{"boxes":[[0,0,10,10]],"labels":[1]}]
  r=m.detection_metrics(p,t,[1]);assert r["per_class"]["1"]["tp"]==1 and r["per_class"]["1"]["fp"]==1 and r["per_class"]["1"]["fn"]==0
