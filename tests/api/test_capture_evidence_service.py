@@ -307,6 +307,80 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.assertEqual(self.sessions.conn.appended[-1][1], "reviewer-1")
 
 
+    def test_audited_capture_exception_must_be_resolved_before_quality_or_seal(self):
+        slots = resolve_capture_protocol(DEFAULT_CAPTURE_PROTOCOL).slots
+        sessions = FakeSessions(self.operator.actor_id, DEFAULT_CAPTURE_PROTOCOL)
+        sessions.actors = self.sessions.actors
+        service = CaptureEvidenceService(sessions, self.byte_store, "p" * 43)
+        service.record_consent("owner-token", self.session_id, request_id=UUID(int=700), accepted=True, scope="capture_review")
+        service.record_vehicle("operator-token", self.session_id, request_id=UUID(int=701), vin="1HGCM82633A004352")
+        for index, slot in enumerate(slots[:-1], start=1):
+            raw = ("exception-test:" + slot).encode()
+            service.register_artifact("operator-token", self.session_id, request_id=UUID(int=710+index),
+                artifact_id=UUID(int=810+index), slot=slot, payload_base64=base64.b64encode(raw).decode(),
+                sha256_hex=hashlib.sha256(raw).hexdigest())
+        missing = slots[-1]
+        opened = service.record_capture_exception("operator-token", self.session_id,
+            request_id=UUID(int=799), slot=missing, reason_code="UNSAFE_TO_APPROACH",
+            explanation="Vehicle is positioned beside moving traffic.")
+        self.assertFalse(opened["replayed"])
+        readiness = service.evidence_readiness("operator-token", self.session_id)
+        self.assertEqual(readiness["active_capture_exceptions"][0]["slot"], missing)
+        raw = ("exception-test:" + missing).encode()
+        service.register_artifact("operator-token", self.session_id, request_id=UUID(int=899),
+            artifact_id=UUID(int=999), slot=missing, payload_base64=base64.b64encode(raw).decode(),
+            sha256_hex=hashlib.sha256(raw).hexdigest())
+        with self.assertRaisesRegex(CaptureSessionConflict, "UNRESOLVED_CAPTURE_EXCEPTIONS"):
+            service.seal_capture("operator-token", self.session_id, request_id=UUID(int=898))
+        with self.assertRaisesRegex(CaptureAuthorizationError, "SUPERVISOR_IDENTITY_REQUIRED"):
+            service.resolve_capture_exception("operator-token", self.session_id,
+                request_id=UUID(int=897), slot=missing, resolution_code="SUPERVISOR_REVIEWED",
+                explanation="Operator cannot attest a supervisor review.")
+        with self.assertRaisesRegex(CaptureSessionConflict, "UNRESOLVED_CAPTURE_EXCEPTIONS"):
+            service.record_quality("operator-token", self.session_id, request_id=UUID(int=900),
+                                        results={slot: True for slot in slots})
+        resolved = service.resolve_capture_exception("operator-token", self.session_id,
+            request_id=UUID(int=901), slot=missing, resolution_code="CAPTURED_AFTER_RETRY",
+            explanation="Safe access restored; replacement view uploaded.")
+        self.assertEqual(resolved["exception_event_id"], "capture-exception:" + str(UUID(int=799)))
+        self.assertEqual(service.evidence_readiness("operator-token", self.session_id)["active_capture_exceptions"], [])
+        service.record_quality("operator-token", self.session_id, request_id=UUID(int=902),
+                                    results={slot: True for slot in slots})
+        sealed = service.seal_capture("operator-token", self.session_id, request_id=UUID(int=903))
+        self.assertEqual(len(sealed["artifact_ids"]), 16)
+        kinds = [item[0] for item in sessions.conn.appended]
+        self.assertIn("CAPTURE_EXCEPTION_RECORDED", kinds)
+        self.assertIn("CAPTURE_EXCEPTION_RESOLVED", kinds)
+
+    def test_pause_resume_is_audited_and_blocks_artifact_upload_while_paused(self):
+        sessions = FakeSessions(self.operator.actor_id, DEFAULT_CAPTURE_PROTOCOL)
+        sessions.actors = self.sessions.actors
+        service = CaptureEvidenceService(sessions, self.byte_store, "p" * 43)
+        service.record_consent("owner-token", self.session_id, request_id=UUID(int=920), accepted=True, scope="capture_review")
+        service.record_vehicle("operator-token", self.session_id, request_id=UUID(int=921), vin="1HGCM82633A004352")
+        paused = service.pause_capture_session("operator-token", self.session_id,
+            request_id=UUID(int=922), reason="Operator must leave the roadside.")
+        self.assertTrue(paused["paused"])
+        replay = service.pause_capture_session("operator-token", self.session_id,
+            request_id=UUID(int=922), reason="Operator must leave the roadside.")
+        self.assertTrue(replay["replayed"])
+        self.assertTrue(service.evidence_readiness("operator-token", self.session_id)["capture_paused"])
+        raw = b"pause-test-original"
+        with self.assertRaisesRegex(CaptureSessionConflict, "CAPTURE_SESSION_PAUSED"):
+            service.register_artifact("operator-token", self.session_id, request_id=UUID(int=923),
+                artifact_id=UUID(int=924), slot=resolve_capture_protocol(DEFAULT_CAPTURE_PROTOCOL).slots[0],
+                payload_base64=base64.b64encode(raw).decode(), sha256_hex=hashlib.sha256(raw).hexdigest())
+        resumed = service.resume_capture_session("operator-token", self.session_id,
+            request_id=UUID(int=925), reason="Roadside hazard cleared.")
+        self.assertFalse(resumed["paused"])
+        self.assertFalse(service.evidence_readiness("operator-token", self.session_id)["capture_paused"])
+        result = service.register_artifact("operator-token", self.session_id, request_id=UUID(int=923),
+            artifact_id=UUID(int=924), slot=resolve_capture_protocol(DEFAULT_CAPTURE_PROTOCOL).slots[0],
+            payload_base64=base64.b64encode(raw).decode(), sha256_hex=hashlib.sha256(raw).hexdigest())
+        self.assertFalse(result["replayed"])
+        self.assertIn("CAPTURE_SESSION_PAUSED", [item[0] for item in sessions.conn.appended])
+        self.assertIn("CAPTURE_SESSION_RESUMED", [item[0] for item in sessions.conn.appended])
+
     def test_16_v1_persistent_evidence_lifecycle_uses_exact_session_slots(self):
         sessions = FakeSessions(self.operator.actor_id, DEFAULT_CAPTURE_PROTOCOL)
         sessions.actors = self.sessions.actors

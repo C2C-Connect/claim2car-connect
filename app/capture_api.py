@@ -147,6 +147,28 @@ class SealRequest(BaseModel):
     class Config:
         extra = 'forbid'
 
+class CaptureExceptionRequest(BaseModel):
+    request_id: UUID
+    slot: StrictStr = Field(min_length=1, max_length=64)
+    reason_code: StrictStr = Field(min_length=1, max_length=64)
+    explanation: StrictStr = Field(min_length=1, max_length=500)
+    class Config:
+        extra = 'forbid'
+
+class CaptureExceptionResolutionRequest(BaseModel):
+    request_id: UUID
+    slot: StrictStr = Field(min_length=1, max_length=64)
+    resolution_code: StrictStr = Field(min_length=1, max_length=64)
+    explanation: StrictStr = Field(min_length=1, max_length=500)
+    class Config:
+        extra = 'forbid'
+
+class CapturePauseRequest(BaseModel):
+    request_id: UUID
+    reason: StrictStr = Field(min_length=1, max_length=500)
+    class Config:
+        extra = 'forbid'
+
 class HumanReviewRequest(BaseModel):
     request_id: UUID
     disposition: StrictStr = Field(min_length=1, max_length=64)
@@ -570,6 +592,29 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 artifact_id=body.artifact_id, slot=body.slot, payload_base64=body.payload_base64,
                 sha256_hex=body.sha256,
             )
+
+        @api.post('/v1/capture-sessions/{session_id}/exceptions')
+        def record_capture_exception(session_id: UUID, body: CaptureExceptionRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.record_capture_exception, authorization, session_id,
+                                   request_id=body.request_id, slot=body.slot,
+                                   reason_code=body.reason_code, explanation=body.explanation)
+
+        @api.post('/v1/capture-sessions/{session_id}/exceptions/resolve')
+        def resolve_capture_exception(session_id: UUID, body: CaptureExceptionResolutionRequest,
+                                       authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.resolve_capture_exception, authorization, session_id,
+                                   request_id=body.request_id, slot=body.slot,
+                                   resolution_code=body.resolution_code, explanation=body.explanation)
+
+        @api.post('/v1/capture-sessions/{session_id}/pause')
+        def pause_capture_session(session_id: UUID, body: CapturePauseRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.pause_capture_session, authorization, session_id,
+                                   request_id=body.request_id, reason=body.reason)
+
+        @api.post('/v1/capture-sessions/{session_id}/resume')
+        def resume_capture_session(session_id: UUID, body: CapturePauseRequest, authorization: str = Depends(authorize)):
+            return invoke_evidence(evidence.resume_capture_session, authorization, session_id,
+                                   request_id=body.request_id, reason=body.reason)
 
         @api.post('/v1/capture-sessions/{session_id}/quality')
         def record_quality(session_id: UUID, body: AdvisoryQualityRequest, authorization: str = Depends(authorize)):
