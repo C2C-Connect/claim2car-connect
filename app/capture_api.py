@@ -599,7 +599,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             if not isinstance(registered, JSONResponse) or registered.status_code != 200:
                 return registered
             result = json.loads(registered.body)
-            localization = {"status": "NOT_APPLICABLE", "reason": "capture_slot_not_exterior"}
+            localization = {"status": "NOT_APPLICABLE", "reason": "capture_slot_not_exterior", "image": {"sha256": body.sha256_hex, "byte_length": result.get("byte_length", 0), "persisted": True}}
             protocol_version = next(
                 (version for version in (DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL)
                  if body.slot in resolve_capture_protocol(version).slots and zone_for_slot(body.slot, version)),
@@ -609,9 +609,10 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 try:
                     raw = base64.b64decode(body.payload_base64, validate=True)
                     localization = analyze_photo_bytes(raw, body.slot, protocol_version)
+                    localization["image"]["persisted"] = True
                 except (binascii.Error, PhotoBaselineError) as error:
                     code = error.code if isinstance(error, PhotoBaselineError) else "INVALID_ARTIFACT_ENCODING"
-                    localization = {"status": "UNAVAILABLE", "code": code, "model_status": "BASELINE_NOT_AI"}
+                    localization = {"status": "UNAVAILABLE", "code": code, "model_status": "BASELINE_NOT_AI", "image": {"sha256": body.sha256_hex, "byte_length": result.get("byte_length", 0), "persisted": True}}
             result["localization"] = localization
             return JSONResponse(jsonable_encoder(result), headers=dict(NO_STORE_HEADERS))
 
