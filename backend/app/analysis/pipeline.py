@@ -1,6 +1,9 @@
 """
 Layer 2 end-to-end analysis pipeline:
   pre-flight gate → YOLO → SAM2 → Depth → LMM → DARCI → 55/45 ensemble
+
+IMPORTANT: Current default adapters are deterministic placeholders, not trained
+models. Results are explicitly marked as simulation/stub-only and advisory.
 """
 
 from __future__ import annotations
@@ -46,6 +49,9 @@ class AnalysisResult:
     segmentation_source: str
     formula_version: str = C.VERSION
     notes: List[str] = field(default_factory=list)
+    model_status: str = "STUBS_ONLY"
+    advisory_only: bool = True
+    model_outputs_are_real_inference: bool = False
 
 
 class AnalysisPipeline:
@@ -57,7 +63,12 @@ class AnalysisPipeline:
         self.lmm = CognitiveLMMAdapter()
 
     def run(self, req: AnalysisRequest) -> AnalysisResult:
-        notes: List[str] = []
+        notes: List[str] = [
+            "MODEL_STATUS_STUBS_ONLY: default vision adapters are deterministic placeholders; "
+            "detections, masks, depth, and LMM values are not real model inference.",
+            "ADVISORY_ONLY: outputs must not be used as an appraisal, safety determination, "
+            "claim decision, repair authorization, or settlement decision.",
+        ]
         photos = list(req.photos) or [b""]
         zone_hints = list(req.zone_hints or ["front"] * len(photos))
         materials = list(req.materials or ["mild_steel"] * len(photos))
@@ -74,7 +85,7 @@ class AnalysisPipeline:
             all_dets.extend(dets)
 
         all_dets = nms_dedupe(all_dets)
-        notes.append(f"yolo_detections={len(all_dets)}")
+        notes.append(f"yolo_detections={len(all_dets)} (synthetic stub output)")
 
         # SAM2 + Depth on first photo for stub simplicity
         primary = photos[0]
@@ -128,20 +139,20 @@ class AnalysisPipeline:
                     disagreement=False,
                 )
             else:
-                # simulate multi-model votes from yolo conf + lmm
+                # These proxy votes are also synthetic; do not represent independent models.
                 votes = {
-                    "lmm": lmm.p_tl_ai,
-                    "yolo_proxy": min(0.95, 0.3 + 0.5 * (all_dets[0].confidence if all_dets else 0.5)),
-                    "depth_proxy": min(0.95, 0.2 + darci.p_tl_physics * 0.7),
+                    "lmm_stub": lmm.p_tl_ai,
+                    "yolo_stub_proxy": min(0.95, 0.3 + 0.5 * (all_dets[0].confidence if all_dets else 0.5)),
+                    "depth_stub_proxy": min(0.95, 0.2 + darci.p_tl_physics * 0.7),
                 }
                 mean_ai, disagree = two_thirds_vote(votes)
                 vision = VisionSignal(
                     p_tl_ai=mean_ai,
-                    source="ensemble_vision",
-                    confidence=0.7,
+                    source="stub_ensemble",
+                    confidence=0.0,
                     model_votes=votes,
                     disagreement=disagree,
-                    details={"lmm_panels": len(lmm.panels)},
+                    details={"lmm_panels": len(lmm.panels), "stub_only": True},
                 )
         except Exception as exc:  # noqa: BLE001
             notes.append(f"lmm_error:{type(exc).__name__}")
@@ -166,18 +177,25 @@ class AnalysisPipeline:
                     "confidence": d.confidence,
                     "zone": d.zone,
                     "bbox_xyxy": d.bbox_xyxy,
+                    "source": "synthetic_stub",
+                    "confidence_is_model_calibrated": False,
                 }
                 for d in all_dets
             ],
             masks=[
-                {"area_cm2": m.area_cm2, "zone": m.detection.zone, "class_name": m.detection.class_name}
+                {"area_cm2": m.area_cm2, "zone": m.detection.zone, "class_name": m.detection.class_name,
+                 "source": "synthetic_stub"}
                 for m in masks
             ],
             depths=[
-                {"mean_depth_cm": d.mean_depth_cm, "volume_cm3": d.volume_cm3, "zone": d.zone}
+                {"mean_depth_cm": d.mean_depth_cm, "volume_cm3": d.volume_cm3, "zone": d.zone,
+                 "source": "synthetic_stub"}
                 for d in depths
             ],
-            lmm_panels=[asdict(p) for p in (lmm.panels if lmm else [])],
+            lmm_panels=[asdict(p) | {"source": "synthetic_stub"} for p in (lmm.panels if lmm else [])],
             segmentation_source=seg_source,
             notes=notes,
+            model_status="STUBS_ONLY",
+            advisory_only=True,
+            model_outputs_are_real_inference=False,
         )

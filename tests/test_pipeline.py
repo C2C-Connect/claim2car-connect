@@ -32,9 +32,18 @@ def test_pipeline_end_to_end():
     assert result.darci.e_k_kj > 0
     assert result.formula_version == C.VERSION
     assert result.segmentation_source in ("vision_stack", "physics_fallback")
+    assert result.model_status == "STUBS_ONLY"
+    assert result.advisory_only is True
+    assert result.model_outputs_are_real_inference is False
+    assert any("not real model inference" in note for note in result.notes)
+    assert all(d["source"] == "synthetic_stub" for d in result.detections)
+    assert all(d["confidence_is_model_calibrated"] is False for d in result.detections)
+    assert all(m["source"] == "synthetic_stub" for m in result.masks)
+    assert all(d["source"] == "synthetic_stub" for d in result.depths)
+    assert all(p["source"] == "synthetic_stub" for p in result.lmm_panels)
 
 
-def test_pipeline_zero_photo_still_runs():
+def test_pipeline_zero_photo_still_runs_and_marks_stubs():
     pipe = AnalysisPipeline()
     result = pipe.run(
         AnalysisRequest(
@@ -46,3 +55,6 @@ def test_pipeline_zero_photo_still_runs():
     )
     assert result.darci is not None
     assert result.ensemble is not None
+    assert result.model_status == "STUBS_ONLY"
+    assert result.advisory_only is True
+    assert result.model_outputs_are_real_inference is False
