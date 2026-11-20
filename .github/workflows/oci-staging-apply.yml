@@ -1,0 +1,223 @@
+name: OCI staging apply (manual, guarded)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_apply:
+        description: Explicitly confirm provisioning the OCI staging resources
+        type: choice
+        required: true
+        default: "no"
+        options:
+          - "no"
+          - "yes"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_apply == 'yes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: oci-staging
+    defaults:
+      run:
+        working-directory: infra/oci/staging
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      TF_VAR_region: us-chicago-1
+      OCI_STATE_BUCKET: ${{ vars.OCI_STATE_BUCKET }}
+      OCI_STATE_NAMESPACE: ${{ vars.OCI_STATE_NAMESPACE }}
+      TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
+      TF_VAR_vcn_ocid: ${{ secrets.OCI_VCN_OCID }}
+      TF_VAR_private_subnet_ocid: ${{ secrets.OCI_PRIVATE_SUBNET_OCID }}
+      TF_VAR_image_ocid: ${{ secrets.OCI_STAGING_IMAGE_OCID }}
+      TF_VAR_ssh_authorized_keys: ${{ secrets.OCI_STAGING_SSH_PUBLIC_KEYS }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.0"
+      - name: Fail closed and configure ephemeral OCI API credentials
+        env:
+          OCI_USER: ${{ secrets.OCI_USER_OCID }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_API_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_API_PRIVATE_KEY }}
+          COMPARTMENT: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          VCN: ${{ secrets.OCI_VCN_OCID }}
+          SUBNET: ${{ secrets.OCI_PRIVATE_SUBNET_OCID }}
+          IMAGE: ${{ secrets.OCI_STAGING_IMAGE_OCID }}
+          ADMIN_CIDRS: ${{ secrets.OCI_ADMIN_INGRESS_CIDRS_JSON }}
+          APP_CIDRS: ${{ secrets.OCI_APP_INGRESS_CIDRS_JSON }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in OCI_USER OCI_TENANCY OCI_FINGERPRINT OCI_PRIVATE_KEY COMPARTMENT VCN SUBNET IMAGE OCI_STATE_BUCKET OCI_STATE_NAMESPACE; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( "${#missing[@]}" > 0 )); then
+            printf 'Missing OCI inputs: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          [[ -n "${ADMIN_CIDRS}" ]] || ADMIN_CIDRS='[]'
+          [[ -n "${APP_CIDRS}" ]] || APP_CIDRS='[]'
+          jq -e 'type == "array" and all(.[]; type == "string")' <<<"${ADMIN_CIDRS}" >/dev/null
+          jq -e 'type == "array" and all(.[]; type == "string")' <<<"${APP_CIDRS}" >/dev/null
+          if jq -e 'any(.[]; . == "0.0.0.0/0" or . == "::/0")' <<<"${ADMIN_CIDRS}" >/dev/null; then
+            echo "Public SSH ingress is forbidden."; exit 1
+          fi
+          if jq -e 'any(.[]; . == "0.0.0.0/0" or . == "::/0")' <<<"${APP_CIDRS}" >/dev/null; then
+            echo "Public application ingress is forbidden."; exit 1
+          fi
+          printf 'TF_VAR_admin_ingress_cidrs=%s\n' "${ADMIN_CIDRS}" >> "${GITHUB_ENV}"
+          printf 'TF_VAR_app_ingress_cidrs=%s\n' "${APP_CIDRS}" >> "${GITHUB_ENV}"
+          install -d -m 0700 "${HOME}/.oci"
+          key_path="${RUNNER_TEMP}/oci_api_key.pem"
+          printf '%s\n' "${OCI_PRIVATE_KEY}" > "${key_path}"
+          chmod 0600 "${key_path}"
+          cat > "${HOME}/.oci/config" <<EOF
+          [DEFAULT]
+          user=${OCI_USER}
+          tenancy=${OCI_TENANCY}
+          fingerprint=${OCI_FINGERPRINT}
+          key_file=${key_path}
+          region=us-chicago-1
+          EOF
+          chmod 0600 "${HOME}/.oci/config"
+          openssl pkey -in "${key_path}" -check -noout >/dev/null
+          echo "Credential and ingress guard checks passed."
+      - name: Initialize persistent OCI state
+        run: |
+          set -euo pipefail
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${OCI_STATE_BUCKET}" \
+            -backend-config="namespace=${OCI_STATE_NAMESPACE}" \
+            -backend-config="key=claim2car/oci-staging.tfstate" \
+            -backend-config="region=us-chicago-1" \
+            -backend-config="config_file_profile=DEFAULT"
+      - name: Validate configuration
+        run: terraform validate -no-color
+      - name: Create and enforce non-destructive plan
+        id: plan
+        run: |
+          set -euo pipefail
+          set +e
+          terraform plan -input=false -no-color -detailed-exitcode -out=tfplan > plan-output.txt 2>&1
+          rc=$?
+          set -e
+          if [[ "${rc}" -ne 0 && "${rc}" -ne 2 ]]; then
+            echo "Terraform plan failed; details withheld from summary."
+            exit "${rc}"
+          fi
+          terraform show -json tfplan > tfplan.json
+          summary="$(jq -r '
+            [.resource_changes[]?.change.actions] |
+            {
+              create: ([.[] | select(. == ["create"])] | length),
+              update: ([.[] | select(. == ["update"])] | length),
+              delete: ([.[] | select(any(.[]; . == "delete"))] | length),
+              replace: ([.[] | select(length == 2 and (index("delete") != null and index("create") != null))] | length)
+            }' tfplan.json)"
+          echo "${summary}" | tee "${GITHUB_STEP_SUMMARY}"
+          if jq -e '.delete > 0 or .replace > 0' <<<"${summary}" >/dev/null; then
+            echo "Destructive changes rejected; no apply artifact is produced."
+            exit 1
+          fi
+          {
+            echo "## Staging plan approved for review"
+            echo
+            echo "The saved plan contains only create/update actions. The plan artifact is sensitive and expires after one day."
+            echo "The apply job is gated by the `oci-staging-apply` environment's required reviewers."
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Upload exact saved plan (sensitive; 1-day retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: oci-staging-plan-${{ github.run_id }}
+          path: infra/oci/staging/tfplan
+          if-no-files-found: error
+          retention-days: 1
+
+  apply:
+    needs: plan
+    if: github.ref == 'refs/heads/main' && inputs.confirm_apply == 'yes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: oci-staging-apply
+    defaults:
+      run:
+        working-directory: infra/oci/staging
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      TF_VAR_region: us-chicago-1
+      OCI_STATE_BUCKET: ${{ vars.OCI_STATE_BUCKET }}
+      OCI_STATE_NAMESPACE: ${{ vars.OCI_STATE_NAMESPACE }}
+      TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
+      TF_VAR_vcn_ocid: ${{ secrets.OCI_VCN_OCID }}
+      TF_VAR_private_subnet_ocid: ${{ secrets.OCI_PRIVATE_SUBNET_OCID }}
+      TF_VAR_image_ocid: ${{ secrets.OCI_STAGING_IMAGE_OCID }}
+      TF_VAR_ssh_authorized_keys: ${{ secrets.OCI_STAGING_SSH_PUBLIC_KEYS }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.0"
+      - name: Download exact approved-run plan
+        uses: actions/download-artifact@v4
+        with:
+          name: oci-staging-plan-${{ github.run_id }}
+          path: infra/oci/staging
+      - name: Fail closed and configure ephemeral OCI API credentials
+        env:
+          OCI_USER: ${{ secrets.OCI_USER_OCID }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_API_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in OCI_USER OCI_TENANCY OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_STATE_BUCKET OCI_STATE_NAMESPACE; do
+            [[ -n "${!name}" ]] || { echo "Missing required apply environment input: ${name}"; exit 1; }
+          done
+          install -d -m 0700 "${HOME}/.oci"
+          key_path="${RUNNER_TEMP}/oci_api_key.pem"
+          printf '%s\n' "${OCI_PRIVATE_KEY}" > "${key_path}"
+          chmod 0600 "${key_path}"
+          cat > "${HOME}/.oci/config" <<EOF
+          [DEFAULT]
+          user=${OCI_USER}
+          tenancy=${OCI_TENANCY}
+          fingerprint=${OCI_FINGERPRINT}
+          key_file=${key_path}
+          region=us-chicago-1
+          EOF
+          chmod 0600 "${HOME}/.oci/config"
+          openssl pkey -in "${key_path}" -check -noout >/dev/null
+      - name: Initialize persistent OCI state
+        run: |
+          set -euo pipefail
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${OCI_STATE_BUCKET}" \
+            -backend-config="namespace=${OCI_STATE_NAMESPACE}" \
+            -backend-config="key=claim2car/oci-staging.tfstate" \
+            -backend-config="region=us-chicago-1" \
+            -backend-config="config_file_profile=DEFAULT"
+      - name: Apply exact saved plan
+        run: |
+          set -euo pipefail
+          [[ -s tfplan ]] || { echo "Saved plan is missing or empty."; exit 1; }
+          terraform apply -input=false -no-color tfplan
+          {
+            echo "## OCI staging infrastructure apply completed"
+            echo
+            echo "Applied the exact saved plan from run ${GITHUB_RUN_ID} to the protected staging environment."
+            echo "Verify private networking, host cloud-init, and persistent-volume identity before runtime bootstrap."
+          } >> "${GITHUB_STEP_SUMMARY}"
