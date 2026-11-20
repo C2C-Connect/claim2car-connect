@@ -1,3 +1,16 @@
+## Current verified implementation milestone — PR #83 (2026-11-20)
+
+**Status:** merged into `main`; synthetic CI passed on the exact candidate head before merge.
+
+- PR: [#83 — Connect Vehicle Lab to persistent claim-case creation](https://github.com/C2C-Connect/claim2car-connect/pull/83)
+- Candidate head: `ca97cdd4d10c6a6d39b03ee14183fb46ae0da1e2`; merge commit: `853cbe36fa30211a925d8bc24b1cdb705835c70c`.
+- Full repository pytest: **859 passed, 208 subtests passed, 31 warnings** — [run 44782624984](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44782624984).
+- PostgreSQL authority acceptance: **357/357 counted tests executed and passed**, zero failures/errors/skips/expected failures/unexpected successes; **DB-01–DB-14 14/14 PASS with 14 formal awards**, contract adopted, `overall_acceptance: ACCEPTED` — [run 44782624939](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44782624939).
+- Browser IndexedDB and Vehicle Lab Chromium journey: [run 44782624967](https://github.com/C2C-Connect/claim2car-connect/actions/runs/44782624967). The browser journey verified persistent claim-case creation, owner capture consent, VIN reference and separate decode consent, capture pause/resume, and server-readiness refreshes. The fixture echoes the client-generated claim ID to verify idempotent binding.
+- All **13/13 PR workflow runs** passed on the exact PR head before merge.
+- Vehicle Lab now creates a persistent claim case through `/api/v1/claim-cases`, binds the server-returned capture session, validates the response scope/IDs, preserves claim/request UUIDs across retry, and displays both identifiers. The controlled-test-only session creation route is no longer used by this UI.
+- **Deployment status:** no OCI staging deployment. PostgreSQL/PostGIS, dedicated persistent database/evidence volumes, secrets, host deployment, restart-persistence, restore rehearsal, private access and field qualification remain unverified/release-blocking.
+
 # Claim2Car Connect — Acceptance & Release Gate Matrix
 
 > **Product north star:** [Claim2Car Product Premise: Forensic Intelligence, Truth, and Resolution](../architecture/PRODUCT_PREMISE_FORENSIC_INTELLIGENCE.md) defines the owner-aligned product objective and Post-Accident Truth Standard. This document records implementation, verification, and release evidence; the vision document must not be read as proof that target capabilities are already implemented.
