@@ -7,6 +7,7 @@ on:
       - ".github/workflows/oci-infrastructure-validate.yml"
       - ".github/workflows/oci-staging-plan.yml"
       - ".github/workflows/oci-integrated-image-publish.yml"
+      - ".github/workflows/integrated-container-smoke.yml"
   push:
     branches: [main, "infra/**"]
     paths:
@@ -14,6 +15,7 @@ on:
       - ".github/workflows/oci-infrastructure-validate.yml"
       - ".github/workflows/oci-staging-plan.yml"
       - ".github/workflows/oci-integrated-image-publish.yml"
+      - ".github/workflows/integrated-container-smoke.yml"
 
 permissions:
   contents: read
@@ -38,7 +40,7 @@ jobs:
           curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz" -o "$archive"
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum -c
           tar -xzf "$archive" -C "$RUNNER_TEMP"
-          "$RUNNER_TEMP/actionlint" .github/workflows/oci-staging-plan.yml .github/workflows/oci-integrated-image-publish.yml .github/workflows/oci-infrastructure-validate.yml
+          "$RUNNER_TEMP/actionlint" .github/workflows/oci-staging-plan.yml .github/workflows/oci-integrated-image-publish.yml .github/workflows/integrated-container-smoke.yml .github/workflows/oci-infrastructure-validate.yml
       - name: Validate manual OCI plan and image publish workflow YAML and shell
         working-directory: ${{ github.workspace }}
         run: |
