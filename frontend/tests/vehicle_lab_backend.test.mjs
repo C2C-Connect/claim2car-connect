@@ -19,3 +19,6 @@ assert.match(source,/capturePaused/);
 assert.match(source,/Record audited exception/);
 assert.match(source,/Resolve exception/);
 console.log(JSON.stringify({suite:"vehicle-lab-backend-contract",assertions:ids.length+13,status:"passed"}));
+
+assert.match(source,/pause-capture\"\)\.disabled = !state\.captureToken \|\| !state\.sessionId \|\| state\.capturePaused/);
+assert.match(source,/resume-capture\"\)\.disabled = !state\.captureToken \|\| !state\.sessionId \|\| !state\.capturePaused/);

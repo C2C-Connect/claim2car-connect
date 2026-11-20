@@ -98,6 +98,9 @@ async function refreshEvidenceReadiness() {
   $("capture-paused-status").textContent = state.capturePaused ? "CAPTURE PAUSED · uploads blocked" : "Capture active";
   $("pause-capture").hidden = state.capturePaused;
   $("resume-capture").hidden = !state.capturePaused;
+  // Successful transitions re-enable the opposite action; never leave the UI locked.
+  $("pause-capture").disabled = !state.captureToken || !state.sessionId || state.capturePaused;
+  $("resume-capture").disabled = !state.captureToken || !state.sessionId || !state.capturePaused;
   renderPhotoSlots();
   updateSealAvailability();
   return readiness;
