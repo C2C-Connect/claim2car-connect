@@ -3,7 +3,7 @@ import { validateVin } from "../src/modules/capture/vin.mjs";
 const $ = (id) => document.getElementById(id);
 const API = "/api";
 const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
-const state = { profile:null, vin:null, retrievedAt:null, photos:new Map(), qualities:new Map(), observations:[], stream:null, detector:null, scanFrame:null, captureToken:null, sessionId:null, captureConsentRecorded:false, vehicleRecorded:false, sealed:false, manifestDigest:null };
+const state = { profile:null, vin:null, retrievedAt:null, photos:new Map(), qualities:new Map(), observations:[], stream:null, detector:null, scanFrame:null, captureToken:null, sessionId:null, captureConsentRecorded:false, vehicleRecorded:false, sealed:false, manifestDigest:null, capturePaused:false, activeExceptions:new Map() };
 const slots = [
   ["00_front_exterior","Front exterior"],
   ["01_front_right_exterior","Front-right 45°"],
@@ -90,6 +90,18 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
 
+async function refreshEvidenceReadiness() {
+  if (!state.captureToken || !state.sessionId) return;
+  const readiness = await captureApi("/v1/capture-sessions/" + state.sessionId + "/evidence-readiness", state.captureToken);
+  state.capturePaused = readiness.capture_paused === true;
+  state.activeExceptions = new Map((readiness.active_capture_exceptions || []).map(item => [item.slot, item]));
+  $("capture-paused-status").textContent = state.capturePaused ? "CAPTURE PAUSED · uploads blocked" : "Capture active";
+  $("pause-capture").hidden = state.capturePaused;
+  $("resume-capture").hidden = !state.capturePaused;
+  renderPhotoSlots();
+  updateSealAvailability();
+  return readiness;
+}
 function renderPhotoSlots() {
   const grid = $("photo-grid");
   grid.replaceChildren();
@@ -115,7 +127,59 @@ function renderPhotoSlots() {
     quality.add(new Option("Quality review pending",""));
     quality.add(new Option("Usable","usable"));
     quality.add(new Option("Needs retake","retake"));
-    quality.addEventListener("change", () => { state.qualities.set(slot, quality.value); updateSealAvailability(); });
+        quality.addEventListener("change", () => { state.qualities.set(slot, quality.value); updateSealAvailability(); });
+    const exceptionControls = document.createElement("div");
+    exceptionControls.className = "capture-exception-controls";
+    const reason = document.createElement("select");
+    reason.setAttribute("aria-label", "Capture exception reason for " + label);
+    reason.add(new Option("Record exception reason", ""));
+    for (const [code, text] of [["UNSAFE_TO_APPROACH","Unsafe to approach"],["ACCESS_RESTRICTED","Access restricted"],["VEHICLE_IN_MOTION","Vehicle in motion"],["WEATHER_HAZARD","Weather hazard"],["OWNER_DECLINED","Owner declined this view"],["EQUIPMENT_FAILURE","Equipment failure"],["OTHER","Other"]]) reason.add(new Option(text,code));
+    const explanation = document.createElement("textarea");
+    explanation.rows = 2; explanation.maxLength = 500;
+    explanation.placeholder = "Explain why this view is unavailable (required)";
+    explanation.setAttribute("aria-label", "Capture exception explanation for " + label);
+    const recordException = document.createElement("button");
+    recordException.type = "button"; recordException.className = "button quiet";
+    recordException.textContent = "Record audited exception";
+    const activeException = state.activeExceptions.get(slot);
+    const exceptionStatus = document.createElement("div");
+    exceptionStatus.className = "photo-state";
+    exceptionStatus.textContent = activeException ? "OPEN EXCEPTION · " + activeException.reason_code + " · " + activeException.explanation : "No open exception";
+    recordException.disabled = !state.captureToken || !state.sessionId || !state.captureConsentRecorded || state.capturePaused || Boolean(activeException) || state.sealed;
+    recordException.addEventListener("click", async () => {
+      if (!reason.value || !explanation.value.trim()) { exceptionStatus.textContent = "Select a reason and explain the exception."; return; }
+      recordException.disabled = true;
+      try {
+        await captureApi("/v1/capture-sessions/" + state.sessionId + "/exceptions", state.captureToken, {
+          method:"POST", body:JSON.stringify({request_id:uuid(),slot,reason_code:reason.value,explanation:explanation.value.trim()})
+        });
+        await refreshEvidenceReadiness();
+        backendStatus("Audited exception recorded. The view remains required; exception records do not replace original evidence.");
+      } catch (error) { exceptionStatus.textContent = "Exception not recorded · " + error.message; recordException.disabled = false; }
+    });
+    const resolution = document.createElement("select");
+    resolution.setAttribute("aria-label", "Capture exception resolution for " + label);
+    resolution.add(new Option("Resolution action", ""));
+    for (const [code,text] of [["CAPTURED_AFTER_RETRY","Captured after retry"],["NO_LONGER_APPLICABLE","No longer applicable"]]) resolution.add(new Option(text,code));
+    const resolutionNotes = document.createElement("textarea");
+    resolutionNotes.rows = 2; resolutionNotes.maxLength = 500;
+    resolutionNotes.placeholder = "Explain resolution (required)";
+    resolutionNotes.setAttribute("aria-label", "Exception resolution explanation for " + label);
+    const resolveException = document.createElement("button");
+    resolveException.type = "button"; resolveException.className = "button quiet"; resolveException.textContent = "Resolve exception";
+    resolveException.disabled = !activeException || !state.photos.get(slot)?.uploaded || state.capturePaused || state.sealed;
+    resolveException.addEventListener("click", async () => {
+      if (!resolution.value || !resolutionNotes.value.trim()) { exceptionStatus.textContent = "Select a resolution and explain it."; return; }
+      resolveException.disabled = true;
+      try {
+        await captureApi("/v1/capture-sessions/" + state.sessionId + "/exceptions/resolve", state.captureToken, {
+          method:"POST", body:JSON.stringify({request_id:uuid(),slot,resolution_code:resolution.value,explanation:resolutionNotes.value.trim()})
+        });
+        await refreshEvidenceReadiness();
+        backendStatus("Exception resolution recorded. All 16 original views are still required before sealing.");
+      } catch (error) { exceptionStatus.textContent = "Resolution not recorded · " + error.message; resolveException.disabled = false; }
+    });
+    exceptionControls.append(reason,explanation,recordException,exceptionStatus,resolution,resolutionNotes,resolveException);
     input.addEventListener("change", async () => {
       const file = input.files?.[0]; if (!file) return;
       if (!file.type.startsWith("image/") || file.size <= 0 || file.size > MAX_EVIDENCE_BYTES) {
@@ -137,12 +201,22 @@ function renderPhotoSlots() {
         preview.src = url; preview.hidden = false;
         stateText.textContent = "Original uploaded · " + file.size.toLocaleString() + " bytes · SHA-256 verified";
         updateReportAvailability(); syncPhotoSelect(); updateSealAvailability();
+        await refreshEvidenceReadiness();
       } catch (error) {
         stateText.textContent = "Upload failed · " + error.message + " · Select the image again to retry.";
         stateText.classList.add("error"); input.value = "";
       } finally { input.disabled = false; }
     });
-    card.append(title,input,quality,stateText,preview);
+    const existingPhoto = state.photos.get(slot);
+    if (existingPhoto?.uploaded) {
+      quality.disabled = state.capturePaused;
+      quality.value = state.qualities.get(slot) || "";
+      preview.src = existingPhoto.url;
+      preview.hidden = false;
+      stateText.textContent = "Original uploaded · " + existingPhoto.byteLength.toLocaleString() + " bytes · SHA-256 verified";
+    }
+    input.disabled = state.capturePaused || state.sealed;
+    card.append(title,input,quality,exceptionControls,stateText,preview);
     grid.append(card);
   }
 }
@@ -154,9 +228,35 @@ function syncPhotoSelect() {
   if (state.photos.has(selected)) select.value = selected;
 }
 function updateSealAvailability() {
-  const complete = slots.every(([slot]) => state.photos.get(slot)?.uploaded === true && state.qualities.get(slot) === "usable");
-  $("seal-evidence").disabled = !complete || state.sealed || !state.sessionId;
+  const complete = !state.capturePaused && state.activeExceptions.size === 0 && slots.every(([slot]) => state.photos.get(slot)?.uploaded === true && state.qualities.get(slot) === "usable");
+  $("seal-evidence").disabled = !complete || state.sealed || !state.sessionId || state.capturePaused || state.activeExceptions.size > 0;
 }
+$("pause-capture").addEventListener("click", async () => {
+  if (!state.sessionId || !state.captureToken) return;
+  const reason = $("capture-pause-reason").value.trim();
+  if (!reason) { backendStatus("Enter a reason for pausing the capture session.", true); return; }
+  $("pause-capture").disabled = true;
+  try {
+    await captureApi("/v1/capture-sessions/" + state.sessionId + "/pause", state.captureToken, {
+      method:"POST", body:JSON.stringify({request_id:uuid(),reason})
+    });
+    await refreshEvidenceReadiness();
+    backendStatus("Capture paused and audit event recorded. Uploads and evidence-finalization actions are blocked.");
+  } catch (error) { backendStatus(error.message,true); $("pause-capture").disabled = false; }
+});
+$("resume-capture").addEventListener("click", async () => {
+  if (!state.sessionId || !state.captureToken) return;
+  const reason = $("capture-pause-reason").value.trim();
+  if (!reason) { backendStatus("Enter a reason for resuming the capture session.", true); return; }
+  $("resume-capture").disabled = true;
+  try {
+    await captureApi("/v1/capture-sessions/" + state.sessionId + "/resume", state.captureToken, {
+      method:"POST", body:JSON.stringify({request_id:uuid(),reason})
+    });
+    await refreshEvidenceReadiness();
+    backendStatus("Capture resumed and audit event recorded.");
+  } catch (error) { backendStatus(error.message,true); $("resume-capture").disabled = false; }
+});
 $("seal-evidence").addEventListener("click", async () => {
   const button = $("seal-evidence"); button.disabled = true;
   try {
@@ -286,6 +386,7 @@ async function decodeVin() {
     state.retrievedAt = profile.requested_at; renderProfile();
     setMessage("Vehicle profile decoded and recorded by the authenticated evidence service. Attributes remain provider-reported; no ownership or condition finding is implied.");
     backendStatus("Capture session active · Vehicle identity recorded · NHTSA profile snapshot stored.");
+    await refreshEvidenceReadiness();
   } catch (error) {
     state.profile = null; show("vehicle-panel",false); show("inspection-panel",false); show("report-panel",false);
     setMessage("Server-authoritative vehicle decode unavailable: " + error.message + ". Verify consent and retry.", true);
