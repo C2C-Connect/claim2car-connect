@@ -2,25 +2,12 @@ name: OCI staging infrastructure plan (manual, no apply)
 
 on:
   workflow_dispatch:
-    inputs:
-      acknowledgement:
-        description: "Confirm this is a plan-only run; no infrastructure will be applied."
-        required: true
-        type: choice
-        options:
-          - "PLAN_ONLY_NO_APPLY"
-      region:
-        description: OCI region
-        required: true
-        type: string
-        default: us-chicago-1
 
 permissions:
   contents: read
 
 jobs:
   plan:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: oci-staging
@@ -29,13 +16,11 @@ jobs:
         working-directory: infra/oci/staging
     env:
       OCI_CONFIG_FILE: ${{ runner.temp }}/oci-config
-      TF_VAR_region: ${{ inputs.region }}
+      TF_VAR_region: us-chicago-1
       TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
       TF_VAR_vcn_ocid: ${{ secrets.OCI_VCN_OCID }}
       TF_VAR_private_subnet_ocid: ${{ secrets.OCI_PRIVATE_SUBNET_OCID }}
       TF_VAR_image_ocid: ${{ secrets.OCI_STAGING_IMAGE_OCID }}
-      TF_VAR_admin_ingress_cidrs: ${{ secrets.OCI_ADMIN_INGRESS_CIDRS_JSON || '[]' }}
-      TF_VAR_app_ingress_cidrs: ${{ secrets.OCI_APP_INGRESS_CIDRS_JSON || '[]' }}
       TF_VAR_ssh_authorized_keys: ${{ secrets.OCI_STAGING_SSH_PUBLIC_KEYS }}
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +68,8 @@ jobs:
             echo "Configure these in the protected oci-staging environment before running a plan."
             exit 1
           fi
+          printf 'TF_VAR_admin_ingress_cidrs=%s\n' "$ADMIN_CIDRS" >> "$GITHUB_ENV"
+          printf 'TF_VAR_app_ingress_cidrs=%s\n' "$APP_CIDRS" >> "$GITHUB_ENV"
           install -d -m 0700 "$(dirname "$OCI_CONFIG_FILE")"
           key_path="$(dirname "$OCI_CONFIG_FILE")/oci_api_key.pem"
           printf '%s\n' "$OCI_PRIVATE_KEY" > "$key_path"
@@ -93,7 +80,7 @@ jobs:
           tenancy=$OCI_TENANCY
           fingerprint=$OCI_FINGERPRINT
           key_file=$key_path
-          region=${{ inputs.region }}
+          region=us-chicago-1
           EOF
           chmod 0600 "$OCI_CONFIG_FILE"
           openssl pkey -in "$key_path" -check -noout >/dev/null
