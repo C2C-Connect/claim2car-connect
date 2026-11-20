@@ -72,7 +72,13 @@ Create the OCIR repository first and ensure the registry user has only the neede
 
 The image publish workflow is verified by the OCI infrastructure validation job. Publishing alone does not satisfy the staging deployment gates.
 
-## 8. Terraform remote state (required before any apply)
+## 8. State bucket bootstrap (implemented; not executed)
+
+The manual workflow `Bootstrap private OCI Terraform state bucket (manual)` creates the state bucket if absent, or ensures versioning and visibility are configured if it already exists. It is restricted to `main` with `confirm_bootstrap=yes` and the `oci-staging` environment. The workflow verifies the resulting bucket reports `versioning=Enabled` and `public-access-type=NoPublicAccess`.
+
+It requires `OCI_STATE_BUCKET`, `OCI_STATE_NAMESPACE`, `OCI_REGION`, and the OCI API credentials plus `OCI_COMPARTMENT_OCID` in the `oci-staging` environment. It does not create IAM policies or run Terraform. Before dispatch, grant the automation identity bucket creation and bucket/object inspection/update permissions in the selected compartment. Versioning has a storage cost; state artifacts are expected to remain small. The bucket has not been created from this session.
+
+## 9. Terraform remote state (required before any apply)
 
 The OCI staging stack uses Terraform's native OCI Object Storage backend. Create a dedicated state bucket in the same tenancy before running the plan workflow. Enable bucket versioning, restrict the bucket to the automation identity, and grant only the object permissions needed to read/write state and lock objects. The backend uses state locking; state files may contain sensitive resource data.
 
@@ -87,13 +93,13 @@ The fixed state key is `claim2car/oci-staging.tfstate`. The plan workflow initia
 
 References: [Terraform OCI backend](https://developer.hashicorp.com/terraform/language/backend/oci) and [Oracle Object Storage state guidance](https://docs.oracle.com/en-us/iaas/Content/dev/terraform/object-storage-state.htm).
 
-## 9. Guarded infrastructure apply (implemented; not executed)
+## 10. Guarded infrastructure apply (implemented; not executed)
 
 The manual `OCI staging apply (manual, guarded)` workflow requires dispatch from `main` with `confirm_apply=yes`. It creates a plan, rejects any delete/replace actions, uploads the exact saved plan for one day, and only then reaches the `oci-staging-apply` environment gate. The apply job uses that saved plan—not a newly generated plan—and runs `terraform apply tfplan`. The workflow contains no destroy operation.
 
 Configure the `oci-staging-apply` environment with the same required OCI credentials, Terraform variables, and state-bucket variables as `oci-staging`. Set required reviewers/environment protection there before enabling apply. The plan job also requires the `oci-staging` environment values. The saved plan artifact is sensitive and must be reviewed before approval. Confirm the plan is only for the approved private network, A1 Flex candidate, and bounded 200 GB aggregate volumes. Account eligibility/capacity and actual OCI pricing remain an owner-side check. No apply has been dispatched from this session.
 
-## 10. Outstanding prerequisites
+## 11. Outstanding prerequisites
 
 - Confirm exact compartment, VCN, subnet, image, and OCIDs inside OCI.
 - Confirm Always Free compute and block-volume capacity in the selected region; otherwise obtain explicit cost approval.
