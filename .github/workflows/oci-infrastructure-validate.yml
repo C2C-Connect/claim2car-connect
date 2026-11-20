@@ -56,6 +56,7 @@ jobs:
           assert "refs/heads/main" in publish_job["if"] and "confirm_publish == 'yes'" in publish_job["if"]
           publish_steps = publish_job["steps"]
           assert any(step.get("id") == "validate" and "GITHUB_OUTPUT" in step.get("run", "") for step in publish_steps)
+          assert any(step.get("uses", "").startswith("docker/setup-qemu-action@") for step in publish_steps), "ARM64 build must configure emulation"
           assert any(step.get("uses", "").startswith("docker/login-action@") for step in publish_steps)
           builder = next(step for step in publish_steps if step.get("uses", "").startswith("docker/build-push-action@"))
           assert builder["with"]["file"] == "Dockerfile.integrated" and builder["with"]["platforms"] == "linux/arm64" and builder["with"]["push"] is True
