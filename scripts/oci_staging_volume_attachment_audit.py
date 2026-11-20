@@ -20,7 +20,7 @@ def audit(payload,instance_id,postgres_id,evidence_id):
         if row.get("lifecycleState")!="ATTACHED": raise AuditError("VOLUME_NOT_ATTACHED:"+purpose)
         if row.get("attachmentType")!="paravirtualized": raise AuditError("ATTACHMENT_TYPE_INVALID:"+purpose)
         device=row.get("device")
-        if not isinstance(device,str) or not re.fullmatch(r"/dev/[A-Za-z0-9._/-]+",device): raise AuditError("DEVICE_PATH_INVALID:"+purpose)
+        if not isinstance(device,str) or not re.fullmatch(r"/dev/[A-Za-z0-9._/-]+",device) or ".." in device.split("/"): raise AuditError("DEVICE_PATH_INVALID:"+purpose)
         if device in devices: raise AuditError("DEVICE_COLLISION:"+purpose)
         devices.add(device); result[purpose]={"volume_ocid":vol,"device":device,"lifecycle_state":row["lifecycleState"],"attachment_type":row["attachmentType"]}
     return {"instance_ocid":instance_id,"attachments":result,"control_plane_verified":True,"guest_device_probe_performed":False}
