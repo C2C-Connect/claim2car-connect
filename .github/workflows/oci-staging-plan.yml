@@ -33,8 +33,8 @@ jobs:
       TF_VAR_vcn_ocid: ${{ secrets.OCI_VCN_OCID }}
       TF_VAR_private_subnet_ocid: ${{ secrets.OCI_PRIVATE_SUBNET_OCID }}
       TF_VAR_image_ocid: ${{ secrets.OCI_STAGING_IMAGE_OCID }}
-      TF_VAR_admin_ingress_cidrs: ${{ secrets.OCI_ADMIN_INGRESS_CIDRS_JSON }}
-      TF_VAR_app_ingress_cidrs: ${{ secrets.OCI_APP_INGRESS_CIDRS_JSON }}
+      TF_VAR_admin_ingress_cidrs: ${{ secrets.OCI_ADMIN_INGRESS_CIDRS_JSON || '[]' }}
+      TF_VAR_app_ingress_cidrs: ${{ secrets.OCI_APP_INGRESS_CIDRS_JSON || '[]' }}
       TF_VAR_ssh_authorized_keys: ${{ secrets.OCI_STAGING_SSH_PUBLIC_KEYS }}
     steps:
       - uses: actions/checkout@v4
@@ -119,7 +119,7 @@ jobs:
               create: ([.[] | select(. == ["create"])] | length),
               update: ([.[] | select(. == ["update"])] | length),
               delete: ([.[] | select(any(.[]; . == "delete"))] | length),
-              replace: ([.[] | select(length == 2 and (contains(["delete"]) or contains(["create"]))] | length)
+              replace: ([.[] | select(length == 2 and (index("delete") != null and index("create") != null))] | length)
             }' tfplan.json)"
           echo "$summary" | tee "$GITHUB_STEP_SUMMARY"
           if jq -e '.delete > 0 or .replace > 0' <<<"$summary" >/dev/null; then
