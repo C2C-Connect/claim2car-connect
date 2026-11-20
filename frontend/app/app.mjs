@@ -19,7 +19,7 @@ const API_CAPTURE_SLOTS = [
   ["14_physical_vin", "Physical VIN plate"],
   ["15_license_and_insurance_docs", "License / insurance documentation"]
 ];
-const state = { token:null, role:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, artifacts:new Map(), previews:new Map() };
+const state = { token:null, role:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, artifacts:new Map(), previews:new Map() };
 const byId = (id) => document.getElementById(id);
 const show = (id, visible=true) => { byId(id).hidden = !visible; };
 const message = (id, value, isError=false) => {
@@ -50,7 +50,7 @@ function setConnected(role){
   if(role==="reviewer")refreshQueue();
 }
 function disconnect(){
-  state.token=null;state.role=null;state.sessionId=null;state.consentRecorded=false;
+  state.token=null;state.role=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;
   state.vehicleRecorded=false;state.sealed=false;state.artifacts.clear();
   state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
   byId("access-token").value="";byId("owner-token").value="";byId("vin-input").value="";
@@ -70,10 +70,16 @@ byId("disconnect-button").addEventListener("click",disconnect);
 byId("create-case").addEventListener("click",async()=>{
   byId("create-case").disabled=true;
   try{
-    const sessionId=uuid();
-    await api("/v1/capture-sessions",state.token,{method:"POST",body:JSON.stringify({session_id:sessionId})});
-    state.sessionId=sessionId;byId("case-id").textContent="CASE ID  "+sessionId;show("case-id");
-    show("consent-panel");message("consent-status","Case created. Owner consent is required before vehicle identification or evidence capture.");
+    const claimId=uuid();
+    const created=await api("/v1/claim-cases",state.token,{method:"POST",body:JSON.stringify({
+      claim_id:claimId,request_id:uuid(),capture_protocol_version:"claims2car-16-v1"
+    })});
+    if(!created||created.claim_id!==claimId||typeof created.capture_session_id!=="string"||!created.capture_session_id){
+      throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
+    }
+    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;
+    byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
+    show("consent-panel");message("consent-status","Persistent claim case created using the 16-view capture protocol. Owner consent is required before vehicle identification or evidence capture.");
   }catch(error){message("case-status",error.message,true);}
   finally{byId("create-case").disabled=false;}
 });
