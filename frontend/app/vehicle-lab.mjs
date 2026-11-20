@@ -209,7 +209,7 @@ function renderPhotoSlots() {
     });
     const existingPhoto = state.photos.get(slot);
     if (existingPhoto?.uploaded) {
-      quality.disabled = false;
+      quality.disabled = state.capturePaused;
       quality.value = state.qualities.get(slot) || "";
       preview.src = existingPhoto.url;
       preview.hidden = false;
