@@ -80,7 +80,7 @@ It requires `OCI_STATE_BUCKET`, `OCI_STATE_NAMESPACE`, `OCI_REGION`, and the OCI
 
 ## 9. Terraform remote state (required before any apply)
 
-The OCI staging stack uses Terraform's native OCI Object Storage backend. Create a dedicated state bucket in the same tenancy before running the plan workflow. Enable bucket versioning, restrict the bucket to the automation identity, and grant only the object permissions needed to read/write state and lock objects. The backend uses state locking; state files may contain sensitive resource data.
+The OCI staging stack uses Terraform's native OCI Object Storage backend. Run the state-bucket bootstrap workflow first to create the bucket; then restrict it to the automation identity and grant only the object permissions needed to read/write state and lock objects. The backend uses state locking; state files may contain sensitive resource data.
 
 Set these variables in the protected `oci-staging` GitHub environment:
 
