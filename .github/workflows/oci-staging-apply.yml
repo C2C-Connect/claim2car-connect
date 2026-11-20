@@ -133,7 +133,7 @@ jobs:
             echo "## Staging plan approved for review"
             echo
             echo "The saved plan contains only create/update actions. The plan artifact is sensitive and expires after one day."
-            echo "The apply job is gated by the `oci-staging-apply` environment's required reviewers."
+            echo "The apply job requires configured reviewers in the oci-staging environment."
           } >> "${GITHUB_STEP_SUMMARY}"
       - name: Upload exact saved plan (sensitive; 1-day retention)
         uses: actions/upload-artifact@v4
