@@ -72,7 +72,7 @@ Create the OCIR repository first and ensure the registry user has only the neede
 
 The image publish workflow is verified by the OCI infrastructure validation job. Publishing alone does not satisfy the staging deployment gates.
 
-## Terraform remote state (required before any apply)
+## 8. Terraform remote state (required before any apply)
 
 The OCI staging stack uses Terraform's native OCI Object Storage backend. Create a dedicated state bucket in the same tenancy before running the plan workflow. Enable bucket versioning, restrict the bucket to the automation identity, and grant only the object permissions needed to read/write state and lock objects. The backend uses state locking; state files may contain sensitive resource data.
 
