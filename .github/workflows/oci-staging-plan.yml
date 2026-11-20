@@ -44,9 +44,8 @@ jobs:
           STATE_NAMESPACE: ${{ vars.OCI_STATE_NAMESPACE }}
         run: |
           set -euo pipefail
-          OCI_CONFIG_FILE="$RUNNER_TEMP/oci-config"
-          export OCI_CONFIG_FILE
-          echo "OCI_CONFIG_FILE=$OCI_CONFIG_FILE" >> "$GITHUB_ENV"
+          config_path="$HOME/.oci/config"
+          key_path="$RUNNER_TEMP/oci_api_key.pem"
           missing=()
           for name in OCI_USER OCI_TENANCY OCI_FINGERPRINT OCI_PRIVATE_KEY COMPARTMENT VCN SUBNET IMAGE STATE_BUCKET STATE_NAMESPACE; do
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
@@ -76,11 +75,10 @@ jobs:
           fi
           printf 'TF_VAR_admin_ingress_cidrs=%s\n' "$ADMIN_CIDRS" >> "$GITHUB_ENV"
           printf 'TF_VAR_app_ingress_cidrs=%s\n' "$APP_CIDRS" >> "$GITHUB_ENV"
-          install -d -m 0700 "$(dirname "$OCI_CONFIG_FILE")"
-          key_path="$(dirname "$OCI_CONFIG_FILE")/oci_api_key.pem"
+          install -d -m 0700 "$HOME/.oci"
           printf '%s\n' "$OCI_PRIVATE_KEY" > "$key_path"
           chmod 0600 "$key_path"
-          cat > "$OCI_CONFIG_FILE" <<EOF
+          cat > "$config_path" <<EOF
           [DEFAULT]
           user=$OCI_USER
           tenancy=$OCI_TENANCY
@@ -88,7 +86,7 @@ jobs:
           key_file=$key_path
           region=us-chicago-1
           EOF
-          chmod 0600 "$OCI_CONFIG_FILE"
+          chmod 0600 "$config_path"
           openssl pkey -in "$key_path" -check -noout >/dev/null
           echo "OCI credentials and cost/network guard inputs validated (values redacted)."
       - name: Initialize OCI remote state backend
