@@ -140,6 +140,9 @@ jobs:
                   raise SystemExit(checked.stderr)
           print("PASS: manual dispatch only, plan-only boundary, destructive guard, read-only attachment audit, and shell syntax")
           PY
+      - name: Run read-only OCI volume identity audit unit tests
+        working-directory: ${{ github.workspace }}
+        run: python -m unittest discover -s tests/api -p 'test_oci_staging_volume_attachment_audit.py' -v
       - name: Check Terraform formatting across OCI stacks
         working-directory: infra/oci
         run: terraform fmt -diff -check -recursive
