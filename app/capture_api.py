@@ -612,7 +612,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                     localization["image"]["persisted"] = True
                 except (binascii.Error, PhotoBaselineError) as error:
                     code = error.code if isinstance(error, PhotoBaselineError) else "INVALID_ARTIFACT_ENCODING"
-                    localization = {"status": "UNAVAILABLE", "code": code, "model_status": "BASELINE_NOT_AI", "image": {"sha256": body.sha256_hex, "byte_length": result.get("byte_length", 0), "persisted": True}}
+                    localization = {"status": "UNAVAILABLE", "code": code, "model_status": "BASELINE_NOT_AI", "image": {"sha256": body.sha256, "byte_length": result.get("byte_length", 0), "persisted": True}}
             result["localization"] = localization
             return JSONResponse(jsonable_encoder(result), headers=dict(NO_STORE_HEADERS))
 
