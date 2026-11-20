@@ -1,0 +1,84 @@
+name: OCI staging volume attachment identity audit (manual, read-only)
+on:
+  workflow_dispatch:
+    inputs:
+      instance_ocid:
+        description: Existing staging instance OCID
+        type: string
+        required: true
+      postgres_volume_ocid:
+        description: Dedicated PostgreSQL data volume OCID
+        type: string
+        required: true
+      evidence_volume_ocid:
+        description: Dedicated original-evidence volume OCID
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  audit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: oci-staging
+    env:
+      OCI_REGION: ${{ vars.OCI_REGION || 'us-chicago-1' }}
+      INSTANCE_OCID: ${{ inputs.instance_ocid }}
+      POSTGRES_VOLUME_OCID: ${{ inputs.postgres_volume_ocid }}
+      EVIDENCE_VOLUME_OCID: ${{ inputs.evidence_volume_ocid }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install OCI CLI pinned
+        run: python -m pip install --quiet oci-cli==3.96.3
+      - name: Configure ephemeral API credentials and validate identifiers
+        env:
+          OCI_USER: ${{ secrets.OCI_USER_OCID }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_API_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in OCI_USER OCI_TENANCY OCI_FINGERPRINT OCI_PRIVATE_KEY INSTANCE_OCID POSTGRES_VOLUME_OCID EVIDENCE_VOLUME_OCID; do
+            [[ -n "${!name}" ]] || { echo "Missing required audit input: ${name}"; exit 1; }
+          done
+          [[ "${INSTANCE_OCID}" =~ ^ocid1\.instance\. ]] || { echo "Invalid instance OCID"; exit 1; }
+          [[ "${POSTGRES_VOLUME_OCID}" =~ ^ocid1\.volume\. ]] || { echo "Invalid PostgreSQL volume OCID"; exit 1; }
+          [[ "${EVIDENCE_VOLUME_OCID}" =~ ^ocid1\.volume\. ]] || { echo "Invalid evidence volume OCID"; exit 1; }
+          [[ "${POSTGRES_VOLUME_OCID}" != "${EVIDENCE_VOLUME_OCID}" ]] || { echo "Volumes must be distinct"; exit 1; }
+          install -d -m 0700 "${HOME}/.oci"
+          key="${RUNNER_TEMP}/oci_api_key.pem"
+          printf '%s\n' "${OCI_PRIVATE_KEY}" > "${key}"
+          chmod 0600 "${key}"
+          cat > "${HOME}/.oci/config" <<EOF
+          [DEFAULT]
+          user=${OCI_USER}
+          tenancy=${OCI_TENANCY}
+          fingerprint=${OCI_FINGERPRINT}
+          key_file=${key}
+          region=${OCI_REGION}
+          EOF
+          chmod 0600 "${HOME}/.oci/config"
+          openssl pkey -in "${key}" -check -noout >/dev/null
+      - name: Verify instance is running
+        run: |
+          set -euo pipefail
+          oci compute instance get --instance-id "${INSTANCE_OCID}" --config-file "${HOME}/.oci/config" --profile DEFAULT --output json > "${RUNNER_TEMP}/instance.json"
+          jq -e '.data["lifecycle-state"] == "RUNNING" and .data.shape != null' "${RUNNER_TEMP}/instance.json" >/dev/null
+      - name: Audit exact volume attachments (read-only)
+        run: |
+          set -euo pipefail
+          oci compute volume-attachment list --instance-id "${INSTANCE_OCID}" --all --config-file "${HOME}/.oci/config" --profile DEFAULT --output json > "${RUNNER_TEMP}/attachments.json"
+          python scripts/oci_staging_volume_attachment_audit.py --input "${RUNNER_TEMP}/attachments.json" --instance-id "${INSTANCE_OCID}" --postgres-volume-id "${POSTGRES_VOLUME_OCID}" --evidence-volume-id "${EVIDENCE_VOLUME_OCID}" | tee "${RUNNER_TEMP}/audit.json"
+          {
+            echo "## OCI volume identity audit passed"
+            echo "- Instance lifecycle: RUNNING"
+            echo "- Both exact volume OCIDs: uniquely ATTACHED using paravirtualized attachments"
+            echo "- Device paths: distinct"
+            echo "- Scope: control-plane metadata only; no guest device probing, filesystem inspection, writes, formatting, mounting, or infrastructure mutation"
+          } >> "${GITHUB_STEP_SUMMARY}"
