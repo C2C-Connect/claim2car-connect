@@ -116,6 +116,15 @@ async function refreshEvidenceReadiness() {
   updateSealAvailability();
   return readiness;
 }
+function localizationStatus(localization) {
+  if (localization?.analysis?.status === "COMPLETED") {
+    const count = localization.analysis.observations?.length || 0;
+    return "Contrast baseline: " + count + " candidate region(s) · heuristic, not AI";
+  }
+  if (localization?.status === "UNAVAILABLE") return "Contrast baseline unavailable · " + (localization.code || "unknown error");
+  if (localization?.status === "NOT_APPLICABLE") return "Localization not applicable to this view";
+  return "Localization not run";
+}
 function renderPhotoSlots() {
   const grid = $("photo-grid");
   grid.replaceChildren();
@@ -205,15 +214,16 @@ function renderPhotoSlots() {
       input.disabled = true; stateText.textContent = "Hashing and uploading original bytes…"; stateText.classList.remove("error");
       try {
         const buffer = await file.arrayBuffer(), digest = await sha256Hex(buffer), artifactId = uuid();
-        await captureApi("/v1/capture-sessions/" + state.sessionId + "/artifacts", state.captureToken, {
+        const uploadResponse = await captureApi("/v1/capture-sessions/" + state.sessionId + "/artifacts", state.captureToken, {
           method:"POST", body:JSON.stringify({request_id:uuid(),artifact_id:artifactId,slot,payload_base64:bytesToBase64(new Uint8Array(buffer)),sha256:digest})
         });
+        const localization = uploadResponse?.localization || null;
         const old = state.photos.get(slot); if (old?.url) URL.revokeObjectURL(old.url);
         const url = URL.createObjectURL(file);
-        state.photos.set(slot,{file,url,label,artifactId,sha256:digest,uploaded:true,byteLength:file.size});
+        state.photos.set(slot,{file,url,label,artifactId,sha256:digest,uploaded:true,byteLength:file.size,localization});
         state.qualities.delete(slot); quality.disabled = false; quality.value = "";
         preview.src = url; preview.hidden = false;
-        stateText.textContent = "Original uploaded · " + file.size.toLocaleString() + " bytes · SHA-256 verified";
+        stateText.textContent = "Original uploaded · " + file.size.toLocaleString() + " bytes · SHA-256 verified" + (localization ? " · " + localizationStatus(localization) : "");
         updateReportAvailability(); syncPhotoSelect(); updateSealAvailability();
         await refreshEvidenceReadiness();
       } catch (error) {
@@ -227,7 +237,7 @@ function renderPhotoSlots() {
       quality.value = state.qualities.get(slot) || "";
       preview.src = existingPhoto.url;
       preview.hidden = false;
-      stateText.textContent = "Original uploaded · " + existingPhoto.byteLength.toLocaleString() + " bytes · SHA-256 verified";
+      stateText.textContent = "Original uploaded · " + existingPhoto.byteLength.toLocaleString() + " bytes · SHA-256 verified" + (existingPhoto.localization ? " · " + localizationStatus(existingPhoto.localization) : "");
     }
     input.disabled = state.capturePaused || state.sealed;
     card.append(title,input,quality,exceptionControls,stateText,preview);
@@ -569,6 +579,27 @@ function reportHtml() {
   const images = [...state.photos.values()].map(x =>
     "<div><strong>" + escapeHtml(x.label) + "</strong><br><img src='" + x.url + "' alt='" + escapeHtml(x.label) + "'></div>"
   ).join("");
+  const localizationRows = [...state.photos.values()].map(photo => {
+    const loc = photo.localization || {};
+    const analysis = loc.analysis || {};
+    let detail = "No localization result returned.";
+    if (analysis.status === "COMPLETED") {
+      const candidates = analysis.observations || [];
+      detail = candidates.length ? candidates.map((candidate, i) => {
+        const box = candidate.bbox_normalized || [];
+        const bounds = box.length === 4 ? " · normalized bounds " + box.map(v => Number(v).toFixed(3)).join(", ") : "";
+        return "<li>Candidate " + (i+1) + ": " + escapeHtml(candidate.predicted_damage_class || "unknown") +
+          " · zone " + escapeHtml(candidate.zone || "unknown") +
+          " · image area " + (Number(candidate.normalized_region_area_fraction || 0)*100).toFixed(2) + "%" +
+          " · raw score " + Number(candidate.raw_detector_score || 0).toFixed(3) + " (uncalibrated)" + escapeHtml(bounds) + "</li>";
+      }).join("") : "<li>No contrast candidates returned. This is not evidence that the view is damage-free.</li>";
+      detail = "<ul>" + detail + "</ul><p>Method: " + escapeHtml(analysis.method || "baseline") + " · Version: " + escapeHtml(analysis.model_version || "unknown") + "</p>";
+    } else if (loc.status === "NOT_APPLICABLE") detail = "Not an exterior view; localization not applicable.";
+    else if (loc.status === "UNAVAILABLE") detail = "Unavailable: " + escapeHtml(loc.code || "unknown error") + ". Original upload remains registered.";
+    return "<li><strong>" + escapeHtml(photo.label) + "</strong> · " + escapeHtml(localizationStatus(loc)) +
+      (photo.sha256 ? "<br>Original SHA-256: " + escapeHtml(photo.sha256) : "") + "<br>" + detail + "</li>";
+  }).join("");
+  const localizationHtml = "<h3>2.1 Image-space contrast baseline (not AI)</h3><p>These are heuristic image-space candidates, not confirmed damage. Detector scores are uncalibrated; normalized boxes and area are image-relative, not physical measurements. A zero-candidate result does not establish absence of damage.</p><ul>" + (localizationRows || "<li>No localization responses recorded.</li>") + "</ul>";
   const estimate = estimateTotals();
   const estimateRows = state.observations.map((x,i) => {
     const e=x.estimate||{}, subtotal=estimateLineSubtotal(e,estimate.rate);
@@ -576,14 +607,14 @@ function reportHtml() {
   }).join("");
   const estimateHtml = "<h3>4. Preliminary repair-cost worksheet (operator-entered)</h3><p>Labor rate: $" + estimate.rate.toFixed(2) + "/hour · Tax rate: " + estimate.taxRate.toFixed(2) + "% · These values are user-entered assumptions, not an AI appraisal or verified shop quote.</p><table><thead><tr><th>Observed item</th><th>Action</th><th>Hours</th><th>Parts</th><th>Materials / sublet</th><th>Subtotal</th></tr></thead><tbody>" + (estimateRows || "<tr><td colspan='6'>No worksheet line items.</td></tr>") + "</tbody><tfoot><tr><th colspan='5'>Labor</th><td>$" + estimate.labor.toFixed(2) + "</td></tr><tr><th colspan='5'>Parts</th><td>$" + estimate.parts.toFixed(2) + "</td></tr><tr><th colspan='5'>Materials / sublet</th><td>$" + estimate.materials.toFixed(2) + "</td></tr><tr><th colspan='5'>Subtotal</th><td>$" + estimate.subtotal.toFixed(2) + "</td></tr><tr><th colspan='5'>Tax (operator-selected)</th><td>$" + estimate.tax.toFixed(2) + "</td></tr><tr><th colspan='5'>Worksheet total</th><td><strong>$" + estimate.total.toFixed(2) + "</strong></td></tr></tfoot></table><p>Excluded unless explicitly entered: hidden damage, diagnostics, ADAS calibration, towing, storage, supplements, fees, and insurer-specific pricing. This worksheet does not establish repairability, safety, total-loss status, or authorization.</p>";
   return "<h2>Claim2Car Vehicle &amp; Condition Report</h2><p>Prototype report · Generated " + escapeHtml(now()) + " · VIN decoded " + escapeHtml(state.retrievedAt ? new Date(state.retrievedAt).toLocaleString() : "time unavailable") +
-    "</p><p class='report-warning'><strong>Scope limitation:</strong> This is a documentation prototype, not an appraisal, insurance decision, ownership verification, roadworthiness inspection, or professional repair estimate. Damage observations were entered by the operator. No automated damage assessment or repair-cost model ran.</p>" +
+    "</p><p class='report-warning'><strong>Scope limitation:</strong> This is a documentation prototype, not an appraisal, insurance decision, ownership verification, roadworthiness inspection, or professional repair estimate. Damage observations were entered by the operator. A deterministic contrast baseline may identify image-space candidates; no trained AI damage assessment or automated repair-cost model ran.</p>" +
     "<h3>1. Vehicle identity</h3><p>Source: NHTSA vPIC. VIN check digit status: " + escapeHtml(p.checkDigitStatus) + ". A mismatch override is not proof of VIN authenticity or vehicle identity.</p><table>" + table + "</table>" +
     "<h3>2. Capture completeness</h3><p>" + [...state.photos.values()].filter(x => x.uploaded).length + " of 16 original views uploaded to the authenticated evidence service. Session: " + escapeHtml(state.sessionId || "not connected") + ".</p>" + (state.sealed ? "<p><strong>Sealed manifest SHA-256:</strong> " + escapeHtml(state.manifestDigest) + "</p>" : "<p><strong>Evidence status:</strong> Not sealed.</p>") + "<p>Views not captured: " +
-    (missing.length ? missing.map(escapeHtml).join(", ") : "None") + ". Missing views are unknown, not evidence of no damage.</p><div class='report-images'>" + images + "</div>" +
+    (missing.length ? missing.map(escapeHtml).join(", ") : "None") + ". Missing views are unknown, not evidence of no damage.</p><div class='report-images'>" + images + "</div>" + localizationHtml +
     "<h3>3. Visible condition observations</h3><ul>" + observations + "</ul>" +
     estimateHtml + "<h3>5. Unresolved questions</h3><ul><li>Concealed structure and components have not been assessed.</li><li>No collision causation, fault, liability, coverage, total-loss status, repair scope, or repair price is determined.</li><li>Severity labels are qualitative operator judgments, not calibrated probabilities or verified engineering classifications.</li><li>Qualified physical inspection and diagnostic procedures may be required.</li></ul>" +
     "<h3>6. Disposition</h3><p><strong>LIMITED DOCUMENTATION ONLY — NOT ADJUDICATED.</strong> This report is not clearance to drive or repair authorization.</p>" +
-    "<p>Method: server-recorded NHTSA vPIC vehicle description; user-provided photographs and observations. " + (state.sealed ? "Original evidence bytes are stored and the 16-view manifest is sealed." : "Evidence remains unsealed; no final evidence package is asserted.") + " No automated damage model was used.</p>";
+    "<p>Method: server-recorded NHTSA vPIC vehicle description; user-provided photographs and observations. " + (state.sealed ? "Original evidence bytes are stored and the 16-view manifest is sealed." : "Evidence remains unsealed; no final evidence package is asserted.") + " No trained AI damage model or automated appraisal was used; exterior photos may have received a heuristic contrast baseline.</p>";
 }
 $("generate-report").addEventListener("click",() => {
   if (!state.profile) {
