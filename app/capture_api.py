@@ -8,6 +8,8 @@ end-user sign-in; actor roles come from private config.
 """
 from dataclasses import asdict, dataclass, field
 import json
+import base64
+import binascii
 import os
 from pathlib import Path
 from typing import NoReturn
@@ -36,6 +38,8 @@ from app.artifact_storage import (
 )
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
+from app.damage_localization import zone_for_slot
+from backend.app.vision.photo_baseline import PhotoBaselineError, analyze_photo_bytes
 from app.vehicle_intelligence.vpic import VpicClient
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
@@ -587,11 +591,29 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
 
         @api.post('/v1/capture-sessions/{session_id}/artifacts')
         def register_artifact(session_id: UUID, body: EvidenceArtifactRequest, authorization: str = Depends(authorize)):
-            return invoke_evidence(
+            registered = invoke_evidence(
                 evidence.register_artifact, authorization, session_id, request_id=body.request_id,
                 artifact_id=body.artifact_id, slot=body.slot, payload_base64=body.payload_base64,
                 sha256_hex=body.sha256,
             )
+            if not isinstance(registered, JSONResponse) or registered.status_code != 200:
+                return registered
+            result = json.loads(registered.body)
+            localization = {"status": "NOT_APPLICABLE", "reason": "capture_slot_not_exterior"}
+            protocol_version = next(
+                (version for version in (DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL)
+                 if body.slot in resolve_capture_protocol(version).slots and zone_for_slot(body.slot, version)),
+                None,
+            )
+            if protocol_version:
+                try:
+                    raw = base64.b64decode(body.payload_base64, validate=True)
+                    localization = analyze_photo_bytes(raw, body.slot, protocol_version)
+                except (binascii.Error, PhotoBaselineError) as error:
+                    code = error.code if isinstance(error, PhotoBaselineError) else "INVALID_ARTIFACT_ENCODING"
+                    localization = {"status": "UNAVAILABLE", "code": code, "model_status": "BASELINE_NOT_AI"}
+            result["localization"] = localization
+            return JSONResponse(jsonable_encoder(result), headers=dict(NO_STORE_HEADERS))
 
         @api.post('/v1/capture-sessions/{session_id}/exceptions')
         def record_capture_exception(session_id: UUID, body: CaptureExceptionRequest, authorization: str = Depends(authorize)):
