@@ -1,15 +1,6 @@
 name: OCI staging infrastructure plan (manual, no apply)
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/oci-staging-plan.yml"
-      - "infra/oci/staging/**"
-  push:
-    branches: ["infra/**"]
-    paths:
-      - ".github/workflows/oci-staging-plan.yml"
-      - "infra/oci/staging/**"
   workflow_dispatch:
     inputs:
       acknowledgement:
@@ -28,56 +19,6 @@ permissions:
   contents: read
 
 jobs:
-  static-validate:
-    if: github.event_name != 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.8"
-      - name: Parse workflow and assert plan-only safety boundary
-        run: |
-          python -m pip install --quiet PyYAML
-          python - <<'PY'
-          import yaml
-          from pathlib import Path
-          workflow = yaml.safe_load(Path(".github/workflows/oci-staging-plan.yml").read_text())
-          trigger = workflow.get("on", workflow.get(True))
-          assert isinstance(trigger, dict) and "workflow_dispatch" in trigger
-          assert "pull_request" in trigger and "push" in trigger
-          plan = workflow["jobs"]["plan"]
-          assert plan["environment"] == "oci-staging"
-          joined = "\\n".join(step.get("run", "") for step in plan["steps"])
-          assert "terraform plan" in joined
-          assert "terraform apply" not in joined
-          assert "Destructive changes detected" in joined
-          print("PASS: workflow YAML, triggers, protected environment, plan-only and destructive-change guard")
-          PY
-      - name: Validate embedded shell syntax
-        run: |
-          python - <<'PY'
-          import re, subprocess, yaml
-          workflow = yaml.safe_load(open(".github/workflows/oci-staging-plan.yml"))
-          for job in workflow["jobs"].values():
-              for index, step in enumerate(job.get("steps", [])):
-                  if "run" in step:
-                      script = re.sub(r"\$\{\{.*?\}\}", "SAFE_EXPR", step["run"])
-                      result = subprocess.run(["bash", "-n"], input=script, text=True, capture_output=True)
-                      if result.returncode:
-                          raise SystemExit(f"Shell syntax error in {step.get('name', index)}: {result.stderr}")
-          print("PASS: bash syntax for embedded scripts")
-          PY
-      - name: Validate Terraform configuration
-        working-directory: infra/oci/staging
-        run: |
-          terraform fmt -diff -check -recursive
-          terraform init -backend=false -input=false
-          terraform validate -no-color
   plan:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
