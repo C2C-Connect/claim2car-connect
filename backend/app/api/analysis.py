@@ -1,5 +1,7 @@
 """
 Analysis API routes — Layer 2.
+The /run endpoint currently accepts metadata only and feeds synthetic image
+bytes into deterministic stub adapters. It is not a real vehicle appraisal.
 """
 
 from __future__ import annotations
@@ -36,7 +38,7 @@ class AnalyzeRequest(BaseModel):
     session_id: str
     mass_kg: float = Field(..., ge=500, le=5000)
     velocity_kph: float = Field(..., ge=0, le=250)
-    # base64 images optional in M3; empty list runs physics + stub vision
+    # No image upload is supported by this endpoint; photo_count is only a placeholder.
     photo_count: int = Field(default=1, ge=0, le=32)
     zone_hints: Optional[List[str]] = None
     materials: Optional[List[str]] = None
@@ -55,6 +57,10 @@ def analysis_health() -> Dict[str, Any]:
         },
         "adapters": ["damage_gate", "yolov11", "sam2", "depth_anything_v2", "cognitive_lmm"],
         "mode": "stub_models_physics_primary",
+        "model_status": "STUBS_ONLY",
+        "model_outputs_are_real_inference": False,
+        "advisory_only": True,
+        "vehicle_images_supported": False,
     }
 
 
@@ -95,16 +101,18 @@ def physics_only(body: PhysicsOnlyRequest) -> Dict[str, Any]:
         "overrides_applied": result.overrides_applied,
         "zones": result.zones,
         "formula_version": result.formula_version,
+        "advisory_only": True,
+        "not_a_vehicle_appraisal": True,
     }
 
 
 @router.post("/run", dependencies=[Depends(require_internal_service)])
 def run_analysis(body: AnalyzeRequest) -> Dict[str, Any]:
     """
-    Full Layer 2 pipeline with stub vision models.
-    Photos are synthetic placeholders when not provided (M3).
+    Demonstration-only Layer 2 pipeline. It does not ingest photos.
+    Synthetic byte strings are fed to deterministic stub adapters.
     """
-    photos = [f"photo-{i}-{body.session_id}".encode() for i in range(max(1, body.photo_count))]
+    photos = [f"synthetic-placeholder-{i}-{body.session_id}".encode() for i in range(max(1, body.photo_count))]
     try:
         result = _pipeline.run(
             AnalysisRequest(
@@ -125,9 +133,18 @@ def run_analysis(body: AnalyzeRequest) -> Dict[str, Any]:
     return {
         "session_id": result.session_id,
         "decision": e.decision,
+        "decision_is_simulated": True,
         "p_ensemble": e.p_ensemble,
+        "p_ensemble_is_appraisal_probability": False,
         "p_tl_physics": e.p_tl_physics,
         "p_tl_ai": e.p_tl_ai,
+        "vision_signal_is_synthetic": True,
+        "model_status": result.model_status,
+        "model_outputs_are_real_inference": result.model_outputs_are_real_inference,
+        "advisory_only": result.advisory_only,
+        "not_a_vehicle_appraisal": True,
+        "input_image_mode": "synthetic_placeholders",
+        "vehicle_images_received": False,
         "model_disagreement": e.model_disagreement,
         "entropy_override": e.entropy_override,
         "overrides_applied": e.overrides_applied,
