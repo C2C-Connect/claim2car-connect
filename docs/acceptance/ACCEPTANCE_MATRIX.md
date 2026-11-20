@@ -1,3 +1,14 @@
+## Current Terraform remote-state milestone — PR #85 (2026-11-20)
+
+**Status:** merged to `main`; 14/14 workflow runs successful.
+
+- PR: [#85 — Move OCI staging Terraform plans to persistent remote state](https://github.com/C2C-Connect/claim2car-connect/pull/85)
+- Merge commit: `a527bbe4eeb93ebcbace42f0beb312ac7f97df94`.
+- Terraform now requires 1.12+ and declares the native OCI Object Storage backend.
+- The manual plan workflow requires a pre-created state bucket/namespace, initializes remote state and locking, and remains plan-only with destructive-action rejection.
+- OCI infrastructure validation, Terraform formatting, and backend-free validation passed; full project CI passed on the PR.
+- **No state bucket or OCI infrastructure was created.** The state bucket must be created/versioned and GitHub environment variables configured before the plan/apply workflows can access OCI.
+
 ## Current infrastructure automation milestone — PR #84 (2026-11-20)
 
 **Status:** merged to `main`; CI green on exact PR head.
