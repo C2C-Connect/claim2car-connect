@@ -1,0 +1,86 @@
+name: Publish integrated Claim2Car image to OCIR (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_publish:
+        description: Explicitly confirm publishing an integrated staging image
+        type: choice
+        required: true
+        default: "no"
+        options:
+          - "no"
+          - "yes"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_publish == 'yes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: oci-staging
+    env:
+      OCI_REGION: ${{ vars.OCI_REGION || 'us-chicago-1' }}
+      OCIR_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
+      OCIR_REPOSITORY: ${{ vars.OCIR_REPOSITORY }}
+      OCIR_HOST: ${{ vars.OCI_REGION || 'us-chicago-1' }}.ocir.io
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate protected publish inputs
+        id: validate
+        env:
+          OCIR_USERNAME: ${{ secrets.OCIR_USERNAME }}
+          OCIR_AUTH_TOKEN: ${{ secrets.OCIR_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_REF}" == "refs/heads/main" ]] || { echo "Publishing is allowed only from main."; exit 1; }
+          [[ -n "${OCIR_USERNAME}" && -n "${OCIR_AUTH_TOKEN}" ]] || { echo "Missing OCIR_USERNAME or OCIR_AUTH_TOKEN in the protected oci-staging environment."; exit 1; }
+          [[ "${OCI_REGION}" =~ ^[a-z0-9-]+$ ]] || { echo "Invalid OCI_REGION."; exit 1; }
+          [[ "${OCIR_NAMESPACE}" =~ ^[a-z0-9]+$ ]] || { echo "Invalid OCIR_NAMESPACE."; exit 1; }
+          [[ "${OCIR_REPOSITORY}" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]] || { echo "Invalid OCIR_REPOSITORY path."; exit 1; }
+          [[ -f Dockerfile.integrated ]] || { echo "Dockerfile.integrated is missing."; exit 1; }
+          image="${OCIR_HOST}/${OCIR_NAMESPACE}/${OCIR_REPOSITORY}:sha-${GITHUB_SHA}"
+          echo "image=${image}" >> "${GITHUB_OUTPUT}"
+          echo "Validated protected publish inputs; image tag is immutable commit SHA."
+      - name: Set up ARM64 emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Authenticate to Oracle Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.OCIR_HOST }}
+          username: ${{ secrets.OCIR_USERNAME }}
+          password: ${{ secrets.OCIR_AUTH_TOKEN }}
+      - name: Build and publish ARM64 integrated image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.integrated
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.validate.outputs.image }}
+          provenance: true
+          sbom: true
+      - name: Record immutable image reference
+        env:
+          IMAGE: ${{ steps.validate.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## OCI staging image published"
+            echo
+            echo "- Source commit: ${GITHUB_SHA}"
+            echo "- Image: ${IMAGE}"
+            echo "- Digest: ${DIGEST}"
+            echo "- Platform: linux/arm64"
+            echo "- **Not deployed:** publishing does not change OCI compute or runtime services."
+          } >> "${GITHUB_STEP_SUMMARY}"

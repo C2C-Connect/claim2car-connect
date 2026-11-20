@@ -16,6 +16,8 @@ on:
       - "authority_migrations/**"
       - "frontend/**"
       - ".github/workflows/integrated-container-smoke.yml"
+      - ".github/workflows/oci-integrated-image-publish.yml"
+      - ".github/workflows/oci-infrastructure-validate.yml"
   push:
     branches: [main, "cto/**"]
     paths:
@@ -32,6 +34,8 @@ on:
       - "authority_migrations/**"
       - "frontend/**"
       - ".github/workflows/integrated-container-smoke.yml"
+      - ".github/workflows/oci-integrated-image-publish.yml"
+      - ".github/workflows/oci-infrastructure-validate.yml"
 
 permissions:
   contents: read
@@ -184,6 +188,30 @@ jobs:
               method="POST",
               body={"mass_kg": 1500, "velocity_kph": 30, "zones": []},
           )[0] == 404
+          PY
+
+      - name: Set up ARM64 emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build integrated image for OCI ARM64 without publishing
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/arm64 --file Dockerfile.integrated \
+            --output "type=oci,dest=$RUNNER_TEMP/claim2car-integrated-arm64.tar" .
+          python - <<'PY'
+          import json, tarfile, os
+          archive = os.path.join(os.environ["RUNNER_TEMP"], "claim2car-integrated-arm64.tar")
+          with tarfile.open(archive) as image:
+              index = json.load(image.extractfile("index.json"))
+          manifests = index["manifests"]
+          assert any(m.get("platform", {}).get("architecture") == "arm64"
+                     and m.get("platform", {}).get("os") == "linux" for m in manifests), index
+          print("PASS: integrated runtime builds and exports a linux/arm64 OCI image; image is not published")
           PY
 
       - name: Show container logs on failure
