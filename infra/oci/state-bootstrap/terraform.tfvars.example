@@ -1,0 +1,2 @@
+compartment_ocid = "ocid1.compartment.oc1..REPLACE_WITH_APPROVED_COMPARTMENT_OCID"
+bucket_name      = "claim2car-terraform-state"
