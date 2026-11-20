@@ -298,7 +298,7 @@ class CaptureEvidenceService:
             if current is None:
                 raise CaptureSessionConflict("ACTIVE_CAPTURE_EXCEPTION_REQUIRED")
             artifacts = {item[2].get("slot") for item in history if item[0] == "ARTIFACT_REGISTERED" and type(item[2]) is dict}
-            if slot not in artifacts and resolution_code != "SUPERVISOR_REVIEWED":
+            if resolution_code == "CAPTURED_AFTER_RETRY" and slot not in artifacts:
                 raise CaptureSessionConflict("CAPTURE_ARTIFACT_REQUIRED_TO_RESOLVE_EXCEPTION")
             payload = {"request_id": request_id, "slot": slot, "exception_event_id": current["event_id"],
                        "resolution_code": resolution_code, "explanation": explanation.strip()}
