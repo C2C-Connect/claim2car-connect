@@ -46,6 +46,10 @@ jobs:
           image="${OCIR_HOST}/${OCIR_NAMESPACE}/${OCIR_REPOSITORY}:sha-${GITHUB_SHA}"
           echo "image=${image}" >> "${GITHUB_OUTPUT}"
           echo "Validated protected publish inputs; image tag is immutable commit SHA."
+      - name: Set up ARM64 emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Authenticate to Oracle Container Registry
