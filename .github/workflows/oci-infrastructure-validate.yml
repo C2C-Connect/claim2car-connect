@@ -42,7 +42,7 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum -c
           tar -xzf "$archive" -C "$RUNNER_TEMP"
           "$RUNNER_TEMP/actionlint" .github/workflows/oci-staging-plan.yml .github/workflows/oci-staging-apply.yml .github/workflows/oci-integrated-image-publish.yml .github/workflows/integrated-container-smoke.yml .github/workflows/oci-infrastructure-validate.yml
-      - name: Validate manual OCI plan and image publish workflow YAML and shell
+      - name: Validate manual OCI plan, apply and image publish workflow YAML and shell
         working-directory: ${{ github.workspace }}
         run: |
           python -m pip install --quiet PyYAML
