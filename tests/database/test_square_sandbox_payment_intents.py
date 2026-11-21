@@ -192,10 +192,11 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
         self.assertEqual(self.webhook('event-paid','COMPLETED',created=paid_at),'RECONCILED')
         self.assertEqual(self.webhook('event-other-payment','COMPLETED',payment='payment-2',created=paid_at+timedelta(seconds=1)),'PAYMENT_ID_CONFLICT')
         self.assertEqual(self.webhook('event-old-approval','APPROVED',created=paid_at-timedelta(seconds=1)),'STALE_EVENT')
-        row=self.conn.execute(
-            'SELECT COALESCE(r.status,i.status),r.provider_payment_id FROM faos.square_sandbox_payment_intents i '
-            'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
-        ).fetchone()
+        with tenant_transaction(self.conn,self.tenant):
+            row=self.conn.execute(
+                'SELECT COALESCE(r.status,i.status),r.provider_payment_id FROM faos.square_sandbox_payment_intents i '
+                'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
+            ).fetchone()
         self.assertEqual(row,('PAID','payment-1'))
 
     def test_event_id_reuse_with_different_payload_is_rejected(self):
