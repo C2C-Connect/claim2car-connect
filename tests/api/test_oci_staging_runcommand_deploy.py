@@ -56,6 +56,13 @@ def test_runcommand_deploy_rejects_unpinned_database_image():
         deploy.validate_inputs(env)
 
 
+def test_runcommand_deploy_rejects_database_image_from_untrusted_registry():
+    env = _valid_env()
+    env["C2C_POSTGRES_IMAGE"] = "attacker.example/db@sha256:" + "c" * 64
+    with pytest.raises(ValueError, match="explicit public registry host"):
+        deploy.validate_inputs(env)
+
+
 def test_runcommand_payload_is_secret_free_and_shell_safe():
     values = deploy.validate_inputs(_valid_env())
     text = deploy.build_command_text(values)
