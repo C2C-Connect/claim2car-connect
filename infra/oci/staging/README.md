@@ -36,7 +36,7 @@ Set environment **variables** `OCI_STATE_BUCKET` and `OCI_STATE_NAMESPACE`; `OCI
 5. Review the plan and tenancy cost/quotas before a separately controlled apply. Do not apply from a pull-request workflow.
 6. After creation, format and mount the two attached volumes by stable OCI device identifiers, configure PostgreSQL 16/PostGIS on the database volume, and mount original evidence at `/var/lib/claim2car/evidence` owned by UID 10001. Verify reboot persistence before deploying the integrated container.
 
-The stack is infrastructure code, not evidence of an applied deployment. It does not yet configure PostgreSQL, create Vault secrets, publish an OCIR image, or expose an application endpoint. Those are subsequent controlled deployment steps.
+The stack is infrastructure code, not evidence of an applied deployment. It does not format/mount volumes, configure PostgreSQL, create Vault secrets, publish an OCIR image, or expose an application endpoint. After volumes are safely mounted and the host preflight passes, follow [the OCI Run Command deployment runbook](../../../docs/OCI_RUN_COMMAND_DEPLOYMENT.md) to enable the restricted private deployment and synthetic acceptance workflow. Those are subsequent controlled deployment steps.
 
 
 ## Host bootstrap behavior
