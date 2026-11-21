@@ -371,44 +371,63 @@ def _pinned_image(revision, digest):
     return f"registry.example.test/ns/app:sha-{revision}@sha256:{digest}"
 
 
+def _oci_harness_cleanup(tmp_path):
+    import shutil
+    sudo=shutil.which("sudo")
+    if sudo:
+        subprocess.run([sudo,"rm","-rf","--",str(tmp_path)],check=False,capture_output=True)
+
+
 def test_oci_runtime_deploy_harness_success_records_verified_image(tmp_path):
     revision="a"*40; image=_pinned_image(revision,"c"*64)
     command,state,config=_oci_deploy_harness(tmp_path,image)
-    result=subprocess.run(command,capture_output=True,text=True)
-    assert result.returncode==0, result.stderr
-    assert (config/"last-image-ref").read_text().strip()==image
-    assert (state/"current-app").read_text()==image
-    assert "PASS: image deployed, readiness and exact revision checked" in result.stdout
+    try:
+        result=subprocess.run(command,capture_output=True,text=True)
+        assert result.returncode==0, result.stderr
+        assert (config/"last-image-ref").read_text().strip()==image
+        assert (state/"current-app").read_text()==image
+        assert "PASS: image deployed, readiness and exact revision checked" in result.stdout
+    finally:
+        _oci_harness_cleanup(tmp_path)
 
 
 def test_oci_runtime_deploy_harness_rolls_back_after_readiness_failure(tmp_path):
     new_revision="a"*40; old_revision="b"*40
     new_image=_pinned_image(new_revision,"c"*64); old_image=_pinned_image(old_revision,"d"*64)
     command,state,config=_oci_deploy_harness(tmp_path,new_image,old_image,fail_ready_sha=new_revision)
-    result=subprocess.run(command,capture_output=True,text=True)
-    assert result.returncode!=0
-    assert "previous image was restored and verified" in result.stderr
-    assert (state/"current-app").read_text()==old_image
-    assert (config/"last-image-ref").read_text().strip()==old_image
+    try:
+        result=subprocess.run(command,capture_output=True,text=True)
+        assert result.returncode!=0
+        assert "previous image was restored and verified" in result.stderr
+        assert (state/"current-app").read_text()==old_image
+        assert (config/"last-image-ref").read_text().strip()==old_image
+    finally:
+        _oci_harness_cleanup(tmp_path)
 
 
 def test_oci_runtime_deploy_harness_rolls_back_after_container_start_failure(tmp_path):
     new_revision="a"*40; old_revision="b"*40
     new_image=_pinned_image(new_revision,"c"*64); old_image=_pinned_image(old_revision,"d"*64)
     command,state,config=_oci_deploy_harness(tmp_path,new_image,old_image,fail_launch_sha=new_revision)
-    result=subprocess.run(command,capture_output=True,text=True)
-    assert result.returncode!=0
-    assert "previous image was restored and verified" in result.stderr
-    assert (state/"current-app").read_text()==old_image
-    assert (config/"last-image-ref").read_text().strip()==old_image
+    try:
+        result=subprocess.run(command,capture_output=True,text=True)
+        assert result.returncode!=0
+        assert "previous image was restored and verified" in result.stderr
+        assert (state/"current-app").read_text()==old_image
+        assert (config/"last-image-ref").read_text().strip()==old_image
+    finally:
+        _oci_harness_cleanup(tmp_path)
 
 
 def test_oci_runtime_deploy_harness_fails_if_rollback_image_is_unhealthy(tmp_path):
     new_revision="a"*40; old_revision="b"*40
     new_image=_pinned_image(new_revision,"c"*64); old_image=_pinned_image(old_revision,"d"*64)
     command,state,config=_oci_deploy_harness(tmp_path,new_image,old_image,fail_ready_sha=new_revision,fail_rollback_sha=old_revision)
-    result=subprocess.run(command,capture_output=True,text=True)
-    assert result.returncode!=0
-    assert "rollback image also failed readiness/revision verification" in result.stderr
-    assert not (state/"current-app").exists()
-    assert (config/"last-image-ref").read_text().strip()==old_image
+    try:
+        result=subprocess.run(command,capture_output=True,text=True)
+        assert result.returncode!=0
+        assert "rollback image also failed readiness/revision verification" in result.stderr
+        assert not (state/"current-app").exists()
+        assert (config/"last-image-ref").read_text().strip()==old_image
+    finally:
+        _oci_harness_cleanup(tmp_path)
