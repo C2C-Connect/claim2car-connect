@@ -26,7 +26,7 @@ def _valid_env():
         "OCIR_REPOSITORY": "claim2car",
         "OCI_OCIR_AUTH_SECRET_OCID": "ocid1.vaultsecret.oc1..secret",
         "C2C_IMAGE_REF": f"us-chicago-1.ocir.io/namespace/claim2car:sha-{commit}@sha256:" + "b" * 64,
-        "C2C_POSTGRES_IMAGE": "us-chicago-1.ocir.io/namespace/postgres@sha256:" + "c" * 64,
+        "C2C_POSTGRES_IMAGE": "docker.io/postgis/postgis:16-3.5@sha256:" + "c" * 64,
         "C2C_DEPLOY_SCRIPT_SHA256": "d" * 64,
     }
 
@@ -68,7 +68,14 @@ def test_runcommand_deploy_rejects_unpinned_database_image():
 def test_runcommand_deploy_rejects_database_image_from_untrusted_registry():
     env = _valid_env()
     env["C2C_POSTGRES_IMAGE"] = "attacker.example/db@sha256:" + "c" * 64
-    with pytest.raises(ValueError, match="explicit public registry host"):
+    with pytest.raises(ValueError, match="official docker.io/postgis/postgis"):
+        deploy.validate_inputs(env)
+
+
+def test_runcommand_deploy_rejects_non_postgis_public_image():
+    env = _valid_env()
+    env["C2C_POSTGRES_IMAGE"] = "docker.io/library/postgres:16@sha256:" + "c" * 64
+    with pytest.raises(ValueError, match="official docker.io/postgis/postgis"):
         deploy.validate_inputs(env)
 
 
