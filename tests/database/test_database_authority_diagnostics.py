@@ -15,7 +15,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
-            '0021_collision_claim_link.sql',
+                '0021_collision_claim_link.sql',
             '0022_collision_vehicle_capture_link.sql',
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
@@ -162,7 +162,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0022_collision_vehicle_capture_link.sql',
                 '0023_consented_vehicle_profile.sql',
                 '0024_audited_capture_exceptions_pause_resume.sql',
-                '0025_square_sandbox_payment_intents.sql',\n                '0026_unreviewed.sql',
+                '0025_square_sandbox_payment_intents.sql',
+                '0026_unreviewed.sql',
             ]))
 
 
