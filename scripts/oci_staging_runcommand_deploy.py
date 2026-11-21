@@ -155,9 +155,12 @@ def poll_command(values: dict[str, str], command_id: str, *, timeout: int = 1860
             executions = json.loads(result.stdout).get("data", [])
         except (json.JSONDecodeError, AttributeError) as exc:
             raise RuntimeError("OCI returned an invalid command-execution response.") from exc
-        matching = [item for item in executions if item.get("commandId") == command_id]
+        matching = [
+            item for item in executions
+            if item.get("command-id", item.get("commandId")) == command_id
+        ]
         if matching:
-            state = matching[-1].get("lifecycleState", "")
+            state = matching[-1].get("lifecycle-state", matching[-1].get("lifecycleState", ""))
             if state in terminal:
                 if state != "SUCCEEDED":
                     raise RuntimeError(f"OCI deployment command ended in {state}. Command OCID: {command_id}")
@@ -171,6 +174,7 @@ def poll_command(values: dict[str, str], command_id: str, *, timeout: int = 1860
             "cancel",
             "--command-id",
             command_id,
+            "--force",
         ],
         check=False,
     )
