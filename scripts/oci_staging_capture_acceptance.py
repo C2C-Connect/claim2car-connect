@@ -84,6 +84,7 @@ def wait_ready(base, revision, seconds=120):
 
 
 def main():
+    global CLEANUP_BASE, CLEANUP_SESSION, CLEANUP_OWNER, CLEANUP_CONSENT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--confirm-synthetic", action="store_true",
