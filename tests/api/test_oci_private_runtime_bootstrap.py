@@ -201,7 +201,7 @@ def test_capture_acceptance_source_revision_guard(monkeypatch, tmp_path):
     def fake_run(args, cwd, capture_output, text, check):
         calls.append(args)
         if args == ["git", "rev-parse", "HEAD"]:
-            return subprocess.CompletedProcess(args, 0, sha + "\\n", "")
+            return subprocess.CompletedProcess(args, 0, sha + "\n", "")
         return subprocess.CompletedProcess(args, 0, "", "")
     monkeypatch.setattr(module.subprocess, "run", fake_run)
     module.verify_source_checkout(sha, tmp_path)
