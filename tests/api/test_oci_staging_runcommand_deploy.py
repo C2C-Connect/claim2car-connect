@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import subprocess
+import textwrap
 from pathlib import Path
 from unittest.mock import patch
 
@@ -138,3 +139,11 @@ def test_private_runtime_deploy_workflow_is_manual_main_only_and_secret_free():
     assert "OCIR_AUTH_TOKEN" not in workflow
     assert "scripts/oci_staging_runcommand_deploy.py" in workflow
     assert "persist-credentials: false" in workflow
+
+
+def test_cloud_init_deploy_wrapper_has_valid_bash_syntax():
+    cloud_init=(ROOT/"infra/oci/staging/cloud-init.yaml").read_text()
+    section=cloud_init.split("path: /usr/local/sbin/claim2car-staging-deploy",1)[1]
+    block=section.split("content: |",1)[1].split("\n  - path:",1)[0]
+    script=textwrap.dedent(block)
+    subprocess.run(["bash","-n"],input=script,text=True,check=True)
