@@ -25,7 +25,7 @@ def _remote_script():
         registry="us-chicago-1.ocir.io",
         registry_username="test-user",
         image_ref=image,
-        postgres_image="docker.io/library/postgres@sha256:"+"d"*64,
+        postgres_image="docker.io/postgis/postgis:16-3.4@sha256:"+"d"*64,
         vault_secret_ocid="ocid1.secret.oc1.test",
         hashes=hashes,
     )
