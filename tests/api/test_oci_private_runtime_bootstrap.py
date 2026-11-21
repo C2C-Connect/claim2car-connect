@@ -233,3 +233,18 @@ def test_capture_acceptance_source_revision_guard(monkeypatch, tmp_path):
         assert "uncommitted or untracked changes" in str(exc)
     else:
         raise AssertionError("dirty source checkout accepted")
+
+
+def test_runtime_deploy_verifies_exact_revision_for_rollback_and_only_records_ready_image():
+    script=ROOT/"scripts/oci_staging_runtime_deploy.sh"
+    subprocess.run(["bash","-n",str(script)],check=True)
+    content=script.read_text()
+    assert "image_revision()" in content
+    assert "wait_for_app()" in content
+    assert 'wait_for_app "$revision"' in content
+    assert 'previous_revision="$(image_revision "$previous")"' in content
+    assert 'wait_for_app "$previous_revision"' in content
+    assert "rollback image readiness and exact revision verified" in content
+    assert "rollback image also failed readiness/revision verification" in content
+    assert "Database migrations are not automatically reversed" in content
+    assert content.index('wait_for_app "$revision"') < content.index('printf \'%s\\\\n\' "$IMAGE_REF" > "$CONFIG/last-image-ref"')
