@@ -104,10 +104,11 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,27500),(%s,%s,2,%s,%s,27500)',
                 (tenant,shop_entry,'AR:SHOP:'+ids['shop_partner'],'DEBIT',tenant,shop_entry,'REV:REPAIR_SHOP_ACCEPTANCE','CREDIT'))
             shop_entries[tenant]=shop_entry
+            payment_intent_id=str(uuid.uuid4())
             order_id='matrix-order-'+uuid.uuid4().hex
             payment_orders[tenant]=order_id
             admin.execute('INSERT INTO faos.square_sandbox_payment_intents(tenant_id,payment_intent_id,obligation_entry_id,session_id,acceptance_id,partner_org_id,provider,provider_link_id,provider_order_id,checkout_url,idempotency_key,amount_cents,currency,status,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,27500,%s,%s,%s)',
-                (tenant,ids['shop_intent'],shop_entry,session,ids['shop_acceptance'],ids['shop_partner'],'SQUARE_SANDBOX','matrix-link-'+uuid.uuid4().hex,order_id,'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'USD','LINK_CREATED','synthetic-matrix'))
+                (tenant,payment_intent_id,shop_entry,session,ids['shop_acceptance'],ids['shop_partner'],'SQUARE_SANDBOX','matrix-link-'+uuid.uuid4().hex,order_id,'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'USD','LINK_CREATED','synthetic-matrix'))
         for index,conn in enumerate(connections):
             own,other = tenants[index],tenants[1-index]
 
