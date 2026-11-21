@@ -35,6 +35,7 @@ cleanup_authfile
 trap - EXIT
 unset REGISTRY_TOKEN
 install -d -o 10001 -g 10001 "$ROOT/postgres/pgdata"
+db_arch="$(podman image inspect "$DB_IMAGE" --format '{{.Os}}/{{.Architecture}}')"; [[ "$db_arch" == "linux/arm64" ]] || fail "Expected ARM64 PostgreSQL image; got $db_arch."
 arch="$(podman image inspect "$IMAGE_REF" --format '{{.Os}}/{{.Architecture}}')"; [[ "$arch" == "linux/arm64" ]] || fail "Expected ARM64 app image; got $arch."
 podman network exists "$NETWORK" || podman network create "$NETWORK"
 if ! podman container exists "$DB_CONTAINER"; then
@@ -53,7 +54,7 @@ podman run --rm --network "$NETWORK" -e MIGRATION_DATABASE_URL="$MIGRATION_DATAB
 podman exec -i "$DB_CONTAINER" psql -U postgres -d claim2car -v ON_ERROR_STOP=1 < "$CONFIG/seed-tenant.sql"
 previous=""; [[ -f "$CONFIG/last-image-ref" ]] && previous="$(cat "$CONFIG/last-image-ref")"
 podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true; podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true
-run_app(){ local ref="$1"; podman run -d --name "$APP_CONTAINER" --restart=always --network "$NETWORK" -p "127.0.0.1:$APP_PORT:8000" -e C2C_RUNTIME_MODE=integrated -e APP_DATABASE_URL="$APP_DATABASE_URL" -e C2C_INTERNAL_SERVICE_TOKEN="$C2C_INTERNAL_SERVICE_TOKEN" -e C2C_VIN_HMAC_PEPPER="$C2C_VIN_HMAC_PEPPER" -e C2C_CAPTURE_CONFIG_FILE=/run/secrets/capture-runtime.json -e C2C_ARTIFACT_STORAGE_ROOT=/var/lib/claim2car/evidence -e C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true -v "$ROOT/evidence:/var/lib/claim2car/evidence:Z" -v "$CONFIG/capture-runtime.json:/run/secrets/capture-runtime.json:ro,Z" "$ref"; }
+run_app(){ local ref="$1"; podman run -d --name "$APP_CONTAINER" --restart=always --network "$NETWORK" --read-only --cap-drop=ALL --security-opt=no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001 -p "127.0.0.1:$APP_PORT:8000" -e C2C_RUNTIME_MODE=integrated -e APP_DATABASE_URL="$APP_DATABASE_URL" -e C2C_INTERNAL_SERVICE_TOKEN="$C2C_INTERNAL_SERVICE_TOKEN" -e C2C_VIN_HMAC_PEPPER="$C2C_VIN_HMAC_PEPPER" -e C2C_CAPTURE_CONFIG_FILE=/run/secrets/capture-runtime.json -e C2C_ARTIFACT_STORAGE_ROOT=/var/lib/claim2car/evidence -e C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true -v "$ROOT/evidence:/var/lib/claim2car/evidence:Z" -v "$CONFIG/capture-runtime.json:/run/secrets/capture-runtime.json:ro,Z" "$ref"; }
 run_app "$IMAGE_REF"; revision="$(echo "$IMAGE_REF" | sed -E 's/.*sha-([0-9a-f]{40}).*/\1/')"; ok=0
 for i in $(seq 1 60); do if curl --fail --silent "http://127.0.0.1:$APP_PORT/health/ready" >/dev/null 2>&1 && curl --fail --silent "http://127.0.0.1:$APP_PORT/health/build" | grep -q "$revision"; then ok=1; break; fi; sleep 3; done
 if [[ "$ok" != 1 ]]; then podman logs "$APP_CONTAINER" >&2 || true; podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true; podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true; [[ -n "$previous" ]] && run_app "$previous"; fail "New deployment failed; rollback attempted."; fi
