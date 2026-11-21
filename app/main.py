@@ -185,6 +185,8 @@ def create_app(settings=None, runtime_mode=None):
         intake_app = create_intake_app(enable_evidence=True)
         settings = getattr(intake_app.state, 'health_settings', settings)
         api.mount('/api', intake_app)
+        from app.payments.square_webhook_api import create_square_webhook_router
+        api.include_router(create_square_webhook_router(database_url=settings.database_url))
         _mount_internal_router(api, analysis_router, '/api/v1/analysis', '/internal/v1/analysis')
         _mount_internal_router(api, triage_router, '/api/v1/triage', '/internal/v1/triage')
         _mount_internal_router(api, dispatch_router, '/api/v1/dispatch', '/internal/v1/dispatch')
