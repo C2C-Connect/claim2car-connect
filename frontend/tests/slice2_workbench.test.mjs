@@ -62,6 +62,7 @@ assert.ok(browserWorkbenchSource.includes("/exceptions"), "operator workbench mu
 assert.ok(browserWorkbenchSource.includes("CAPTURED_AFTER_RETRY"), "exception resolution must link a registered retake");
 assert.ok(browserWorkbenchSource.includes("view still required"), "exception closure must not imply required capture is waived");
 assert.ok(readFileSync(new URL("../app/index.html", import.meta.url), "utf8").includes("exception-slot"), "operator interface must expose exception recording controls");
+assert.ok(readFileSync(new URL("../app/index.html", import.meta.url), "utf8").includes("does not waive any required view"), "safety exception must not be represented as a waiver");
 
 
 console.log(JSON.stringify({ suite: "slice2-workbench", assertions: 12, status: "passed" }));
