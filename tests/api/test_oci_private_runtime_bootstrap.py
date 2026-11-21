@@ -66,6 +66,8 @@ def test_synthetic_live_staging_acceptance_harness_is_16_slot_and_guarded():
     assert all(f'"{slot}"' in source for slot in slots)
     assert "podman restart claim2car-app" in source
     assert "EVIDENCE_ARTIFACT_CONFLICT" in source
+    assert "atexit.register(cleanup_synthetic_consent)" in source
+    assert "automatic consent cleanup failed" in source
     assert "withdrawal did not remove synthetic original bytes" in source
     assert "base-url must be HTTP loopback only" in source
     missing_confirmation=subprocess.run(["python3",str(script)],capture_output=True,text=True)
