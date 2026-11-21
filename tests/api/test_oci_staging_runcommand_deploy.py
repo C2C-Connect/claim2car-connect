@@ -134,6 +134,16 @@ def test_poll_command_fails_closed_for_failed_execution():
             deploy.poll_command(values, "wanted", timeout=1, interval=0)
 
 
+def test_poll_timeout_attempts_forced_command_cancel():
+    values = deploy.validate_inputs(_valid_env())
+    output = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+    with patch.object(deploy, "_run_cli", return_value=output) as run, patch.object(deploy.time, "monotonic", return_value=0):
+        with pytest.raises(TimeoutError, match="timed out"):
+            deploy.poll_command(values, "wanted", timeout=0, interval=0)
+    cancel_args = run.call_args.args[0]
+    assert "cancel" in cancel_args and "--force" in cancel_args
+
+
 def test_cloud_init_enables_private_runcommand_without_broad_sudo():
     cloud_init=(ROOT/"infra/oci/staging/cloud-init.yaml").read_text()
     assert "oci-cli==3.96.3" in cloud_init
