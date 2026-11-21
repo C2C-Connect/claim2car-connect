@@ -97,8 +97,8 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,37500),(%s,%s,2,%s,%s,37500)',
                 (tenant,ledger_id,'AR:DEALER:matrix-partner','DEBIT',tenant,ledger_id,'REV:DEALER_ACQUISITION','CREDIT'))
             shop_entry='matrix-shop-ledger-'+uuid.uuid4().hex
-            admin.execute('INSERT INTO faos.financial_ledger_entries(tenant_id,entry_id,sequence,idempotency_key,session_id,entry_kind,fee_type,partner_org_id,acceptance_id,amount_cents,currency,actor_id,occurred_at,reason,previous_hash,entry_hash) VALUES (%s,%s,1,%s,%s,%s,%s,%s,%s,27500,%s,%s,%s,%s,%s,%s)',
-                (tenant,shop_entry,'matrix-shop-idem-'+uuid.uuid4().hex,session,'OBLIGATION_BOOKED','REPAIR_SHOP_ACCEPTANCE_FEE',ids['shop_partner'],ids['shop_acceptance'],'USD_CENTS','synthetic-matrix','2026-01-01T00:00:00Z','synthetic shop obligation','0'*64,'2'*64))
+            admin.execute('INSERT INTO faos.financial_ledger_entries(tenant_id,entry_id,sequence,idempotency_key,session_id,entry_kind,fee_type,partner_org_id,acceptance_id,amount_cents,currency,actor_id,occurred_at,reason,previous_hash,entry_hash) VALUES (%s,%s,2,%s,%s,%s,%s,%s,%s,27500,%s,%s,%s,%s,%s,%s)',
+                (tenant,shop_entry,'matrix-shop-idem-'+uuid.uuid4().hex,session,'OBLIGATION_BOOKED','REPAIR_SHOP_ACCEPTANCE_FEE',ids['shop_partner'],ids['shop_acceptance'],'USD_CENTS','synthetic-matrix','2026-01-01T00:00:00Z','synthetic shop obligation','1'*64,'2'*64))
             admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,27500),(%s,%s,2,%s,%s,27500)',
                 (tenant,shop_entry,'AR:SHOP:'+ids['shop_partner'],'DEBIT',tenant,shop_entry,'REV:REPAIR_SHOP_ACCEPTANCE','CREDIT'))
             shop_entries[tenant]=shop_entry
