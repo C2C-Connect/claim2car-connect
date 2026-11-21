@@ -10,11 +10,22 @@ This stack describes a private OCI compute host and two separate encrypted-in-tr
 - The existing subnet's security lists are separate from this instance NSG. Audit and remove any broad ingress rules from the subnet security lists before treating the host as secure; an NSG does not cancel permissive subnet security-list rules.
 - The image OCID, compartment, VCN, and subnet are explicit inputs. No tenancy identifiers or credentials are stored in this repository.
 - OCI provider authentication is supplied out-of-band through the standard OCI SDK configuration or workload identity. Do not commit API keys, private keys, state files, or real `terraform.tfvars`.
-- A guarded, manual GitHub Actions apply workflow is available on `main`. It requires the `confirm_apply=yes` input, the protected `oci-staging` environment for planning, and the separate `oci-staging-apply` environment for apply approval. It creates a saved plan, rejects destructive actions, and applies only that exact plan. CI PR workflows perform formatting and static validation; no pull-request workflow applies infrastructure.
+- A guarded, manual GitHub Actions apply workflow is available on `main`. It requires the `confirm_apply=yes` input, the protected `oci-staging` environment for planning, and the separate `oci-staging-apply` environment for apply. GitHub environment reviewer approval is enforced only if reviewers/protection rules are configured in repository settings. It creates a saved plan, rejects destructive actions, and applies only that exact plan. CI PR workflows perform formatting and static validation; no pull-request workflow applies infrastructure.
 
 ## Controlled GitHub Actions path
 
 For the repository-managed path, configure the protected GitHub environments and required secrets/variables before use. Run the manual **Bootstrap private OCI Terraform state bucket** workflow first, then **OCI staging infrastructure plan (manual, no apply)** to validate credentials and inspect a non-destructive plan. For provisioning, run **OCI staging apply (manual, guarded)** from `main` with `confirm_apply=yes`; it produces a one-day saved plan, rejects delete/replace actions, and requires the separate `oci-staging-apply` environment approval before applying that exact plan. Never approve a plan without reviewing resource counts and tenancy costs. The local Terraform path remains available for operators using their own OCI profile.
+
+### GitHub environment configuration prerequisites
+
+In repository **Settings → Environments**, configure `oci-staging` and `oci-staging-apply`. Add required reviewers / deployment protection to `oci-staging-apply` before relying on it as an approval gate. Store these **environment secrets** in `oci-staging` (and ensure they are available to the apply environment if required by the workflow):
+
+- `OCI_USER_OCID`, `OCI_TENANCY_OCID`, `OCI_API_FINGERPRINT`, `OCI_API_PRIVATE_KEY`
+- `OCI_COMPARTMENT_OCID`, `OCI_VCN_OCID`, `OCI_PRIVATE_SUBNET_OCID`, `OCI_STAGING_IMAGE_OCID`
+- `OCI_STAGING_SSH_PUBLIC_KEYS`
+- Optional JSON arrays: `OCI_ADMIN_INGRESS_CIDRS_JSON`, `OCI_APP_INGRESS_CIDRS_JSON` (empty arrays default to no ingress; public CIDRs are rejected)
+
+Set environment **variables** `OCI_STATE_BUCKET` and `OCI_STATE_NAMESPACE`; `OCI_REGION` defaults to `us-chicago-1`. The state bucket must be created/secured with the manual bootstrap workflow before Terraform initialization. OCIR publishing separately needs `OCIR_USERNAME` and `OCIR_AUTH_TOKEN` secrets plus `OCIR_NAMESPACE` and `OCIR_REPOSITORY` variables.
 
 ## Use
 
