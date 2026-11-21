@@ -378,6 +378,12 @@ def _oci_harness_cleanup(tmp_path):
         subprocess.run([sudo,"rm","-rf","--",str(tmp_path)],check=False,capture_output=True)
 
 
+def _read_root_owned_file(path):
+    import shutil
+    sudo=shutil.which("sudo")
+    return subprocess.run([sudo,"cat",str(path)],check=True,capture_output=True,text=True).stdout
+
+
 def test_oci_runtime_deploy_harness_success_records_verified_image(tmp_path):
     revision="a"*40; image=_pinned_image(revision,"c"*64)
     command,state,config=_oci_deploy_harness(tmp_path,image)
