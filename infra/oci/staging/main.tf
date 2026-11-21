@@ -106,6 +106,10 @@ resource "oci_core_instance" "staging" {
       condition     = var.memory_in_gbs >= var.ocpus * 6
       error_message = "A1 Flex memory must be at least 6 GB per OCPU."
     }
+    precondition {
+      condition     = !var.enable_private_runcommand_deploy || (can(regex("^ocid1\\.tenancy\\.", var.tenancy_ocid)) && can(regex("^ocid1\\.vaultsecret\\.", var.ocir_auth_secret_ocid)))
+      error_message = "Private Run Command deployment requires tenancy_ocid and the exact OCIR Vault secret OCID."
+    }
   }
 }
 
