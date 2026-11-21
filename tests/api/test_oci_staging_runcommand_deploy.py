@@ -221,6 +221,14 @@ def test_private_runtime_deploy_workflow_is_manual_main_only_and_secret_free():
     assert "Remove temporary OCI API key and config" in workflow
 
 
+def test_deploy_workflow_verifies_digest_before_remote_execution():
+    workflow=(ROOT/".github/workflows/oci-staging-runtime-deploy.yml").read_text()
+    assert workflow.index("docker buildx imagetools inspect") < workflow.index("Submit and verify private OCI Run Command deployment")
+    assert "actual_digest" in workflow and "expected_digest" in workflow
+    assert "OCIR_AUTH_TOKEN" in workflow
+    assert "OCI_REGISTRY_TOKEN" not in workflow
+
+
 def test_cloud_init_deploy_wrapper_has_valid_bash_syntax():
     cloud_init=(ROOT/"infra/oci/staging/cloud-init.yaml").read_text()
     section=cloud_init.split("path: /usr/local/sbin/claim2car-staging-deploy",1)[1]
