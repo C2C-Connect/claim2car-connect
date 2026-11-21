@@ -150,6 +150,37 @@ class CaptureEvidenceService:
             protocol = require_implemented_protocol(_session.capture_protocol_version)
             paused = self._capture_paused(history)
             exceptions = list(self._active_capture_exceptions(history).values())
+            slots = tuple(protocol.slots)
+            latest_artifacts = {}
+            quality_results = {}
+            quality_recorded = False
+            sealed = False
+            review_recorded = False
+            for kind, _event_actor, payload, _event_id in history:
+                if kind == "ARTIFACT_REGISTERED":
+                    required = {"request_id", "artifact_id", "slot", "sha256", "byte_length", "recorded_by_role"}
+                    if type(payload) is not dict or set(payload) != required:
+                        raise CaptureSessionConflict("UNSUPPORTED_ARTIFACT_HISTORY")
+                    if (payload.get("slot") not in slots or not isinstance(payload.get("artifact_id"), str)
+                            or not re.fullmatch(r"[0-9a-f]{64}", payload.get("sha256", ""))
+                            or type(payload.get("byte_length")) is not int or payload["byte_length"] <= 0):
+                        raise CaptureSessionConflict("UNSUPPORTED_ARTIFACT_HISTORY")
+                    latest_artifacts[payload["slot"]] = {
+                        "artifact_id": payload["artifact_id"], "slot": payload["slot"],
+                        "sha256": payload["sha256"], "byte_length": payload["byte_length"],
+                    }
+                elif kind == "QUALITY_RECORDED":
+                    if (type(payload) is not dict or set(payload) != {"request_id", "results", "advisory_only"}
+                            or payload.get("advisory_only") is not True or type(payload.get("results")) is not dict
+                            or set(payload["results"]) != set(slots)
+                            or any(type(value) is not bool for value in payload["results"].values())):
+                        raise CaptureSessionConflict("UNSUPPORTED_QUALITY_HISTORY")
+                    quality_recorded = True
+                    quality_results = payload["results"]
+                elif kind == "MANIFEST_SEALED":
+                    sealed = True
+                elif kind == "REVIEW_RECORDED":
+                    review_recorded = True
             return {
                 "session_id": session_id,
                 "capture_protocol_version": _session.capture_protocol_version,
@@ -159,6 +190,11 @@ class CaptureEvidenceService:
                 "capture_allowed": consent is not None and vehicle_present and not paused,
                 "capture_paused": paused,
                 "active_capture_exceptions": exceptions,
+                "registered_artifacts": [latest_artifacts[slot] for slot in slots if slot in latest_artifacts],
+                "quality_recorded": quality_recorded,
+                "quality_results": quality_results,
+                "sealed": sealed,
+                "review_recorded": review_recorded,
             }
 
 
