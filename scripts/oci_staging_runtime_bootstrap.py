@@ -17,12 +17,15 @@ def main():
  dsn=lambda u,p:f"postgresql://{u}:{p}@claim2car-db:5432/claim2car"
  cfg={"health_database_url":dsn("faos_app",app),"dsn_by_role":{"faos_app":dsn("faos_app",app)},"credentials":creds}
  write(root/"capture-runtime.json",json.dumps(cfg,indent=2)+"\n")
+ if os.geteuid()==0: os.chown(root/"capture-runtime.json",0,10001)
+ os.chmod(root/"capture-runtime.json",0o640)
  write(root/"postgres-init.sql",f"""CREATE ROLE faos_migrator LOGIN PASSWORD {lit(mig)};
 CREATE ROLE faos_app LOGIN PASSWORD {lit(app)};
 CREATE ROLE faos_fixture LOGIN PASSWORD {lit(secrets.token_hex(32))};
 CREATE ROLE faos_writer NOLOGIN;
-CREATE DATABASE claim2car OWNER postgres;\n\\connect claim2car\nCREATE EXTENSION IF NOT EXISTS postgis;
+CREATE DATABASE claim2car OWNER postgres;
 \\connect claim2car
+CREATE EXTENSION IF NOT EXISTS postgis;
 GRANT USAGE, CREATE ON SCHEMA public TO faos_migrator;
 GRANT CONNECT, CREATE ON DATABASE claim2car TO faos_migrator;
 GRANT faos_writer TO faos_migrator;

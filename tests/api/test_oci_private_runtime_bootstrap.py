@@ -5,6 +5,7 @@ def test_bootstrap_credentials_and_permissions(tmp_path):
  s=ROOT/"scripts/oci_staging_runtime_bootstrap.py"; out=tmp_path/"runtime"
  subprocess.run(["python3",str(s),"--dir",str(out)],check=True,capture_output=True,text=True)
  for n in ("runtime.env","postgres-init.sql","seed-tenant.sql","operator-tokens.txt"): assert (out/n).stat().st_mode&0o777==0o600
+ assert (out/"capture-runtime.json").stat().st_mode&0o777==0o640
  c=json.loads((out/"capture-runtime.json").read_text()); assert len(c["credentials"])==3
  assert {x["actor_role"] for x in c["credentials"]}=={"owner","operator","reviewer"}
  assert len({x["token_sha256"] for x in c["credentials"]})==3 and all("token" not in x for x in c["credentials"])
