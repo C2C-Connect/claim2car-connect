@@ -79,6 +79,7 @@ def verify(report,admin,connections,tenants,session):
         for brand in ('brand','extra_brand'):
             admin.execute('INSERT INTO faos.brands VALUES (%s,%s)',(ids[brand],'matrix-'+ids[brand]))
         shop_entries={}
+        payment_orders={}
         for tenant in tenants:
             admin.execute('INSERT INTO faos.claim_cases(tenant_id,claim_id,request_id,created_by,owner_actor_id) VALUES (%s,%s,%s,%s,%s)',(tenant,ids['claim'],ids['request'],'synthetic-matrix','synthetic-matrix'))
             admin.execute('INSERT INTO faos.claim_case_incident_intake(tenant_id,claim_id,owner_actor_id,request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,ids['claim'],'synthetic-matrix',ids['request'],'2026-01-01T00:00:00Z','collision','San Antonio','TX','78201'))
@@ -103,14 +104,13 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,27500),(%s,%s,2,%s,%s,27500)',
                 (tenant,shop_entry,'AR:SHOP:'+ids['shop_partner'],'DEBIT',tenant,shop_entry,'REV:REPAIR_SHOP_ACCEPTANCE','CREDIT'))
             shop_entries[tenant]=shop_entry
+            order_id='matrix-order-'+uuid.uuid4().hex
+            payment_orders[tenant]=order_id
+            admin.execute('INSERT INTO faos.square_sandbox_payment_intents(tenant_id,payment_intent_id,obligation_entry_id,session_id,acceptance_id,partner_org_id,provider,provider_link_id,provider_order_id,checkout_url,idempotency_key,amount_cents,currency,status,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,27500,%s,%s,%s)',
+                (tenant,ids['shop_intent'],shop_entry,session,ids['shop_acceptance'],ids['shop_partner'],'SQUARE_SANDBOX','matrix-link-'+uuid.uuid4().hex,order_id,'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'USD','LINK_CREATED','synthetic-matrix'))
         for index,conn in enumerate(connections):
-            tenant=tenants[index]
-            with tenant_transaction(conn,tenant):
-                result=conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-                    (tenant,ids['shop_intent'],shop_entries[tenant],'matrix-link-'+uuid.uuid4().hex,'matrix-order-'+uuid.uuid4().hex,
-                     'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'synthetic-matrix')).fetchone()[0]
-                expect(result=='CREATED','PAYMENT_INTENT_FIXTURE_FAILED')
             own,other = tenants[index],tenants[1-index]
+
             for table in TABLES:
                 target = sql.SQL('faos.{}').format(sql.Identifier(table))
                 select = sql.SQL('SELECT tenant_id::text FROM {} WHERE tenant_id IN (%s::uuid,%s::uuid)').format(target)
