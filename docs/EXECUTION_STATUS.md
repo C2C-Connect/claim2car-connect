@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-21  
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
-**Observed main commit:** `1c1a010143ce8c9407fc3299e0eeaa5f623e4c08` (verify live at session start)
+**Observed main:** `e198b40337e7e3fe310e518d76cd898bd151b89c` (verify live at session start)
 
 ## Non-negotiable execution rules
 
@@ -14,20 +14,19 @@
 
 ## Latest checkpoint observed
 
-- Main was observed at `1c1a010143ce8c9407fc3299e0eeaa5f623e4c08`, titled “Record standing autonomous execution mandate and thread handoff (#124)”.
-- **PR #119** persisted tenant-bound Square Sandbox checkout intents and is merged at `c7befe0aa8366b109818310ae488809cc695e58c`.
-- **PR #125** is the current observed fresh-CI-validation candidate for Square Sandbox webhook receipt/payment-state reconciliation (migrations 0025/0026 plus webhook and database logic/tests). Its PR description reports no workflow runs attached to the corrected head. Fetch the live head and workflow checks; do not merge until required checks are green on that exact SHA. PR #120 is superseded/closed unmerged. Treat PR #122 as unverified/not integrated unless live evidence proves otherwise.
-- Prior #116–#118 merged changes are listed in the handoff; verify before relying on them.
-- OCI guarded apply, remote Terraform backend, and image-publishing workflows are code merged, but **there is no evidence of an actual integrated OCI deployment**. State bucket, configuration/secrets, apply, compute, PostgreSQL/PostGIS, persistent evidence storage, backups/restores, and real deployed journey remain outstanding. Do not use the OCI MySQL DB System as the application authority.
+- **PR #121 merged** at `e198b40337e7e3fe310e518d76cd898bd151b89c`: structured Vehicle Intelligence Lab assessment JSON, SHA-256 integrity digest, rule-based disposition, escalation, missing-evidence handling, and browser download verification.
+- **PR #127 active:** Square Sandbox webhook receipt/payment-state reconciliation on clean mainline; exact candidate head `d8fa0b359ab09428cb41807b340cfae1a6d5e968`. Includes migration 0026, API receiver, mapping/reconciliation, diagnostic wiring and integration/unit tests. Migration 0025 is already on main and is not duplicated.
+- A prior DB-authority run completed **362 database tests with 0 failures/errors/skips**, but the diagnostics matrix failed because payment fixtures for the second tenant were seeded after the first tenant's matrix had begun. The fixture order was corrected in PR #127. Fresh CI is pending; don't merge without green exact-head required checks and diff review.
+- PRs #122 and #125 are closed unmerged as superseded. #127 is the sole active candidate.
+- **OCI integrated staging is not deployed.** Terraform, guarded provisioning, image publishing, host preflight, identity-checked volume mounting, runtime bootstrap and deploy scripts exist, but no provisioned compute, app PostgreSQL/PostGIS, persistent evidence storage, backup/restore rehearsal, or integrated deployed journey is evidenced. Required OCI credentials/GitHub environment configuration, private state bucket, reviewed plan, protected apply, host access and deployment remain blockers. The Oracle MySQL DB System is not the app authority.
 
 ## Next executable task (do not ask the founder to choose)
 
-1. Inspect live `main`, PR #125, exact head, and required workflows.
-2. Ensure CI runs on the exact head; fix failures in code/tests and rerun until verified.
-3. Merge only after exact-head required checks are green and diff is reviewed.
-4. Immediately progress OCI staging prerequisites and guarded deployment: verify configuration, costs and access; create/configure remote state, execute plan/apply through protected workflow, deploy the immutable image, provision PostgreSQL/PostGIS and durable evidence storage, then test health, restart persistence, evidence retrieval/integrity, tenant isolation, backup/restore, and the integrated workflow.
-5. If cloud credentials/configuration block deployment, identify the single concrete action needed and continue unblockable product work.
+1. Finish CI on PR #127 exact head; inspect DB-authority diagnostics and integration results. Fix failures and rerun.
+2. Merge only when required checks are green on the exact candidate SHA.
+3. Immediately progress OCI guarded staging provisioning and deployment: validate configuration and costs/access; create/verify remote state; plan/apply using protected workflow; provision Postgres/PostGIS and durable evidence storage; publish/deploy immutable image; verify health, restart persistence, evidence retrieval/integrity, tenant isolation, backup/restore, and integrated workflow.
+4. If cloud credentials/configuration block deployment, identify the one concrete action required and continue unblockable implementation.
 
 ## Start-of-thread checklist
 
-Read this file, `docs/EXECUTION_HANDOFF.md`, `docs/CTO_MASTER_EXECUTION_PLAN.md`, and README. Then inspect the live GitHub main/PR/workflow state. Resume implementation directly; do not recreate or narrate the plan.
+Read this file, `docs/EXECUTION_HANDOFF.md`, `docs/CTO_MASTER_EXECUTION_PLAN.md`, and README. Then inspect live GitHub main, PR #127, and workflow status. Resume implementation directly; do not recreate or narrate the plan.

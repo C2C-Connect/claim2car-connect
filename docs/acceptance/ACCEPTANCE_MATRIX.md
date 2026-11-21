@@ -1,10 +1,13 @@
 # Fresh handoff checkpoint — 2026-11-21
 
-This repository is to be executed, not continually replanned. The founder's standing authorization is to implement, test, fix, verify, merge verified increments, deploy to authorized staging, and exercise real end-to-end workflows with proactive autonomy. See [Execution Handoff](../EXECUTION_HANDOFF.md) and [Execution Status Snapshot](../EXECUTION_STATUS.md). This snapshot is deliberately brief; historical milestone sections below are historical evidence and must not be mistaken for the latest branch or release state.
+Execution directives: production over planning; sequential end-to-end implementation; proactive autonomy. This checkpoint supersedes stale status claims below when verified against live repository state.
 
-**Observed main:** `1c1a010143ce8c9407fc3299e0eeaa5f623e4c08` (verify live before use).  
-**Latest open validation candidate observed:** PR #125 (Square sandbox webhook reconciliation); PR description reports no workflow runs for its corrected head. Exact head/checks must be revalidated. Do not merge without exact-head required checks green.  
-**Staging:** OCI integrated staging is not deployed; cloud prerequisites remain.
+**Observed main:** `e198b40337e7e3fe310e518d76cd898bd151b89c` (verify live). PR #121 merged structured assessment output and integrity/disposition increment.
+**Active candidate:** PR #127 Square Sandbox webhook reconciliation, exact head `d8fa0b359ab09428cb41807b340cfae1a6d5e968`. Migration 0026 and receiver/reconciliation/test/diagnostic changes; migration 0025 already on main.
+**CI finding:** 362 database tests previously passed; post-cutover 17-table matrix failed due incomplete two-tenant payment fixtures. Fixture sequencing fixed; fresh exact-head CI pending. No merge until all required exact-head checks pass.
+**Staging:** OCI integrated deployment remains unprovisioned and unverified. Infrastructure/runtime assets are not deployment evidence.
+
+See [Execution Handoff](../EXECUTION_HANDOFF.md) and [Execution Status Snapshot](../EXECUTION_STATUS.md).
 
 ---
 
