@@ -81,17 +81,21 @@ def setup(mapping,*,format_empty=False,confirmation="",dry_run=False,fstab_path=
   if not os.path.exists(dev):raise MountSetupError("DEVICE_NOT_FOUND:"+dev)
   check_disk_without_partitions(dev)
   current=mounted_uuid(target)
+  target_path=Path(target)
+  if target_path.is_symlink():raise MountSetupError("MOUNTPOINT_SYMLINK_REJECTED:"+target)
+  if target_path.exists() and not target_path.is_dir():raise MountSetupError("MOUNTPOINT_NOT_DIRECTORY:"+target)
   if current:
    fs=fs_info(dev)
    if not fs or fs["UUID"]!=current:raise MountSetupError("MOUNTPOINT_SOURCE_MISMATCH:"+target)
    if fs["TYPE"]!="xfs":raise MountSetupError("FILESYSTEM_TYPE_UNSUPPORTED:"+target)
    info[purpose]=fs;plan.append({"purpose":purpose,"action":"already-mounted","device":dev,"target":target,"uuid":fs["UUID"]});continue
   check_unmounted(dev)
+  if target_path.exists() and any(target_path.iterdir()):raise MountSetupError("MOUNTPOINT_NOT_EMPTY:"+target)
   fs=fs_info(dev)
   if fs is None:
    check_no_signatures(dev)
-   if not format_empty:raise MountSetupError("UNFORMATTED_VOLUME_REQUIRES_EXPLICIT_FORMAT:"+purpose)
-   info[purpose]={"TYPE":"xfs","UUID":None};plan.append({"purpose":purpose,"action":"format-xfs-and-mount","device":dev,"target":target})
+   if not format_empty and not dry_run:raise MountSetupError("UNFORMATTED_VOLUME_REQUIRES_EXPLICIT_FORMAT:"+purpose)
+   info[purpose]={"TYPE":"xfs","UUID":None};plan.append({"purpose":purpose,"action":"format-xfs-and-mount" if format_empty else "blank-requires-explicit-format","device":dev,"target":target})
   else:
    if fs["TYPE"]!="xfs":raise MountSetupError("FILESYSTEM_TYPE_UNSUPPORTED:"+purpose)
    info[purpose]=fs;plan.append({"purpose":purpose,"action":"mount-existing-xfs","device":dev,"target":target,"uuid":fs["UUID"]})

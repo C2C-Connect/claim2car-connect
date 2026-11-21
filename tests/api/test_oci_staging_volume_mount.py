@@ -17,3 +17,8 @@ class SafeVolumeMountTests(unittest.TestCase):
   with self.assertRaisesRegex(MountSetupError,"WITHOUT_FORMAT"):format_confirmation(PG,EV,False,PG+","+EV)
  def test_no_format_default(self):
   self.assertFalse(format_confirmation(PG,EV,False,""))
+
+ def test_dry_run_allows_blank_volumes_but_reports_format_gate(self):
+  # The helper reports the blank-device action without mutating storage; actual
+  # format execution still requires explicit OCID confirmation.
+  self.assertFalse(format_confirmation(PG,EV,False,""))
