@@ -73,7 +73,7 @@ The repo now includes a guarded manual workflow to deploy the integrated ARM64 i
 4. Apply Terraform with `tenancy_ocid`, `enable_private_runcommand_deploy=true`, and `ocir_auth_secret_ocid` configured. This enables the Compute Instance Run Command plugin, installs OCI CLI in a dedicated virtual environment, installs a root-owned deployment wrapper, and grants `ocarun` sudo only for that wrapper—not arbitrary commands.
 5. Configure the OCI API user used by GitHub Actions with permissions to create/cancel instance-agent commands and read execution status for the staging instance. A least-privilege group policy can be scoped to the C2C compartment:
    ```
-   Allow group <C2C-deployers> to manage instance-agent-command-family in compartment <C2C>
+   Allow group <C2C-deployers> to manage instance-agent-command-family in compartment id <C2C-compartment-OCID>
    Allow group <C2C-deployers> to use instance-agent-command-execution-family in compartment <C2C>
    Allow group <C2C-deployers> to read instances in compartment <C2C>
    ```
