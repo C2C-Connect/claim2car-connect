@@ -34,6 +34,11 @@ write_files:
       }
       trap cleanup EXIT
       [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Commit SHA is invalid."
+      compare_json="$(curl --fail --silent --show-error --location --retry 2 "https://api.github.com/repos/C2C-Connect/claim2car-connect/compare/${commit}...main")" || fail "Unable to verify source commit against main."
+      compare_status="$(jq -er '.status' <<<"$compare_json")"
+      behind_by="$(jq -er '.behind_by' <<<"$compare_json")"
+      [[ "$behind_by" == "0" && ( "$compare_status" == "ahead" || "$compare_status" == "identical" ) ]] || fail "Source commit is not an ancestor of main."
+      unset compare_json compare_status behind_by
       [[ "$script_sha" =~ ^[a-f0-9]{64}$ ]] || fail "Deploy-script SHA-256 is invalid."
       [[ "$registry" == "us-chicago-1.ocir.io" ]] || fail "Registry host must be the configured Chicago OCIR registry."
       [[ "$namespace" =~ ^[a-z0-9]+$ && "$repository" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]] || fail "OCIR namespace or repository is invalid."
