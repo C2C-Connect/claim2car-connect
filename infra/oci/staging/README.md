@@ -42,3 +42,33 @@ The stack is infrastructure code, not evidence of an applied deployment. It does
 ## Host bootstrap behavior
 
 The instance receives `cloud-init.yaml` as base64 user data. It installs Podman and storage-inspection utilities, creates the non-login runtime identity UID/GID 10001, prepares the PostgreSQL/evidence mountpoints, and enables the Podman socket. The bootstrap is intentionally non-destructive: it does not partition, format, encrypt, or mount block devices, and it does not install application secrets or start the application. After attaching volumes, identify each device against the OCI volume OCID using the OCI control plane and stable device metadata before any filesystem operation. Then configure persistent mounts, verify ownership, and run `claim2car-host-preflight`; it fails unless both dedicated volumes are mounted at their exact paths.
+
+## Private runtime deployment via OCI Instance Agent Run Command
+
+The repo now includes a guarded manual workflow to deploy the integrated ARM64 image to the private instance without SSH or inbound network rules. This path requires the host and IAM setup below and is **not active until the protected environment inputs are configured and Terraform is applied**.
+
+### Required OCI setup
+
+1. Create an OCI Vault secret in the C2C compartment named for the staging OCIR pull credential. Its secret content must be JSON with exactly the needed fields, for example:
+   ```json
+   {"username":"<OCIR username>","auth_token":"<OCIR auth token>"}
+   ```
+   Do not put the token in Git, Terraform variables/state, workflow input, Run Command text, or logs.
+2. Copy the Vault secret OCID. Set GitHub environment variable `OCI_OCIR_AUTH_SECRET_OCID` in both `oci-staging` and `oci-staging-apply`. Set `OCI_ENABLE_PRIVATE_RUNCOMMAND_DEPLOY=true` in both environments.
+3. The Terraform apply user must be allowed to create tenancy-scoped dynamic groups and policies. When the feature is enabled, the stack creates a dynamic group matching only the staging instance and a policy that permits that instance to execute Run Command and read only the OCIR Vault secret OCID.
+4. Apply Terraform with `tenancy_ocid`, `enable_private_runcommand_deploy=true`, and `ocir_auth_secret_ocid` configured. This enables the Compute Instance Run Command plugin, installs OCI CLI in a dedicated virtual environment, installs a root-owned deployment wrapper, and grants `ocarun` sudo only for that wrapper—not arbitrary commands.
+5. Configure the OCI API user used by GitHub Actions with permissions to create/cancel instance-agent commands and read execution status for the staging instance. A least-privilege group policy can be scoped to the C2C compartment:
+   ```
+   Allow group <C2C-deployers> to manage instance-agent-command-family in compartment <C2C>
+   Allow group <C2C-deployers> to use instance-agent-command-execution-family in compartment <C2C>
+   Allow group <C2C-deployers> to read instances in compartment <C2C>
+   ```
+6. Set these GitHub environment variables in `oci-staging-apply`: `OCI_STAGING_INSTANCE_OCID` (Terraform output), `C2C_POSTGRES_IMAGE` (immutable digest-pinned image), `OCI_REGION`, `OCIR_NAMESPACE`, and `OCIR_REPOSITORY`. The API key credentials and compartment OCID must also be configured in that protected environment.
+7. Publish the integrated image with the manual **Publish integrated Claim2Car image to OCIR** workflow. Its summary provides the commit tag and digest. Use the combined immutable ref `<image-tag>@<sha256-digest>` as the deploy workflow input.
+8. Run the manual **Deploy integrated Claim2Car image to private OCI staging** workflow from `main`, set `confirm_deploy=yes`, and provide the exact immutable image reference. The runner submits a secret-free Run Command and waits for the instance execution to succeed. The host fetches the deploy script from the image's source commit and verifies its SHA-256 before running it; the OCIR token is retrieved from Vault using the instance principal.
+
+The Run Command payload contains only the source commit, immutable app/database image refs, script checksum, registry host, and Vault secret OCID. Registry username/token remain in OCI Vault and are fetched by the instance. OCI Run Command retains plain-text scripts for a limited period; do not place credentials or private key material in its content.
+
+The dispatcher fails closed on non-main refs, missing inputs, image/repository mismatch, mutable image tags, missing secret OCID, or a command execution that does not finish successfully. It does not mark staging as deployed until the host deployment script returns success. If the deployment command fails, inspect the OCI Run Command execution record; output is deliberately not copied into GitHub logs to avoid accidental secret disclosure.
+
+This adds a deploy mechanism; it does not certify that OCI provisioning or runtime acceptance has occurred. Verify host readiness, both volume mounts, DB/PostGIS readiness, restart persistence, capture evidence retrieval, tenant isolation, and backup/restore after the first real apply/deploy.
