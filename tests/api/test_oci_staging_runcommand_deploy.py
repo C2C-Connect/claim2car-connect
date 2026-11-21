@@ -80,7 +80,7 @@ def test_runcommand_payload_is_secret_free_and_shell_safe():
 def test_submit_command_sends_text_content_and_exact_instance_target(tmp_path):
     values = deploy.validate_inputs(_valid_env())
     script_text = deploy.build_command_text(values)
-    output = subprocess.CompletedProcess([], 0, stdout="ocid1.instanceagentcommand.oc1..command\\n", stderr="")
+    output = subprocess.CompletedProcess([], 0, stdout="ocid1.instanceagentcommand.oc1..command\n", stderr="")
     captured = {}
 
     def fake_cli(args):
