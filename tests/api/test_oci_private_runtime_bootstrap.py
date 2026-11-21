@@ -247,4 +247,5 @@ def test_runtime_deploy_verifies_exact_revision_for_rollback_and_only_records_re
     assert "rollback image readiness and exact revision verified" in content
     assert "rollback image also failed readiness/revision verification" in content
     assert "Database migrations are not automatically reversed" in content
-    assert content.index('wait_for_app "$revision"') < content.index('printf \'%s\\\\n\' "$IMAGE_REF" > "$CONFIG/last-image-ref"')
+    record_image_line=content.index("printf",content.index("systemctl enable --now podman-restart.service"))
+    assert content.index('wait_for_app "$revision"') < record_image_line
