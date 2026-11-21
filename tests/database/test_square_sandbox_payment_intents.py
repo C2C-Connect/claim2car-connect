@@ -185,6 +185,18 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
         ).fetchall()
         self.assertEqual(states,[('event-unmatched','UNMATCHED_ORDER'),('event-wrong-amount','AMOUNT_MISMATCH')])
 
+    def test_same_timestamp_completion_advances_authorized_state(self):
+        with tenant_transaction(self.conn,self.tenant):
+            self.assertEqual(self.register(),'CREATED')
+        timestamp=datetime.now(timezone.utc)
+        self.assertEqual(self.webhook('same-time-approved','APPROVED',created=timestamp),'RECONCILED')
+        self.assertEqual(self.webhook('same-time-completed','COMPLETED',created=timestamp),'RECONCILED')
+        row=self.seed.execute(
+            'SELECT r.status,r.provider_payment_id FROM faos.square_sandbox_payment_reconciliations r '
+            'WHERE r.tenant_id=%s AND r.payment_intent_id=%s',(self.tenant,self.intent_id),
+        ).fetchone()
+        self.assertEqual(row,('PAID','payment-1'))
+
     def test_webhook_payment_id_conflict_and_stale_event_cannot_regress_paid_state(self):
         with tenant_transaction(self.conn,self.tenant):
             self.assertEqual(self.register(),'CREATED')
