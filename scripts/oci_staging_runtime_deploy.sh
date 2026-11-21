@@ -69,7 +69,7 @@ image_revision() {
 wait_for_app() {
  local expected_revision="$1"
  for i in $(seq 1 60); do
-  if curl --fail --silent "http://127.0.0.1:$APP_PORT/health/ready" >/dev/null 2>&1 && curl --fail --silent "http://127.0.0.1:$APP_PORT/health/build" | grep -Fq "$expected_revision"; then return 0; fi
+  if curl --fail --silent "http://127.0.0.1:$APP_PORT/health/ready" >/dev/null 2>&1 && curl --fail --silent "http://127.0.0.1:$APP_PORT/health/build" | python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("revision")==sys.argv[1] else 1)' "$expected_revision"; then return 0; fi
   sleep 3
  done
  return 1
