@@ -173,7 +173,7 @@ resource "oci_identity_policy" "staging_runcommand" {
   name           = "${var.display_name_prefix}-runcommand-policy"
   description    = "Restricted Run Command execution and read access to the single OCIR Vault secret."
   statements = [
-    "Allow dynamic-group ${local.runcommand_dynamic_group_name} to use instance-agent-command-execution-family in compartment ${data.oci_identity_compartment.existing.name} where request.instance.id=target.instance.id",
-    "Allow dynamic-group ${local.runcommand_dynamic_group_name} to read secret-bundles in compartment ${data.oci_identity_compartment.existing.name} where target.secret.id='${var.ocir_auth_secret_ocid}'"
+    "Allow dynamic-group ${local.runcommand_dynamic_group_name} to use instance-agent-command-execution-family in compartment ${data.oci_identity_compartment.existing.name} where request.instance.id = target.instance.id",
+    "Allow dynamic-group ${local.runcommand_dynamic_group_name} to read secret-bundles in compartment ${data.oci_identity_compartment.existing.name} where target.secret.id = '${var.ocir_auth_secret_ocid}'"
   ]
 }
