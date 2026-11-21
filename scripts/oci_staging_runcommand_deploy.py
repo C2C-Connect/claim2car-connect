@@ -14,8 +14,8 @@ import time
 from pathlib import Path
 
 
-def _required_env(name: str) -> str:
-    value = os.environ.get(name, "").strip()
+def _required_env(name: str, env: dict[str, str]) -> str:
+    value = env.get(name, "").strip()
     if not value:
         raise ValueError(f"Missing required deployment input: {name}")
     return value
@@ -33,7 +33,7 @@ def validate_inputs(env: dict[str, str]) -> dict[str, str]:
         "C2C_POSTGRES_IMAGE",
         "C2C_DEPLOY_SCRIPT_SHA256",
     )
-    values = {name: _required_env(name) for name in names}
+    values = {name: _required_env(name, env) for name in names}
     if not re.fullmatch(r"ocid1\.compartment\.[a-zA-Z0-9.]+", values["OCI_COMPARTMENT_OCID"]):
         raise ValueError("OCI_COMPARTMENT_OCID is malformed.")
     if not re.fullmatch(r"ocid1\.instance\.[a-zA-Z0-9.]+", values["OCI_STAGING_INSTANCE_OCID"]):
