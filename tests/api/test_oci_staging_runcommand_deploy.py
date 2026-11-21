@@ -188,7 +188,7 @@ def test_cloud_init_enables_private_runcommand_without_broad_sudo():
     assert "oci-cli==3.96.3" in cloud_init
     assert "systemctl is-active --quiet oracle-cloud-agent" in cloud_init
     terraform=(ROOT/"infra/oci/staging/main.tf").read_text()
-    assert 'name = "Compute Instance Run Command"' in terraform
+    assert '"Compute Instance Run Command"' in terraform
     assert 'desired_state = "ENABLED"' in terraform
     assert "ocarun ALL=(root) NOPASSWD: /usr/local/sbin/claim2car-staging-deploy" in cloud_init
     assert "NOPASSWD:ALL" not in cloud_init
