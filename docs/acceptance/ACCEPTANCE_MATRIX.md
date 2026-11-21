@@ -3,7 +3,7 @@
 Execution directives: production over planning; sequential end-to-end implementation; proactive autonomy. This checkpoint supersedes stale status claims below when verified against live repository state.
 
 **Observed main:** `e198b40337e7e3fe310e518d76cd898bd151b89c` (verify live). PR #121 merged structured assessment output and integrity/disposition increment.
-**Active candidate:** PR #127 Square Sandbox webhook reconciliation, exact head `d8fa0b359ab09428cb41807b340cfae1a6d5e968`. Migration 0026 and receiver/reconciliation/test/diagnostic changes; migration 0025 already on main.
+**Active candidate:** PR #127 Square Sandbox webhook reconciliation, exact head `dede7bdd4f803d7ea9fcb71991a47b98d8cf26ab`. Migration 0026 and receiver/reconciliation/test/diagnostic changes; migration 0025 already on main.
 **CI finding:** 362 database tests previously passed; post-cutover 17-table matrix failed due incomplete two-tenant payment fixtures. Fixture sequencing fixed; fresh exact-head CI pending. No merge until all required exact-head checks pass.
 **Staging:** OCI integrated deployment remains unprovisioned and unverified. Infrastructure/runtime assets are not deployment evidence.
 
