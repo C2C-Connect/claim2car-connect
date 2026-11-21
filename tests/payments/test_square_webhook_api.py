@@ -58,6 +58,17 @@ def client(config_factory=lambda:CONFIG,db_url="postgresql://synthetic"):
     return TestClient(app)
 
 
+def test_webhook_only_credentials_are_sufficient_for_receipt():
+    global connection
+    connection=FakeConnection("RECONCILED")
+    body=make_body()
+    webhook_config=SquareSandboxConfig("", "", KEY, URL, "sandbox")
+    response=client(config_factory=lambda:webhook_config).post("/webhooks/square",content=body,headers={"x-square-hmacsha256-signature":signature(body)})
+    assert response.status_code==200
+    assert response.json()=={"status":"RECONCILED"}
+    assert len(connection.calls)==1
+
+
 def test_verified_webhook_calls_reconciliation_and_returns_outcome():
     global connection
     connection=FakeConnection("RECONCILED")
