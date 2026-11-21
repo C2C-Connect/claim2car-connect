@@ -241,6 +241,11 @@ def verify_and_parse_square_payment_event(
         envelope = json.loads(raw_body)
         event_id = envelope["event_id"]
         event_type = envelope["type"]
+    except (ValueError, TypeError, KeyError):
+        raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_INVALID") from None
+    if event_type not in {"payment.created", "payment.updated"}:
+        raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_UNSUPPORTED")
+    try:
         payment = envelope["data"]["object"]["payment"]
         payment_id = payment["id"]
         order_id = payment["order_id"]
@@ -250,8 +255,6 @@ def verify_and_parse_square_payment_event(
         currency = money["currency"]
     except (ValueError, TypeError, KeyError):
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_INVALID") from None
-    if event_type not in {"payment.created", "payment.updated"}:
-        raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_UNSUPPORTED")
     if not all(isinstance(value, str) and value for value in (event_id, payment_id, order_id, status, currency)):
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_INVALID")
     if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:

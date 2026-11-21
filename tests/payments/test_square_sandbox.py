@@ -74,7 +74,7 @@ def test_checkout_link_is_sandbox_only_fixed_fee_and_idempotent():
     assert "acceptance-0001" not in body["payment_note"]
     assert checkout.checkout_url == "https://sandbox.square.link/u/test"
     assert checkout.provider_order_id == "order-test"
-    assert create_shop_acceptance_checkout(Obligation(), config(), transport=transport).idempotency_key == checkout.idempotency_key
+    assert create_shop_acceptance_checkout(make_obligation(), config(), transport=transport).idempotency_key == checkout.idempotency_key
     other_tenant = make_obligation(tenant_id="10000000-0000-4000-8000-000000000002", idempotency_key="ledger-idem-shop")
     assert other_tenant.entry_id == make_obligation().entry_id
     assert create_shop_acceptance_checkout(other_tenant, config(), transport=transport).idempotency_key != checkout.idempotency_key
@@ -100,7 +100,7 @@ def test_config_loads_from_environment(monkeypatch):
 ])
 def test_config_fail_closed(changes, code):
     with pytest.raises(SquareSandboxError, match=code):
-        create_shop_acceptance_checkout(Obligation(), config(**changes), transport=fake_transport()[1])
+        create_shop_acceptance_checkout(make_obligation(), config(**changes), transport=fake_transport()[1])
 
 
 @pytest.mark.parametrize("changes,code", [
@@ -120,7 +120,7 @@ def test_checkout_requires_exact_shop_acceptance_obligation(changes, code):
 @pytest.mark.parametrize("timeout", [0, -1, 31, True, "15"])
 def test_checkout_timeout_is_bounded(timeout):
     with pytest.raises(SquareSandboxError, match="TIMEOUT_INVALID"):
-        create_shop_acceptance_checkout(Obligation(), config(), transport=fake_transport()[1], timeout_seconds=timeout)
+        create_shop_acceptance_checkout(make_obligation(), config(), transport=fake_transport()[1], timeout_seconds=timeout)
 
 
 def test_checkout_rejects_fake_obligation_object():
@@ -138,10 +138,10 @@ def test_checkout_rejects_corrupt_postings():
 def test_provider_failure_and_bad_checkout_url_are_redacted_and_rejected():
     _, rejected = fake_transport(status=403)
     with pytest.raises(SquareSandboxError, match="CHECKOUT_REQUEST_REJECTED"):
-        create_shop_acceptance_checkout(Obligation(), config(), transport=rejected)
+        create_shop_acceptance_checkout(make_obligation(), config(), transport=rejected)
     _, bad_url = fake_transport({"payment_link": {"id": "l", "order_id": "o", "url": "https://evil.example/payment"}})
     with pytest.raises(SquareSandboxError, match="CHECKOUT_URL_INVALID"):
-        create_shop_acceptance_checkout(Obligation(), config(), transport=bad_url)
+        create_shop_acceptance_checkout(make_obligation(), config(), transport=bad_url)
 
 
 @pytest.mark.parametrize("url", [
@@ -151,7 +151,7 @@ def test_provider_failure_and_bad_checkout_url_are_redacted_and_rejected():
 ])
 def test_checkout_accepts_known_square_hosts(url):
     _, transport = fake_transport({"payment_link": {"id": "l", "order_id": "o", "url": url}})
-    assert create_shop_acceptance_checkout(Obligation(), config(), transport=transport).checkout_url == url
+    assert create_shop_acceptance_checkout(make_obligation(), config(), transport=transport).checkout_url == url
 
 
 @pytest.mark.parametrize("url", [
@@ -164,7 +164,7 @@ def test_checkout_accepts_known_square_hosts(url):
 def test_checkout_rejects_malformed_or_untrusted_url(url):
     _, transport = fake_transport({"payment_link": {"id": "l", "order_id": "o", "url": url}})
     with pytest.raises(SquareSandboxError, match="CHECKOUT_URL_INVALID"):
-        create_shop_acceptance_checkout(Obligation(), config(), transport=transport)
+        create_shop_acceptance_checkout(make_obligation(), config(), transport=transport)
 
 
 def sign(body, cfg):
