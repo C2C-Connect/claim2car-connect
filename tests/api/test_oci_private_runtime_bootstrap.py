@@ -1,6 +1,10 @@
 import json,subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
+
+def _read_root_owned_file(path):
+    sudo=subprocess.run(["sudo","cat",str(path)],check=True,capture_output=True,text=True)
+    return sudo.stdout
 def test_bootstrap_credentials_and_permissions(tmp_path):
  s=ROOT/"scripts/oci_staging_runtime_bootstrap.py"; out=tmp_path/"runtime"
  subprocess.run(["python3",str(s),"--dir",str(out)],check=True,capture_output=True,text=True)
