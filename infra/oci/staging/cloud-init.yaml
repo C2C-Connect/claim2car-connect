@@ -145,3 +145,4 @@ runcmd:
   - [bash, -lc, "install -d -o 10001 -g 10001 -m 0750 /var/lib/claim2car /var/lib/claim2car/postgres /var/lib/claim2car/evidence"]
   - [bash, -lc, "install -d -o root -g root -m 0750 /opt/claim2car /etc/claim2car"]
   - [bash, -lc, "systemctl enable podman.socket"]
+  - [bash, -lc, "systemctl restart oracle-cloud-agent"]
