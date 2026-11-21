@@ -24,9 +24,9 @@ for f in runtime.env capture-runtime.json postgres-init.sql seed-tenant.sql; do 
 [[ "$(stat -c %u "$CONFIG/capture-runtime.json")" == 0 && "$(stat -c %a "$CONFIG/capture-runtime.json")" == 640 ]] || fail "capture-runtime.json must be root-owned mode 0640."
 source "$CONFIG/runtime.env"
 authfile="$(mktemp /run/claim2car-ocir-auth.XXXXXX)" || fail "Unable to create ephemeral registry auth file."
-chmod 0600 "$authfile"
 cleanup_authfile() { rm -f "$authfile"; }
 trap cleanup_authfile EXIT
+chmod 0600 "$authfile"
 printf '%s' "$REGISTRY_TOKEN" | podman login --authfile "$authfile" "$REGISTRY" --username "$REGISTRY_USER" --password-stdin
 podman pull --authfile "$authfile" "$DB_IMAGE"
 podman pull --authfile "$authfile" "$IMAGE_REF"
