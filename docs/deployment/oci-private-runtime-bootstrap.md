@@ -8,6 +8,6 @@ First boot as root: `python3 scripts/oci_staging_runtime_bootstrap.py --dir /etc
 
 Set `OCI_IMAGE_REF` to digest-pinned OCIR ref including `:sha-<40-character-commit>@sha256:<digest>`, `OCI_REGISTRY`, `OCI_REGISTRY_USERNAME`, `OCI_REGISTRY_TOKEN`; optional loopback port `C2C_STAGING_LOOPBACK_PORT`. Source root-only env and run `sudo -E scripts/oci_staging_runtime_deploy.sh`.
 
-Script checks both persistent mounts and ownership, pulls ARM64 image, starts PostGIS with loopback-only DB port, applies authority migrations, seeds synthetic tenant/login binding, and starts app with evidence volume/runtime config. Verifies readiness/build identity; on failure stops new app and attempts rollback to prior image. Never formats disks or deletes data.
+Script checks both persistent mounts and ownership, pulls ARM64 image, starts PostGIS with loopback-only DB port, applies authority migrations, seeds synthetic tenant/login binding, and starts app with evidence volume/runtime config. Verifies readiness/build identity; on failure stops the new app and attempts rollback to the prior image. Database migrations are not rolled back; migration compatibility must be reviewed before each release. Never formats disks or deletes data.
 
 Constraints: single synthetic tenant only; DB login `faos_app` is tenant-bound. No multi-tenant production. DB init only on empty volume. App binds loopback only: private TLS/tunnel remains necessary for phone testing. Readiness is not capture acceptance, inference, adjudication, dispatch, payments, or production release.
