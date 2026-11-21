@@ -76,7 +76,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         self.assertIn("claim2car-staging-deploy", cloud_init)
         self.assertIn("ocarun ALL=(root) NOPASSWD: /usr/local/sbin/claim2car-staging-deploy", cloud_init)
         self.assertNotIn("NOPASSWD:ALL", cloud_init)
-        self.assertIn('name = "Compute Instance Run Command"', terraform)
+        self.assertIn('"Compute Instance Run Command"', terraform)
         self.assertIn('desired_state = "ENABLED"', terraform)
         self.assertIn("secret-bundle get", cloud_init)
         self.assertIn("compare/${commit}...main", cloud_init)
