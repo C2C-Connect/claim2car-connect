@@ -1,0 +1,124 @@
+name: Deploy private OCI staging and run synthetic acceptance (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: Explicitly authorize a staging deployment and synthetic acceptance journey
+        type: choice
+        required: true
+        default: "no"
+        options:
+          - "no"
+          - "yes"
+      image_ref:
+        description: Exact immutable OCIR image reference from the publish workflow (tag plus sha256 digest)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-accept:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_deploy == 'yes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: oci-staging
+    env:
+      OCI_REGION: ${{ vars.OCI_REGION || 'us-chicago-1' }}
+      OCIR_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
+      OCIR_REPOSITORY: ${{ vars.OCIR_REPOSITORY }}
+      OCI_REGISTRY: ${{ vars.OCI_REGION || 'us-chicago-1' }}.ocir.io
+      OCI_IMAGE_REF: ${{ inputs.image_ref }}
+      OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+      OCI_STAGING_INSTANCE_OCID: ${{ secrets.OCI_STAGING_INSTANCE_OCID }}
+      OCI_OCIR_VAULT_SECRET_OCID: ${{ secrets.OCI_OCIR_VAULT_SECRET_OCID }}
+      OCI_REGISTRY_USERNAME: ${{ secrets.OCIR_USERNAME }}
+      C2C_POSTGRES_IMAGE: ${{ vars.OCI_STAGING_POSTGRES_IMAGE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Validate guarded deployment inputs and image/source alignment
+        id: validate
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_REF}" == "refs/heads/main" ]] || { echo "Deployments are allowed only from main."; exit 1; }
+          [[ -n "${OCI_COMPARTMENT_OCID}" && -n "${OCI_STAGING_INSTANCE_OCID}" && -n "${OCI_OCIR_VAULT_SECRET_OCID}" && -n "${OCI_REGISTRY_USERNAME}" ]] || { echo "Missing required protected OCI staging environment secrets."; exit 1; }
+          [[ "${OCI_COMPARTMENT_OCID}" =~ ^ocid1\.compartment\. ]] || { echo "Invalid compartment OCID."; exit 1; }
+          [[ "${OCI_STAGING_INSTANCE_OCID}" =~ ^ocid1\.instance\. ]] || { echo "Invalid staging instance OCID."; exit 1; }
+          [[ "${OCI_OCIR_VAULT_SECRET_OCID}" =~ ^ocid1\.secret\. ]] || { echo "Invalid Vault secret OCID."; exit 1; }
+          [[ "${C2C_POSTGRES_IMAGE}" =~ @sha256:[a-f0-9]{64}$ ]] || { echo "PostgreSQL image variable must be pinned by digest."; exit 1; }
+          [[ "${OCI_IMAGE_REF}" =~ :sha-([a-f0-9]{40})@sha256:([a-f0-9]{64})$ ]] || { echo "Input image must use full source SHA and immutable digest."; exit 1; }
+          source_sha="${BASH_REMATCH[1]}"
+          expected_prefix="${OCI_REGISTRY}/${OCIR_NAMESPACE}/${OCIR_REPOSITORY}:sha-${source_sha}@"
+          [[ "${OCI_IMAGE_REF}" == "${expected_prefix}"* ]] || { echo "Image registry/namespace/repository mismatch."; exit 1; }
+          echo "source_sha=${source_sha}" >> "${GITHUB_OUTPUT}"
+          echo "Validated staging target and digest-pinned image reference (values redacted)."
+      - name: Checkout the exact image source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.validate.outputs.source_sha }}
+          path: source
+          persist-credentials: false
+      - name: Install pinned OCI CLI
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-cache-dir oci-cli==3.96.3
+      - name: Configure ephemeral OCI API credentials
+        env:
+          OCI_USER: ${{ secrets.OCI_USER_OCID }}
+          OCI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_API_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "${OCI_USER}" && -n "${OCI_TENANCY}" && -n "${OCI_FINGERPRINT}" && -n "${OCI_PRIVATE_KEY}" ]] || { echo "Missing OCI API key credentials."; exit 1; }
+          install -d -m 0700 "${HOME}/.oci"
+          key_path="${RUNNER_TEMP}/oci_api_key.pem"
+          printf '%s\n' "${OCI_PRIVATE_KEY}" > "${key_path}"
+          chmod 0600 "${key_path}"
+          cat > "${HOME}/.oci/config" <<EOF
+          [DEFAULT]
+          user=${OCI_USER}
+          tenancy=${OCI_TENANCY}
+          fingerprint=${OCI_FINGERPRINT}
+          key_file=${key_path}
+          region=${OCI_REGION}
+          EOF
+          chmod 0600 "${HOME}/.oci/config"
+          openssl pkey -in "${key_path}" -check -noout >/dev/null
+          oci os ns get --output json >/dev/null
+          echo "OCI API key authentication succeeded; values redacted."
+      - name: Submit Run Command, deploy immutable image, and execute synthetic acceptance
+        env:
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          OCI_STAGING_INSTANCE_OCID: ${{ secrets.OCI_STAGING_INSTANCE_OCID }}
+          OCI_OCIR_VAULT_SECRET_OCID: ${{ secrets.OCI_OCIR_VAULT_SECRET_OCID }}
+          OCI_REGISTRY_USERNAME: ${{ secrets.OCIR_USERNAME }}
+          OCI_IMAGE_REF: ${{ inputs.image_ref }}
+          OCI_REGISTRY: ${{ vars.OCI_REGION || 'us-chicago-1' }}.ocir.io
+          OCIR_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
+          OCIR_REPOSITORY: ${{ vars.OCIR_REPOSITORY }}
+          C2C_POSTGRES_IMAGE: ${{ vars.OCI_STAGING_POSTGRES_IMAGE }}
+          C2C_DEPLOY_SOURCE_DIR: source
+          OCI_RUN_COMMAND_TIMEOUT_SECONDS: "1800"
+          OCI_RUN_COMMAND_MAX_WAIT_SECONDS: "1800"
+          OCI_RUN_COMMAND_POLL_SECONDS: "15"
+        run: |
+          set -euo pipefail
+          python3 scripts/oci_staging_run_command_deploy.py
+      - name: Deployment and acceptance summary
+        if: success()
+        run: |
+          {
+            echo "## Claim2Car private staging deployment"
+            echo
+            echo "- Image source: ${{ steps.validate.outputs.source_sha }}"
+            echo "- Deployment and synthetic acceptance: **OCI Run Command SUCCEEDED**"
+            echo "- Target: private instance; no SSH ingress or public application endpoint"
+            echo "- Acceptance includes 16-slot capture, seal, reviewer byte retrieval, restart persistence, tamper rejection, and consent-withdrawal deletion."
+            echo "- Synthetic-only. This is not production/field certification."
+          } >> "${GITHUB_STEP_SUMMARY}"
