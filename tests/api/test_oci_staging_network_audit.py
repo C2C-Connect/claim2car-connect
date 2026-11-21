@@ -66,6 +66,18 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")
         self.assertIn("INGRESS_SOURCE_INVALID:broken:0", findings)
 
+    def test_manual_github_network_audit_workflow_is_read_only_and_fail_closed(self):
+        workflow = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "oci-staging-network-audit.yml").read_text()
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("environment: oci-staging", workflow)
+        self.assertIn("if: github.ref == 'refs/heads/main'", workflow)
+        self.assertIn("oci-cli==3.96.3", workflow)
+        self.assertIn("scripts/oci_staging_network_audit.py", workflow)
+        self.assertIn("OCI_API_PRIVATE_KEY", workflow)
+        self.assertIn("no network rule changes were made", workflow.lower())
+        for forbidden in ("terraform apply", "oci network security-list update", "oci network security-list create", "oci network security-list delete"):
+            self.assertNotIn(forbidden, workflow.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
