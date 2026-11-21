@@ -175,6 +175,7 @@ def test_poll_timeout_attempts_forced_command_cancel():
 def test_cloud_init_enables_private_runcommand_without_broad_sudo():
     cloud_init=(ROOT/"infra/oci/staging/cloud-init.yaml").read_text()
     assert "oci-cli==3.96.3" in cloud_init
+    assert "systemctl is-active --quiet oracle-cloud-agent" in cloud_init
     terraform=(ROOT/"infra/oci/staging/main.tf").read_text()
     assert 'name = "Compute Instance Run Command"' in terraform
     assert 'desired_state = "ENABLED"' in terraform
