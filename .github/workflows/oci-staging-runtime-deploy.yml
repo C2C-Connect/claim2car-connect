@@ -99,7 +99,7 @@ jobs:
         env:
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
           OCI_STAGING_INSTANCE_OCID: ${{ vars.OCI_STAGING_INSTANCE_OCID }}
-          OCI_REGISTRY: ${{ env.OCI_REGISTRY }}
+          OCI_REGISTRY: ${{ (vars.OCI_REGION || 'us-chicago-1') }}.ocir.io
           OCIR_NAMESPACE: ${{ vars.OCIR_NAMESPACE }}
           OCIR_REPOSITORY: ${{ vars.OCIR_REPOSITORY }}
           OCI_OCIR_AUTH_SECRET_OCID: ${{ vars.OCI_OCIR_AUTH_SECRET_OCID }}
