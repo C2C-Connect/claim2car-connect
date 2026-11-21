@@ -21,8 +21,8 @@ def main():
 CREATE ROLE faos_app LOGIN PASSWORD {lit(app)};
 CREATE ROLE faos_fixture LOGIN PASSWORD {lit(secrets.token_hex(32))};
 CREATE ROLE faos_writer NOLOGIN;
-CREATE DATABASE claim2car OWNER postgres;
-\\\\connect claim2car
+CREATE DATABASE claim2car OWNER postgres;\n\\connect claim2car\nCREATE EXTENSION IF NOT EXISTS postgis;
+\\connect claim2car
 GRANT USAGE, CREATE ON SCHEMA public TO faos_migrator;
 GRANT CONNECT, CREATE ON DATABASE claim2car TO faos_migrator;
 GRANT faos_writer TO faos_migrator;

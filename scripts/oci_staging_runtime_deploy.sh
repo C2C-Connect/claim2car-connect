@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 ROOT=/var/lib/claim2car; CONFIG=/etc/claim2car/runtime
-IMAGE_REF="\${OCI_IMAGE_REF:-}"; REGISTRY="\${OCI_REGISTRY:-}"; REGISTRY_USER="\${OCI_REGISTRY_USERNAME:-}"; REGISTRY_TOKEN="\${OCI_REGISTRY_TOKEN:-}"
-APP_PORT="\${C2C_STAGING_LOOPBACK_PORT:-8000}"; DB_IMAGE="\${C2C_POSTGRES_IMAGE:-postgis/postgis:16-3.4}"
+IMAGE_REF="${OCI_IMAGE_REF:-}"; REGISTRY="${OCI_REGISTRY:-}"; REGISTRY_USER="${OCI_REGISTRY_USERNAME:-}"; REGISTRY_TOKEN="${OCI_REGISTRY_TOKEN:-}"
+APP_PORT="${C2C_STAGING_LOOPBACK_PORT:-8000}"; DB_IMAGE="${C2C_POSTGRES_IMAGE:-postgis/postgis:16-3.4}"
 APP_CONTAINER=claim2car-app; DB_CONTAINER=claim2car-db; NETWORK=claim2car-staging
 fail(){ echo "FAIL: $*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || fail "Run as root."
