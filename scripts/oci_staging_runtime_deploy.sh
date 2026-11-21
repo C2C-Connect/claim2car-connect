@@ -61,9 +61,39 @@ podman exec -i "$DB_CONTAINER" psql -U postgres -d claim2car -v ON_ERROR_STOP=1 
 previous=""; [[ -f "$CONFIG/last-image-ref" ]] && previous="$(cat "$CONFIG/last-image-ref")"
 podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true; podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true
 run_app(){ local ref="$1"; podman run -d --name "$APP_CONTAINER" --restart=always --network "$NETWORK" --user 10001:10001 --read-only --cap-drop=ALL --security-opt=no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001 -p "127.0.0.1:$APP_PORT:8000" -e C2C_RUNTIME_MODE=integrated -e APP_DATABASE_URL="$APP_DATABASE_URL" -e C2C_INTERNAL_SERVICE_TOKEN="$C2C_INTERNAL_SERVICE_TOKEN" -e C2C_VIN_HMAC_PEPPER="$C2C_VIN_HMAC_PEPPER" -e C2C_CAPTURE_CONFIG_FILE=/run/secrets/capture-runtime.json -e C2C_ARTIFACT_STORAGE_ROOT=/var/lib/claim2car/evidence -e C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true -e SQUARE_ENVIRONMENT="${SQUARE_ENVIRONMENT:-}" -e SQUARE_SANDBOX_ACCESS_TOKEN="${SQUARE_SANDBOX_ACCESS_TOKEN:-}" -e SQUARE_SANDBOX_LOCATION_ID="${SQUARE_SANDBOX_LOCATION_ID:-}" -e SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY="${SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY:-}" -e SQUARE_SANDBOX_WEBHOOK_URL="${SQUARE_SANDBOX_WEBHOOK_URL:-}" -v "$ROOT/evidence:/var/lib/claim2car/evidence:Z" -v "$CONFIG/capture-runtime.json:/run/secrets/capture-runtime.json:ro,Z" "$ref"; }
-run_app "$IMAGE_REF"; revision="$(echo "$IMAGE_REF" | sed -E 's/.*sha-([0-9a-f]{40}).*/\1/')"; ok=0
-for i in $(seq 1 60); do if curl --fail --silent "http://127.0.0.1:$APP_PORT/health/ready" >/dev/null 2>&1 && curl --fail --silent "http://127.0.0.1:$APP_PORT/health/build" | grep -q "$revision"; then ok=1; break; fi; sleep 3; done
-if [[ "$ok" != 1 ]]; then podman logs "$APP_CONTAINER" >&2 || true; podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true; podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true; [[ -n "$previous" ]] && run_app "$previous"; fail "New deployment failed; rollback attempted."; fi
-printf '%s\n' "$IMAGE_REF" > "$CONFIG/last-image-ref"; chmod 0600 "$CONFIG/last-image-ref"
+image_revision() {
+ local ref="$1"
+ [[ "$ref" =~ :sha-([a-f0-9]{40})@sha256:[a-f0-9]{64}$ ]] || return 1
+ printf '%s' "${BASH_REMATCH[1]}"
+}
+wait_for_app() {
+ local expected_revision="$1"
+ for i in $(seq 1 60); do
+  if curl --fail --silent "http://127.0.0.1:$APP_PORT/health/ready" >/dev/null 2>&1 && curl --fail --silent "http://127.0.0.1:$APP_PORT/health/build" | python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("revision")==sys.argv[1] else 1)' "$expected_revision"; then return 0; fi
+  sleep 3
+ done
+ return 1
+}
+revision="$(image_revision "$IMAGE_REF")" || fail "Unable to extract exact revision from requested image ref."
+if ! run_app "$IMAGE_REF" || ! wait_for_app "$revision"; then
+ podman logs "$APP_CONTAINER" >&2 || true
+ podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true
+ podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true
+ if [[ -n "$previous" ]]; then
+  previous_revision="$(image_revision "$previous")" || fail "New image failed and recorded rollback reference is invalid; no rollback launched."
+  if run_app "$previous" && wait_for_app "$previous_revision"; then
+   echo "PASS: rollback image readiness and exact revision verified: $previous_revision" >&2
+  else
+   podman logs "$APP_CONTAINER" >&2 || true
+   podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true
+   podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true
+   fail "New deployment failed; rollback image also failed readiness/revision verification."
+  fi
+ else
+  fail "New deployment failed and no prior image is recorded; app remains stopped."
+ fi
+ fail "New deployment failed; previous image was restored and verified. Database migrations are not automatically reversed."
+fi
 systemctl enable --now podman-restart.service >/dev/null 2>&1 || fail "Podman restart service unavailable; reboot persistence cannot be guaranteed."
-echo "PASS: image deployed, readiness and revision checked. Loopback HTTP only; TLS/private access remains separate."
+printf '%s\n' "$IMAGE_REF" > "$CONFIG/last-image-ref"; chmod 0600 "$CONFIG/last-image-ref"
+echo "PASS: image deployed, readiness and exact revision checked. Loopback HTTP only; TLS/private access remains separate."
