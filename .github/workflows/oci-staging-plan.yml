@@ -8,6 +8,7 @@ permissions:
 
 jobs:
   plan:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: oci-staging
@@ -25,6 +26,9 @@ jobs:
       TF_VAR_ssh_authorized_keys: ${{ secrets.OCI_STAGING_SSH_PUBLIC_KEYS }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.12.0"
@@ -44,6 +48,7 @@ jobs:
           STATE_NAMESPACE: ${{ vars.OCI_STATE_NAMESPACE }}
         run: |
           set -euo pipefail
+          [[ "${GITHUB_REF}" == "refs/heads/main" ]] || { echo "Planning is allowed only from main."; exit 1; }
           config_path="$HOME/.oci/config"
           key_path="$RUNNER_TEMP/oci_api_key.pem"
           missing=()
