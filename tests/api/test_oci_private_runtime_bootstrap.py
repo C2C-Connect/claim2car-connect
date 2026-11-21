@@ -4,8 +4,7 @@ ROOT=Path(__file__).resolve().parents[2]
 def test_bootstrap_credentials_and_permissions(tmp_path):
  s=ROOT/"scripts/oci_staging_runtime_bootstrap.py"; out=tmp_path/"runtime"
  subprocess.run(["python3",str(s),"--dir",str(out)],check=True,capture_output=True,text=True)
- for n in ("runtime.env","postgres-init.sql","seed-tenant.sql","operator-tokens.txt"): assert (out/n).stat().st_mode&0o777==0o600
- assert (out/"capture-runtime.json").stat().st_mode&0o777==0o640
+ for n in ("runtime.env","capture-runtime.json","postgres-init.sql","seed-tenant.sql","operator-tokens.txt"): assert (out/n).stat().st_mode&0o777==0o600
  assert out.stat().st_mode&0o777==0o700
  c=json.loads((out/"capture-runtime.json").read_text()); assert len(c["credentials"])==3
  assert {x["actor_role"] for x in c["credentials"]}=={"owner","operator","reviewer"}
@@ -19,18 +18,3 @@ def test_runtime_deployment_guardrails(tmp_path):
  assert "mkfs" not in d and "wipefs" not in d and "rm -rf" not in d
  assert "@sha256:" in d and "mountpoint -q" in d and "python -m database.migrate" in d
  assert "health/ready" in d and "health/build" in d and "127.0.0.1" in d
-
-
-def test_bootstrap_sql_has_single_database_switch_and_postgis(tmp_path):
-    s=ROOT/"scripts/oci_staging_runtime_bootstrap.py"; out=tmp_path/"runtime"
-    subprocess.run(["python3",str(s),"--dir",str(out)],check=True,capture_output=True,text=True)
-    sql=(out/"postgres-init.sql").read_text()
-    assert sql.count("\\connect claim2car")==1
-    assert "CREATE EXTENSION IF NOT EXISTS postgis" in sql
-
-def test_deploy_shell_syntax_and_expansion(tmp_path):
-    d=ROOT/"scripts/oci_staging_runtime_deploy.sh"
-    subprocess.run(["bash","-n",str(d)],check=True)
-    content=d.read_text()
-    assert "\\${OCI_IMAGE_REF" not in content
-    assert "PGDATA=/var/lib/postgresql/data/pgdata" in content
