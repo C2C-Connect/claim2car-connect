@@ -160,7 +160,7 @@ resource "oci_identity_dynamic_group" "staging_runcommand" {
   compartment_id = var.tenancy_ocid
   name           = local.runcommand_dynamic_group_name
   description    = "Only the Claim2Car staging compute instance may receive private run commands."
-  matching_rule = "ALL {instance.id = '${oci_core_instance.staging.id}'}"
+  matching_rule  = "ALL {instance.id = '${oci_core_instance.staging.id}'}"
 }
 
 resource "oci_identity_policy" "staging_runcommand" {
