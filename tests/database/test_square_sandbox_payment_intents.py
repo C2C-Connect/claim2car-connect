@@ -1,6 +1,7 @@
 """Tenant/RLS integration tests for persisted Sandbox checkout-link intent."""
 import hashlib
 from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 import json
 import os
 from pathlib import Path
@@ -81,7 +82,7 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
         with tenant_transaction(self.conn,self.tenant):
             self.assertEqual(self.register(),'CREATED')
             self.assertEqual(self.register(intent_id=str(uuid.uuid4())),'DUPLICATE')
-            rows=self.conn.execute('SELECT obligation_entry_id,provider_link_id,provider_order_id,amount_cents,currency,status FROM faos.square_sandbox_payment_intents').fetchall()
+            rows=self.conn.execute('SELECT i.obligation_entry_id,i.provider_link_id,i.provider_order_id,i.amount_cents,i.currency,COALESCE(r.status,i.status) FROM faos.square_sandbox_payment_intents i LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id').fetchall()
             self.assertEqual(rows,[(self.entry_id,'link-1','order-1',27500,'USD','LINK_CREATED')])
 
     def test_concurrent_retries_share_one_payment_intent(self):
@@ -131,3 +132,77 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
                 with self.conn.transaction():
                     self.register(tenant=str(uuid.uuid4()),intent_id=str(uuid.uuid4()),actor='operator-1')
             self.assertEqual(mismatch.exception.diag.message_primary,'TENANT_CONTEXT_MISMATCH')
+
+    def webhook(self,event_id,status,*,order='order-1',payment='payment-1',amount=27500,currency='USD',created=None,body=None):
+        created=created or datetime.now(timezone.utc)
+        raw=body if body is not None else (f'{event_id}|{status}|{payment}|{order}|{amount}|{currency}|{created.isoformat()}').encode()
+        digest=hashlib.sha256(raw).hexdigest()
+        with tenant_transaction(self.conn,self.tenant):
+            return self.conn.execute(
+                'SELECT faos.reconcile_square_sandbox_webhook(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (event_id,'payment.updated',payment,order,status,amount,currency,created.isoformat(),digest),
+            ).fetchone()[0]
+
+    def test_verified_webhook_authorizes_and_completes_intent_idempotently(self):
+        with tenant_transaction(self.conn,self.tenant):
+            self.assertEqual(self.register(),'CREATED')
+        created=datetime.now(timezone.utc)+timedelta(seconds=1)
+        self.assertEqual(self.webhook('event-approved','APPROVED',created=created),'RECONCILED')
+        row=self.conn.execute(
+            'SELECT COALESCE(r.status,i.status),r.provider_payment_id FROM faos.square_sandbox_payment_intents i '
+            'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
+        ).fetchone()
+        self.assertEqual(row,('AUTHORIZED','payment-1'))
+        paid_at=created+timedelta(seconds=2)
+        self.assertEqual(self.webhook('event-completed','COMPLETED',created=paid_at),'RECONCILED')
+        self.assertEqual(self.webhook('event-completed','COMPLETED',created=paid_at),'DUPLICATE')
+        row=self.conn.execute(
+            'SELECT COALESCE(r.status,i.status),r.provider_payment_id FROM faos.square_sandbox_payment_intents i '
+            'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
+        ).fetchone()
+        self.assertEqual(row,('PAID','payment-1'))
+        receipt=self.seed.execute(
+            'SELECT reconciliation_status FROM faos.square_sandbox_webhook_receipts WHERE provider_event_id=%s',
+            ('event-completed',),
+        ).fetchone()
+        self.assertEqual(receipt,('RECONCILED',))
+
+    def test_webhook_amount_mismatch_and_unmatched_order_are_recorded_without_payment(self):
+        with tenant_transaction(self.conn,self.tenant):
+            self.assertEqual(self.register(),'CREATED')
+        self.assertEqual(self.webhook('event-wrong-amount','COMPLETED',amount=26000),'AMOUNT_MISMATCH')
+        self.assertEqual(self.webhook('event-unmatched','COMPLETED',order='unknown-order'),'UNMATCHED_ORDER')
+        status=self.conn.execute(
+            'SELECT COALESCE(r.status,i.status) FROM faos.square_sandbox_payment_intents i '
+            'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
+        ).fetchone()[0]
+        self.assertEqual(status,'LINK_CREATED')
+        states=self.seed.execute(
+            'SELECT provider_event_id,reconciliation_status FROM faos.square_sandbox_webhook_receipts '
+            'WHERE provider_event_id IN (%s,%s) ORDER BY provider_event_id',
+            ('event-unmatched','event-wrong-amount'),
+        ).fetchall()
+        self.assertEqual(states,[('event-unmatched','UNMATCHED_ORDER'),('event-wrong-amount','AMOUNT_MISMATCH')])
+
+    def test_webhook_payment_id_conflict_and_stale_event_cannot_regress_paid_state(self):
+        with tenant_transaction(self.conn,self.tenant):
+            self.assertEqual(self.register(),'CREATED')
+        paid_at=datetime.now(timezone.utc)+timedelta(seconds=3)
+        self.assertEqual(self.webhook('event-paid','COMPLETED',created=paid_at),'RECONCILED')
+        self.assertEqual(self.webhook('event-other-payment','COMPLETED',payment='payment-2',created=paid_at+timedelta(seconds=1)),'PAYMENT_ID_CONFLICT')
+        self.assertEqual(self.webhook('event-old-approval','APPROVED',created=paid_at-timedelta(seconds=1)),'STALE_EVENT')
+        row=self.conn.execute(
+            'SELECT COALESCE(r.status,i.status),r.provider_payment_id FROM faos.square_sandbox_payment_intents i '
+            'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
+        ).fetchone()
+        self.assertEqual(row,('PAID','payment-1'))
+
+    def test_event_id_reuse_with_different_payload_is_rejected(self):
+        with tenant_transaction(self.conn,self.tenant):
+            self.assertEqual(self.register(),'CREATED')
+        timestamp=datetime.now(timezone.utc)
+        self.webhook('event-conflict','APPROVED',created=timestamp,body=b'first-payload')
+        with self.assertRaises(psycopg.errors.RaiseException) as conflict:
+            with self.conn.transaction():
+                self.webhook('event-conflict','COMPLETED',created=timestamp,body=b'different-payload')
+        self.assertEqual(conflict.exception.diag.message_primary,'SQUARE_WEBHOOK_EVENT_ID_CONFLICT')
