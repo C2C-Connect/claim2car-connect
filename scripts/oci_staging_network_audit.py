@@ -123,12 +123,12 @@ def run_audit(subnet_id: str, expected_vcn_id: str, nsg_ids: list[str] | None = 
     subnet_document = _oci_json("network", "subnet", "get", "--subnet-id", subnet_id)
     subnet = _data(subnet_document)
     ids = subnet.get("securityListIds")
-    if not isinstance(ids, list) or not ids:
-        return audit_network(subnet_document, [], expected_vcn_id)
-    documents = [
-        _oci_json("network", "security-list", "get", "--security-list-id", str(security_id))
-        for security_id in ids
-    ]
+    documents = []
+    if isinstance(ids, list) and ids:
+        documents = [
+            _oci_json("network", "security-list", "get", "--security-list-id", str(security_id))
+            for security_id in ids
+        ]
     findings = audit_network(subnet_document, documents, expected_vcn_id)
     for nsg_id in nsg_ids or []:
         nsg_document = _oci_json("network", "nsg", "get", "--network-security-group-id", nsg_id)

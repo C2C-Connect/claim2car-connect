@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "oci_staging_network_audit.py"
@@ -121,6 +122,17 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         findings = AUDIT.audit_nsg(nsg, rules, "vcn-good")
         self.assertIn("NSG_VCN_MISMATCH:staging", findings)
         self.assertIn("NSG_INGRESS_SOURCE_UNSUPPORTED:staging:0", findings)
+
+    def test_nsg_audit_still_runs_when_subnet_security_list_inventory_is_missing(self):
+        responses = [
+            {"data": {"vcnId": "vcn-good", "prohibitPublicIpOnVnic": True, "securityListIds": []}},
+            {"data": {"id": "nsg-wrong", "vcnId": "vcn-good", "displayName": "staging"}},
+            {"data": []},
+        ]
+        with patch.object(AUDIT, "_oci_json", side_effect=responses):
+            findings = AUDIT.run_audit("ocid1.subnet.test", "vcn-good", ["ocid1.networksecuritygroup.test"])
+        self.assertIn("SUBNET_SECURITY_LISTS_MISSING", findings)
+        self.assertIn("NSG_ID_MISMATCH:staging", findings)
 
     def test_manual_github_network_audit_workflow_is_read_only_and_fail_closed(self):
         workflow = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "oci-staging-network-audit.yml").read_text()
