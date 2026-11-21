@@ -214,7 +214,8 @@ def verify(report,admin,connections,tenants,session):
     finally:
         for tenant in tenants:
             admin.execute('DELETE FROM faos.square_sandbox_payment_intents WHERE tenant_id=%s AND idempotency_key LIKE %s',(tenant,'matrix-idem-%'))
-            admin.execute('DELETE FROM faos.square_sandbox_payment_intents WHERE tenant_id=%s AND idempotency_key LIKE %s',(tenant,'matrix-idem-%'))
+            admin.execute('DELETE FROM faos.financial_ledger_postings WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-shop-ledger-%'))
+            admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-shop-ledger-%'))
             admin.execute('DELETE FROM faos.financial_ledger_postings WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','location_brands'):
