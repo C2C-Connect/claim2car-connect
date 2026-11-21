@@ -65,6 +65,15 @@ resource "oci_core_instance" "staging" {
     ocpus         = var.ocpus
     memory_in_gbs = var.memory_in_gbs
   }
+  agent_config {
+    is_management_disabled  = false
+    is_monitoring_disabled = false
+
+    plugins_config {
+      name          = "Compute Instance Run Command"
+      desired_state = "ENABLED"
+    }
+  }
 
   create_vnic_details {
     subnet_id        = data.oci_core_subnet.existing.id
