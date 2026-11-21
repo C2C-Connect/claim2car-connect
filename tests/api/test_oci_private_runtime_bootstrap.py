@@ -360,7 +360,7 @@ sys.exit(0)
         "OCI_REGISTRY":"registry.example.test",
         "OCI_REGISTRY_USERNAME":"test-user",
         "OCI_REGISTRY_TOKEN":"test-token",
-        "C2C_POSTGRES_IMAGE":"registry.example.test/ns/postgres@sha256:"+"b"*64,
+        "C2C_POSTGRES_IMAGE":"docker.io/postgis/postgis:16-3.4@sha256:"+"b"*64,
         "C2C_STAGING_LOOPBACK_PORT":"18000",
     }
     command=[sudo,"env"]+[f"{k}={v}" for k,v in env.items()]+["bash",str(ROOT/"scripts/oci_staging_runtime_deploy.sh")]
