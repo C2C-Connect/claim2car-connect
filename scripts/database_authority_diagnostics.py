@@ -52,7 +52,7 @@ def denied(conn,tenant,event):
     else:
         raise AssertionError('UNAUTHORIZED_APPEND_ALLOWED')
 
-TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases','claim_case_incident_intake')
+TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases','claim_case_incident_intake','square_sandbox_payment_intents')
 CHECKS = ('rls_flags','own_read','cross_read','cross_insert','cross_update','cross_delete','tenant_reassignment','spoofed_context','missing_context','malformed_context')
 
 def reject_mutation(conn,tenant,statement,parameters):
@@ -71,7 +71,7 @@ def verify(report,admin,connections,tenants,session):
     report['checks'].append(matrix)
     actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings' AND c.relname NOT IN ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox','vehicle_identity_sources','vehicle_decode_snapshots')").fetchall()
     expect({row[0] for row in actual}==set(TABLES),'TENANT_TABLE_SCOPE_CHANGED')
-    ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim')}
+    ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim','shop_acceptance','shop_partner','shop_intent')}
     seal = 'matrix-seal-'+uuid.uuid4().hex
     digest = '0'*64
     try:
@@ -95,6 +95,16 @@ def verify(report,admin,connections,tenants,session):
                 (tenant,ledger_id,'matrix-ledger-idem-'+uuid.uuid4().hex,session,'OBLIGATION_BOOKED','DEALER_ACQUISITION_FEE','matrix-partner','matrix-acceptance','USD_CENTS','diagnostics','2026-01-01T00:00:00Z','diagnostic storage fixture','0'*64,'1'*64))
             admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,37500),(%s,%s,2,%s,%s,37500)',
                 (tenant,ledger_id,'AR:DEALER:matrix-partner','DEBIT',tenant,ledger_id,'REV:DEALER_ACQUISITION','CREDIT'))
+            shop_entry='matrix-shop-ledger-'+uuid.uuid4().hex
+            admin.execute('INSERT INTO faos.financial_ledger_entries(tenant_id,entry_id,sequence,idempotency_key,session_id,entry_kind,fee_type,partner_org_id,acceptance_id,amount_cents,currency,actor_id,occurred_at,reason,previous_hash,entry_hash) VALUES (%s,%s,1,%s,%s,%s,%s,%s,%s,27500,%s,%s,%s,%s,%s,%s)',
+                (tenant,shop_entry,'matrix-shop-idem-'+uuid.uuid4().hex,session,'OBLIGATION_BOOKED','REPAIR_SHOP_ACCEPTANCE_FEE',ids['shop_partner'],ids['shop_acceptance'],'USD_CENTS','synthetic-matrix','2026-01-01T00:00:00Z','synthetic shop obligation','0'*64,'2'*64))
+            admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,27500),(%s,%s,2,%s,%s,27500)',
+                (tenant,shop_entry,'AR:SHOP:'+ids['shop_partner'],'DEBIT',tenant,shop_entry,'REV:REPAIR_SHOP_ACCEPTANCE','CREDIT'))
+            with tenant_transaction(conn,tenant):
+                register=conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+                    (tenant,ids['shop_intent'],shop_entry,'matrix-link-'+uuid.uuid4().hex,'matrix-order-'+uuid.uuid4().hex,
+                     'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'synthetic-matrix')).fetchone()[0]
+                expect(register=='CREATED','PAYMENT_INTENT_FIXTURE_FAILED')
         for index,conn in enumerate(connections):
             own,other = tenants[index],tenants[1-index]
             for table in TABLES:
@@ -133,7 +143,7 @@ def verify(report,admin,connections,tenants,session):
                 privileges = conn.execute("SELECT has_table_privilege(current_user,%s,'INSERT'),has_table_privilege(current_user,%s,'UPDATE'),has_table_privilege(current_user,%s,'DELETE')",('faos.'+table,)*3).fetchone()
                 cursor = admin.execute(sql.SQL('SELECT * FROM {} WHERE tenant_id=%s LIMIT 1').format(target),(other,))
                 values = dict(zip((column.name for column in cursor.description),cursor.fetchone()))
-                key = {'users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id','claim_case_incident_intake':'request_id'}.get(table)
+                key = {'square_sandbox_payment_intents':'payment_intent_id','users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id','claim_case_incident_intake':'request_id'}.get(table)
                 if key:
                     values[key] = str(uuid.uuid4())
                 if table=='claim_case_incident_intake':
@@ -203,6 +213,8 @@ def verify(report,admin,connections,tenants,session):
         matrix['status'] = 'PASS'
     finally:
         for tenant in tenants:
+            admin.execute('DELETE FROM faos.square_sandbox_payment_intents WHERE tenant_id=%s AND idempotency_key LIKE %s',(tenant,'matrix-idem-%'))
+            admin.execute('DELETE FROM faos.square_sandbox_payment_intents WHERE tenant_id=%s AND idempotency_key LIKE %s',(tenant,'matrix-idem-%'))
             admin.execute('DELETE FROM faos.financial_ledger_postings WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','location_brands'):

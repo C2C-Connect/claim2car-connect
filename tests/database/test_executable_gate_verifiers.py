@@ -207,10 +207,10 @@ class ExecutableGateVerifierTests(unittest.TestCase):
                        tests=[{"id": "test_example.Example.test_skip", "outcome": "skipped"}])
         self.assertFalse(_counted_report_ok(skipped))
 
-    def test_tenant_matrix_requires_all_280_adversarial_assertions(self):
+    def test_tenant_matrix_requires_all_300_adversarial_assertions(self):
         self.assertFalse(_matrix_ok({
-            "status": "PASS", "table_count": 14, "tenant_directions": 2,
-            "assertion_count": 280, "results": [],
+            "status": "PASS", "table_count": 15, "tenant_directions": 2,
+            "assertion_count": 300, "results": [],
         }))
 
     def test_contract_is_not_silently_adopted_by_a_green_gate_run(self):

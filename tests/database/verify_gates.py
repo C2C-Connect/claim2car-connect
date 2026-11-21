@@ -164,9 +164,9 @@ def _check_map(diagnostics):
 def _matrix_ok(check):
     if not isinstance(check, dict) or check.get("status") != "PASS":
         return False
-    if check.get("table_count") != 14 or check.get("tenant_directions") != 2:
+    if check.get("table_count") != 15 or check.get("tenant_directions") != 2:
         return False
-    if check.get("assertion_count") != 280 or len(check.get("results", [])) != 28:
+    if check.get("assertion_count") != 300 or len(check.get("results", [])) != 30:
         return False
     required = {
         "rls_flags", "own_read", "cross_read", "cross_insert", "cross_update",
