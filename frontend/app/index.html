@@ -40,6 +40,10 @@
       <div class="workspace-bar"><div><div class="eyebrow">ACTIVE WORKSPACE</div><strong id="workspace-role">Operator</strong></div><button id="disconnect-button" class="button quiet" type="button">Disconnect</button></div>
       <section id="operator-view" hidden>
         <div class="section-heading"><div><div class="eyebrow">OPERATOR WORKFLOW</div><h2>New evidence case</h2><p class="muted">Create a case, record owner consent, identify the vehicle, and capture the required original images.</p></div><span class="step-index">02</span></div>
+        <article class="panel workflow-panel case-history-panel">
+          <div class="step-title"><span class="step-dot">↺</span><div><h3>Recent persistent cases</h3><p class="muted">Your tenant- and operator-scoped cases. Reopen to restore server-recorded consent, vehicle, evidence and quality status.</p></div></div>
+          <button id="refresh-cases" class="button secondary" type="button">Refresh cases</button><div id="case-list-status" class="inline-status"></div><div id="case-list" class="case-list"></div>
+        </article>
         <article class="panel workflow-panel">
           <div class="step-title"><span class="step-dot">1</span><div><h3>Create a case</h3><p class="muted">The server assigns the authenticated operator and tenant.</p></div></div>
           <button id="create-case" class="button primary" type="button">Create new case</button><div id="case-status" class="inline-status"></div><div id="case-id" class="case-id" hidden></div>
@@ -59,7 +63,7 @@
           <div class="step-title"><span class="step-dot">4</span><div><h3>Capture original evidence</h3><p class="muted">Use the device camera or choose an image. Original bytes are uploaded without resizing or recompression. Retaking a slot supersedes its prior artifact.</p></div></div>
           <div class="capture-warning"><strong>Roadside safety comes first.</strong> Never enter traffic or delay emergency response, police direction, stabilization, loading, or scene clearance to complete a capture. If a required angle is unsafe, stop and leave the case unsealed. This initial UI cannot yet record a server-side skip or abort event.</div>
           <div id="slot-grid" class="slot-grid"></div>
-          <div class="quality-block"><div><h3>Operator image check</h3><p class="muted">This is a manual advisory check, not an AI verdict or an acceptance decision.</p></div><div id="quality-grid" class="quality-grid"></div><button id="seal-case" class="button primary" type="button" disabled>Record checks and seal evidence</button><div id="seal-status" class="inline-status"></div></div>
+          <div class="quality-block"><button id="resume-capture" class="button secondary" type="button" hidden>Resume capture after safety pause</button><div><h3>Operator image check</h3><p class="muted">This is a manual advisory check, not an AI verdict or an acceptance decision.</p></div><div id="quality-grid" class="quality-grid"></div><button id="seal-case" class="button primary" type="button" disabled>Record checks and seal evidence</button><div id="seal-status" class="inline-status"></div></div>
         </article>
       </section>
       <section id="reviewer-view" hidden>

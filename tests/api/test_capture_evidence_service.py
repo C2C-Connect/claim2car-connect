@@ -121,6 +121,17 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.byte_store = RecordingByteStore(Path(temp.name).resolve())
         self.service = CaptureEvidenceService(self.sessions, self.byte_store, "p" * 43)
 
+    def test_evidence_readiness_exposes_resume_state_without_sensitive_identity(self):
+        readiness = self.service.evidence_readiness("operator-token", self.session_id)
+        self.assertFalse(readiness["consent_active"])
+        self.assertFalse(readiness["vehicle_reference_present"])
+        self.assertFalse(readiness["capture_allowed"])
+        self.assertEqual(readiness["registered_artifacts"], [])
+        self.assertFalse(readiness["quality_recorded"])
+        self.assertEqual(readiness["quality_results"], {})
+        self.assertFalse(readiness["sealed"])
+        self.assertFalse(readiness["review_recorded"])
+
     def test_owner_consent_and_keyed_vin_reference_never_store_raw_vin(self):
         self.service.record_consent(
             "owner-token", self.session_id, request_id=UUID(int=3),

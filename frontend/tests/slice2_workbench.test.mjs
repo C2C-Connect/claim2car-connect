@@ -54,5 +54,10 @@ assert.deepEqual(apiSlots, CANONICAL_SLOTS, "browser upload slots must exactly m
 assert.ok(browserWorkbenchSource.includes("/v1/claim-cases"), "workbench must create a persistent claim-case record");
 assert.ok(browserWorkbenchSource.includes("capture_protocol_version:\"claims2car-16-v1\""), "new cases must bind the implemented 16-view protocol");
 assert.ok(!browserWorkbenchSource.includes('api("/v1/capture-sessions",state.token'), "workbench must not create unlinked controlled-test sessions");
+assert.ok(browserWorkbenchSource.includes("/v1/claim-cases?limit=50"), "operator workbench must load persistent case history");
+assert.ok(browserWorkbenchSource.includes("/evidence-readiness"), "resuming a case must use server-authoritative readiness");
+assert.ok(browserWorkbenchSource.includes("registered_artifacts"), "resume must restore registered original artifact metadata");
+assert.ok(browserWorkbenchSource.includes("qualityRecorded"), "resume must avoid duplicating quality records when sealing retries");
+
 
 console.log(JSON.stringify({ suite: "slice2-workbench", assertions: 12, status: "passed" }));

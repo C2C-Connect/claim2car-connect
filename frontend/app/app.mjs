@@ -48,9 +48,10 @@ function setConnected(role){
   byId("connection-indicator").textContent="Connected · "+role;
   byId("connection-indicator").classList.add("connected");
   if(role==="reviewer")refreshQueue();
+  if(role==="operator")refreshCaseList();
 }
 function disconnect(){
-  state.token=null;state.role=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;
+  state.token=null;state.role=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};
   state.vehicleRecorded=false;state.sealed=false;state.artifacts.clear();
   state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
   byId("access-token").value="";byId("owner-token").value="";byId("vin-input").value="";
@@ -66,6 +67,7 @@ byId("connect-form").addEventListener("submit",(event)=>{
   state.token=token;message("connect-message","");setConnected(byId("role").value);
 });
 byId("disconnect-button").addEventListener("click",disconnect);
+byId("refresh-cases").addEventListener("click",refreshCaseList);
 
 byId("create-case").addEventListener("click",async()=>{
   byId("create-case").disabled=true;
@@ -77,8 +79,9 @@ byId("create-case").addEventListener("click",async()=>{
     if(!created||created.claim_id!==claimId||typeof created.capture_session_id!=="string"||!created.capture_session_id){
       throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
     }
-    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;
+    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
+    refreshCaseList();
     show("consent-panel");message("consent-status","Persistent claim case created using the 16-view capture protocol. Owner consent is required before vehicle identification or evidence capture.");
   }catch(error){message("case-status",error.message,true);}
   finally{byId("create-case").disabled=false;}
@@ -111,13 +114,21 @@ async function sha256Hex(buffer){
   const digest=await crypto.subtle.digest("SHA-256",buffer);
   return Array.from(new Uint8Array(digest),(value)=>value.toString(16).padStart(2,"0")).join("");
 }
-function renderCaptureSlots(){
+function renderCaptureSlots(readiness=null){
   const grid=byId("slot-grid"),quality=byId("quality-grid");grid.replaceChildren();quality.replaceChildren();
+  state.artifacts.clear();
+  const knownArtifacts=readiness?.registered_artifacts||[];
+  state.qualityResults=readiness?.quality_results||{};
   API_CAPTURE_SLOTS.forEach(([slot,label])=>{
+    const existing=knownArtifacts.find(item=>item.slot===slot);
+    if(existing)state.artifacts.set(slot,{artifactId:existing.artifact_id,sha256:existing.sha256,byteLength:existing.byte_length,label});
     const card=document.createElement("div");card.className="slot-card";
     const heading=document.createElement("h4");heading.textContent=label;
     const input=document.createElement("input");input.type="file";input.accept="image/*";input.capture="environment";input.setAttribute("aria-label","Capture "+label);
-    const meta=document.createElement("div");meta.className="slot-meta";meta.textContent="Original image not uploaded";
+    input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;
+    const meta=document.createElement("div");meta.className="slot-meta";
+    meta.textContent=existing?"Previously uploaded · "+existing.byte_length.toLocaleString()+" bytes · SHA-256 "+existing.sha256.slice(0,12)+"…":"Original image not uploaded";
+    if(existing)meta.classList.add("done");
     const preview=document.createElement("img");preview.className="slot-preview";preview.hidden=true;
     input.addEventListener("change",async()=>{
       const file=input.files&&input.files[0];if(!file)return;
@@ -131,31 +142,97 @@ function renderCaptureSlots(){
         const url=URL.createObjectURL(file);state.previews.set(slot,url);preview.src=url;preview.hidden=false;
         meta.textContent="Uploaded · "+file.size.toLocaleString()+" bytes · SHA-256 verified";meta.classList.add("done");updateSealButton();
       }catch(error){meta.textContent=error.message;meta.classList.add("error");}
-      finally{input.disabled=false;}
+      finally{input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;}
     });
     card.append(heading,input,meta,preview);grid.append(card);
     const row=document.createElement("div");row.className="quality-item";
     const name=document.createElement("span");name.textContent=label;
     const select=document.createElement("select");select.dataset.slot=slot;
     for(const [value,text] of [["","Not checked"],["usable","Usable"],["retake","Needs retake"]]){const option=document.createElement("option");option.value=value;option.textContent=text;select.append(option);}
+    if(Object.prototype.hasOwnProperty.call(state.qualityResults,slot))select.value=state.qualityResults[slot]?"usable":"retake";
+    select.disabled=state.qualityRecorded||state.sealed;
     select.addEventListener("change",updateSealButton);row.append(name,select);quality.append(row);
   });
+  byId("resume-capture").hidden=!state.capturePaused;
+  byId("resume-capture").disabled=!state.capturePaused;
   updateSealButton();
 }
 function updateSealButton(){
   const allUploaded=API_CAPTURE_SLOTS.every(([slot])=>state.artifacts.has(slot));
-  const allChecked=Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");
-  byId("seal-case").disabled=!allUploaded||!allChecked||state.sealed;
+  const allChecked=state.qualityRecorded||Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");
+  byId("seal-case").disabled=!allUploaded||!allChecked||state.sealed||state.capturePaused;
+  byId("seal-case").textContent=state.qualityRecorded?"Retry evidence sealing":"Record checks and seal evidence";
 }
 byId("seal-case").addEventListener("click",async()=>{
   const button=byId("seal-case");button.disabled=true;
   try{
-    const results={};byId("quality-grid").querySelectorAll("select").forEach((node)=>{results[node.dataset.slot]=node.value==="usable";});
-    await api("/v1/capture-sessions/"+state.sessionId+"/quality",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),results})});
+    if(!state.qualityRecorded){
+      const results={};byId("quality-grid").querySelectorAll("select").forEach((node)=>{results[node.dataset.slot]=node.value==="usable";});
+      await api("/v1/capture-sessions/"+state.sessionId+"/quality",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),results})});
+      state.qualityRecorded=true;state.qualityResults=results;
+      byId("quality-grid").querySelectorAll("select").forEach((node)=>node.disabled=true);
+      byId("slot-grid").querySelectorAll("input[type=file]").forEach((node)=>node.disabled=true);
+    }
     const sealed=await api("/v1/capture-sessions/"+state.sessionId+"/seal",state.token,{method:"POST",body:JSON.stringify({request_id:uuid()})});
     state.sealed=true;message("seal-status","Evidence sealed. Manifest SHA-256: "+sealed.manifest_digest);button.textContent="Evidence sealed";
+    byId("slot-grid").querySelectorAll("input[type=file]").forEach((node)=>node.disabled=true);
+    byId("quality-grid").querySelectorAll("select").forEach((node)=>node.disabled=true);
+    updateSealButton();refreshCaseList();
   }catch(error){message("seal-status",error.message,true);updateSealButton();}
 });
+byId("resume-capture").addEventListener("click",async()=>{
+  const button=byId("resume-capture");button.disabled=true;
+  try{
+    await api("/v1/capture-sessions/"+state.sessionId+"/resume",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),reason:"Operator resumed capture in workbench"})});
+    const readiness=await api("/v1/capture-sessions/"+state.sessionId+"/evidence-readiness",state.token);
+    state.capturePaused=Boolean(readiness.capture_paused);state.qualityRecorded=Boolean(readiness.quality_recorded);state.qualityResults=readiness.quality_results||{};state.sealed=Boolean(readiness.sealed);message("seal-status","Capture resumed. Safety remains the operator's responsibility.");
+    renderCaptureSlots(readiness);
+  }catch(error){message("seal-status",error.message,true);button.disabled=false;}
+});
+async function refreshCaseList(){
+  const container=byId("case-list");if(!container)return;
+  container.replaceChildren();
+  const status=byId("case-list-status");status.textContent="Loading persistent cases…";status.classList.remove("error");
+  try{
+    const cases=await api("/v1/claim-cases?limit=50",state.token);
+    status.textContent=cases.length?cases.length+" recent case(s)":"No persistent cases yet.";
+    cases.forEach((item)=>{
+      const row=document.createElement("article");row.className="case-list-item";
+      const info=document.createElement("div");info.className="case-list-info";
+      const title=document.createElement("strong");title.textContent="Claim "+item.claim_id;
+      const detail=document.createElement("span");detail.textContent=(item.state||"UNKNOWN")+" · "+(item.created_at||"Created date unavailable");
+      info.append(title,detail);
+      const button=document.createElement("button");button.type="button";button.className="button secondary";button.textContent="Resume";
+      button.addEventListener("click",()=>openClaimCase(item,button));
+      row.append(info,button);container.append(row);
+    });
+  }catch(error){status.textContent="Unable to load cases: "+error.message;status.classList.add("error");}
+}
+async function openClaimCase(item,button){
+  if(button)button.disabled=true;
+  try{
+    const readiness=await api("/v1/capture-sessions/"+item.capture_session_id+"/evidence-readiness",state.token);
+    state.claimId=item.claim_id;state.sessionId=item.capture_session_id;byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.consentRecorded=Boolean(readiness.consent_active);
+    state.vehicleRecorded=Boolean(readiness.vehicle_reference_present);
+    state.sealed=Boolean(readiness.sealed);
+    state.qualityRecorded=Boolean(readiness.quality_recorded);
+    state.capturePaused=Boolean(readiness.capture_paused);
+    state.qualityResults=readiness.quality_results||{};
+    state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
+    byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
+    show("consent-panel",!state.consentRecorded);
+    show("vin-panel",state.consentRecorded&&!state.vehicleRecorded);
+    show("capture-panel",state.consentRecorded&&state.vehicleRecorded);
+    if(state.consentRecorded&&state.vehicleRecorded){
+      renderCaptureSlots(readiness);
+      message("seal-status",state.capturePaused?"Capture is paused. Resume only when the scene is safe.":state.sealed?"Evidence is already sealed; this view is read-only.":state.qualityRecorded?"Quality checks were already recorded. Use Retry evidence sealing to finish the interrupted seal operation.":"Case resumed. Existing server-registered originals and prior quality checks are restored.");
+    }
+    message("consent-status","Existing case selected. Owner consent status is server-authoritative.");
+    message("vin-status","Existing vehicle-reference status is server-authoritative.");
+  }catch(error){message("case-list-status","Unable to resume case: "+error.message,true);}
+  finally{if(button)button.disabled=false;}
+}
 byId("refresh-queue").addEventListener("click",refreshQueue);
 function sniffImageType(buffer){
   const b=new Uint8Array(buffer);
