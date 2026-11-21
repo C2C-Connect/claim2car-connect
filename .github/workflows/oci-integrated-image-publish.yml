@@ -68,6 +68,8 @@ jobs:
           push: true
           tags: ${{ steps.validate.outputs.image }}
           provenance: true
+          build-args: |
+            C2C_BUILD_REVISION=${{ github.sha }}
           sbom: true
       - name: Record immutable image reference
         env:
