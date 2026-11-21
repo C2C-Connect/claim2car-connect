@@ -89,7 +89,11 @@ def audit_nsg(nsg_document: dict[str, Any], rules_document: dict[str, Any], expe
         if not isinstance(rule, dict):
             findings.append(f"NSG_RULE_INVALID:{name}:{index}")
             continue
-        if str(rule.get("direction", "")).upper() != "INGRESS":
+        direction = str(rule.get("direction", "")).upper()
+        if direction not in {"INGRESS", "EGRESS"}:
+            findings.append(f"NSG_RULE_DIRECTION_INVALID:{name}:{index}")
+            continue
+        if direction == "EGRESS":
             continue
         source_type = rule.get("sourceType")
         source = rule.get("source")

@@ -116,6 +116,12 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         findings = AUDIT.audit_nsg(nsg, rules, "vcn-good")
         self.assertIn("NSG_PUBLIC_INGRESS:staging:0:source=::/0", findings)
 
+    def test_nsg_rule_without_direction_fails_closed(self):
+        nsg = {"data": {"id": "nsg-1", "vcnId": "vcn-good", "displayName": "staging"}}
+        rules = {"data": [{"sourceType": "CIDR_BLOCK", "source": "10.0.0.0/16"}]}
+        findings = AUDIT.audit_nsg(nsg, rules, "vcn-good")
+        self.assertIn("NSG_RULE_DIRECTION_INVALID:staging:0", findings)
+
     def test_nsg_wrong_vcn_and_unsupported_source_fail_closed(self):
         nsg = {"data": {"id": "nsg-1", "vcnId": "vcn-other", "displayName": "staging"}}
         rules = {"data": [{"direction": "INGRESS", "sourceType": "NETWORK_SECURITY_GROUP", "source": "nsg-source", "protocol": "6"}]}

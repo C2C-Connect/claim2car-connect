@@ -73,6 +73,7 @@ jobs:
           if [[ -n "${NSG_OCIDS}" ]]; then
             IFS=',' read -ra nsg_ids <<< "${NSG_OCIDS}"
             for nsg_id in "${nsg_ids[@]}"; do
+              nsg_id="${nsg_id//[[:space:]]/}"
               [[ "${nsg_id}" =~ ^ocid1\.networksecuritygroup\. ]] || { echo "Invalid NSG OCID"; exit 2; }
               nsg_args+=(--nsg-id "${nsg_id}")
             done
