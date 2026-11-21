@@ -183,6 +183,7 @@ def test_cloud_init_enables_private_runcommand_without_broad_sudo():
     assert "ocir_auth_secret" in cloud_init or "secret-bundle get" in cloud_init
     assert 'registry == "us-chicago-1.ocir.io"' in cloud_init
     assert 'image == "$registry/$namespace/$repository:"*' in cloud_init
+    assert 'db_image == "docker.io/postgis/postgis:"*' in cloud_init
 
 
 def test_terraform_runcommand_secret_access_is_scoped_to_secret_ocid():
