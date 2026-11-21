@@ -106,4 +106,6 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION faos.register_square_sandbox_payment_intent(uuid,uuid,text,text,text,text,text,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION faos.register_square_sandbox_payment_intent(uuid,uuid,text,text,text,text,text,text) TO faos_app;
+GRANT CREATE ON SCHEMA faos TO faos_writer;
 ALTER FUNCTION faos.register_square_sandbox_payment_intent(uuid,uuid,text,text,text,text,text,text) OWNER TO faos_writer;
+REVOKE CREATE ON SCHEMA faos FROM faos_writer;
