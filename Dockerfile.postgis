@@ -1,0 +1,12 @@
+# ARM64 staging PostgreSQL 16 with PostGIS extensions.
+# Published as a digest-pinned OCI image from the same source commit as the app.
+FROM postgres:16-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-16-postgis-3 postgresql-16-postgis-3-scripts \
+    && rm -rf /var/lib/apt/lists/* \
+    && test -f "$(pg_config --sharedir)/extension/postgis.control" \
+    && test -f "$(pg_config --sharedir)/extension/postgis_topology.control"
+
+LABEL org.opencontainers.image.title="Claim2Car PostgreSQL 16 + PostGIS staging database"
+LABEL org.opencontainers.image.description="Digest-pinned ARM64 PostGIS database runtime for Claim2Car private staging"
