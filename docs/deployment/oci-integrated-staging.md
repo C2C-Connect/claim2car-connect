@@ -12,6 +12,8 @@ The provider-neutral restricted container remains a CI-only containment check. T
 
 ## 2. Existing foundation and boundaries
 
+Before provisioning, run the manual **OCI staging private-network ingress audit (read-only)** workflow from `main` using the exact private subnet OCID and expected VCN OCID. It reads the subnet and every attached security list and fails if the subnet is not private, VCN identity differs, inventory is incomplete, or any ingress source is unrestricted IPv4/IPv6. It does not mutate OCI. Remediate findings through a separately approved OCI change, then rerun the audit and retain its result.
+
 The owner has already created an OCI tenancy/compartment foundation and a private VCN/subnet with NAT and Oracle-services egress. Exact OCIDs, private CIDRs, API keys, and resource identifiers are intentionally not stored in this public repository.
 
 A private VCN DNS name is not a public internet domain. Keep the first staging deployment private and access it through OCI Bastion or an approved VPN. Public claimant/operator access requires a separately approved public domain, TLS certificate, and ingress design.
