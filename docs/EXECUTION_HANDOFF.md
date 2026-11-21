@@ -64,13 +64,15 @@ For each increment:
 6. **Field/pilot readiness:** only after software and deployment are demonstrated; close legal/partner, consent, data retention, safety, and field-validation requirements.
 7. **Broader marketplace/dispatch/payment/analytics:** implement incrementally behind explicit lifecycle and security controls.
 
-## Current verified checkpoint (2026-11-21)
+## Current verified checkpoint (2026-11-21; freshly reconciled)
 
-- **PR #119 — Persist tenant-bound Square Sandbox checkout intents:** merged to main. Merge commit: `c7befe0aa8366b109818310ae488809cc695e58c`. Tested head: `dd21e35484a90dcced1990eccbf674e9cad5c342`; the observed workflow list showed 18 completed successful runs (including full suite, database authority, legacy DB, controlled intake, integrated runtime smoke, and frontend/browser workflows). Verify current main freshly before relying on this.
-- **PR #120 — Square Sandbox webhook receipt and payment-state reconciliation:** closed unmerged as superseded; its branch remains. Latest observed head: `3b7ab26c7aca151ded5b2fd41c09573f618f4b68`. No workflow runs were returned for that exact head. It is **not** verified or integrated. The earlier successful run for PR #119 does not test #120.
-- **OCI staging:** still not deployed. Existing Terraform, guarded provisioning, image publication, preflight and runtime scripts are implementation assets only. No live OCI compute, app PostgreSQL/PostGIS, persistent evidence storage, or deployed end-to-end journey has been evidenced.
-- **Do not use the Oracle MySQL Always Free DB as the app authority**; it conflicts with PostgreSQL/PostGIS direction.
-- **Known deployment dependencies:** OCI credentials and GitHub environment configuration/permission to dispatch/apply, private Terraform state bucket, plan review, availability/cost confirmation, then guarded provisioning and actual host configuration. Keep the environment private.
+- **Main baseline observed:** `1c1a010143ce8c9407fc3299e0eeaa5f623e4c08` — commit titled “Record standing autonomous execution mandate and thread handoff (#124)”. Verify live main before acting; this snapshot is not a substitute for live inspection.
+- **PR #119 — tenant-bound Square Sandbox checkout intents:** merged to main at `c7befe0aa8366b109818310ae488809cc695e58c`. This increment adds persisted sandbox checkout-intent registration with eligibility and tenant checks. Do not infer actual Square payments or settlement.
+- **PR #125 — Square Sandbox webhook receipt/payment-state reconciliation, fresh CI validation:** open as last observed. It carries migrations 0025/0026, webhook receipt/reconciliation, and related fixes. Its PR description says corrected head has no workflow runs attached yet; exact head/check status must be fetched before merge. PR #120 was closed unmerged as superseded; PR #122 must not be treated as integrated unless live evidence proves it. PR #125 is the active validation candidate to inspect first.
+- **Latest merged app workflow increments:** #116 hardened non-root runtime, #117 Sandbox-only Square checkout/webhook verification, #118 direct capture-workbench/Vehicle-Lab entry points, and #119 persisted checkout intents; inspect current main and CI evidence before relying on these summaries.
+- **OCI integrated staging:** not deployed. The guarded apply workflow and remote Terraform backend are merged, but no state bucket, apply, compute, PostgreSQL/PostGIS authority DB, persistent evidence storage, or integrated staging deployment is evidenced. Required OCI/GitHub configuration and access remain the practical blockers. Existing Oracle MySQL Always Free DB is not the app authority.
+- **Next execution step:** inspect live main, PR #125 exact head and all checks; run or enable CI for that exact head if possible; fix failures; merge only when all required checks pass. Then proceed immediately to OCI state bucket/configuration and guarded plan/apply/deployment, verifying costs and access first. Keep independent implementation moving if credentials/configuration block cloud work.
+- **Status discipline:** this snapshot is dated, and facts may age. Always verify live repository, PR, workflow, and cloud state before claiming current status.
 
 ## Thread-resume instructions
 
