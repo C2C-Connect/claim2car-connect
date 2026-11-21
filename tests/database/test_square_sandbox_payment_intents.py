@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 import uuid
 import psycopg
 from psycopg import sql
@@ -69,8 +70,9 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
                  'verified shop acceptance',None,previous,entry_hash,json.dumps(lines,separators=(',',':')))).fetchone()[0]
         self.assertEqual(result,'ACCEPTED')
 
-    def register(self,*,tenant=None,intent_id=None,link='link-1',order='order-1',url='https://sandbox.square.link/u/test',key='c2c-shop-fee-test',actor='operator-1'):
-        return self.conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+    def register(self,*,conn=None,tenant=None,intent_id=None,link='link-1',order='order-1',url='https://sandbox.square.link/u/test',key='c2c-shop-fee-test',actor='operator-1'):
+        conn=conn or self.conn
+        return conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
             (tenant or self.tenant,intent_id or str(uuid.uuid4()),self.entry_id,link,order,url,key,actor)).fetchone()[0]
 
     def test_create_and_retry_are_idempotent_and_tenant_visible(self):
@@ -79,6 +81,19 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
             self.assertEqual(self.register(intent_id=str(uuid.uuid4())),'DUPLICATE')
         rows=self.conn.execute('SELECT obligation_entry_id,provider_link_id,provider_order_id,amount_cents,currency,status FROM faos.square_sandbox_payment_intents').fetchall()
         self.assertEqual(rows,[(self.entry_id,'link-1','order-1',27500,'USD','LINK_CREATED')])
+
+    def test_concurrent_retries_share_one_payment_intent(self):
+        second=psycopg.connect(make_conninfo(
+            os.getenv('MIGRATION_TEST_ADMIN_URL','postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test'),
+            dbname=self.db,user=self.role,password=self.password),autocommit=True,connect_timeout=5)
+        self.addCleanup(second.close)
+        def attempt(conn,intent):
+            with tenant_transaction(conn,self.tenant):
+                return self.register(conn=conn,intent_id=intent,key='same-concurrent-key')
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(lambda args: attempt(*args),[(self.conn,str(uuid.uuid4())),(second,str(uuid.uuid4()))]))
+        self.assertCountEqual(results,['CREATED','DUPLICATE'])
+        self.assertEqual(self.seed.execute('SELECT count(*) FROM faos.square_sandbox_payment_intents WHERE tenant_id=%s',(self.tenant,)).fetchone()[0],1)
 
     def test_idempotency_conflict_and_one_link_per_obligation(self):
         with tenant_transaction(self.conn,self.tenant):

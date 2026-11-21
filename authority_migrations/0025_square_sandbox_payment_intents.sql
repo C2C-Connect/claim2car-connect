@@ -50,6 +50,8 @@ BEGIN
  IF faos.tenant_id() IS NULL OR p_tenant IS DISTINCT FROM faos.tenant_id() THEN
   RAISE EXCEPTION 'TENANT_CONTEXT_MISMATCH';
  END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended(p_tenant::text||'|'||COALESCE(p_idempotency,''),0));
+ PERFORM pg_advisory_xact_lock(hashtextextended(p_tenant::text||'|'||COALESCE(p_obligation_entry,''),0));
  IF p_payment_intent IS NULL OR p_obligation_entry IS NULL OR length(trim(p_obligation_entry))=0
  OR p_provider_link IS NULL OR length(trim(p_provider_link))=0
  OR p_provider_order IS NULL OR length(trim(p_provider_order))=0
