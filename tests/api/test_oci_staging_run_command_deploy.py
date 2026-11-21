@@ -131,6 +131,14 @@ def test_terraform_enables_instance_agent_run_command_plugin():
     assert "is_management_disabled  = false" in content
 
 
+def test_integrated_image_embeds_source_revision_for_health_gate():
+    dockerfile=(ROOT/"Dockerfile.integrated").read_text()
+    publish=(ROOT/".github/workflows/oci-integrated-image-publish.yml").read_text()
+    assert "ARG C2C_BUILD_REVISION=unknown" in dockerfile
+    assert 'app/_build_revision.txt' in dockerfile
+    assert "C2C_BUILD_REVISION=${{ github.sha }}" in publish
+
+
 def test_run_command_deployment_workflow_is_manual_and_fail_closed():
     workflow=(ROOT/".github/workflows/oci-staging-runtime-deploy.yml").read_text()
     assert "workflow_dispatch:" in workflow
