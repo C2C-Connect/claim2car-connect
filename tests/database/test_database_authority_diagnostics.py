@@ -1,4 +1,4 @@
-"""Regression tests for strict 0017-0024 inventory and DB-01/DB-02 acceptance diagnostics."""
+"""Regression tests for strict 0017-0025 inventory and DB-01/DB-02 acceptance diagnostics."""
 import unittest
 
 from scripts.database_authority_diagnostics import validate_authority_migration_inventory
@@ -15,10 +15,11 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
-                '0021_collision_claim_link.sql',
+                    '0021_collision_claim_link.sql',
             '0022_collision_vehicle_capture_link.sql',
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
+            '0025_square_sandbox_payment_intents.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
