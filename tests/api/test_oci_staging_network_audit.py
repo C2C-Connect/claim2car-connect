@@ -149,6 +149,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         self.assertIn("scripts/oci_staging_network_audit.py", workflow)
         self.assertIn("network_security_group_ocids", workflow)
         self.assertIn("--nsg-id", workflow)
+        self.assertIn("NSG rules were not audited", workflow)
         self.assertIn("OCI_API_PRIVATE_KEY", workflow)
         self.assertIn("no network rule changes were made", workflow.lower())
         for forbidden in ("terraform apply", "oci network security-list update", "oci network security-list create", "oci network security-list delete"):

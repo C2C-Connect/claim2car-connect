@@ -90,7 +90,11 @@ jobs:
               echo "- Subnet belongs to expected VCN"
               echo "- Subnet prohibits public IP assignment"
               echo "- Every attached security list was inspected"
-              if [[ -n "${NSG_OCIDS}" ]]; then echo "- Supplied staging NSGs and their ingress rules were inspected"; fi
+              if [[ -n "${NSG_OCIDS}" ]]; then
+                echo "- Supplied staging NSGs and their ingress rules were inspected"
+              else
+                echo "- No NSG OCIDs supplied; NSG rules were not audited"
+              fi
               echo "- No IPv4 or IPv6 ingress source is unrestricted"
               echo "- Audit is read-only; no network rule changes were made"
             } >> "${GITHUB_STEP_SUMMARY}"
