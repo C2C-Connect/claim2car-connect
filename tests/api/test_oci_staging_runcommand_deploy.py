@@ -34,6 +34,14 @@ def test_runcommand_deploy_validates_exact_ocir_repository_and_digest():
     assert values["C2C_IMAGE_COMMIT"] == "a" * 40
 
 
+def test_runcommand_deploy_rejects_non_chicago_registry():
+    env = _valid_env()
+    env["OCI_REGISTRY"] = "eu-frankfurt-1.ocir.io"
+    env["C2C_IMAGE_REF"] = env["C2C_IMAGE_REF"].replace("us-chicago-1.ocir.io", "eu-frankfurt-1.ocir.io")
+    with pytest.raises(ValueError, match="Chicago OCIR"):
+        deploy.validate_inputs(env)
+
+
 def test_runcommand_deploy_rejects_image_from_wrong_repository():
     env = _valid_env()
     env["C2C_IMAGE_REF"] = env["C2C_IMAGE_REF"].replace("/claim2car:", "/attacker-repo:")
