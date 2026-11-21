@@ -50,7 +50,7 @@ The private deployment workflow uses the `oci-staging-apply` environment. Set th
 
 - `OCI_ENABLE_PRIVATE_RUNCOMMAND_DEPLOY=true` and `OCI_OCIR_AUTH_SECRET_OCID` in both protected environments.
 - `OCI_STAGING_INSTANCE_OCID` to the instance OCID output from Terraform in `oci-staging-apply`.
-- `C2C_POSTGRES_IMAGE` to a digest-pinned image. Use an OCIR reference or an explicit public host (`docker.io` / `quay.io`); no mutable tags.
+- `C2C_POSTGRES_IMAGE` to the official `docker.io/postgis/postgis` image, with a version tag and immutable digest (for example, `docker.io/postgis/postgis:16-3.5@sha256:<digest>`). The root wrapper rejects any other database repository.
 - `OCI_REGION=us-chicago-1`, `OCIR_NAMESPACE`, and `OCIR_REPOSITORY`.
 - OCI API user key credentials and `OCI_COMPARTMENT_OCID` in `oci-staging-apply`.
 
