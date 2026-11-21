@@ -64,15 +64,14 @@ For each increment:
 6. **Field/pilot readiness:** only after software and deployment are demonstrated; close legal/partner, consent, data retention, safety, and field-validation requirements.
 7. **Broader marketplace/dispatch/payment/analytics:** implement incrementally behind explicit lifecycle and security controls.
 
-## Current verified checkpoint (2026-11-21; post-merge)
+## Current verified checkpoint (2026-11-21; post-PR #132 merge)
 
-- **Main:** `ee7e7c4680f7c3cfbf9fa1eb86bec463e8384fc0` — PR #127 merged after all 13 required workflows passed on exact candidate `dede7bdd4f803d7ea9fcb71991a47b98d8cf26ab`.
-- **PR #121:** merged structured Vehicle Intelligence Lab assessment JSON, SHA-256 digest, rule-based disposition, escalation, missing-evidence handling and download verification.
-- **PR #127:** merged Square Sandbox webhook receipt/payment-state reconciliation (migration 0026). It includes HMAC validation, event dedupe, tenant-bound provider order mapping, payment-state reconciliation, amount mismatch/conflict/stale/unmatched outcomes, webhook receiver, diagnostics and PostgreSQL integration tests. Migration 0025 was already main.
-- **Verification:** 13/13 workflows green. Full suite: **1,185 tests, 0 failures, 0 errors, 0 skips**. DB-01 through DB-14: **14/14 pass/awarded**, 26 migrations verified, synthetic diagnostics accepted, 17 tenant-scoped tables and 34 matrix entries pass. This is synthetic CI acceptance, not field validation or production certification.
-- **Earlier defects fixed during this increment:** payment fixtures seeded for both tenants before isolation matrix; DB-14 migration inventory count updated from stale 24 to 26. Both fixes are covered by successful exact-head CI.
-- PRs #122 and #125 are closed unmerged as superseded.
-- **OCI integrated staging remains NOT deployed.** Terraform/guarded apply, image publishing, volume identity/mount, bootstrap and runtime deploy code exist, but no provisioned staging compute, app Postgres/PostGIS, durable evidence volume, backup/restore rehearsal, or integrated deployed journey is evidenced. Remaining practical prerequisites: OCI access/credentials, remote-state bucket, reviewed Terraform plan, protected apply, private host access, deployment and real acceptance. Oracle MySQL is not the app authority. Square Sandbox provider delivery itself has not been verified; live payments remain disabled.
+- **Main:** `bf0649b6c65ec6d1bdb0d6dbcde8843abdad4122` — PR #132 merged: optional Square Sandbox runtime configuration now passes through OCI bootstrap/runtime deploy. Bootstrap writes five optional Square settings as empty by default; deployment injects them into the integrated container. Tests cover defaults, secret-file permissions, and pass-through. No credentials were committed.
+- **PR #127:** Square Sandbox webhook receipt/payment-state reconciliation (migration 0026) merged. HMAC validation, deduplication, tenant-bound order mapping, mismatch/conflict/stale/unmatched outcomes, and synthetic PostgreSQL tests are implemented.
+- **PR #121:** structured Vehicle Intelligence Lab assessment JSON, digest, rule-based disposition, escalation, missing-evidence handling and report download verification merged.
+- **PR #132 verification:** exact head `ccade1681ce122750160c8a5169fe2b86d821190`; **12/12 distinct workflows successful**. Full suite, DB authority cutover, legacy DB, FastAPI and frontend VIN/decoder/transport checks are green on that candidate. Merge commit is above.
+- **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
+- **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
 ## Next executable task (no founder choice required)
 
