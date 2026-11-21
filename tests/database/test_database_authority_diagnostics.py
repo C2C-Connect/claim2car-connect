@@ -1,4 +1,4 @@
-"""Regression tests for strict 0017-0025 inventory and DB-01/DB-02 acceptance diagnostics."""
+"""Regression tests for strict 0017-0026 inventory and DB-01/DB-02 acceptance diagnostics."""
 import unittest
 
 from scripts.database_authority_diagnostics import validate_authority_migration_inventory
@@ -20,6 +20,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
             '0025_square_sandbox_payment_intents.sql',
+            '0026_square_sandbox_webhook_reconciliation.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
@@ -112,7 +113,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_db02_accepts_the_complete_25_migration_inventory(self):
+    def test_db02_accepts_the_complete_26_migration_inventory(self):
         names = [
             '0001_tenant_registry.sql', '0002_event_journal.sql',
             '0003_completion_lock.sql', '0004_manifest_roots.sql',
@@ -129,6 +130,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0022_collision_vehicle_capture_link.sql',
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
+            '0025_square_sandbox_payment_intents.sql',
+            '0026_square_sandbox_webhook_reconciliation.sql',
         ]
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
