@@ -156,11 +156,10 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
         paid_at=created+timedelta(seconds=2)
         self.assertEqual(self.webhook('event-completed','COMPLETED',created=paid_at),'RECONCILED')
         self.assertEqual(self.webhook('event-completed','COMPLETED',created=paid_at),'DUPLICATE')
-        with tenant_transaction(self.conn,self.tenant):
-            row=self.conn.execute(
-                'SELECT COALESCE(r.status,i.status),r.provider_payment_id FROM faos.square_sandbox_payment_intents i '
-                'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
-            ).fetchone()
+        row=self.seed.execute(
+            'SELECT r.status,r.provider_payment_id FROM faos.square_sandbox_payment_reconciliations r '
+            'WHERE r.tenant_id=%s AND r.payment_intent_id=%s',(self.tenant,self.intent_id),
+        ).fetchone()
         self.assertEqual(row,('PAID','payment-1'))
         receipt=self.seed.execute(
             'SELECT reconciliation_status FROM faos.square_sandbox_webhook_receipts WHERE provider_event_id=%s',
