@@ -5,6 +5,10 @@ def test_bootstrap_credentials_and_permissions(tmp_path):
  s=ROOT/"scripts/oci_staging_runtime_bootstrap.py"; out=tmp_path/"runtime"
  subprocess.run(["python3",str(s),"--dir",str(out)],check=True,capture_output=True,text=True)
  for n in ("runtime.env","postgres-init.sql","seed-tenant.sql","operator-tokens.txt"): assert (out/n).stat().st_mode&0o777==0o600
+ runtime_env=(out/"runtime.env").read_text()
+ for name in ("SQUARE_ENVIRONMENT","SQUARE_SANDBOX_ACCESS_TOKEN","SQUARE_SANDBOX_LOCATION_ID","SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY","SQUARE_SANDBOX_WEBHOOK_URL"):
+  assert f"export {name}=" in runtime_env
+  assert f"export {name}=''" in runtime_env
  assert (out/"capture-runtime.json").stat().st_mode&0o777==0o640
  c=json.loads((out/"capture-runtime.json").read_text()); assert len(c["credentials"])==3
  assert {x["actor_role"] for x in c["credentials"]}=={"owner","operator","reviewer"}
@@ -18,6 +22,8 @@ def test_runtime_deployment_guardrails(tmp_path):
  assert "mkfs" not in d and "wipefs" not in d and "rm -rf" not in d
  assert "@sha256:" in d and "mountpoint -q" in d and "python -m database.migrate" in d
  assert "health/ready" in d and "health/build" in d and "127.0.0.1" in d
+ for name in ("SQUARE_ENVIRONMENT","SQUARE_SANDBOX_ACCESS_TOKEN","SQUARE_SANDBOX_LOCATION_ID","SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY","SQUARE_SANDBOX_WEBHOOK_URL"):
+  assert f"-e {name}=" in d
 
 
 def test_generated_database_init_is_single_connect_and_postgis(tmp_path):
