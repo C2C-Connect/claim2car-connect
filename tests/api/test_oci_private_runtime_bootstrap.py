@@ -111,6 +111,21 @@ def test_synthetic_original_path_guard_rejects_symlinked_tenant_and_artifact(tmp
     else:
         raise AssertionError("symlinked tenant directory accepted")
     (root / "tenant").unlink()
+    real_root = tmp_path / "evidence-real"
+    real_root.mkdir()
+    real_tenant = real_root / "tenant"
+    real_tenant.mkdir()
+    real_session = real_tenant / "session"
+    real_session.mkdir()
+    (real_session / "artifact.original").write_bytes(b"synthetic")
+    root_link = tmp_path / "evidence-link"
+    root_link.symlink_to(real_root, target_is_directory=True)
+    try:
+        module.synthetic_original_path(root_link, "tenant", "session", "artifact")
+    except RuntimeError as exc:
+        assert "must not be symlinks" in str(exc)
+    else:
+        raise AssertionError("symlinked evidence root accepted")
     tenant = root / "tenant"
     tenant.mkdir()
     session = tenant / "session"
