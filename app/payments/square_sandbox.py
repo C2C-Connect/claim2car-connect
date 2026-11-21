@@ -241,10 +241,14 @@ def verify_and_parse_square_payment_event(
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_UNSUPPORTED")
     if not all(isinstance(value, str) and value for value in (event_id, payment_id, order_id, status, currency)):
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_INVALID")
-    if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+    if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_INVALID")
+    if amount != SHOP_FEE_CENTS:
+        raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_AMOUNT_MISMATCH")
     if currency != "USD":
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_CURRENCY_UNSUPPORTED")
+    if status not in {"APPROVED", "COMPLETED", "CANCELED", "FAILED"}:
+        raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_STATUS_UNSUPPORTED")
     return SquareSandboxPaymentEvent(
         event_id=event_id,
         event_type=event_type,

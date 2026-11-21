@@ -186,6 +186,8 @@ def test_payment_event_is_authenticated_and_parsed_minimally():
     ("COMPLETED", 27500, "CAD", "PAYMENT_CURRENCY_UNSUPPORTED"),
     ("COMPLETED", -1, "USD", "PAYMENT_EVENT_INVALID"),
     ("COMPLETED", True, "USD", "PAYMENT_EVENT_INVALID"),
+    ("COMPLETED", 27000, "USD", "PAYMENT_AMOUNT_MISMATCH"),
+    ("PENDING", 27500, "USD", "PAYMENT_STATUS_UNSUPPORTED"),
 ])
 def test_webhook_rejects_invalid_amount_currency(status, amount, currency, code):
     cfg = config()
