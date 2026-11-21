@@ -49,6 +49,7 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
         self._append_shop_obligation()
 
     def drop_role(self):
+        self.seed.execute('DELETE FROM faos.tenant_login_bindings WHERE role_name=%s',(self.role,))
         self.admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(self.role)))
     def drop_database(self):
         self.admin.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(self.db)))
@@ -98,28 +99,34 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
     def test_idempotency_conflict_and_one_link_per_obligation(self):
         with tenant_transaction(self.conn,self.tenant):
             self.assertEqual(self.register(),'CREATED')
-            with self.assertRaises(psycopg.errors.RaiseException) as conflict:
-                self.register(link='different-link',order='different-order',key='c2c-shop-fee-test')
+            with self.conn.transaction():
+                with self.assertRaises(psycopg.errors.RaiseException) as conflict:
+                    self.register(link='different-link',order='different-order',key='c2c-shop-fee-test')
             self.assertEqual(conflict.exception.diag.message_primary,'SQUARE_PAYMENT_IDEMPOTENCY_CONFLICT')
-            with self.assertRaises(psycopg.errors.RaiseException) as second:
-                self.register(link='second-link',order='second-order',key='new-key')
+            with self.conn.transaction():
+                with self.assertRaises(psycopg.errors.RaiseException) as second:
+                    self.register(link='second-link',order='second-order',key='new-key')
             self.assertEqual(second.exception.diag.message_primary,'SQUARE_PAYMENT_INTENT_ALREADY_EXISTS')
 
     def test_checkout_url_and_obligation_guards(self):
         with tenant_transaction(self.conn,self.tenant):
-            with self.assertRaises(psycopg.errors.RaiseException) as bad_url:
-                self.register(url='https://evil.example/checkout')
+            with self.conn.transaction():
+                with self.assertRaises(psycopg.errors.RaiseException) as bad_url:
+                    self.register(url='https://evil.example/checkout')
             self.assertEqual(bad_url.exception.diag.message_primary,'INVALID_SQUARE_SANDBOX_PAYMENT_INTENT')
-            with self.assertRaises(psycopg.errors.RaiseException) as bad_obligation:
-                self.conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-                    (self.tenant,str(uuid.uuid4()),'not-a-ledger-entry','l','o','https://sandbox.square.link/u/test','k','operator-1'))
+            with self.conn.transaction():
+                with self.assertRaises(psycopg.errors.RaiseException) as bad_obligation:
+                    self.conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+                        (self.tenant,str(uuid.uuid4()),'not-a-ledger-entry','l','o','https://sandbox.square.link/u/test','k','operator-1'))
             self.assertEqual(bad_obligation.exception.diag.message_primary,'SHOP_ACCEPTANCE_OBLIGATION_NOT_ELIGIBLE')
 
     def test_application_cannot_direct_insert_or_cross_tenant(self):
-        with tenant_transaction(self.conn,self.tenant):
-            with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+            with self.conn.transaction():
                 self.conn.execute('INSERT INTO faos.square_sandbox_payment_intents(tenant_id,payment_intent_id,obligation_entry_id,session_id,acceptance_id,partner_org_id,provider,provider_link_id,provider_order_id,checkout_url,idempotency_key,amount_cents,currency,status,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                     (self.tenant,str(uuid.uuid4()),self.entry_id,self.session,self.acceptance,self.partner,'SQUARE_SANDBOX','l','o','https://sandbox.square.link/u/test','k',27500,'USD','LINK_CREATED','operator-1'))
-            with self.assertRaises(psycopg.errors.RaiseException) as mismatch:
-                self.register(tenant=str(uuid.uuid4()),intent_id=str(uuid.uuid4()),actor='operator-1')
+        with tenant_transaction(self.conn,self.tenant):
+            with self.conn.transaction():
+                with self.assertRaises(psycopg.errors.RaiseException) as mismatch:
+                    self.register(tenant=str(uuid.uuid4()),intent_id=str(uuid.uuid4()),actor='operator-1')
             self.assertEqual(mismatch.exception.diag.message_primary,'TENANT_CONTEXT_MISMATCH')
