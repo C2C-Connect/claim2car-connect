@@ -84,7 +84,7 @@ def test_synthetic_original_path_guard_rejects_unsafe_components(tmp_path):
     spec = importlib.util.spec_from_file_location("c2c_staging_acceptance_path", script)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    for bad in ("", ".", "..", "../escape", "tenant\\\\escape"):
+    for bad in ("", ".", "..", "../escape", "tenant\\escape"):
         try:
             module.synthetic_original_path(tmp_path, bad, "session", "artifact")
         except RuntimeError as exc:
