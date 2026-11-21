@@ -431,3 +431,10 @@ def test_oci_runtime_deploy_harness_fails_if_rollback_image_is_unhealthy(tmp_pat
         assert (config/"last-image-ref").read_text().strip()==old_image
     finally:
         _oci_harness_cleanup(tmp_path)
+
+
+def test_oci_deploy_harness_cleans_root_owned_tmp_paths():
+    content=(ROOT/"tests/api/test_oci_private_runtime_bootstrap.py").read_text()
+    assert "def _oci_harness_cleanup(tmp_path):" in content
+    assert 'sudo,"rm","-rf","--",str(tmp_path)' in content
+    assert content.count("_oci_harness_cleanup(tmp_path)") >= 4
