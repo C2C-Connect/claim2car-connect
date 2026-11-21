@@ -149,7 +149,7 @@ def test_webhook_rejects_invalid_amount_currency(status, amount, currency, code)
     cfg = config()
     raw = payment_event(status, amount, currency)
     with pytest.raises(SquareSandboxError, match=code):
-        verify_and_parse_square_payment_event(raw, sign(raw, cfg), cfg)
+        verify_and_parse_square_payment_event(raw, sign(raw, cfg, square_environment="Sandbox"), cfg)
 
 
 def test_webhook_rejects_non_sandbox_environment_header():
@@ -163,4 +163,4 @@ def test_webhook_rejects_unsupported_event_type():
     cfg = config()
     raw = json.dumps({"event_id":"event-2","type":"refund.created","data":{"object":{"payment":{}}}}).encode()
     with pytest.raises(SquareSandboxError, match="EVENT_UNSUPPORTED"):
-        verify_and_parse_square_payment_event(raw, sign(raw, cfg), cfg)
+        verify_and_parse_square_payment_event(raw, sign(raw, cfg, square_environment="Sandbox"), cfg)

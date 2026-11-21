@@ -7,7 +7,7 @@ This adapter is deliberately **Sandbox-only**. It hardcodes Square's Sandbox API
 - Creates a Square-hosted Quick Pay link for an existing **shop acceptance obligation** only.
 - Requires the exact current shop fee: 27,500 cents (USD), `REPAIR_SHOP_ACCEPTANCE_FEE`, and `OBLIGATION_BOOKED`.
 - Dealer acquisition checkout remains unavailable until the qualified-acquisition-close source event is integrated.
-- Uses a deterministic idempotency key per internal ledger entry.
+- Uses a deterministic idempotency key per tenant + internal ledger entry, preventing cross-tenant collisions.
 - Validates returned checkout-link URL hosts and never returns/logs raw provider response bodies.
 - Verifies webhook HMAC-SHA256 against the exact configured notification URL + raw request bytes, using constant-time comparison.
 - Parses payment events into a minimal record after signature verification. It does not persist, reconcile, post a ledger entry, refund, void, or settle anything.
