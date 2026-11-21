@@ -70,10 +70,92 @@ def test_synthetic_live_staging_acceptance_harness_is_16_slot_and_guarded():
     assert "automatic consent cleanup failed" in source
     assert "withdrawal did not remove synthetic original bytes" in source
     assert "base-url must be HTTP loopback only" in source
-    assert "tenant ID is missing or unsafe" in source
-    assert "must not be symlinked" in source
+    assert "unsafe path components" in source
+    assert "must not be symlinks" in source
     assert "tenant_dir.is_symlink()" in source
     assert source.rindex("withdrawal did not remove synthetic original bytes") < source.rindex("CLEANUP_CONSENT = False")
     missing_confirmation=subprocess.run(["python3",str(script)],capture_output=True,text=True)
     assert missing_confirmation.returncode==2
     assert "confirm-synthetic" in missing_confirmation.stderr
+
+def test_synthetic_original_path_guard_rejects_unsafe_components(tmp_path):
+    import importlib.util
+    script = ROOT / "scripts" / "oci_staging_capture_acceptance.py"
+    spec = importlib.util.spec_from_file_location("c2c_staging_acceptance_path", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for bad in ("", ".", "..", "../escape", "tenant\\escape"):
+        try:
+            module.synthetic_original_path(tmp_path, bad, "session", "artifact")
+        except RuntimeError as exc:
+            assert "unsafe path components" in str(exc)
+        else:
+            raise AssertionError(f"unsafe tenant component accepted: {bad!r}")
+
+
+def test_synthetic_original_path_guard_rejects_symlinked_tenant_and_artifact(tmp_path):
+    import importlib.util
+    script = ROOT / "scripts" / "oci_staging_capture_acceptance.py"
+    spec = importlib.util.spec_from_file_location("c2c_staging_acceptance_path_symlink", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    root = tmp_path / "evidence"
+    root.mkdir()
+    target = tmp_path / "target"
+    target.mkdir()
+    (root / "tenant").symlink_to(target, target_is_directory=True)
+    try:
+        module.synthetic_original_path(root, "tenant", "session", "artifact")
+    except RuntimeError as exc:
+        assert "must not be symlinks" in str(exc)
+    else:
+        raise AssertionError("symlinked tenant directory accepted")
+    (root / "tenant").unlink()
+    real_root = tmp_path / "evidence-real"
+    real_root.mkdir()
+    real_tenant = real_root / "tenant"
+    real_tenant.mkdir()
+    real_session = real_tenant / "session"
+    real_session.mkdir()
+    (real_session / "artifact.original").write_bytes(b"synthetic")
+    root_link = tmp_path / "evidence-link"
+    root_link.symlink_to(real_root, target_is_directory=True)
+    try:
+        module.synthetic_original_path(root_link, "tenant", "session", "artifact")
+    except RuntimeError as exc:
+        assert "must not be symlinks" in str(exc)
+    else:
+        raise AssertionError("symlinked evidence root accepted")
+    tenant = root / "tenant"
+    tenant.mkdir()
+    session_target = tmp_path / "session-target"
+    session_target.mkdir()
+    session = tenant / "session"
+    session.symlink_to(session_target, target_is_directory=True)
+    try:
+        module.synthetic_original_path(root, "tenant", "session", "artifact")
+    except RuntimeError as exc:
+        assert "must not be symlinks" in str(exc)
+    else:
+        raise AssertionError("symlinked session directory accepted")
+    session.unlink()
+    session.mkdir()
+    (session / "artifact.original").symlink_to(target / "payload")
+    try:
+        module.synthetic_original_path(root, "tenant", "session", "artifact")
+    except RuntimeError as exc:
+        assert "must not be symlinks" in str(exc)
+    else:
+        raise AssertionError("symlinked original artifact accepted")
+
+
+def test_synthetic_original_path_guard_accepts_regular_file(tmp_path):
+    import importlib.util
+    script = ROOT / "scripts" / "oci_staging_capture_acceptance.py"
+    spec = importlib.util.spec_from_file_location("c2c_staging_acceptance_path_regular", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    path = tmp_path / "tenant" / "session" / "artifact.original"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"synthetic")
+    assert module.synthetic_original_path(tmp_path, "tenant", "session", "artifact") == path
