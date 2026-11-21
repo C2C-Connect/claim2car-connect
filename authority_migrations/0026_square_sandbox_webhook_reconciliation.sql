@@ -59,7 +59,8 @@ AS $$
 DECLARE receipt faos.square_sandbox_webhook_receipts%ROWTYPE;
         intent faos.square_sandbox_payment_intents%ROWTYPE;
         current_state faos.square_sandbox_payment_reconciliations%ROWTYPE;
-        next_status text;\n        state_found boolean;
+        next_status text;
+        state_found boolean;\n        state_found boolean;
 BEGIN
  IF p_event_id IS NULL OR length(trim(p_event_id))=0 OR length(p_event_id)>128
  OR p_event_type NOT IN ('payment.created','payment.updated')
@@ -101,7 +102,8 @@ BEGIN
  END IF;
  SELECT * INTO current_state FROM faos.square_sandbox_payment_reconciliations
   WHERE tenant_id=intent.tenant_id AND payment_intent_id=intent.payment_intent_id FOR UPDATE;
- IF FOUND AND current_state.provider_payment_id<>p_payment_id THEN
+ state_found:=FOUND;
+ IF state_found AND current_state.provider_payment_id<>p_payment_id THEN
   UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=intent.tenant_id,
    payment_intent_id=intent.payment_intent_id,reconciliation_status='PAYMENT_ID_CONFLICT'
    WHERE provider_event_id=p_event_id;
