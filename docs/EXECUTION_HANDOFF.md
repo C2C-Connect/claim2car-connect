@@ -64,20 +64,22 @@ For each increment:
 6. **Field/pilot readiness:** only after software and deployment are demonstrated; close legal/partner, consent, data retention, safety, and field-validation requirements.
 7. **Broader marketplace/dispatch/payment/analytics:** implement incrementally behind explicit lifecycle and security controls.
 
-## Current verified checkpoint (2026-11-21; refreshed)
+## Current verified checkpoint (2026-11-21; post-merge)
 
-- **Main:** `e198b40337e7e3fe310e518d76cd898bd151b89c` — PR #121 merged the structured Vehicle Intelligence Lab assessment report/disposition increment. It adds JSON assessment output, a SHA-256 integrity digest, rule-based disposition, and download verification. Confirm live main before acting.
-- **PR #127 — Square Sandbox webhook reconciliation:** active clean mainline candidate, exact head `dede7bdd4f803d7ea9fcb71991a47b98d8cf26ab`. It adds migration 0026, webhook receipt/reconciliation, tenant-bound payment-state, receiver, tests, and diagnostics. Migration 0025 is already on main and is not duplicated.
-- **Validation finding fixed:** a prior DB-authority diagnostics run completed 362 tests successfully but failed the 17-table isolation matrix because payment-state fixtures for tenant 2 were not seeded before cross-tenant row cloning. The fixture order was fixed in the candidate; a fresh CI run is pending. Do not merge until every required workflow passes on the exact current head and the diff is reviewed.
-- PRs #122 and #125 are closed unmerged as superseded; #127 is the sole active candidate for this webhook work.
-- **OCI staging:** still not deployed. Terraform, guarded provisioning, image publishing, volume identity/mount, runtime bootstrap/deploy scripts exist. No live compute, PostgreSQL/PostGIS authority database, persistent evidence volume, backup/restore rehearsal, or integrated deployed workflow is evidenced. Cloud credentials/environment setup, state bucket, reviewed plan, protected apply, host access and actual deployment remain blockers. Existing Oracle MySQL is not the application authority.
+- **Main:** `ee7e7c4680f7c3cfbf9fa1eb86bec463e8384fc0` — PR #127 merged after all 13 required workflows passed on exact candidate `dede7bdd4f803d7ea9fcb71991a47b98d8cf26ab`.
+- **PR #121:** merged structured Vehicle Intelligence Lab assessment JSON, SHA-256 digest, rule-based disposition, escalation, missing-evidence handling and download verification.
+- **PR #127:** merged Square Sandbox webhook receipt/payment-state reconciliation (migration 0026). It includes HMAC validation, event dedupe, tenant-bound provider order mapping, payment-state reconciliation, amount mismatch/conflict/stale/unmatched outcomes, webhook receiver, diagnostics and PostgreSQL integration tests. Migration 0025 was already main.
+- **Verification:** 13/13 workflows green. Full suite: **1,185 tests, 0 failures, 0 errors, 0 skips**. DB-01 through DB-14: **14/14 pass/awarded**, 26 migrations verified, synthetic diagnostics accepted, 17 tenant-scoped tables and 34 matrix entries pass. This is synthetic CI acceptance, not field validation or production certification.
+- **Earlier defects fixed during this increment:** payment fixtures seeded for both tenants before isolation matrix; DB-14 migration inventory count updated from stale 24 to 26. Both fixes are covered by successful exact-head CI.
+- PRs #122 and #125 are closed unmerged as superseded.
+- **OCI integrated staging remains NOT deployed.** Terraform/guarded apply, image publishing, volume identity/mount, bootstrap and runtime deploy code exist, but no provisioned staging compute, app Postgres/PostGIS, durable evidence volume, backup/restore rehearsal, or integrated deployed journey is evidenced. Remaining practical prerequisites: OCI access/credentials, remote-state bucket, reviewed Terraform plan, protected apply, private host access, deployment and real acceptance. Oracle MySQL is not the app authority. Square Sandbox provider delivery itself has not been verified; live payments remain disabled.
 
-## Next executable step (no founder choice required)
+## Next executable task (no founder choice required)
 
-1. Complete CI and DB-authority diagnostics for PR #127 exact head; inspect any failures, fix, and rerun.
-2. Merge only after required checks green on exact SHA.
-3. Proceed directly to OCI protected-environment configuration and guarded infrastructure plan/apply, followed by host volume identity verification, bootstrap, immutable image deployment, and real capture/restart/evidence/tenant-isolation/restore tests.
-4. If credential or cost/access controls block deployment, request only the specific missing prerequisite while continuing unblockable product work.
+1. Inspect live OCI infrastructure state and GitHub environment configuration for authorized credentials/state/access; do not print or expose secrets.
+2. Run the guarded Terraform plan, resolve drift/configuration, and execute apply only through the protected staging workflow after confirming costs and permissions are within authorization.
+3. Provision/verify Postgres/PostGIS and durable evidence storage, bootstrap tenant authority, deploy the immutable image, and test health, restart persistence, capture/evidence retrieval/integrity, tenant isolation, backup/restore and the integrated journey.
+4. If credentials or access are missing, ask only for the exact prerequisite and keep implementing/testable deployment tooling.
 
 ## Thread-resume instructions
 
