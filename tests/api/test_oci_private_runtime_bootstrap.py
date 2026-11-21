@@ -253,3 +253,208 @@ def test_runtime_deploy_verifies_exact_revision_for_rollback_and_only_records_re
     assert "Database migrations are not automatically reversed" in content
     record_image_line=content.index("printf",content.index("systemctl enable --now podman-restart.service"))
     assert content.index('wait_for_app "$revision"') < record_image_line
+
+
+def _oci_deploy_harness(tmp_path, image_ref, previous_ref="", fail_ready_sha="", fail_launch_sha="", fail_rollback_sha=""):
+    import os
+    import shutil
+    import pytest
+
+    sudo=shutil.which("sudo")
+    if not sudo:
+        pytest.skip("sudo is required for root-owned OCI staging deployment harness")
+    fakebin=tmp_path/"fakebin"; fakebin.mkdir()
+    state=tmp_path/"state"; state.mkdir()
+    root=tmp_path/"claim2car"; config=tmp_path/"runtime"
+    (root/"postgres").mkdir(parents=True); (root/"evidence").mkdir(parents=True)
+    config.mkdir()
+    (config/"runtime.env").write_text(
+        "export PG_ADMIN_PASSWORD=test-admin\n"
+        "export MIGRATION_DATABASE_URL=postgresql://faos_migrator:test@claim2car-db:5432/claim2car\n"
+        "export APP_DATABASE_URL=postgresql://faos_app:test@claim2car-db:5432/claim2car\n"
+        "export C2C_INTERNAL_SERVICE_TOKEN=test-service\n"
+        "export C2C_VIN_HMAC_PEPPER=test-pepper\n"
+        "export SQUARE_ENVIRONMENT=''\n"
+        "export SQUARE_SANDBOX_ACCESS_TOKEN=''\n"
+        "export SQUARE_SANDBOX_LOCATION_ID=''\n"
+        "export SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY=''\n"
+        "export SQUARE_SANDBOX_WEBHOOK_URL=''\n"
+    )
+    for name in ("capture-runtime.json","postgres-init.sql","seed-tenant.sql"):
+        (config/name).write_text("{}\n")
+    if previous_ref:
+        (config/"last-image-ref").write_text(previous_ref+"\n")
+    pg=root/"postgres"; ev=root/"evidence"
+    (pg/"pgdata").mkdir()
+    os.chmod(pg,0o750); os.chmod(ev,0o700)
+    subprocess.run([sudo,"chown","-R","10001:10001",str(pg),str(ev)],check=True)
+    subprocess.run([sudo,"chown","root:root",str(config)],check=True)
+    subprocess.run([sudo,"chmod","700",str(config)],check=True)
+    subprocess.run([sudo,"chown","root:root",str(config/"runtime.env")],check=True)
+    subprocess.run([sudo,"chmod","600",str(config/"runtime.env")],check=True)
+    subprocess.run([sudo,"chown","root:root",str(config/"postgres-init.sql"),str(config/"seed-tenant.sql")],check=True)
+    subprocess.run([sudo,"chmod","600",str(config/"postgres-init.sql"),str(config/"seed-tenant.sql")],check=True)
+    subprocess.run([sudo,"chown","root:10001",str(config/"capture-runtime.json")],check=True)
+    subprocess.run([sudo,"chmod","640",str(config/"capture-runtime.json")],check=True)
+    if previous_ref:
+        subprocess.run([sudo,"chown","root:root",str(config/"last-image-ref")],check=True)
+        subprocess.run([sudo,"chmod","600",str(config/"last-image-ref")],check=True)
+
+    podman_script = """#!/usr/bin/env python3
+import os, re, sys
+from pathlib import Path
+args=sys.argv[1:]
+state=Path(os.environ["STATE"])
+if args[:2]==["image","inspect"]:
+    print("linux/arm64" if "{{.Os}}/{{.Architecture}}" in args else "image-id")
+    sys.exit(0)
+if args[:2]==["container","exists"]:
+    sys.exit(1)
+if args[:2]==["network","exists"]:
+    sys.exit(0)
+if args and args[0]=="run":
+    if "--name" in args and args[args.index("--name")+1]=="claim2car-app":
+        ref=args[-1]
+        match=re.search(r":sha-([a-f0-9]{40})@",ref)
+        sha=match.group(1) if match else ""
+        if sha==os.environ.get("FAIL_LAUNCH_SHA",""):
+            sys.exit(42)
+        (state/"current-app").write_text(ref)
+    sys.exit(0)
+if args and args[0] in ("stop","rm"):
+    if "claim2car-app" in args:
+        (state/"current-app").unlink(missing_ok=True)
+    sys.exit(0)
+sys.exit(0)
+"""
+    curl_script = """#!/usr/bin/env python3
+import json, os, re, sys
+from pathlib import Path
+url=sys.argv[-1]
+ref=(Path(os.environ["STATE"])/"current-app").read_text() if (Path(os.environ["STATE"])/"current-app").exists() else ""
+match=re.search(r":sha-([a-f0-9]{40})@",ref)
+sha=match.group(1) if match else ""
+if url.endswith("/health/ready"):
+    sys.exit(1 if sha in (os.environ.get("FAIL_READY_SHA",""),os.environ.get("FAIL_ROLLBACK_SHA","")) and sha else 0)
+if url.endswith("/health/build"):
+    print(json.dumps({"revision":sha,"runtime_mode":"integrated"}))
+    sys.exit(0)
+sys.exit(0)
+"""
+    simple = "#!/usr/bin/env python3\nimport sys\nsys.exit(0)\n"
+    findmnt_script = "#!/usr/bin/env python3\nimport sys\nprint('/dev/fake-postgres' if 'postgres' in sys.argv[-1] else '/dev/fake-evidence')\n"
+    for name,script in {
+        "podman":podman_script,"curl":curl_script,"systemctl":simple,
+        "mountpoint":simple,"sleep":simple,"findmnt":findmnt_script,
+    }.items():
+        p=fakebin/name; p.write_text(script); p.chmod(0o755)
+    env={
+        "PATH":str(fakebin)+":/usr/bin:/bin",
+        "STATE":str(state),
+        "FAIL_READY_SHA":fail_ready_sha,
+        "FAIL_LAUNCH_SHA":fail_launch_sha,
+        "FAIL_ROLLBACK_SHA":fail_rollback_sha,
+        "C2C_STAGING_ROOT":str(root),
+        "C2C_STAGING_RUNTIME_CONFIG":str(config),
+        "OCI_IMAGE_REF":image_ref,
+        "OCI_REGISTRY":"registry.example.test",
+        "OCI_REGISTRY_USERNAME":"test-user",
+        "OCI_REGISTRY_TOKEN":"test-token",
+        "C2C_POSTGRES_IMAGE":"registry.example.test/ns/postgres@sha256:"+"b"*64,
+        "C2C_STAGING_LOOPBACK_PORT":"18000",
+    }
+    command=[sudo,"env"]+[f"{k}={v}" for k,v in env.items()]+["bash",str(ROOT/"scripts/oci_staging_runtime_deploy.sh")]
+    return command,state,config
+
+
+def _pinned_image(revision, digest):
+    return f"registry.example.test/ns/app:sha-{revision}@sha256:{digest}"
+
+
+def _oci_harness_cleanup(tmp_path):
+    import shutil
+    sudo=shutil.which("sudo")
+    if sudo:
+        subprocess.run([sudo,"rm","-rf","--",str(tmp_path)],check=False,capture_output=True)
+
+
+def _read_root_owned_file(path):
+    import shutil
+    sudo=shutil.which("sudo")
+    return subprocess.run([sudo,"cat",str(path)],check=True,capture_output=True,text=True).stdout
+
+
+def test_oci_runtime_deploy_harness_success_records_verified_image(tmp_path):
+    revision="a"*40; image=_pinned_image(revision,"c"*64)
+    command,state,config=_oci_deploy_harness(tmp_path,image)
+    try:
+        result=subprocess.run(command,capture_output=True,text=True)
+        assert result.returncode==0, result.stderr
+        assert _read_root_owned_file(config/"last-image-ref").strip()==image
+        assert (state/"current-app").read_text()==image
+        assert "PASS: image deployed, readiness and exact revision checked" in result.stdout
+    finally:
+        _oci_harness_cleanup(tmp_path)
+
+
+def test_oci_runtime_deploy_harness_rolls_back_after_readiness_failure(tmp_path):
+    new_revision="a"*40; old_revision="b"*40
+    new_image=_pinned_image(new_revision,"c"*64); old_image=_pinned_image(old_revision,"d"*64)
+    command,state,config=_oci_deploy_harness(tmp_path,new_image,old_image,fail_ready_sha=new_revision)
+    try:
+        result=subprocess.run(command,capture_output=True,text=True)
+        assert result.returncode!=0
+        assert "previous image was restored and verified" in result.stderr
+        assert (state/"current-app").read_text()==old_image
+        assert _read_root_owned_file(config/"last-image-ref").strip()==old_image
+    finally:
+        _oci_harness_cleanup(tmp_path)
+
+
+def test_oci_runtime_deploy_harness_rolls_back_after_container_start_failure(tmp_path):
+    new_revision="a"*40; old_revision="b"*40
+    new_image=_pinned_image(new_revision,"c"*64); old_image=_pinned_image(old_revision,"d"*64)
+    command,state,config=_oci_deploy_harness(tmp_path,new_image,old_image,fail_launch_sha=new_revision)
+    try:
+        result=subprocess.run(command,capture_output=True,text=True)
+        assert result.returncode!=0
+        assert "previous image was restored and verified" in result.stderr
+        assert (state/"current-app").read_text()==old_image
+        assert _read_root_owned_file(config/"last-image-ref").strip()==old_image
+    finally:
+        _oci_harness_cleanup(tmp_path)
+
+
+def test_oci_runtime_deploy_harness_fails_if_rollback_image_is_unhealthy(tmp_path):
+    new_revision="a"*40; old_revision="b"*40
+    new_image=_pinned_image(new_revision,"c"*64); old_image=_pinned_image(old_revision,"d"*64)
+    command,state,config=_oci_deploy_harness(tmp_path,new_image,old_image,fail_ready_sha=new_revision,fail_rollback_sha=old_revision)
+    try:
+        result=subprocess.run(command,capture_output=True,text=True)
+        assert result.returncode!=0
+        assert "rollback image also failed readiness/revision verification" in result.stderr
+        assert not (state/"current-app").exists()
+        assert _read_root_owned_file(config/"last-image-ref").strip()==old_image
+    finally:
+        _oci_harness_cleanup(tmp_path)
+
+
+def test_oci_deploy_harness_cleans_root_owned_tmp_paths():
+    content=(ROOT/"tests/api/test_oci_private_runtime_bootstrap.py").read_text()
+    assert "def _oci_harness_cleanup(tmp_path):" in content
+    assert 'sudo,"rm","-rf","--",str(tmp_path)' in content
+    assert content.count("_oci_harness_cleanup(tmp_path)") >= 4
+
+
+def test_oci_deploy_harness_uses_privileged_file_read_and_cleanup_helpers():
+    content=(ROOT/"tests/api/test_oci_private_runtime_bootstrap.py").read_text()
+    assert "def _read_root_owned_file(path):" in content
+    assert 'sudo,"cat",str(path)' in content
+    assert content.count('_read_root_owned_file(config/"last-image-ref")') >= 4
+    assert "def _oci_harness_cleanup(tmp_path):" in content
+    assert 'sudo,"rm","-rf","--",str(tmp_path)' in content
+
+
+def test_root_owned_last_image_ref_assertions_use_sudo_reader():
+    content=(ROOT/"tests/api/test_oci_private_runtime_bootstrap.py").read_text()
+    assert content.count('_read_root_owned_file(config/"last-image-ref")') >= 4
