@@ -93,8 +93,6 @@ REVOKE ALL ON faos.square_sandbox_webhook_receipts FROM PUBLIC,faos_app,faos_fix
 GRANT SELECT ON faos.square_sandbox_webhook_receipts TO faos_app;
 GRANT SELECT,INSERT,UPDATE ON faos.square_sandbox_webhook_receipts TO faos_writer;
 GRANT CREATE ON SCHEMA faos TO faos_writer;
-ALTER TABLE faos.square_sandbox_webhook_receipts OWNER TO faos_writer;
-REVOKE CREATE ON SCHEMA faos FROM faos_writer;
 
 CREATE FUNCTION faos.reconcile_square_sandbox_webhook(
  p_event_id text,p_event_type text,p_payment_id text,p_order_id text,
@@ -184,6 +182,5 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION faos.reconcile_square_sandbox_webhook(text,text,text,text,text,bigint,text,timestamptz,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION faos.reconcile_square_sandbox_webhook(text,text,text,text,text,bigint,text,timestamptz,text) TO faos_app;
-GRANT CREATE ON SCHEMA faos TO faos_writer;
 ALTER FUNCTION faos.reconcile_square_sandbox_webhook(text,text,text,text,text,bigint,text,timestamptz,text) OWNER TO faos_writer;
 REVOKE CREATE ON SCHEMA faos FROM faos_writer;
