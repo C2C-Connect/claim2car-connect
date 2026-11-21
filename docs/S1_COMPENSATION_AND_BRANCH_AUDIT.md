@@ -1,10 +1,10 @@
 # Slice 1 — Compensation and Branch Evidence Audit
 
 **Document ID:** C2C-S1-COMP-AUDIT-001  
-**Revision:** 0.2 — partial evidence record, not Slice 1 exit evidence  
-**Reviewed:** 2026-11-08  
+**Revision:** 0.3 — partial evidence record, not Slice 1 exit evidence  
+**Original review:** 2026-11-08; **revalidated:** 2026-11-21  
 **Canonical repository:** `C2C-Connect/claim2car-connect`  
-**Main revision inspected:** `a54ce7a08553ea7a35f70167b868ecb1ff4eb813`  
+**Original main revision inspected:** `a54ce7a08553ea7a35f70167b868ecb1ff4eb813`; **revalidation main:** `9372ab528cd200afeadf60b376cab008e018056f`  
 **Working branch:** `cto/slice-1-control-reconciliation`  
 **CI-tested source/test revision:** `50b8b5fa466643334ee51a424ffacdb929af4c85`  
 **Current PR branch head at revision 0.2:** `ee1bb80939970199e95cb857ba79c7ee8d0f98a9`
@@ -26,6 +26,8 @@ It also enumerated the repository's accessible branches: **155 total** at the ti
 **Important limitation:** GitHub code search used here searches the default branch, not every branch. The 155 branches and any other repositories accessible to the organization have not all been searched file-by-file. Therefore this document does not claim a complete repository-wide, all-branch, or all-repository audit. No branch or historical file was deleted.
 
 ## 3. Findings and disposition
+
+**Historical snapshot dated 2026-11-08:** the rows below preserve findings recorded at that time. They are not current-main status; see §7 revalidation.
 
 | Surface / reference | Finding | Classification / disposition |
 |---|---|---|
@@ -103,3 +105,23 @@ Classification: stale branch refs with no unique commits relative to current mai
 4. The 13 behind-only branches may be considered for archival after the evidence-retention policy is defined. No deletion is authorized by this audit record.
 5. Four representative `acceptance-evidence/` branches have been sampled across general diagnostic, API, VIN, and VPIC-live categories; their sampled contents are JSON evidence artifacts, including both failed and successful results. The other 127 branches remain uninspected at content level. Do not extrapolate the sample to all branches; index and classify all remaining evidence before any pruning.
 6. Continue to separate salvageable technical assets (RLS proof, migrations, capture workflow, VIN guard, hash-chain prototype) from stale policy, unvalidated behavior, and unsupported completion claims.
+
+
+## 7. Canonical-main revalidation (2026-11-21)
+
+Rechecked the previously reported compensation-output defects against canonical `main` at commit `9372ab528cd200afeadf60b376cab008e018056f` after PR #24 (`232cee06301dfa5a62d96807ed1b17817b5df9d0`) was merged.
+
+### Current findings (narrow source scope)
+
+- `backend/app/main.py`: public constants response contains no `operator_payout_usd` or `owner_payout` keys.
+- `backend/app/api/triage.py`: current adjudication response serializer contains no operator/owner payout keys.
+- `backend/app/reports/forensic_pdf.py`: generated-document path has a prohibited-output identifier list and `_assert_zero_prohibited_payout_fields` guard; it rejects payout/incentive identifiers from serialized document content. Existing adversarial tests pass legacy input fields and assert they do not appear in recipient-facing output.
+- `config/forensic_constants.py`: no `OPERATOR_PAYOUT_USD`, `OWNER_PAYOUT`, or owner-incentive constant is present; the unresolved policy is recorded in comments/governance only.
+- `backend/app/anchor/ledger.py`: operator payout remains gated by default (`operator_payout_policy_approved=False`); repository-default code search found no explicit `operator_payout_policy_approved=True` instantiation and no operator-payout recording method. Owner/driver cash incentive party types remain prohibited.
+- PR #24 is merged. The previous table entries describing active payout-field defects on main are superseded; the corrections are now in canonical main.
+
+### Evidence and limitations
+
+- Revalidation inspected the full current contents of the five source files above and searched the default branch for the payout keys, constant names, gate error, and operator-payout recording method.
+- This is a targeted revalidation, not a complete all-branch or all-repository legal/commercial audit. Historical docs, negative tests, denylist safeguards, and archived branches intentionally contain terminology. The unresolved operator policy remains disabled; owner cash incentives remain prohibited.
+- Do not treat this correction as Slice 1 exit evidence. The remaining branch inventory, acceptance-evidence retention classification, and wider historical/source scan remain open.
