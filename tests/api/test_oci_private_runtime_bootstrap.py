@@ -458,3 +458,11 @@ def test_oci_deploy_harness_uses_privileged_file_read_and_cleanup_helpers():
 def test_root_owned_last_image_ref_assertions_use_sudo_reader():
     content=(ROOT/"tests/api/test_oci_private_runtime_bootstrap.py").read_text()
     assert content.count('_read_root_owned_file(config/"last-image-ref")') >= 4
+
+
+def test_oci_staging_plan_workflow_is_main_only_and_checks_out_immutable_ref():
+    workflow=(ROOT/".github/workflows/oci-staging-plan.yml").read_text()
+    assert "if: github.ref == 'refs/heads/main'" in workflow
+    assert '[[ "${GITHUB_REF}" == "refs/heads/main" ]]' in workflow
+    assert "ref: ${{ github.sha }}" in workflow
+    assert "persist-credentials: false" in workflow
