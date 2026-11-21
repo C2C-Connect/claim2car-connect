@@ -31,7 +31,7 @@ CLEANUP_CONSENT = False
 def synthetic_original_path(evidence_root: Path, tenant_id: str, session_id: str, artifact_id: str) -> Path:
     """Resolve a synthetic original only after validating each path component."""
     components = (tenant_id, session_id, artifact_id)
-    if any(not isinstance(value, str) or not value or value in {".", ".."} or Path(value).name != value or "/" in value or "\\\\" in value for value in components):
+    if any(not isinstance(value, str) or not value or value in {".", ".."} or Path(value).name != value or "/" in value or "\\" in value for value in components):
         raise RuntimeError("Synthetic evidence identifiers contain unsafe path components.")
     tenant_dir = evidence_root / tenant_id
     session_dir = tenant_dir / session_id
