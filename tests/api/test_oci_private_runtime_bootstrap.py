@@ -70,7 +70,7 @@ def test_synthetic_live_staging_acceptance_harness_is_16_slot_and_guarded():
     assert "automatic consent cleanup failed" in source
     assert "withdrawal did not remove synthetic original bytes" in source
     assert "base-url must be HTTP loopback only" in source
-    assert "tenant ID is missing or unsafe" in source
+    assert "unsafe path components" in source
     assert "must not be symlinks" in source
     assert "tenant_dir.is_symlink()" in source
     assert source.rindex("withdrawal did not remove synthetic original bytes") < source.rindex("CLEANUP_CONSENT = False")
