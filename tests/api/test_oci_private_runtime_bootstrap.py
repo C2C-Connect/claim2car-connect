@@ -188,3 +188,48 @@ def test_synthetic_original_path_guard_accepts_regular_file(tmp_path):
     path.parent.mkdir(parents=True)
     path.write_bytes(b"synthetic")
     assert module.synthetic_original_path(tmp_path, "tenant", "session", "artifact") == path
+
+
+def test_capture_acceptance_source_revision_guard(monkeypatch, tmp_path):
+    import importlib.util
+    script = ROOT / "scripts" / "oci_staging_capture_acceptance.py"
+    spec = importlib.util.spec_from_file_location("c2c_staging_acceptance_revision", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    sha = "a" * 40
+    calls = []
+    def fake_run(args, cwd, capture_output, text, check):
+        calls.append(args)
+        if args == ["git", "rev-parse", "HEAD"]:
+            return subprocess.CompletedProcess(args, 0, sha + "\\n", "")
+        return subprocess.CompletedProcess(args, 0, "", "")
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    module.verify_source_checkout(sha, tmp_path)
+    assert calls == [["git", "rev-parse", "HEAD"], ["git", "status", "--porcelain"]]
+    for invalid in ("shortsha", "A" * 40, "f" * 39, "f" * 41):
+        try:
+            module.verify_source_checkout(invalid, tmp_path)
+        except RuntimeError as exc:
+            assert "full 40-character commit SHA" in str(exc)
+        else:
+            raise AssertionError(f"invalid build revision accepted: {invalid!r}")
+
+    def mismatched_run(args, cwd, capture_output, text, check):
+        return subprocess.CompletedProcess(args, 0, "b" * 40 + "\\n", "") if args[-1] == "HEAD" else subprocess.CompletedProcess(args, 0, "", "")
+    monkeypatch.setattr(module.subprocess, "run", mismatched_run)
+    try:
+        module.verify_source_checkout(sha, tmp_path)
+    except RuntimeError as exc:
+        assert "revision mismatch" in str(exc)
+    else:
+        raise AssertionError("source revision mismatch accepted")
+
+    def dirty_run(args, cwd, capture_output, text, check):
+        return subprocess.CompletedProcess(args, 0, sha + "\\n", "") if args[-1] == "HEAD" else subprocess.CompletedProcess(args, 0, " M file.py\\n", "")
+    monkeypatch.setattr(module.subprocess, "run", dirty_run)
+    try:
+        module.verify_source_checkout(sha, tmp_path)
+    except RuntimeError as exc:
+        assert "uncommitted or untracked changes" in str(exc)
+    else:
+        raise AssertionError("dirty source checkout accepted")
