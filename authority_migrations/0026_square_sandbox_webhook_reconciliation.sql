@@ -17,6 +17,9 @@ CREATE POLICY writer_square_sandbox_payment_order_map ON faos.square_sandbox_pay
  TO faos_writer USING(true) WITH CHECK(true);
 REVOKE ALL ON faos.square_sandbox_payment_order_map FROM PUBLIC,faos_app,faos_fixture;
 GRANT SELECT,INSERT ON faos.square_sandbox_payment_order_map TO faos_writer;
+GRANT CREATE ON SCHEMA faos TO faos_writer;
+ALTER TABLE faos.square_sandbox_payment_order_map OWNER TO faos_writer;
+REVOKE CREATE ON SCHEMA faos FROM faos_writer;
 INSERT INTO faos.square_sandbox_payment_order_map(provider_order_id,tenant_id,payment_intent_id,amount_cents,currency)
  SELECT provider_order_id,tenant_id,payment_intent_id,amount_cents,currency
  FROM faos.square_sandbox_payment_intents;
@@ -58,6 +61,9 @@ CREATE POLICY writer_square_sandbox_payment_reconciliations ON faos.square_sandb
 REVOKE ALL ON faos.square_sandbox_payment_reconciliations FROM PUBLIC,faos_app,faos_fixture;
 GRANT SELECT ON faos.square_sandbox_payment_reconciliations TO faos_app;
 GRANT SELECT,INSERT,UPDATE ON faos.square_sandbox_payment_reconciliations TO faos_writer;
+GRANT CREATE ON SCHEMA faos TO faos_writer;
+ALTER TABLE faos.square_sandbox_payment_reconciliations OWNER TO faos_writer;
+REVOKE CREATE ON SCHEMA faos FROM faos_writer;
 
 CREATE TABLE faos.square_sandbox_webhook_receipts(
  provider_event_id text PRIMARY KEY CHECK(length(trim(provider_event_id)) BETWEEN 1 AND 128),
@@ -86,8 +92,9 @@ CREATE POLICY writer_square_sandbox_webhook_receipts ON faos.square_sandbox_webh
 REVOKE ALL ON faos.square_sandbox_webhook_receipts FROM PUBLIC,faos_app,faos_fixture;
 GRANT SELECT ON faos.square_sandbox_webhook_receipts TO faos_app;
 GRANT SELECT,INSERT,UPDATE ON faos.square_sandbox_webhook_receipts TO faos_writer;
-
-CREATE FUNCTION faos.reconcile_square_sandbox_webhook(
+GRANT CREATE ON SCHEMA faos TO faos_writer;
+ALTER TABLE faos.square_sandbox_webhook_receipts OWNER TO faos_writer;
+REVOKE CREATE ON SCHEMA faos FROM faos_writer(
  p_event_id text,p_event_type text,p_payment_id text,p_order_id text,
  p_status text,p_amount bigint,p_currency text,p_event_created_at timestamptz,
  p_payload_sha256 text
