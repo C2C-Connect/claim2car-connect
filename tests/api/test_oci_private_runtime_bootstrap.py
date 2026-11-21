@@ -384,7 +384,7 @@ def test_oci_runtime_deploy_harness_success_records_verified_image(tmp_path):
     try:
         result=subprocess.run(command,capture_output=True,text=True)
         assert result.returncode==0, result.stderr
-        assert (config/"last-image-ref").read_text().strip()==image
+        assert _read_root_owned_file(config/"last-image-ref").strip()==image
         assert (state/"current-app").read_text()==image
         assert "PASS: image deployed, readiness and exact revision checked" in result.stdout
     finally:
@@ -400,7 +400,7 @@ def test_oci_runtime_deploy_harness_rolls_back_after_readiness_failure(tmp_path)
         assert result.returncode!=0
         assert "previous image was restored and verified" in result.stderr
         assert (state/"current-app").read_text()==old_image
-        assert (config/"last-image-ref").read_text().strip()==old_image
+        assert _read_root_owned_file(config/"last-image-ref").strip()==old_image
     finally:
         _oci_harness_cleanup(tmp_path)
 
@@ -414,7 +414,7 @@ def test_oci_runtime_deploy_harness_rolls_back_after_container_start_failure(tmp
         assert result.returncode!=0
         assert "previous image was restored and verified" in result.stderr
         assert (state/"current-app").read_text()==old_image
-        assert (config/"last-image-ref").read_text().strip()==old_image
+        assert _read_root_owned_file(config/"last-image-ref").strip()==old_image
     finally:
         _oci_harness_cleanup(tmp_path)
 
@@ -428,7 +428,7 @@ def test_oci_runtime_deploy_harness_fails_if_rollback_image_is_unhealthy(tmp_pat
         assert result.returncode!=0
         assert "rollback image also failed readiness/revision verification" in result.stderr
         assert not (state/"current-app").exists()
-        assert (config/"last-image-ref").read_text().strip()==old_image
+        assert _read_root_owned_file(config/"last-image-ref").strip()==old_image
     finally:
         _oci_harness_cleanup(tmp_path)
 
@@ -444,5 +444,6 @@ def test_oci_deploy_harness_uses_privileged_file_read_and_cleanup_helpers():
     content=(ROOT/"tests/api/test_oci_private_runtime_bootstrap.py").read_text()
     assert "def _read_root_owned_file(path):" in content
     assert 'sudo,"cat",str(path)' in content
+    assert content.count('_read_root_owned_file(config/"last-image-ref")') >= 4
     assert "def _oci_harness_cleanup(tmp_path):" in content
     assert 'sudo,"rm","-rf","--",str(tmp_path)' in content
