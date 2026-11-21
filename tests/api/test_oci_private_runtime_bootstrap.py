@@ -286,8 +286,8 @@ def _oci_deploy_harness(tmp_path, image_ref, previous_ref="", fail_ready_sha="",
         (config/"last-image-ref").write_text(previous_ref+"\n")
     pg=root/"postgres"; ev=root/"evidence"
     (pg/"pgdata").mkdir()
-    subprocess.run([sudo,"chown","-R","10001:10001",str(pg),str(ev)],check=True)
     os.chmod(pg,0o750); os.chmod(ev,0o700)
+    subprocess.run([sudo,"chown","-R","10001:10001",str(pg),str(ev)],check=True)
     subprocess.run([sudo,"chown","root:root",str(config)],check=True)
     subprocess.run([sudo,"chmod","700",str(config)],check=True)
     subprocess.run([sudo,"chown","root:root",str(config/"runtime.env")],check=True)
