@@ -24,10 +24,10 @@ Supply through a secret manager/environment; do not commit credentials:
 
 The API host is fixed to `https://connect.squareupsandbox.com`. Sandbox test credentials/resources cannot be used against production. No provider calls are made during unit tests; transport is injected.
 
-## Next acceptance increment
+## Webhook reconciliation increment (implemented, awaiting CI and real Sandbox verification)\n\n- Exposes `POST /webhooks/square` only in integrated runtime.\n- Verifies HMAC-SHA256 against exact notification URL and raw body before connecting to the database.\n- Stores event identity, minimal payment fields, event time and raw-body SHA-256; raw webhook payload is not stored.\n- Reconciles by provider order against a protected tenant mapping; deduplicates event IDs and payment IDs; checks exact $275 USD.\n- Tenant-readable payment state is separate from the financial ledger. No settlement or ledger posting is implied.\n- Unmatched orders, amount mismatch, payment ID conflict, stale events are recorded and return stable outcomes.\n- **Still not verified:** CI, live Sandbox delivery, deployment, webhook replay from Square dashboard, or ledger settlement/refunds.\n\n## Next acceptance increment
 
-1. Implement deduplicated webhook receipt persistence and reconciliation.
-2. Add refund/void sandbox workflow and ledger reversal integration.
-3. Exercise the real Square Sandbox using authorized test credentials; retain redacted request/response and event evidence.
+1. Complete CI verification for webhook persistence/reconciliation and the updated 26-migration acceptance inventory.
+2. Exercise the real Square Sandbox using authorized test credentials; verify signature delivery, duplicate replay, amount mismatch, payment status transitions, and tenant isolation with redacted evidence.
+3. Implement refund/void Sandbox workflows and ledger reversal integration as a separate reviewed financial increment.
 4. Keep live Square credentials, payment collection, and settlement disabled pending separate release authorization.
 

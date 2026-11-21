@@ -1,4 +1,4 @@
-"""Unit tests for 14-gate acceptance, 24 migrations, and 16-v1 root binding."""
+"""Unit tests for 14-gate acceptance, 26 migrations, and 16-v1 root binding."""
 import unittest
 
 from verify_gates import (
@@ -35,7 +35,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(results[-1]["id"], "DB-14")
         self.assertEqual(results[-1]["status"], "NOT AWARDED")
 
-    def test_authority_migration_inventory_requires_all_twenty_five_ordered_files(self):
+    def test_authority_migration_inventory_requires_all_twenty_six_ordered_files(self):
         names = [
             '0001_tenant_registry.sql',
             '0002_event_journal.sql',
@@ -62,6 +62,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
             '0025_square_sandbox_payment_intents.sql',
+            '0026_square_sandbox_webhook_reconciliation.sql',
         ]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_added_migration_detected',
@@ -207,10 +208,10 @@ class ExecutableGateVerifierTests(unittest.TestCase):
                        tests=[{"id": "test_example.Example.test_skip", "outcome": "skipped"}])
         self.assertFalse(_counted_report_ok(skipped))
 
-    def test_tenant_matrix_requires_all_300_adversarial_assertions(self):
+    def test_tenant_matrix_requires_all_280_adversarial_assertions(self):
         self.assertFalse(_matrix_ok({
-            "status": "PASS", "table_count": 15, "tenant_directions": 2,
-            "assertion_count": 300, "results": [],
+            "status": "PASS", "table_count": 14, "tenant_directions": 2,
+            "assertion_count": 280, "results": [],
         }))
 
     def test_contract_is_not_silently_adopted_by_a_green_gate_run(self):

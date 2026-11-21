@@ -367,6 +367,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0025_square_sandbox_payment_intents.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0026_square_sandbox_webhook_reconciliation.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)

@@ -1,4 +1,4 @@
-"""Regression tests for strict 0017-0025 inventory and DB-01/DB-02 acceptance diagnostics."""
+"""Regression tests for strict 0017-0026 inventory and DB-01/DB-02 acceptance diagnostics."""
 import unittest
 
 from scripts.database_authority_diagnostics import validate_authority_migration_inventory
@@ -15,11 +15,12 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
-                '0021_collision_claim_link.sql',
+            '0021_collision_claim_link.sql',
             '0022_collision_vehicle_capture_link.sql',
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
             '0025_square_sandbox_payment_intents.sql',
+            '0026_square_sandbox_webhook_reconciliation.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
@@ -67,7 +68,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0021_collision_claim_link.sql',
             ]))
 
-    def test_db01_accepts_the_25_migration_synthetic_environment(self):
+    def test_db01_accepts_the_24_migration_synthetic_environment(self):
         names = [f'{number:04d}_' + suffix for number, suffix in enumerate((
             'tenant_registry.sql', 'event_journal.sql', 'completion_lock.sql',
             'manifest_roots.sql', 'completion_receipts.sql',
@@ -77,7 +78,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             'claim_case_retry_without_update_lock.sql', 'claim_case_capture_session.sql',
             'claim_case_incident_intake.sql', 'incident_event_kinds.sql',
             'claim_case_incident_read_boundary.sql', 'event_contract_parity.sql',
-            'capture_protocol_session_binding.sql', 'manifest_root_protocol_binding.sql', 'collision_lifecycle_record.sql', 'collision_claim_link.sql', 'collision_vehicle_capture_link.sql', 'consented_vehicle_profile.sql', 'audited_capture_exceptions_pause_resume.sql', 'square_sandbox_payment_intents.sql',
+            'capture_protocol_session_binding.sql', 'manifest_root_protocol_binding.sql', 'collision_lifecycle_record.sql', 'collision_claim_link.sql', 'collision_vehicle_capture_link.sql', 'consented_vehicle_profile.sql', 'audited_capture_exceptions_pause_resume.sql',
         ), start=1)]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_unchanged_candidate_compares',
@@ -112,7 +113,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_db02_accepts_the_complete_25_migration_inventory(self):
+    def test_db02_accepts_the_complete_26_migration_inventory(self):
         names = [
             '0001_tenant_registry.sql', '0002_event_journal.sql',
             '0003_completion_lock.sql', '0004_manifest_roots.sql',
@@ -130,6 +131,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
             '0025_square_sandbox_payment_intents.sql',
+            '0026_square_sandbox_webhook_reconciliation.sql',
         ]
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
@@ -153,8 +155,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_rejects_unreviewed_migration_after_0025(self):
-        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0025'):
+    def test_rejects_unreviewed_migration_after_0026(self):
+        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0026'):
             validate_authority_migration_inventory(self.inventory([
                 '0017_event_contract_parity.sql',
                 '0018_capture_protocol_session_binding.sql',
@@ -165,7 +167,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0023_consented_vehicle_profile.sql',
                 '0024_audited_capture_exceptions_pause_resume.sql',
                 '0025_square_sandbox_payment_intents.sql',
-                '0026_unreviewed.sql',
+                '0026_square_sandbox_webhook_reconciliation.sql',
+                '0027_unreviewed.sql',
             ]))
 
 

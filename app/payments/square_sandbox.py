@@ -225,6 +225,7 @@ def verify_and_parse_square_payment_event(
     config: SquareSandboxConfig,
     *,
     square_environment: str,
+    allow_amount_mismatch: bool = False,
 ) -> SquareSandboxPaymentEvent:
     """Authenticate first; return a minimal payment event, not PII or raw payload."""
     config.validate()
@@ -255,11 +256,12 @@ def verify_and_parse_square_payment_event(
         currency = money["currency"]
     except (ValueError, TypeError, KeyError):
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_INVALID") from None
-    if not all(isinstance(value, str) and value for value in (event_id, payment_id, order_id, status, currency)):
+    if (not all(isinstance(value, str) and value for value in (event_id, payment_id, order_id, status, currency))
+            or any(len(value) > 128 for value in (event_id, payment_id, order_id))):
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_INVALID")
     if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_EVENT_INVALID")
-    if amount != SHOP_FEE_CENTS:
+    if amount != SHOP_FEE_CENTS and not allow_amount_mismatch:
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_AMOUNT_MISMATCH")
     if currency != "USD":
         raise SquareSandboxError("SQUARE_SANDBOX_PAYMENT_CURRENCY_UNSUPPORTED")
