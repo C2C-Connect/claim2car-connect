@@ -53,13 +53,10 @@ class SquareSandboxConfig:
             environment=os.environ.get("SQUARE_ENVIRONMENT", ""),
         )
 
-    def validate(self) -> None:
+    def validate_webhook(self) -> None:
+        """Validate only the configuration required to authenticate webhook delivery."""
         if self.environment != "sandbox":
             raise SquareSandboxError("SQUARE_SANDBOX_ENVIRONMENT_REQUIRED")
-        if not isinstance(self.access_token, str) or not self.access_token.strip():
-            raise SquareSandboxError("SQUARE_SANDBOX_ACCESS_TOKEN_REQUIRED")
-        if not isinstance(self.location_id, str) or not self.location_id.strip():
-            raise SquareSandboxError("SQUARE_SANDBOX_LOCATION_ID_REQUIRED")
         if not isinstance(self.webhook_signature_key, str) or not self.webhook_signature_key:
             raise SquareSandboxError("SQUARE_SANDBOX_WEBHOOK_KEY_REQUIRED")
         url = self.webhook_notification_url
@@ -67,6 +64,16 @@ class SquareSandboxConfig:
         if (not parsed or parsed.scheme != "https" or not parsed.hostname
                 or parsed.username or parsed.password or parsed.fragment):
             raise SquareSandboxError("SQUARE_SANDBOX_WEBHOOK_URL_MUST_BE_HTTPS")
+
+    def validate(self) -> None:
+        """Validate all credentials needed to create Sandbox checkout links."""
+        if self.environment != "sandbox":
+            raise SquareSandboxError("SQUARE_SANDBOX_ENVIRONMENT_REQUIRED")
+        if not isinstance(self.access_token, str) or not self.access_token.strip():
+            raise SquareSandboxError("SQUARE_SANDBOX_ACCESS_TOKEN_REQUIRED")
+        if not isinstance(self.location_id, str) or not self.location_id.strip():
+            raise SquareSandboxError("SQUARE_SANDBOX_LOCATION_ID_REQUIRED")
+        self.validate_webhook()
 
 
 @dataclass(frozen=True)
@@ -228,7 +235,7 @@ def verify_and_parse_square_payment_event(
     allow_amount_mismatch: bool = False,
 ) -> SquareSandboxPaymentEvent:
     """Authenticate first; return a minimal payment event, not PII or raw payload."""
-    config.validate()
+    config.validate_webhook()
     if square_environment != "Sandbox":
         raise SquareSandboxError("SQUARE_SANDBOX_WEBHOOK_ENVIRONMENT_INVALID")
     if not verify_square_webhook_signature(
