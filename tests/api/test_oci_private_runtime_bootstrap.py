@@ -73,7 +73,7 @@ def test_synthetic_live_staging_acceptance_harness_is_16_slot_and_guarded():
     assert "tenant ID is missing or unsafe" in source
     assert "must not be symlinked" in source
     assert "tenant_dir.is_symlink()" in source
-    assert source.index("withdrawal did not remove synthetic original bytes") < source.index("CLEANUP_CONSENT = False")
+    assert source.rindex("withdrawal did not remove synthetic original bytes") < source.rindex("CLEANUP_CONSENT = False")
     missing_confirmation=subprocess.run(["python3",str(script)],capture_output=True,text=True)
     assert missing_confirmation.returncode==2
     assert "confirm-synthetic" in missing_confirmation.stderr
