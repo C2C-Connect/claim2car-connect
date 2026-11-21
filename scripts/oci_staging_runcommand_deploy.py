@@ -57,14 +57,8 @@ def validate_inputs(env: dict[str, str]) -> dict[str, str]:
         raise ValueError("C2C_IMAGE_REF must match the configured OCIR repo, commit tag, and pinned digest.")
     values["C2C_IMAGE_COMMIT"] = match.group(1)
     db_image = values["C2C_POSTGRES_IMAGE"]
-    if not re.search(r"@sha256:[a-f0-9]{64}$", db_image):
-        raise ValueError("C2C_POSTGRES_IMAGE must be digest-pinned.")
-    if not (
-        db_image.startswith(f"{values['OCI_REGISTRY']}/")
-        or db_image.startswith("docker.io/")
-        or db_image.startswith("quay.io/")
-    ):
-        raise ValueError("C2C_POSTGRES_IMAGE must use OCIR or an explicit public registry host.")
+    if not re.fullmatch(r"docker.io/postgis/postgis(?::[a-zA-Z0-9._-]+)?@sha256:[a-f0-9]{64}", db_image):
+        raise ValueError("C2C_POSTGRES_IMAGE must be the official docker.io/postgis/postgis image pinned by digest.")
     return values
 
 
