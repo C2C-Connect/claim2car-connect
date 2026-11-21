@@ -174,12 +174,21 @@ def execute_command(
     last_state = "UNKNOWN"
     last_data: dict = {}
     while time.monotonic() < deadline:
-        output = run_oci([
-            "instance-agent", "command-execution", "get",
-            "--command-id", command_id,
-            "--instance-id", instance_ocid,
-            "--output", "json",
-        ], timeout=120)
+        try:
+            output = run_oci([
+                "instance-agent", "command-execution", "get",
+                "--command-id", command_id,
+                "--instance-id", instance_ocid,
+                "--output", "json",
+            ], timeout=120)
+        except RuntimeError as error:
+            # The execution record can lag command creation. Retry only transient not-found
+            # responses briefly; persistent 404s usually indicate IAM or plugin readiness.
+            detail = str(error)
+            if ("404" in detail or "NotAuthorizedOrNotFound" in detail) and time.monotonic() < deadline:
+                time.sleep(max(1, poll_seconds))
+                continue
+            raise
         payload = json.loads(output)
         last_data = payload.get("data") or payload
         last_state = get_state(last_data)
@@ -200,7 +209,7 @@ def execute_command(
         "message": message,
         "text": text_output,
     }
-    if last_state != "SUCCEEDED" or exit_code not in (0, None):
+    if last_state != "SUCCEEDED" or exit_code != 0:
         raise RuntimeError(
             f"OCI Run Command failed: state={last_state}, exit_code={exit_code}, "
             f"command_id={command_id}, message={str(message)[:1000]}, output={str(text_output)[-1000:]}"
