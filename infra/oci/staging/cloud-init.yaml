@@ -14,6 +14,7 @@ packages:
   - python3
   - git
   - curl
+  - oci-cli
 
 write_files:
   - path: /usr/local/sbin/claim2car-host-preflight
@@ -79,6 +80,81 @@ write_files:
       [[ "$postgres_source" != "$evidence_source" ]] || fail "PostgreSQL and evidence paths resolve to the same mounted source"
       echo "PASS: private host runtime, distinct persistent volumes, UID 10001 access, and write/fsync/remove probes"
       
+  - path: /usr/local/sbin/claim2car-runtime-bootstrap
+    owner: root:root
+    permissions: '0750'
+    content: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      fail() { echo "FAIL: $*" >&2; exit 1; }
+      [[ $EUID -eq 0 ]] || fail "Run Command bootstrap wrapper requires root."
+      [[ "${C2C_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid source SHA."
+      path="/tmp/claim2car-runtime-bootstrap-${C2C_SOURCE_SHA}.py"
+      [[ "${C2C_BOOTSTRAP_SCRIPT_PATH:-}" == "$path" && -f "$path" && ! -L "$path" ]] || fail "Bootstrap script path mismatch."
+      [[ "${C2C_BOOTSTRAP_SCRIPT_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "Invalid bootstrap checksum."
+      echo "${C2C_BOOTSTRAP_SCRIPT_SHA256}  $path" | sha256sum -c - >/dev/null || fail "Bootstrap checksum failed."
+      install -d -o root -g root -m 0750 /opt/claim2car/scripts
+      install -o root -g root -m 0750 "$path" /opt/claim2car/scripts/oci_staging_runtime_bootstrap.py
+      exec python3 /opt/claim2car/scripts/oci_staging_runtime_bootstrap.py --dir /etc/claim2car/runtime
+  - path: /usr/local/sbin/claim2car-runtime-deploy
+    owner: root:root
+    permissions: '0750'
+    content: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      fail() { echo "FAIL: $*" >&2; exit 1; }
+      [[ $EUID -eq 0 ]] || fail "Run Command deployment wrapper requires root."
+      [[ "${C2C_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid source SHA."
+      path="/tmp/claim2car-runtime-deploy-${C2C_SOURCE_SHA}.sh"
+      [[ "${C2C_DEPLOY_SCRIPT_PATH:-}" == "$path" && -f "$path" && ! -L "$path" ]] || fail "Deployment script path mismatch."
+      [[ "${C2C_DEPLOY_SCRIPT_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "Invalid deployment checksum."
+      echo "${C2C_DEPLOY_SCRIPT_SHA256}  $path" | sha256sum -c - >/dev/null || fail "Deployment script checksum failed."
+      [[ "${OCI_IMAGE_REF:-}" =~ :sha-${C2C_SOURCE_SHA}@sha256:[a-f0-9]{64}$ ]] || fail "Image revision/digest does not match source SHA."
+      [[ "${OCI_REGISTRY:-}" =~ ^[a-z0-9.-]+$ && "${OCI_IMAGE_REF}" == "${OCI_REGISTRY}/"* ]] || fail "Image registry host mismatch."
+      [[ -n "${OCI_REGISTRY_USERNAME:-}" && -n "${OCI_REGISTRY_TOKEN:-}" ]] || fail "OCIR credentials are missing."
+      [[ "${C2C_POSTGRES_IMAGE:-}" =~ @sha256:[a-f0-9]{64}$ ]] || fail "PostgreSQL image must be digest pinned."
+      install -d -o root -g root -m 0750 /opt/claim2car/scripts
+      install -o root -g root -m 0750 "$path" /opt/claim2car/scripts/oci_staging_runtime_deploy.sh
+      export C2C_STAGING_ROOT=/var/lib/claim2car C2C_STAGING_RUNTIME_CONFIG=/etc/claim2car/runtime
+      exec bash /opt/claim2car/scripts/oci_staging_runtime_deploy.sh
+  - path: /usr/local/sbin/claim2car-runtime-acceptance
+    owner: root:root
+    permissions: '0750'
+    content: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      fail() { echo "FAIL: $*" >&2; exit 1; }
+      [[ $EUID -eq 0 ]] || fail "Run Command acceptance wrapper requires root."
+      [[ "${C2C_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid source SHA."
+      path="/tmp/claim2car-runtime-acceptance-${C2C_SOURCE_SHA}.py"
+      [[ "${C2C_ACCEPTANCE_SCRIPT_PATH:-}" == "$path" && -f "$path" && ! -L "$path" ]] || fail "Acceptance script path mismatch."
+      [[ "${C2C_ACCEPTANCE_SCRIPT_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "Invalid acceptance checksum."
+      echo "${C2C_ACCEPTANCE_SCRIPT_SHA256}  $path" | sha256sum -c - >/dev/null || fail "Acceptance script checksum failed."
+      checkout="/opt/claim2car/acceptance-source-${C2C_SOURCE_SHA}"
+      [[ ! -L "$checkout" ]] || fail "Acceptance checkout path is a symlink."
+      if [[ -e "$checkout" ]]; then rm -rf -- "$checkout"; fi
+      git clone --quiet https://github.com/C2C-Connect/claim2car-connect.git "$checkout"
+      git -C "$checkout" fetch --quiet --depth 1 origin "$C2C_SOURCE_SHA"
+      git -C "$checkout" checkout --quiet --detach "$C2C_SOURCE_SHA"
+      [[ "$(git -C "$checkout" rev-parse HEAD)" == "$C2C_SOURCE_SHA" ]] || fail "Acceptance checkout revision mismatch."
+      [[ -z "$(git -C "$checkout" status --porcelain)" ]] || fail "Acceptance checkout is dirty."
+      acceptance="$checkout/scripts/oci_staging_capture_acceptance.py"
+      [[ -f "$acceptance" && ! -L "$acceptance" ]] || fail "Pinned acceptance script missing."
+      [[ "$(sha256sum "$acceptance" | awk '{print $1}')" == "${C2C_ACCEPTANCE_SCRIPT_SHA256}" ]] || fail "Pinned acceptance script checksum mismatch."
+      tokens="/etc/claim2car/runtime/operator-tokens.txt"
+      [[ -f "$tokens" && ! -L "$tokens" && "$(stat -c %u "$tokens")" == 0 && "$(stat -c %a "$tokens")" == 600 ]] || fail "Synthetic operator token file is missing or unsafe."
+      owner_token="$(awk -F': ' '$1=="owner"{print $2}' "$tokens")"
+      operator_token="$(awk -F': ' '$1=="operator"{print $2}' "$tokens")"
+      reviewer_token="$(awk -F': ' '$1=="reviewer"{print $2}' "$tokens")"
+      [[ "${#owner_token}" -ge 32 && "${#operator_token}" -ge 32 && "${#reviewer_token}" -ge 32 ]] || fail "Synthetic acceptance tokens are malformed."
+      export C2C_ACCEPTANCE_OWNER_TOKEN="$owner_token" C2C_ACCEPTANCE_OPERATOR_TOKEN="$operator_token" C2C_ACCEPTANCE_REVIEWER_TOKEN="$reviewer_token"
+      export C2C_CAPTURE_CONFIG_FILE=/etc/claim2car/runtime/capture-runtime.json C2C_ARTIFACT_STORAGE_ROOT=/var/lib/claim2car/evidence
+      exec python3 "$acceptance" --base-url "${C2C_ACCEPTANCE_BASE_URL:-http://127.0.0.1:8000}" --confirm-synthetic
+  - path: /etc/sudoers.d/101-claim2car-run-command
+    owner: root:root
+    permissions: '0440'
+    content: |
+      ocarun ALL=(root) NOPASSWD: SETENV: /usr/local/sbin/claim2car-runtime-bootstrap, /usr/local/sbin/claim2car-runtime-deploy, /usr/local/sbin/claim2car-runtime-acceptance
 runcmd:
   - [bash, -lc, "getent group 10001 >/dev/null || groupadd --gid 10001 claim2car"]
   - [bash, -lc, "getent passwd 10001 >/dev/null || useradd --uid 10001 --gid 10001 --system --no-create-home --home-dir /var/lib/claim2car --shell /usr/sbin/nologin claim2car"]
