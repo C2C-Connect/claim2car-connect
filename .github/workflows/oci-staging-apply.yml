@@ -173,6 +173,9 @@ jobs:
       TF_VAR_private_subnet_ocid: ${{ secrets.OCI_PRIVATE_SUBNET_OCID }}
       TF_VAR_image_ocid: ${{ secrets.OCI_STAGING_IMAGE_OCID }}
       TF_VAR_ssh_authorized_keys: ${{ secrets.OCI_STAGING_SSH_PUBLIC_KEYS }}
+      TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
+      TF_VAR_enable_private_runcommand_deploy: ${{ vars.OCI_ENABLE_PRIVATE_RUNCOMMAND_DEPLOY || 'false' }}
+      TF_VAR_ocir_auth_secret_ocid: ${{ vars.OCI_OCIR_AUTH_SECRET_OCID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -192,6 +195,9 @@ jobs:
           OCI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
           OCI_FINGERPRINT: ${{ secrets.OCI_API_FINGERPRINT }}
           OCI_PRIVATE_KEY: ${{ secrets.OCI_API_PRIVATE_KEY }}
+          TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
+          ENABLE_RUNCOMMAND: ${{ vars.OCI_ENABLE_PRIVATE_RUNCOMMAND_DEPLOY || 'false' }}
+          OCIR_SECRET_OCID: ${{ vars.OCI_OCIR_AUTH_SECRET_OCID }}
           COMPARTMENT: ${{ secrets.OCI_COMPARTMENT_OCID }}
           VCN: ${{ secrets.OCI_VCN_OCID }}
           SUBNET: ${{ secrets.OCI_PRIVATE_SUBNET_OCID }}
@@ -199,6 +205,10 @@ jobs:
         run: |
           set -euo pipefail
           missing=()
+          if [[ "${ENABLE_RUNCOMMAND}" == "true" && -z "${OCIR_SECRET_OCID}" ]]; then
+            echo "Private Run Command deployment is enabled but OCI_OCIR_AUTH_SECRET_OCID is missing."
+            exit 1
+          fi
           for name in OCI_USER OCI_TENANCY OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_STATE_BUCKET OCI_STATE_NAMESPACE COMPARTMENT VCN SUBNET IMAGE; do
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
