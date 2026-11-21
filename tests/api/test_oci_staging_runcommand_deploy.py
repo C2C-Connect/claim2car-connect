@@ -4,7 +4,7 @@ import importlib.util
 import json
 import shlex
 import subprocess
-import pytest
+import unittest
 import textwrap
 from pathlib import Path
 from unittest.mock import patch
@@ -34,14 +34,14 @@ def _valid_env():
 def test_runcommand_deploy_rejects_missing_input_mapping_value():
     env = _valid_env()
     del env["OCI_STAGING_INSTANCE_OCID"]
-    with pytest.raises(ValueError, match="Missing required deployment input"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "Missing required deployment input"):
         deploy.validate_inputs(env)
 
 
 def test_runcommand_deploy_rejects_invalid_source_script_checksum():
     env = _valid_env()
     env["C2C_DEPLOY_SCRIPT_SHA256"] = "not-a-sha256"
-    with pytest.raises(ValueError, match="lowercase SHA-256"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "lowercase SHA-256"):
         deploy.validate_inputs(env)
 
 
@@ -54,35 +54,35 @@ def test_runcommand_deploy_rejects_non_chicago_registry():
     env = _valid_env()
     env["OCI_REGISTRY"] = "eu-frankfurt-1.ocir.io"
     env["C2C_IMAGE_REF"] = env["C2C_IMAGE_REF"].replace("us-chicago-1.ocir.io", "eu-frankfurt-1.ocir.io")
-    with pytest.raises(ValueError, match="Chicago OCIR"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "Chicago OCIR"):
         deploy.validate_inputs(env)
 
 
 def test_runcommand_deploy_rejects_image_from_wrong_repository():
     env = _valid_env()
     env["C2C_IMAGE_REF"] = env["C2C_IMAGE_REF"].replace("/claim2car:", "/attacker-repo:")
-    with pytest.raises(ValueError, match="configured OCIR repo"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "configured OCIR repo"):
         deploy.validate_inputs(env)
 
 
 def test_runcommand_deploy_rejects_unpinned_database_image():
     env = _valid_env()
     env["C2C_POSTGRES_IMAGE"] = "us-chicago-1.ocir.io/namespace/postgres:latest"
-    with pytest.raises(ValueError, match="digest-pinned"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "digest-pinned"):
         deploy.validate_inputs(env)
 
 
 def test_runcommand_deploy_rejects_database_image_from_untrusted_registry():
     env = _valid_env()
     env["C2C_POSTGRES_IMAGE"] = "attacker.example/db@sha256:" + "c" * 64
-    with pytest.raises(ValueError, match="official docker.io/postgis/postgis"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "official docker.io/postgis/postgis"):
         deploy.validate_inputs(env)
 
 
 def test_runcommand_deploy_rejects_non_postgis_public_image():
     env = _valid_env()
     env["C2C_POSTGRES_IMAGE"] = "docker.io/library/postgres:16@sha256:" + "c" * 64
-    with pytest.raises(ValueError, match="official docker.io/postgis/postgis"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "official docker.io/postgis/postgis"):
         deploy.validate_inputs(env)
 
 
@@ -165,7 +165,7 @@ def test_poll_command_fails_closed_for_failed_execution():
         [], 0, stdout=json.dumps({"data": [{"command-id": "wanted", "lifecycle-state": "FAILED"}]}), stderr=""
     )
     with patch.object(deploy, "_run_cli", return_value=response), patch.object(deploy.time, "sleep"):
-        with pytest.raises(RuntimeError, match="FAILED"):
+        with unittest.TestCase().assertRaisesRegex(RuntimeError, "FAILED"):
             deploy.poll_command(values, "wanted", timeout=1, interval=0)
 
 
@@ -173,7 +173,7 @@ def test_poll_timeout_attempts_forced_command_cancel():
     values = deploy.validate_inputs(_valid_env())
     output = subprocess.CompletedProcess([], 0, stdout="", stderr="")
     with patch.object(deploy, "_run_cli", return_value=output) as run, patch.object(deploy.time, "monotonic", return_value=0):
-        with pytest.raises(TimeoutError, match="timed out"):
+        with unittest.TestCase().assertRaisesRegex(TimeoutError, "timed out"):
             deploy.poll_command(values, "wanted", timeout=0, interval=0)
     cancel_args = run.call_args.args[0]
     assert "cancel" in cancel_args and "--force" in cancel_args
