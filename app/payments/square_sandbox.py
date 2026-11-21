@@ -113,6 +113,8 @@ def create_shop_acceptance_checkout(
 ) -> SquareSandboxCheckout:
     """Create a Sandbox Quick Pay link for a verified shop-fee obligation only."""
     config.validate()
+    if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or not 1 <= timeout_seconds <= 30:
+        raise SquareSandboxError("SQUARE_SANDBOX_TIMEOUT_INVALID")
     if getattr(obligation, "entry_kind", None) != OBLIGATION_KIND:
         raise SquareSandboxError("SHOP_FEE_OBLIGATION_REQUIRED")
     if getattr(obligation, "fee_type", None) != SHOP_FEE_TYPE:
@@ -136,7 +138,7 @@ def create_shop_acceptance_checkout(
             "price_money": {"amount": SHOP_FEE_CENTS, "currency": "USD"},
             "location_id": config.location_id,
         },
-        "payment_note": f"Claim2Car sandbox obligation {entry_id}; acceptance {acceptance_id}",
+        "payment_note": "Claim2Car Sandbox shop acceptance fee",
     }
     headers = {
         "Authorization": f"Bearer {config.access_token}",
@@ -190,7 +192,9 @@ def verify_square_webhook_signature(
     notification_url: str,
 ) -> bool:
     """Verify Square's HMAC-SHA256 over exact configured URL + raw body."""
-    if not isinstance(raw_body, bytes) or not signature or not signature_key or not notification_url:
+    if (not isinstance(raw_body, bytes) or not isinstance(signature, str) or not signature
+            or not isinstance(signature_key, str) or not signature_key
+            or not isinstance(notification_url, str) or not notification_url):
         return False
     expected = base64.b64encode(
         hmac.new(

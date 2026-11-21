@@ -62,7 +62,9 @@ def test_checkout_link_is_sandbox_only_fixed_fee_and_idempotent():
     body = captured["body"]
     assert body["quick_pay"]["price_money"] == {"amount": 27500, "currency": "USD"}
     assert body["quick_pay"]["location_id"] == "sandbox-location"
-    assert body["payment_note"].startswith("Claim2Car sandbox obligation")
+    assert body["payment_note"] == "Claim2Car Sandbox shop acceptance fee"
+    assert "ledger-shop-0001" not in body["payment_note"]
+    assert "acceptance-0001" not in body["payment_note"]
     assert checkout.checkout_url == "https://sandbox.square.link/u/test"
     assert checkout.provider_order_id == "order-test"
     assert create_shop_acceptance_checkout(Obligation(), config(), transport=transport).idempotency_key == checkout.idempotency_key
@@ -104,6 +106,12 @@ def test_checkout_requires_exact_shop_acceptance_obligation(changes, code):
     obligation = Obligation(**changes)
     with pytest.raises(SquareSandboxError, match=code):
         create_shop_acceptance_checkout(obligation, config(), transport=fake_transport()[1])
+
+
+@pytest.mark.parametrize("timeout", [0, -1, 31, True, "15"])
+def test_checkout_timeout_is_bounded(timeout):
+    with pytest.raises(SquareSandboxError, match="TIMEOUT_INVALID"):
+        create_shop_acceptance_checkout(Obligation(), config(), transport=fake_transport()[1], timeout_seconds=timeout)
 
 
 def test_provider_failure_and_bad_checkout_url_are_redacted_and_rejected():
