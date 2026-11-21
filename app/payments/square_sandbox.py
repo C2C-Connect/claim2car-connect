@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from urllib.parse import urlparse
 
 SQUARE_SANDBOX_API = "https://connect.squareupsandbox.com"
 SQUARE_API_VERSION = "2026-11-18"
@@ -49,7 +50,9 @@ class SquareSandboxConfig:
         if not isinstance(self.webhook_signature_key, str) or not self.webhook_signature_key:
             raise SquareSandboxError("SQUARE_SANDBOX_WEBHOOK_KEY_REQUIRED")
         url = self.webhook_notification_url
-        if not isinstance(url, str) or not url.startswith("https://") or not url.strip():
+        parsed = urlparse(url) if isinstance(url, str) else None
+        if (not parsed or parsed.scheme != "https" or not parsed.hostname
+                or parsed.username or parsed.password or parsed.fragment):
             raise SquareSandboxError("SQUARE_SANDBOX_WEBHOOK_URL_MUST_BE_HTTPS")
 
 
@@ -110,10 +113,11 @@ def create_shop_acceptance_checkout(
     entry_id = getattr(obligation, "entry_id", "")
     acceptance_id = getattr(obligation, "acceptance_id", "")
     partner_id = getattr(obligation, "partner_org_id", "")
-    if not all(isinstance(value, str) and value.strip() for value in (entry_id, acceptance_id, partner_id)):
+    tenant_id = getattr(obligation, "tenant_id", "")
+    if not all(isinstance(value, str) and value.strip() for value in (entry_id, acceptance_id, partner_id, tenant_id)):
         raise SquareSandboxError("SHOP_FEE_OBLIGATION_IDENTITY_REQUIRED")
-    # Square's idempotency key is deterministic per internal obligation and under its 192-char limit.
-    key = "c2c-shop-fee-" + hashlib.sha256(entry_id.encode("utf-8")).hexdigest()
+    # Entry IDs may repeat across tenants; namespace the provider key by tenant.
+    key = "c2c-shop-fee-" + hashlib.sha256(f"{tenant_id}|{entry_id}".encode("utf-8")).hexdigest()
     payload = {
         "idempotency_key": key,
         "quick_pay": {
@@ -185,9 +189,13 @@ def verify_and_parse_square_payment_event(
     raw_body: bytes,
     signature: str,
     config: SquareSandboxConfig,
+    *,
+    square_environment: str,
 ) -> SquareSandboxPaymentEvent:
     """Authenticate first; return a minimal payment event, not PII or raw payload."""
     config.validate()
+    if square_environment != "Sandbox":
+        raise SquareSandboxError("SQUARE_SANDBOX_WEBHOOK_ENVIRONMENT_INVALID")
     if not verify_square_webhook_signature(
         raw_body,
         signature,

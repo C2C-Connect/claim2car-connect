@@ -28,6 +28,7 @@ class Obligation:
     currency: str = "USD_CENTS"
     acceptance_id: str = "acceptance-0001"
     partner_org_id: str = "shop-tenant-001"
+    tenant_id: str = "tenant-001"
 
 
 def config(**changes):
@@ -65,6 +66,8 @@ def test_checkout_link_is_sandbox_only_fixed_fee_and_idempotent():
     assert checkout.checkout_url == "https://square.link/u/test"
     assert checkout.provider_order_id == "order-test"
     assert create_shop_acceptance_checkout(Obligation(), config(), transport=transport).idempotency_key == checkout.idempotency_key
+    other_tenant = Obligation(tenant_id="tenant-002")
+    assert create_shop_acceptance_checkout(other_tenant, config(), transport=transport).idempotency_key != checkout.idempotency_key
 
 
 @pytest.mark.parametrize("changes,code", [
@@ -129,12 +132,12 @@ def test_webhook_signature_exact_url_body_and_key():
 def test_payment_event_is_authenticated_and_parsed_minimally():
     cfg = config()
     raw = payment_event()
-    parsed = verify_and_parse_square_payment_event(raw, sign(raw, cfg), cfg)
+    parsed = verify_and_parse_square_payment_event(raw, sign(raw, cfg), cfg, square_environment="Sandbox")
     assert (parsed.event_id, parsed.payment_id, parsed.order_id) == ("event-001", "payment-001", "order-test")
     assert (parsed.status, parsed.amount_cents, parsed.currency) == ("COMPLETED", 27500, "USD")
     assert not hasattr(parsed, "raw_payload")
     with pytest.raises(SquareSandboxError, match="SIGNATURE_INVALID"):
-        verify_and_parse_square_payment_event(raw, "invalid", cfg)
+        verify_and_parse_square_payment_event(raw, "invalid", cfg, square_environment="Sandbox")
 
 
 @pytest.mark.parametrize("status,amount,currency,code", [
@@ -147,6 +150,13 @@ def test_webhook_rejects_invalid_amount_currency(status, amount, currency, code)
     raw = payment_event(status, amount, currency)
     with pytest.raises(SquareSandboxError, match=code):
         verify_and_parse_square_payment_event(raw, sign(raw, cfg), cfg)
+
+
+def test_webhook_rejects_non_sandbox_environment_header():
+    cfg = config()
+    raw = payment_event()
+    with pytest.raises(SquareSandboxError, match="WEBHOOK_ENVIRONMENT_INVALID"):
+        verify_and_parse_square_payment_event(raw, sign(raw, cfg), cfg, square_environment="Production")
 
 
 def test_webhook_rejects_unsupported_event_type():
