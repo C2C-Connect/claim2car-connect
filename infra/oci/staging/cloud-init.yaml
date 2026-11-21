@@ -12,6 +12,8 @@ packages:
   - lvm2
   - util-linux
   - python3
+  - git
+  - curl
 
 write_files:
   - path: /usr/local/sbin/claim2car-host-preflight
