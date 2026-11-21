@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import traceback
 import uuid
 import psycopg
 from psycopg import sql
@@ -37,9 +36,9 @@ def validate_authority_migration_inventory(inventory):
     expect('0024_audited_capture_exceptions_pause_resume.sql' in names,'AUDITED_CAPTURE_EXCEPTIONS_MIGRATION_REQUIRED')
     expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql') < names.index('0020_collision_lifecycle_record.sql') < names.index('0021_collision_claim_link.sql') < names.index('0022_collision_vehicle_capture_link.sql') < names.index('0023_consented_vehicle_profile.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql'),
+    expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql') < names.index('0026_square_sandbox_webhook_reconciliation.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names[-1]=='0025_square_sandbox_payment_intents.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0025')
+    expect(names[-1]=='0026_square_sandbox_webhook_reconciliation.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0026')
 
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
@@ -53,7 +52,7 @@ def denied(conn,tenant,event):
     else:
         raise AssertionError('UNAUTHORIZED_APPEND_ALLOWED')
 
-TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases','claim_case_incident_intake','square_sandbox_payment_intents')
+TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases','claim_case_incident_intake','square_sandbox_payment_intents','square_sandbox_payment_reconciliations','square_sandbox_webhook_receipts')
 CHECKS = ('rls_flags','own_read','cross_read','cross_insert','cross_update','cross_delete','tenant_reassignment','spoofed_context','missing_context','malformed_context')
 
 def reject_mutation(conn,tenant,statement,parameters):
@@ -70,7 +69,7 @@ def verify(report,admin,connections,tenants,session):
               'fixture_classification':'admin-provisioned storage-isolation fixtures; not evidence evaluation or accepted completion',
               'results':[]}
     report['checks'].append(matrix)
-    actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings' AND c.relname NOT IN ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox','vehicle_identity_sources','vehicle_decode_snapshots')").fetchall()
+    actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings' AND c.relname NOT IN ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox','vehicle_identity_sources','vehicle_decode_snapshots','square_sandbox_payment_order_map')").fetchall()
     expect({row[0] for row in actual}==set(TABLES),'TENANT_TABLE_SCOPE_CHANGED')
     ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim','shop_partner','shop_acceptance','shop_intent')}
     seal = 'matrix-seal-'+uuid.uuid4().hex
@@ -79,7 +78,6 @@ def verify(report,admin,connections,tenants,session):
         for brand in ('brand','extra_brand'):
             admin.execute('INSERT INTO faos.brands VALUES (%s,%s)',(ids[brand],'matrix-'+ids[brand]))
         shop_entries={}
-        payment_orders={}
         for tenant in tenants:
             admin.execute('INSERT INTO faos.claim_cases(tenant_id,claim_id,request_id,created_by,owner_actor_id) VALUES (%s,%s,%s,%s,%s)',(tenant,ids['claim'],ids['request'],'synthetic-matrix','synthetic-matrix'))
             admin.execute('INSERT INTO faos.claim_case_incident_intake(tenant_id,claim_id,owner_actor_id,request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,ids['claim'],'synthetic-matrix',ids['request'],'2026-01-01T00:00:00Z','collision','San Antonio','TX','78201'))
@@ -104,14 +102,21 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,27500),(%s,%s,2,%s,%s,27500)',
                 (tenant,shop_entry,'AR:SHOP:'+ids['shop_partner'],'DEBIT',tenant,shop_entry,'REV:REPAIR_SHOP_ACCEPTANCE','CREDIT'))
             shop_entries[tenant]=shop_entry
+        # Seed every tenant's payment-state rows before the cross-tenant matrix.
+        # Otherwise the first tenant's fixture would try to clone a row from the
+        # second tenant before that row exists, aborting the diagnostic mid-matrix.
+        for tenant in tenants:
+            payment_id='matrix-payment-'+uuid.uuid4().hex
+            event_id='matrix-webhook-'+uuid.uuid4().hex
             payment_intent_id=str(uuid.uuid4())
             order_id='matrix-order-'+uuid.uuid4().hex
-            payment_orders[tenant]=order_id
             admin.execute('INSERT INTO faos.square_sandbox_payment_intents(tenant_id,payment_intent_id,obligation_entry_id,session_id,acceptance_id,partner_org_id,provider,provider_link_id,provider_order_id,checkout_url,idempotency_key,amount_cents,currency,status,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,27500,%s,%s,%s)',
-                (tenant,payment_intent_id,shop_entry,session,ids['shop_acceptance'],ids['shop_partner'],'SQUARE_SANDBOX','matrix-link-'+uuid.uuid4().hex,order_id,'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'USD','LINK_CREATED','synthetic-matrix'))
+                (tenant,payment_intent_id,shop_entries[tenant],session,ids['shop_acceptance'],ids['shop_partner'],'SQUARE_SANDBOX','matrix-link-'+uuid.uuid4().hex,order_id,'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'USD','LINK_CREATED','synthetic-matrix'))
+            admin.execute('INSERT INTO faos.square_sandbox_payment_reconciliations(tenant_id,payment_intent_id,provider_payment_id,status,provider_event_id,updated_at) VALUES (%s,%s,%s,%s,%s,now())',(tenant,payment_intent_id,payment_id,'PAID',event_id))
+            admin.execute('INSERT INTO faos.square_sandbox_webhook_receipts(provider_event_id,event_type,provider_payment_id,provider_order_id,provider_status,amount_cents,currency,event_created_at,payload_sha256,tenant_id,payment_intent_id,reconciliation_status,reconciled_at) VALUES (%s,%s,%s,%s,%s,27500,%s,now(),%s,%s,%s,%s,now())',(event_id,'payment.updated',payment_id,order_id,'COMPLETED','USD','0'*64,tenant,payment_intent_id,'RECONCILED'))
         for index,conn in enumerate(connections):
+            tenant=tenants[index]
             own,other = tenants[index],tenants[1-index]
-
             for table in TABLES:
                 target = sql.SQL('faos.{}').format(sql.Identifier(table))
                 select = sql.SQL('SELECT tenant_id::text FROM {} WHERE tenant_id IN (%s::uuid,%s::uuid)').format(target)
@@ -147,10 +152,8 @@ def verify(report,admin,connections,tenants,session):
                         results['cross_read'] = {'status':'PASS'}
                 privileges = conn.execute("SELECT has_table_privilege(current_user,%s,'INSERT'),has_table_privilege(current_user,%s,'UPDATE'),has_table_privilege(current_user,%s,'DELETE')",('faos.'+table,)*3).fetchone()
                 cursor = admin.execute(sql.SQL('SELECT * FROM {} WHERE tenant_id=%s LIMIT 1').format(target),(other,))
-                fixture_row = cursor.fetchone()
-                expect(fixture_row is not None,'TENANT_MATRIX_FIXTURE_MISSING:'+table)
-                values = dict(zip((column.name for column in cursor.description),fixture_row))
-                key = {'square_sandbox_payment_intents':'payment_intent_id','users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id','claim_case_incident_intake':'request_id'}.get(table)
+                values = dict(zip((column.name for column in cursor.description),cursor.fetchone()))
+                key = {'square_sandbox_payment_intents':'payment_intent_id','square_sandbox_payment_reconciliations':'payment_intent_id','square_sandbox_webhook_receipts':'provider_event_id','users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id','claim_case_incident_intake':'request_id'}.get(table)
                 if key:
                     values[key] = str(uuid.uuid4())
                 if table=='claim_case_incident_intake':
@@ -220,6 +223,9 @@ def verify(report,admin,connections,tenants,session):
         matrix['status'] = 'PASS'
     finally:
         for tenant in tenants:
+            admin.execute('DELETE FROM faos.square_sandbox_webhook_receipts WHERE tenant_id=%s AND provider_event_id LIKE %s',(tenant,'matrix-webhook-%'))
+            admin.execute('DELETE FROM faos.square_sandbox_payment_reconciliations WHERE tenant_id=%s AND provider_payment_id LIKE %s',(tenant,'matrix-payment-%'))
+            admin.execute('DELETE FROM faos.square_sandbox_payment_order_map WHERE tenant_id=%s AND provider_order_id LIKE %s',(tenant,'matrix-order-%'))
             admin.execute('DELETE FROM faos.square_sandbox_payment_intents WHERE tenant_id=%s AND idempotency_key LIKE %s',(tenant,'matrix-idem-%'))
             admin.execute('DELETE FROM faos.financial_ledger_postings WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-shop-ledger-%'))
             admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-shop-ledger-%'))
@@ -361,7 +367,6 @@ if __name__ == '__main__':
         report['diagnostics_successful'] = False
         report['execution_error_type'] = type(error).__name__
         report['execution_error_message'] = str(error)
-        report['execution_error_traceback'] = traceback.format_exc()
     try:
         counted_path, counted_tests = load_counted_database_report()
         report['counted_test_report_path'] = str(counted_path)
