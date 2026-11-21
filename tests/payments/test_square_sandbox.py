@@ -46,7 +46,7 @@ def config(**changes):
 def fake_transport(response=None, status=200):
     captured = {}
     if response is None:
-        response = {"payment_link": {"id": "link-test", "order_id": "order-test", "url": "https://square.link/u/test"}}
+        response = {"payment_link": {"id": "link-test", "order_id": "order-test", "url": "https://sandbox.square.link/u/test"}}
     def post(url, headers, body, timeout):
         captured.update(url=url, headers=headers, body=json.loads(body), timeout=timeout)
         return status, json.dumps(response).encode()
@@ -63,20 +63,13 @@ def test_checkout_link_is_sandbox_only_fixed_fee_and_idempotent():
     assert body["quick_pay"]["price_money"] == {"amount": 27500, "currency": "USD"}
     assert body["quick_pay"]["location_id"] == "sandbox-location"
     assert body["payment_note"].startswith("Claim2Car sandbox obligation")
-    assert checkout.checkout_url == "https://square.link/u/test"
+    assert checkout.checkout_url == "https://sandbox.square.link/u/test"
     assert checkout.provider_order_id == "order-test"
     assert create_shop_acceptance_checkout(Obligation(), config(), transport=transport).idempotency_key == checkout.idempotency_key
     other_tenant = Obligation(tenant_id="tenant-002")
     assert create_shop_acceptance_checkout(other_tenant, config(), transport=transport).idempotency_key != checkout.idempotency_key
 
 
-@pytest.mark.parametrize("changes,code", [
-    ({"environment": "production"}, "SQUARE_SANDBOX_ENVIRONMENT_REQUIRED"),
-    ({"access_token": ""}, "SQUARE_SANDBOX_ACCESS_TOKEN_REQUIRED"),
-    ({"location_id": ""}, "SQUARE_SANDBOX_LOCATION_ID_REQUIRED"),
-    ({"webhook_signature_key": ""}, "SQUARE_SANDBOX_WEBHOOK_KEY_REQUIRED"),
-    ({"webhook_notification_url": "http://bad.example"}, "SQUARE_SANDBOX_WEBHOOK_URL_MUST_BE_HTTPS"),
-])
 def test_config_loads_from_environment(monkeypatch):
     monkeypatch.setenv("SQUARE_ENVIRONMENT", "sandbox")
     monkeypatch.setenv("SQUARE_SANDBOX_ACCESS_TOKEN", "test-token")
@@ -88,7 +81,13 @@ def test_config_loads_from_environment(monkeypatch):
     assert loaded.environment == "sandbox"
     assert loaded.location_id == "test-location"
 
-
+@pytest.mark.parametrize("changes,code", [
+    ({"environment": "production"}, "SQUARE_SANDBOX_ENVIRONMENT_REQUIRED"),
+    ({"access_token": ""}, "SQUARE_SANDBOX_ACCESS_TOKEN_REQUIRED"),
+    ({"location_id": ""}, "SQUARE_SANDBOX_LOCATION_ID_REQUIRED"),
+    ({"webhook_signature_key": ""}, "SQUARE_SANDBOX_WEBHOOK_KEY_REQUIRED"),
+    ({"webhook_notification_url": "http://bad.example"}, "SQUARE_SANDBOX_WEBHOOK_URL_MUST_BE_HTTPS"),
+])
 def test_config_fail_closed(changes, code):
     with pytest.raises(SquareSandboxError, match=code):
         create_shop_acceptance_checkout(Obligation(), config(**changes), transport=fake_transport()[1])
@@ -114,6 +113,29 @@ def test_provider_failure_and_bad_checkout_url_are_redacted_and_rejected():
     _, bad_url = fake_transport({"payment_link": {"id": "l", "order_id": "o", "url": "https://evil.example/payment"}})
     with pytest.raises(SquareSandboxError, match="CHECKOUT_URL_INVALID"):
         create_shop_acceptance_checkout(Obligation(), config(), transport=bad_url)
+
+
+@pytest.mark.parametrize("url", [
+    "https://sandbox.square.link/u/test",
+    "https://square.link/u/test",
+    "https://checkout.square.site/checkout/test",
+])
+def test_checkout_accepts_known_square_hosts(url):
+    _, transport = fake_transport({"payment_link": {"id": "l", "order_id": "o", "url": url}})
+    assert create_shop_acceptance_checkout(Obligation(), config(), transport=transport).checkout_url == url
+
+
+@pytest.mark.parametrize("url", [
+    "http://sandbox.square.link/u/test",
+    "https://sandbox.square.link.evil.test/u/test",
+    "https://user@sandbox.square.link/u/test",
+    "https://sandbox.square.link:443/u/test",
+    "https://sandbox.square.link/u/test#fragment",
+])
+def test_checkout_rejects_malformed_or_untrusted_url(url):
+    _, transport = fake_transport({"payment_link": {"id": "l", "order_id": "o", "url": url}})
+    with pytest.raises(SquareSandboxError, match="CHECKOUT_URL_INVALID"):
+        create_shop_acceptance_checkout(Obligation(), config(), transport=transport)
 
 
 def sign(body, cfg):

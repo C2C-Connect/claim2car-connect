@@ -11,7 +11,7 @@ import base64
 import hashlib
 import hmac
 import json
-import re
+import os
 from dataclasses import dataclass
 from typing import Callable
 from urllib.error import HTTPError, URLError
@@ -23,7 +23,7 @@ SQUARE_API_VERSION = "2026-11-18"
 SHOP_FEE_CENTS = 27_500
 SHOP_FEE_TYPE = "REPAIR_SHOP_ACCEPTANCE_FEE"
 OBLIGATION_KIND = "OBLIGATION_BOOKED"
-ALLOWED_CHECKOUT_HOSTS = frozenset({"square.link", "checkout.square.site"})
+ALLOWED_CHECKOUT_HOSTS = frozenset({"sandbox.square.link", "square.link", "checkout.square.site"})
 
 
 class SquareSandboxError(ValueError):
@@ -160,9 +160,15 @@ def create_shop_acceptance_checkout(
         checkout_url = link["url"]
     except (ValueError, TypeError, KeyError):
         raise SquareSandboxError("SQUARE_SANDBOX_CHECKOUT_RESPONSE_INVALID") from None
-    from urllib.parse import urlparse
+    if not isinstance(checkout_url, str) or not checkout_url:
+        raise SquareSandboxError("SQUARE_SANDBOX_CHECKOUT_URL_INVALID")
     parsed_url = urlparse(checkout_url)
-    if parsed_url.scheme != "https" or parsed_url.hostname not in ALLOWED_CHECKOUT_HOSTS:
+    try:
+        explicit_port = parsed_url.port
+    except ValueError:
+        raise SquareSandboxError("SQUARE_SANDBOX_CHECKOUT_URL_INVALID") from None
+    if (parsed_url.scheme != "https" or parsed_url.hostname not in ALLOWED_CHECKOUT_HOSTS
+            or parsed_url.username or parsed_url.password or parsed_url.fragment or explicit_port is not None):
         raise SquareSandboxError("SQUARE_SANDBOX_CHECKOUT_URL_INVALID")
     if not all(isinstance(value, str) and value for value in (link_id, order_id)):
         raise SquareSandboxError("SQUARE_SANDBOX_CHECKOUT_RESPONSE_INVALID")
