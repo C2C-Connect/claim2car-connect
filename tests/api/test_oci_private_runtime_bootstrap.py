@@ -34,3 +34,8 @@ def test_deploy_script_shell_syntax_and_expanded_variables():
     assert "\\${OCI_IMAGE_REF" not in content
     assert "PGDATA=/var/lib/postgresql/data/pgdata" in content
     assert "podman-restart.service" in content
+
+
+def test_host_bootstrap_installs_deploy_dependencies():
+    cloud=(ROOT/"infra/oci/staging/cloud-init.yaml").read_text()
+    assert "  - git" in cloud and "  - curl" in cloud
