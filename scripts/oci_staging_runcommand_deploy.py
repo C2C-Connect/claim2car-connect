@@ -40,8 +40,8 @@ def validate_inputs(env: dict[str, str]) -> dict[str, str]:
         raise ValueError("OCI_STAGING_INSTANCE_OCID is malformed.")
     if not re.fullmatch(r"ocid1\.vaultsecret\.[a-zA-Z0-9.]+", values["OCI_OCIR_AUTH_SECRET_OCID"]):
         raise ValueError("OCI_OCIR_AUTH_SECRET_OCID is malformed.")
-    if not re.fullmatch(r"[a-z0-9.-]+", values["OCI_REGISTRY"]):
-        raise ValueError("OCI_REGISTRY is malformed.")
+    if values["OCI_REGISTRY"] != "us-chicago-1.ocir.io":
+        raise ValueError("OCI_REGISTRY must be the configured Chicago OCIR host.")
     if not re.fullmatch(r"[a-z0-9]+", values["OCIR_NAMESPACE"]):
         raise ValueError("OCIR_NAMESPACE is malformed.")
     if not re.fullmatch(r"[a-z0-9]+(?:[._/-][a-z0-9]+)*", values["OCIR_REPOSITORY"]):
@@ -56,8 +56,15 @@ def validate_inputs(env: dict[str, str]) -> dict[str, str]:
     if not match:
         raise ValueError("C2C_IMAGE_REF must match the configured OCIR repo, commit tag, and pinned digest.")
     values["C2C_IMAGE_COMMIT"] = match.group(1)
-    if not re.search(r"@sha256:[a-f0-9]{64}$", values["C2C_POSTGRES_IMAGE"]):
+    db_image = values["C2C_POSTGRES_IMAGE"]
+    if not re.search(r"@sha256:[a-f0-9]{64}$", db_image):
         raise ValueError("C2C_POSTGRES_IMAGE must be digest-pinned.")
+    if not (
+        db_image.startswith(f"{values['OCI_REGISTRY']}/")
+        or db_image.startswith("docker.io/")
+        or db_image.startswith("quay.io/")
+    ):
+        raise ValueError("C2C_POSTGRES_IMAGE must use OCIR or an explicit public registry host.")
     return values
 
 
@@ -69,6 +76,8 @@ def build_command_text(values: dict[str, str]) -> str:
         values["C2C_POSTGRES_IMAGE"],
         values["OCI_REGISTRY"],
         values["OCI_OCIR_AUTH_SECRET_OCID"],
+        values["OCIR_NAMESPACE"],
+        values["OCIR_REPOSITORY"],
     ]
     command = "sudo -n /usr/local/sbin/claim2car-staging-deploy " + " ".join(
         shlex.quote(arg) for arg in args
