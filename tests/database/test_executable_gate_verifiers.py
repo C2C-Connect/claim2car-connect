@@ -35,7 +35,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(results[-1]["id"], "DB-14")
         self.assertEqual(results[-1]["status"], "NOT AWARDED")
 
-    def test_authority_migration_inventory_requires_all_twenty_four_ordered_files(self):
+    def test_authority_migration_inventory_requires_all_twenty_five_ordered_files(self):
         names = [
             '0001_tenant_registry.sql',
             '0002_event_journal.sql',
@@ -61,6 +61,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             '0022_collision_vehicle_capture_link.sql',
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
+            '0025_square_sandbox_payment_intents.sql',
         ]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_added_migration_detected',
