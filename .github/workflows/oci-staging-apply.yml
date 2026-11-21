@@ -193,7 +193,7 @@ jobs:
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
           if (( "${#missing[@]}" > 0 )); then
-            printf 'Missing required OCI apply-environment inputs: %s\\n' "${missing[*]}"
+            printf 'Missing required OCI apply-environment inputs: %s\n' "${missing[*]}"
             echo "The oci-staging-apply environment must contain the OCI credentials, infrastructure OCIDs, and state-bucket variables used by this saved plan."
             exit 1
           fi
