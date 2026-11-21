@@ -225,6 +225,9 @@ def main() -> int:
     namespace = env["OCIR_NAMESPACE"]
     repository = env["OCIR_REPOSITORY"]
     source_sha = validate_image_ref(image_ref, registry, namespace, repository)
+    workflow_sha = env.get("GITHUB_SHA", "")
+    if workflow_sha != source_sha:
+        raise ValueError("Image source SHA must equal the protected workflow commit.")
     source_dir = Path(env.get("C2C_DEPLOY_SOURCE_DIR", "source"))
     hashes = {
         name: hashlib.sha256((source_dir / "scripts" / filename).read_bytes()).hexdigest()
