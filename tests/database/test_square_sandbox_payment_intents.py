@@ -121,8 +121,8 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
             self.assertEqual(bad_obligation.exception.diag.message_primary,'SHOP_ACCEPTANCE_OBLIGATION_NOT_ELIGIBLE')
 
     def test_application_cannot_direct_insert_or_cross_tenant(self):
-        with self.conn.transaction():
-            with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+            with self.conn.transaction():
                 self.conn.execute('INSERT INTO faos.square_sandbox_payment_intents(tenant_id,payment_intent_id,obligation_entry_id,session_id,acceptance_id,partner_org_id,provider,provider_link_id,provider_order_id,checkout_url,idempotency_key,amount_cents,currency,status,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                     (self.tenant,str(uuid.uuid4()),self.entry_id,self.session,self.acceptance,self.partner,'SQUARE_SANDBOX','l','o','https://sandbox.square.link/u/test','k',27500,'USD','LINK_CREATED','operator-1'))
         with tenant_transaction(self.conn,self.tenant):
