@@ -60,16 +60,29 @@ def test_runcommand_payload_is_secret_free_and_shell_safe():
 
 def test_submit_command_sends_text_content_and_exact_instance_target(tmp_path):
     values = deploy.validate_inputs(_valid_env())
-    text = deploy.build_command_text(values)
-    output = subprocess.CompletedProcess([], 0, stdout="ocid1.instanceagentcommand.oc1..command\n", stderr="")
-    with patch.object(deploy, "_run_cli", return_value=output) as run:
-        command_id = deploy.submit_command(values, text)
+    script_text = deploy.build_command_text(values)
+    output = subprocess.CompletedProcess([], 0, stdout="ocid1.instanceagentcommand.oc1..command\\n", stderr="")
+    captured = {}
+
+    def fake_cli(args):
+        content_file = Path(args[args.index("--content") + 1].removeprefix("file://"))
+        target_file = Path(args[args.index("--target") + 1].removeprefix("file://"))
+        captured["content"] = json.loads(content_file.read_text())
+        captured["target"] = json.loads(target_file.read_text())
+        captured["content_mode"] = content_file.stat().st_mode & 0o777
+        captured["target_mode"] = target_file.stat().st_mode & 0o777
+        return output
+
+    with patch.object(deploy, "_run_cli", side_effect=fake_cli) as run:
+        command_id = deploy.submit_command(values, script_text)
     assert command_id == "ocid1.instanceagentcommand.oc1..command"
+    assert captured["content"]["source"]["sourceType"] == "TEXT"
+    assert values["OCI_OCIR_AUTH_SECRET_OCID"] in captured["content"]["source"]["text"]
+    assert "OCI_REGISTRY_TOKEN" not in captured["content"]["source"]["text"]
+    assert "auth_token" not in captured["content"]["source"]["text"]
+    assert captured["target"] == {"instanceId": values["OCI_STAGING_INSTANCE_OCID"]}
+    assert captured["content_mode"] == 0o600 and captured["target_mode"] == 0o600
     args = run.call_args.args[0]
-    content_file = Path(args[args.index("--content") + 1].removeprefix("file://"))
-    target_file = Path(args[args.index("--target") + 1].removeprefix("file://"))
-    # Temp files are intentionally removed when submit_command returns.
-    assert not content_file.exists() and not target_file.exists()
     assert args[args.index("--timeout-in-seconds") + 1] == "1800"
 
 
