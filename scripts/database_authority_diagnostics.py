@@ -106,11 +106,12 @@ def verify(report,admin,connections,tenants,session):
             tenant=tenants[index]
             payment_id='matrix-payment-'+uuid.uuid4().hex
             event_id='matrix-webhook-'+uuid.uuid4().hex
+            payment_intent_id=str(uuid.uuid4())
             order_id='matrix-order-'+uuid.uuid4().hex
             admin.execute('INSERT INTO faos.square_sandbox_payment_intents(tenant_id,payment_intent_id,obligation_entry_id,session_id,acceptance_id,partner_org_id,provider,provider_link_id,provider_order_id,checkout_url,idempotency_key,amount_cents,currency,status,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,27500,%s,%s,%s)',
-                (tenant,ids['shop_intent'],shop_entries[tenant],session,ids['shop_acceptance'],ids['shop_partner'],'SQUARE_SANDBOX','matrix-link-'+uuid.uuid4().hex,order_id,'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'USD','LINK_CREATED','synthetic-matrix'))
-            admin.execute('INSERT INTO faos.square_sandbox_payment_reconciliations(tenant_id,payment_intent_id,provider_payment_id,status,provider_event_id,updated_at) VALUES (%s,%s,%s,%s,%s,now())',(tenant,ids['shop_intent'],payment_id,'PAID',event_id))
-            admin.execute('INSERT INTO faos.square_sandbox_webhook_receipts(provider_event_id,event_type,provider_payment_id,provider_order_id,provider_status,amount_cents,currency,event_created_at,payload_sha256,tenant_id,payment_intent_id,reconciliation_status,reconciled_at) VALUES (%s,%s,%s,%s,%s,27500,%s,now(),%s,%s,%s,%s,now())',(event_id,'payment.updated',payment_id,order_id,'COMPLETED','USD','0'*64,tenant,ids['shop_intent'],'RECONCILED'))
+                (tenant,payment_intent_id,shop_entries[tenant],session,ids['shop_acceptance'],ids['shop_partner'],'SQUARE_SANDBOX','matrix-link-'+uuid.uuid4().hex,order_id,'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'USD','LINK_CREATED','synthetic-matrix'))
+            admin.execute('INSERT INTO faos.square_sandbox_payment_reconciliations(tenant_id,payment_intent_id,provider_payment_id,status,provider_event_id,updated_at) VALUES (%s,%s,%s,%s,%s,now())',(tenant,payment_intent_id,payment_id,'PAID',event_id))
+            admin.execute('INSERT INTO faos.square_sandbox_webhook_receipts(provider_event_id,event_type,provider_payment_id,provider_order_id,provider_status,amount_cents,currency,event_created_at,payload_sha256,tenant_id,payment_intent_id,reconciliation_status,reconciled_at) VALUES (%s,%s,%s,%s,%s,27500,%s,now(),%s,%s,%s,%s,now())',(event_id,'payment.updated',payment_id,order_id,'COMPLETED','USD','0'*64,tenant,payment_intent_id,'RECONCILED'))
             own,other = tenants[index],tenants[1-index]
             for table in TABLES:
                 target = sql.SQL('faos.{}').format(sql.Identifier(table))
