@@ -15,7 +15,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
-            '0021_collision_claim_link.sql',
+                '0021_collision_claim_link.sql',
             '0022_collision_vehicle_capture_link.sql',
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
@@ -130,6 +130,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
         ]
+            '0025_square_sandbox_payment_intents.sql',
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
             'test_migration_preflight.MigrationPreflightTests.test_initial_execution',
@@ -170,5 +171,3 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-                '0025_square_sandbox_payment_intents.sql',
-                '0026_unreviewed.sql',
