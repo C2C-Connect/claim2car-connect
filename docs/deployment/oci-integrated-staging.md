@@ -24,7 +24,7 @@ Before provisioning or exposing any compute instance, review the security lists 
 
 - **Compute:** one private OCI Compute instance for the first controlled staging slice. Use an Always Free-eligible shape only if the account/region confirms eligibility and capacity. Do not silently substitute a paid shape.
 - **Application:** build the integrated image from `Dockerfile.integrated`; run as non-root UID 10001.
-- **Database:** PostgreSQL 16 with PostGIS, separate migration and least-privilege runtime identities, RLS/forced policies, and the accepted migration inventory through 0024. Add pgRouting only where the routing subsystem requires it; dispatch remains disabled.
+- **Database:** PostgreSQL 16 with PostGIS, separate migration and least-privilege runtime identities, RLS/forced policies, and the accepted migration inventory through 0026. Add pgRouting only where the routing subsystem requires it; dispatch remains disabled.
 - **Evidence storage:** a dedicated persistent block volume mounted exactly at `/var/lib/claim2car/evidence`, owned by UID 10001 and not shared across replicas. The integrated readiness probe requires this exact root to be a mount point and to pass a write/fsync/remove/directory-fsync probe.
 - **Database storage:** persistent database data volume, separate from the evidence volume.
 - **Secrets:** OCI Vault or an approved secret manager for database credentials, runtime actor tokens, VIN pepper, internal service token, and OCIR credentials. Never put raw tokens, private keys, or OCIDs in source files.
@@ -37,14 +37,20 @@ Before provisioning or exposing any compute instance, review the security lists 
 2. Tighten security-list ingress and confirm the private subnet's NAT/service-gateway routes.
 3. Provision an eligible private compute instance and separate persistent database/evidence volumes. Record OCIDs in OCI-side inventory, not this repository.
 4. Install the container runtime and mount volumes. Verify filesystem ownership and mount persistence across a reboot before starting the app.
-5. Provision PostgreSQL 16/PostGIS; create migration/runtime roles and apply the repository's authoritative migration plan through migration 0024.
+5. Provision PostgreSQL 16/PostGIS; create migration/runtime roles and apply the repository's authoritative migration plan through migration 0026.
 6. Provision runtime credentials through OCI Vault and create a dedicated synthetic staging tenant with distinct operator, owner, and reviewer identities.
 7. Build and push the exact integrated image to OCIR; deploy the same SHA to the private compute host.
 8. Verify `/health/live`, `/health/ready`, and `/health/build`; the readiness endpoint must fail if PostgreSQL or the persistent evidence mount is unavailable.
 9. Run authenticated synthetic capture-to-review, restart the service, retrieve and hash-check the same original bytes, and run cross-tenant denial tests.
 10. Back up PostgreSQL and evidence storage, restore to an isolated target, and verify manifest-to-original-byte consistency before declaring staging operational.
 
-## 5. Cost and release guardrails
+## 5. Square Sandbox configuration and webhook boundary
+
+The merged payment integration is Sandbox-only. If testing checkout links, provision only Square Sandbox credentials and configure these environment variables through the protected runtime secret store: `SQUARE_ENVIRONMENT=sandbox`, `SQUARE_SANDBOX_ACCESS_TOKEN`, `SQUARE_SANDBOX_LOCATION_ID`, `SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY`, and `SQUARE_SANDBOX_WEBHOOK_URL`. Checkout-link creation requires the access token and location; webhook signature verification requires the Sandbox environment, signature key, and exact notification URL. Never store these values in repository files, Terraform state, chat, or deployment summaries.
+
+The private staging host has no public ingress. Square's provider webhook cannot reach it directly from the internet. Do not expose the webhook endpoint or open public ingress merely to test Sandbox delivery. Provider delivery requires a separately reviewed HTTPS relay/tunnel design and security controls; the current CI verifies signature validation, receipt persistence, reconciliation, tenant isolation, and failure cases with synthetic tests. No live payments or settlement are enabled.
+
+## 6. Cost and release guardrails
 
 - Use only resources confirmed as Always Free eligible unless the owner separately approves a paid resource.
 - Review the OCI cost estimate before any apply/create action. Resource names containing “free” do not guarantee that every attached volume, network, load balancer, backup, or data-transfer operation is free.
@@ -52,11 +58,11 @@ Before provisioning or exposing any compute instance, review the security lists 
 - The existing MySQL DB System must not be used as a PostgreSQL substitute.
 - Do not expose the integrated service publicly until identity proofing, TLS, network ingress, security review, backup/restore, legal disclosure, and incident response controls pass.
 
-## 6. Host bootstrap implementation
+## 7. Host bootstrap implementation
 
 The Terraform instance metadata now supplies a cloud-init baseline that installs Podman and disk-inspection tools, creates the dedicated UID/GID 10001 runtime identity and storage mountpoints, and enables the Podman socket. It deliberately does not format or mount either block volume: device discovery must first reconcile the guest device to the exact OCI volume OCID. Once both volumes are mounted and owned by UID 10001, run `claim2car-host-preflight`. A successful cloud-init run alone is not proof that PostgreSQL, evidence persistence, or the application is operational.
 
-## 7. Integrated-image publication (implemented; not a deployment)
+## 8. Integrated-image publication (implemented; not a deployment)
 
 A protected manual workflow is available at **Actions → Publish integrated Claim2Car image to OCIR (manual)**. It runs only from `main`, requires the explicit `confirm_publish=yes` input, and uses the protected `oci-staging` environment. It builds the integrated runtime from `Dockerfile.integrated` for `linux/arm64`, pushes an immutable commit-SHA tag to OCIR, and emits the image digest plus provenance/SBOM. The workflow does not create OCI resources, alter the private host, or deploy/run the image.
 
@@ -74,13 +80,13 @@ Create the OCIR repository first and ensure the registry user has only the neede
 
 The image publish workflow is verified by the OCI infrastructure validation job. Publishing alone does not satisfy the staging deployment gates.
 
-## 8. State bucket bootstrap (implemented; not executed)
+## 9. State bucket bootstrap (implemented; not executed)
 
 The manual workflow `Bootstrap private OCI Terraform state bucket (manual)` creates the state bucket if absent, or ensures versioning and visibility are configured if it already exists. It is restricted to `main` with `confirm_bootstrap=yes` and the `oci-staging` environment. The workflow verifies the resulting bucket reports `versioning=Enabled` and `public-access-type=NoPublicAccess`.
 
 It requires `OCI_STATE_BUCKET`, `OCI_STATE_NAMESPACE`, `OCI_REGION`, and the OCI API credentials plus `OCI_COMPARTMENT_OCID` in the `oci-staging` environment. It does not create IAM policies or run Terraform. Before dispatch, grant the automation identity bucket creation and bucket/object inspection/update permissions in the selected compartment. Versioning has a storage cost; state artifacts are expected to remain small. The bucket has not been created from this session.
 
-## 9. Terraform remote state (required before any apply)
+## 10. Terraform remote state (required before any apply)
 
 The OCI staging stack uses Terraform's native OCI Object Storage backend. Run the state-bucket bootstrap workflow first to create the bucket; then restrict it to the automation identity and grant only the object permissions needed to read/write state and lock objects. The backend uses state locking; state files may contain sensitive resource data.
 
@@ -95,13 +101,13 @@ The fixed state key is `claim2car/oci-staging.tfstate`. The plan workflow initia
 
 References: [Terraform OCI backend](https://developer.hashicorp.com/terraform/language/backend/oci) and [Oracle Object Storage state guidance](https://docs.oracle.com/en-us/iaas/Content/dev/terraform/object-storage-state.htm).
 
-## 10. Guarded infrastructure apply (implemented; not executed)
+## 11. Guarded infrastructure apply (implemented; not executed)
 
 The manual `OCI staging apply (manual, guarded)` workflow requires dispatch from `main` with `confirm_apply=yes`. It creates a plan, rejects any delete/replace actions, uploads the exact saved plan for one day, and only then reaches the `oci-staging-apply` environment gate. The apply job uses that saved plan—not a newly generated plan—and runs `terraform apply tfplan`. The workflow contains no destroy operation.
 
 Configure the `oci-staging-apply` environment with the same required OCI credentials, Terraform variables, and state-bucket variables as `oci-staging`. Set required reviewers/environment protection there before enabling apply. The plan job also requires the `oci-staging` environment values. The saved plan artifact is sensitive and must be reviewed before approval. Confirm the plan is only for the approved private network, A1 Flex candidate, and bounded 200 GB aggregate volumes. Account eligibility/capacity and actual OCI pricing remain an owner-side check. No apply has been dispatched from this session.
 
-## 11. Outstanding prerequisites
+## 12. Outstanding prerequisites
 
 - Confirm exact compartment, VCN, subnet, image, and OCIDs inside OCI.
 - Confirm Always Free compute and block-volume capacity in the selected region; otherwise obtain explicit cost approval.
