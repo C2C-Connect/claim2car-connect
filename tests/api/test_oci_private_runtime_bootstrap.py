@@ -51,3 +51,25 @@ def test_runtime_deploy_requires_digest_pinned_database_and_distinct_mounts():
     assert "capture-runtime.json must be root-owned mode 0640" in d
     assert "Existing PostgreSQL container is bound to unexpected storage" in d
     assert "Existing PostgreSQL container image differs from requested digest" in d
+
+
+def test_synthetic_live_staging_acceptance_harness_is_16_slot_and_guarded():
+    script=ROOT/"scripts/oci_staging_capture_acceptance.py"
+    subprocess.run(["python3","-m","py_compile",str(script)],check=True)
+    result=subprocess.run(["python3",str(script),"--help"],capture_output=True,text=True,check=True)
+    assert "--confirm-synthetic" in result.stdout
+    source=script.read_text()
+    from app.capture_protocols import resolve_capture_protocol
+    assert source.count('"00_front_exterior"')==1
+    slots=resolve_capture_protocol().slots
+    assert len(slots)==16
+    assert all(f'"{slot}"' in source for slot in slots)
+    assert all(part in source for part in ('\"podman\"', '\"restart\"', '\"claim2car-app\"'))
+    assert "EVIDENCE_ARTIFACT_CONFLICT" in source
+    assert "atexit.register(cleanup_synthetic_consent)" in source
+    assert "automatic consent cleanup failed" in source
+    assert "withdrawal did not remove synthetic original bytes" in source
+    assert "base-url must be HTTP loopback only" in source
+    missing_confirmation=subprocess.run(["python3",str(script)],capture_output=True,text=True)
+    assert missing_confirmation.returncode==2
+    assert "confirm-synthetic" in missing_confirmation.stderr
