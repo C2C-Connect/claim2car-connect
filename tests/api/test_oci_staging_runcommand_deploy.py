@@ -100,6 +100,16 @@ def test_submit_command_sends_text_content_and_exact_instance_target(tmp_path):
 def test_poll_command_returns_success_for_exact_command_id():
     values = deploy.validate_inputs(_valid_env())
     response = subprocess.CompletedProcess(
+        [], 0, stdout=json.dumps({"data": [{"command-id": "wanted", "lifecycle-state": "SUCCEEDED"}]}), stderr=""
+    )
+    with patch.object(deploy, "_run_cli", return_value=response), patch.object(deploy.time, "sleep"):
+        assert deploy.poll_command(values, "wanted", timeout=1, interval=0) == "SUCCEEDED"
+
+
+
+def test_poll_command_supports_sdk_camel_case_response_fields():
+    values = deploy.validate_inputs(_valid_env())
+    response = subprocess.CompletedProcess(
         [], 0, stdout=json.dumps({"data": [{"commandId": "wanted", "lifecycleState": "SUCCEEDED"}]}), stderr=""
     )
     with patch.object(deploy, "_run_cli", return_value=response), patch.object(deploy.time, "sleep"):
@@ -109,7 +119,7 @@ def test_poll_command_returns_success_for_exact_command_id():
 def test_poll_command_fails_closed_for_failed_execution():
     values = deploy.validate_inputs(_valid_env())
     response = subprocess.CompletedProcess(
-        [], 0, stdout=json.dumps({"data": [{"commandId": "wanted", "lifecycleState": "FAILED"}]}), stderr=""
+        [], 0, stdout=json.dumps({"data": [{"command-id": "wanted", "lifecycle-state": "FAILED"}]}), stderr=""
     )
     with patch.object(deploy, "_run_cli", return_value=response), patch.object(deploy.time, "sleep"):
         with pytest.raises(RuntimeError, match="FAILED"):
