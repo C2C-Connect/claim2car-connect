@@ -122,6 +122,10 @@ def test_cloud_init_installs_oci_cli_and_limits_ocarun_sudo_to_wrappers():
     assert "ocarun ALL=(root) NOPASSWD: SETENV:" in content
     for wrapper in ("claim2car-runtime-bootstrap","claim2car-runtime-deploy","claim2car-runtime-acceptance"):
         assert f"/usr/local/sbin/{wrapper}" in content
+    assert content.count("git ls-remote --heads https://github.com/C2C-Connect/claim2car-connect.git") == 3
+    assert "Source SHA must be the current main head." in content
+    deploy_script=(ROOT/"scripts/oci_staging_runtime_deploy.sh").read_text()
+    assert "postgis/postgis:16-" in deploy_script
 
 
 def test_terraform_enables_instance_agent_run_command_plugin():
