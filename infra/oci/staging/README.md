@@ -10,7 +10,11 @@ This stack describes a private OCI compute host and two separate encrypted-in-tr
 - The existing subnet's security lists are separate from this instance NSG. Audit and remove any broad ingress rules from the subnet security lists before treating the host as secure; an NSG does not cancel permissive subnet security-list rules.
 - The image OCID, compartment, VCN, and subnet are explicit inputs. No tenancy identifiers or credentials are stored in this repository.
 - OCI provider authentication is supplied out-of-band through the standard OCI SDK configuration or workload identity. Do not commit API keys, private keys, state files, or real `terraform.tfvars`.
-- No Terraform apply runs in GitHub Actions. CI performs formatting, initialization, and static validation only.
+- A guarded, manual GitHub Actions apply workflow is available on `main`. It requires the `confirm_apply=yes` input, the protected `oci-staging` environment for planning, and the separate `oci-staging-apply` environment for apply approval. It creates a saved plan, rejects destructive actions, and applies only that exact plan. CI PR workflows perform formatting and static validation; no pull-request workflow applies infrastructure.
+
+## Controlled GitHub Actions path
+
+For the repository-managed path, configure the protected GitHub environments and required secrets/variables before use. Run the manual **Bootstrap private OCI Terraform state bucket** workflow first, then **OCI staging infrastructure plan (manual, no apply)** to validate credentials and inspect a non-destructive plan. For provisioning, run **OCI staging apply (manual, guarded)** from `main` with `confirm_apply=yes`; it produces a one-day saved plan, rejects delete/replace actions, and requires the separate `oci-staging-apply` environment approval before applying that exact plan. Never approve a plan without reviewing resource counts and tenancy costs. The local Terraform path remains available for operators using their own OCI profile.
 
 ## Use
 
