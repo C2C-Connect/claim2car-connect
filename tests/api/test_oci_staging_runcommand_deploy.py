@@ -182,6 +182,7 @@ def test_private_runtime_deploy_workflow_is_manual_main_only_and_secret_free():
     assert "OCIR_AUTH_TOKEN" not in workflow
     assert "scripts/oci_staging_runcommand_deploy.py" in workflow
     assert "persist-credentials: false" in workflow
+    assert "Remove temporary OCI API key and config" in workflow
 
 
 def test_cloud_init_deploy_wrapper_has_valid_bash_syntax():
