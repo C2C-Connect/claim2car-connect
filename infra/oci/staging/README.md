@@ -18,7 +18,7 @@ For the repository-managed path, configure the protected GitHub environments and
 
 ### GitHub environment configuration prerequisites
 
-In repository **Settings → Environments**, configure `oci-staging` and `oci-staging-apply`. Add required reviewers / deployment protection to `oci-staging-apply` before relying on it as an approval gate. Store these **environment secrets** in `oci-staging` (and ensure they are available to the apply environment if required by the workflow):
+In repository **Settings → Environments**, configure `oci-staging` and `oci-staging-apply`. Add required reviewers / deployment protection to `oci-staging-apply` before relying on it as an approval gate. **GitHub environment secrets and variables do not flow from `oci-staging` into `oci-staging-apply`; configure the apply environment separately.** The apply job now fails before Terraform initialization if its required OCI credentials, OCIDs, or state-bucket variables are missing. Store these **environment secrets** in both environments as needed:
 
 - `OCI_USER_OCID`, `OCI_TENANCY_OCID`, `OCI_API_FINGERPRINT`, `OCI_API_PRIVATE_KEY`
 - `OCI_COMPARTMENT_OCID`, `OCI_VCN_OCID`, `OCI_PRIVATE_SUBNET_OCID`, `OCI_STAGING_IMAGE_OCID`

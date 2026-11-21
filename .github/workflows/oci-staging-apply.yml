@@ -182,11 +182,21 @@ jobs:
           OCI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
           OCI_FINGERPRINT: ${{ secrets.OCI_API_FINGERPRINT }}
           OCI_PRIVATE_KEY: ${{ secrets.OCI_API_PRIVATE_KEY }}
+          COMPARTMENT: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          VCN: ${{ secrets.OCI_VCN_OCID }}
+          SUBNET: ${{ secrets.OCI_PRIVATE_SUBNET_OCID }}
+          IMAGE: ${{ secrets.OCI_STAGING_IMAGE_OCID }}
         run: |
           set -euo pipefail
-          for name in OCI_USER OCI_TENANCY OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_STATE_BUCKET OCI_STATE_NAMESPACE; do
-            [[ -n "${!name}" ]] || { echo "Missing required apply environment input: ${name}"; exit 1; }
+          missing=()
+          for name in OCI_USER OCI_TENANCY OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_STATE_BUCKET OCI_STATE_NAMESPACE COMPARTMENT VCN SUBNET IMAGE; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
+          if (( "${#missing[@]}" > 0 )); then
+            printf 'Missing required OCI apply-environment inputs: %s\n' "${missing[*]}"
+            echo "The oci-staging-apply environment must contain the OCI credentials, infrastructure OCIDs, and state-bucket variables used by this saved plan."
+            exit 1
+          fi
           install -d -m 0700 "${HOME}/.oci"
           key_path="${RUNNER_TEMP}/oci_api_key.pem"
           printf '%s\n' "${OCI_PRIVATE_KEY}" > "${key_path}"
