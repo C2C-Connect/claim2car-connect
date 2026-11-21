@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import shlex
+import base64
 import subprocess
 import unittest
 import textwrap
@@ -101,15 +101,19 @@ def test_runcommand_payload_is_secret_free_and_shell_safe():
 
 def test_build_command_text_preserves_validated_argument_order():
     values = deploy.validate_inputs(_valid_env())
-    command_line = deploy.build_command_text(values).splitlines()[2]
-    parsed = shlex.split(command_line)
+    text = deploy.build_command_text(values)
+    payload_line = next(line for line in text.splitlines() if line.startswith("payload="))
+    encoded = payload_line.split("=", 1)[1].strip("'")
+    parsed = json.loads(base64.b64decode(encoded))
     assert parsed == [
-        "sudo", "-n", "/usr/local/sbin/claim2car-staging-deploy",
         values["C2C_IMAGE_COMMIT"], values["C2C_IMAGE_REF"],
         values["C2C_DEPLOY_SCRIPT_SHA256"], values["C2C_POSTGRES_IMAGE"],
         values["OCI_REGISTRY"], values["OCI_OCIR_AUTH_SECRET_OCID"],
         values["OCIR_NAMESPACE"], values["OCIR_REPOSITORY"],
     ]
+    assert 'sudo -n /usr/local/sbin/claim2car-staging-deploy "${deploy_args[@]}"' in text
+
+
 
 
 def test_submit_command_sends_text_content_and_exact_instance_target(tmp_path):
