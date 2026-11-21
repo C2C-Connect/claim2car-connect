@@ -225,7 +225,7 @@ def test_capture_acceptance_source_revision_guard(monkeypatch, tmp_path):
         raise AssertionError("source revision mismatch accepted")
 
     def dirty_run(args, cwd, capture_output, text, check):
-        return subprocess.CompletedProcess(args, 0, sha + "\\n", "") if args[-1] == "HEAD" else subprocess.CompletedProcess(args, 0, " M file.py\n", "")
+        return subprocess.CompletedProcess(args, 0, sha + "\n", "") if args[-1] == "HEAD" else subprocess.CompletedProcess(args, 0, " M file.py\n", "")
     monkeypatch.setattr(module.subprocess, "run", dirty_run)
     try:
         module.verify_source_checkout(sha, tmp_path)
