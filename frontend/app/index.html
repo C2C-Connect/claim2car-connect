@@ -61,8 +61,17 @@
         </article>
         <article id="capture-panel" class="panel workflow-panel" hidden>
           <div class="step-title"><span class="step-dot">4</span><div><h3>Capture original evidence</h3><p class="muted">Use the device camera or choose an image. Original bytes are uploaded without resizing or recompression. Retaking a slot supersedes its prior artifact.</p></div></div>
-          <div class="capture-warning"><strong>Roadside safety comes first.</strong> Never enter traffic or delay emergency response, police direction, stabilization, loading, or scene clearance to complete a capture. If a required angle is unsafe, stop and leave the case unsealed. This initial UI cannot yet record a server-side skip or abort event.</div>
+          <div class="capture-warning"><strong>Roadside safety comes first.</strong> Never enter traffic or delay emergency response, police direction, stabilization, loading, or scene clearance to complete a capture. If a required angle is unsafe, stop and leave the case unsealed. Record a safety exception below; it is audited but does not waive any required view.</div>
           <div id="slot-grid" class="slot-grid"></div>
+          <div class="capture-exception-panel">
+            <h3>Record an unavailable or unsafe required view</h3>
+            <p class="muted">Record why a required view could not be captured. This is an audit event—not a waiver—and the case cannot be sealed with missing required evidence.</p>
+            <label for="exception-slot">Missing capture view</label><select id="exception-slot"></select>
+            <label for="exception-reason">Reason</label><select id="exception-reason"><option value="UNSAFE_TO_APPROACH">Unsafe to approach</option><option value="ACCESS_RESTRICTED">Access restricted</option><option value="VEHICLE_IN_MOTION">Vehicle in motion</option><option value="WEATHER_HAZARD">Weather hazard</option><option value="OWNER_DECLINED">Owner declined</option><option value="EQUIPMENT_FAILURE">Equipment failure</option><option value="OTHER">Other</option></select>
+            <label for="exception-explanation">Explanation</label><textarea id="exception-explanation" rows="2" maxlength="500" placeholder="Describe the condition, without unnecessary personal details"></textarea>
+            <button id="record-exception" class="button secondary" type="button">Record safety exception</button><div id="exception-status" class="inline-status"></div>
+            <div id="exception-list" class="case-list"></div>
+          </div>
           <div class="quality-block"><button id="resume-capture" class="button secondary" type="button" hidden>Resume capture after safety pause</button><div><h3>Operator image check</h3><p class="muted">This is a manual advisory check, not an AI verdict or an acceptance decision.</p></div><div id="quality-grid" class="quality-grid"></div><button id="seal-case" class="button primary" type="button" disabled>Record checks and seal evidence</button><div id="seal-status" class="inline-status"></div></div>
         </article>
       </section>
