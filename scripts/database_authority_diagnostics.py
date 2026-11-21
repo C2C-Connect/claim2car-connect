@@ -102,8 +102,10 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,27500),(%s,%s,2,%s,%s,27500)',
                 (tenant,shop_entry,'AR:SHOP:'+ids['shop_partner'],'DEBIT',tenant,shop_entry,'REV:REPAIR_SHOP_ACCEPTANCE','CREDIT'))
             shop_entries[tenant]=shop_entry
-        for index,conn in enumerate(connections):
-            tenant=tenants[index]
+        # Seed every tenant's payment-state rows before the cross-tenant matrix.
+        # Otherwise the first tenant's fixture would try to clone a row from the
+        # second tenant before that row exists, aborting the diagnostic mid-matrix.
+        for tenant in tenants:
             payment_id='matrix-payment-'+uuid.uuid4().hex
             event_id='matrix-webhook-'+uuid.uuid4().hex
             payment_intent_id=str(uuid.uuid4())
@@ -112,6 +114,8 @@ def verify(report,admin,connections,tenants,session):
                 (tenant,payment_intent_id,shop_entries[tenant],session,ids['shop_acceptance'],ids['shop_partner'],'SQUARE_SANDBOX','matrix-link-'+uuid.uuid4().hex,order_id,'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'USD','LINK_CREATED','synthetic-matrix'))
             admin.execute('INSERT INTO faos.square_sandbox_payment_reconciliations(tenant_id,payment_intent_id,provider_payment_id,status,provider_event_id,updated_at) VALUES (%s,%s,%s,%s,%s,now())',(tenant,payment_intent_id,payment_id,'PAID',event_id))
             admin.execute('INSERT INTO faos.square_sandbox_webhook_receipts(provider_event_id,event_type,provider_payment_id,provider_order_id,provider_status,amount_cents,currency,event_created_at,payload_sha256,tenant_id,payment_intent_id,reconciliation_status,reconciled_at) VALUES (%s,%s,%s,%s,%s,27500,%s,now(),%s,%s,%s,%s,now())',(event_id,'payment.updated',payment_id,order_id,'COMPLETED','USD','0'*64,tenant,payment_intent_id,'RECONCILED'))
+        for index,conn in enumerate(connections):
+            tenant=tenants[index]
             own,other = tenants[index],tenants[1-index]
             for table in TABLES:
                 target = sql.SQL('faos.{}').format(sql.Identifier(table))
