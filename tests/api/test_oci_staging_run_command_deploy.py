@@ -129,3 +129,14 @@ def test_terraform_enables_instance_agent_run_command_plugin():
     assert 'name          = "Compute Instance Run Command"' in content
     assert 'desired_state = "ENABLED"' in content
     assert "is_management_disabled  = false" in content
+
+
+def test_run_command_deployment_workflow_is_manual_and_fail_closed():
+    workflow=(ROOT/".github/workflows/oci-staging-runtime-deploy.yml").read_text()
+    assert "workflow_dispatch:" in workflow
+    assert 'confirm_deploy' in workflow and 'default: "no"' in workflow
+    assert "github.ref == 'refs/heads/main'" in workflow
+    assert "OCI_STAGING_INSTANCE_OCID" in workflow
+    assert "OCI_OCIR_VAULT_SECRET_OCID" in workflow
+    assert "oci_staging_run_command_deploy.py" in workflow
+    assert "OCI_RUN_COMMAND_SUCCEEDED" not in workflow
