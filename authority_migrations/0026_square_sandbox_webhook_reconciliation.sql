@@ -94,7 +94,9 @@ GRANT SELECT ON faos.square_sandbox_webhook_receipts TO faos_app;
 GRANT SELECT,INSERT,UPDATE ON faos.square_sandbox_webhook_receipts TO faos_writer;
 GRANT CREATE ON SCHEMA faos TO faos_writer;
 ALTER TABLE faos.square_sandbox_webhook_receipts OWNER TO faos_writer;
-REVOKE CREATE ON SCHEMA faos FROM faos_writer(
+REVOKE CREATE ON SCHEMA faos FROM faos_writer;
+
+CREATE FUNCTION faos.reconcile_square_sandbox_webhook(
  p_event_id text,p_event_type text,p_payment_id text,p_order_id text,
  p_status text,p_amount bigint,p_currency text,p_event_created_at timestamptz,
  p_payload_sha256 text
