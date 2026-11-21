@@ -68,6 +68,7 @@ jobs:
           fi
           registry="${OCI_REGION}.ocir.io"
           [[ "${OCI_REGION}" =~ ^[a-z0-9-]+$ ]] || { echo "OCI_REGION invalid."; exit 1; }
+          [[ "${OCI_REGION}" == "us-chicago-1" ]] || { echo "Private staging deployment is restricted to us-chicago-1."; exit 1; }
           [[ "${OCIR_NAMESPACE}" =~ ^[a-z0-9]+$ ]] || { echo "OCIR_NAMESPACE invalid."; exit 1; }
           [[ "${OCIR_REPOSITORY}" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]] || { echo "OCIR_REPOSITORY invalid."; exit 1; }
           [[ "${C2C_IMAGE_REF}" == "${registry}/${OCIR_NAMESPACE}/${OCIR_REPOSITORY}:"* ]] || { echo "Image is not in the configured OCIR repository."; exit 1; }
@@ -109,7 +110,6 @@ jobs:
           OCI_OCIR_AUTH_SECRET_OCID: ${{ vars.OCI_OCIR_AUTH_SECRET_OCID }}
           C2C_IMAGE_REF: ${{ inputs.image_ref }}
           C2C_POSTGRES_IMAGE: ${{ vars.C2C_POSTGRES_IMAGE }}
-          C2C_DEPLOY_SCRIPT_SHA256: ${{ env.C2C_DEPLOY_SCRIPT_SHA256 }}
         run: |
           set -euo pipefail
           python scripts/oci_staging_runcommand_deploy.py
