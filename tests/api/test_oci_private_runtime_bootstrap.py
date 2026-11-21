@@ -378,13 +378,19 @@ def _oci_harness_cleanup(tmp_path):
         subprocess.run([sudo,"rm","-rf","--",str(tmp_path)],check=False,capture_output=True)
 
 
+def _read_root_owned_file(path):
+    import shutil
+    sudo=shutil.which("sudo")
+    return subprocess.run([sudo,"cat",str(path)],check=True,capture_output=True,text=True).stdout
+
+
 def test_oci_runtime_deploy_harness_success_records_verified_image(tmp_path):
     revision="a"*40; image=_pinned_image(revision,"c"*64)
     command,state,config=_oci_deploy_harness(tmp_path,image)
     try:
         result=subprocess.run(command,capture_output=True,text=True)
         assert result.returncode==0, result.stderr
-        assert (config/"last-image-ref").read_text().strip()==image
+        assert _read_root_owned_file(config/"last-image-ref").strip()==image
         assert (state/"current-app").read_text()==image
         assert "PASS: image deployed, readiness and exact revision checked" in result.stdout
     finally:
@@ -400,7 +406,7 @@ def test_oci_runtime_deploy_harness_rolls_back_after_readiness_failure(tmp_path)
         assert result.returncode!=0
         assert "previous image was restored and verified" in result.stderr
         assert (state/"current-app").read_text()==old_image
-        assert (config/"last-image-ref").read_text().strip()==old_image
+        assert _read_root_owned_file(config/"last-image-ref").strip()==old_image
     finally:
         _oci_harness_cleanup(tmp_path)
 
