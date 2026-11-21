@@ -62,8 +62,8 @@ def build_remote_script(
         raise ValueError("source_sha must be a full 40-character lowercase SHA.")
     if extract_source_sha(image_ref) != source_sha:
         raise ValueError("OCI image source revision and source checkout SHA differ.")
-    if not DIGEST_RE.fullmatch(postgres_image.rsplit("@", 1)[-1]):
-        raise ValueError("PostgreSQL image must be digest-pinned.")
+    if not re.fullmatch(r"^(docker\\.io|registry-1\\.docker\\.io)/postgis/postgis:16-[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$", postgres_image):
+        raise ValueError("PostGIS 16 image must be pinned by sha256 digest.")
     for name in SCRIPT_NAMES:
         if not re.fullmatch(r"[0-9a-f]{64}", hashes.get(name, "")):
             raise ValueError(f"Missing/invalid checksum for {name} script.")
