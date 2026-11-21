@@ -73,7 +73,9 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         cloud_init = (ROOT / "infra" / "oci" / "staging" / "cloud-init.yaml").read_text()
         marker = "    content: |\n"
         self.assertIn(marker, cloud_init)
-        script_start = cloud_init.index(marker) + len(marker)
+        preflight_path = "path: /usr/local/sbin/claim2car-host-preflight\\n"
+        self.assertIn(preflight_path, cloud_init)
+        script_start = cloud_init.index(marker, cloud_init.index(preflight_path)) + len(marker)
         script_end = cloud_init.index("\nruncmd:", script_start)
         script = textwrap.dedent(cloud_init[script_start:script_end])
 
