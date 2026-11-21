@@ -10,7 +10,7 @@ This adapter is deliberately **Sandbox-only**. It hardcodes Square's Sandbox API
 - Uses a deterministic idempotency key per tenant + internal ledger entry, preventing cross-tenant collisions.
 - Validates returned checkout-link URL hosts and never returns/logs raw provider response bodies.
 - Verifies webhook HMAC-SHA256 against the exact configured notification URL + raw request bytes, using constant-time comparison.
-- Parses payment events into a minimal record after signature verification. It does not persist, reconcile, post a ledger entry, refund, void, or settle anything.
+- Parses payment events into a minimal record after signature verification. It does not reconcile webhook events, post a ledger entry, refund, void, or settle anything. The next increment persists the checkout intent, not payment settlement.
 
 ## Configuration (Sandbox only)
 
@@ -26,9 +26,8 @@ The API host is fixed to `https://connect.squareupsandbox.com`. Sandbox test cre
 
 ## Next acceptance increment
 
-1. Connect webhook event ID and provider order ID to durable obligation/payment-intent records.
-2. Implement deduplicated webhook receipt persistence and reconciliation.
-3. Add refund/void sandbox workflow and ledger reversal integration.
-4. Exercise the real Square Sandbox using authorized test credentials; retain redacted request/response and event evidence.
-5. Keep live Square credentials, payment collection, and settlement disabled pending separate release authorization.
+1. Implement deduplicated webhook receipt persistence and reconciliation.
+2. Add refund/void sandbox workflow and ledger reversal integration.
+3. Exercise the real Square Sandbox using authorized test credentials; retain redacted request/response and event evidence.
+4. Keep live Square credentials, payment collection, and settlement disabled pending separate release authorization.
 
