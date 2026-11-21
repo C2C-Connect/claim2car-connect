@@ -81,6 +81,7 @@ jobs:
             echo "- Source commit: ${GITHUB_SHA}"
             echo "- Image: ${IMAGE}"
             echo "- Digest: ${DIGEST}"
+          echo "- **Immutable deploy reference:** ${IMAGE}@${DIGEST}"
             echo "- Platform: linux/arm64"
             echo "- **Not deployed:** publishing does not change OCI compute or runtime services."
           } >> "${GITHUB_STEP_SUMMARY}"
