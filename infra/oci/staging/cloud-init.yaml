@@ -75,6 +75,10 @@ write_files:
       command -v findmnt >/dev/null || fail "findmnt is not installed"
       command -v runuser >/dev/null || fail "runuser is not installed"
       command -v python3 >/dev/null || fail "python3 is not installed"
+      [[ -x /opt/oci-cli-venv/bin/oci ]] || fail "OCI CLI virtualenv is not installed"
+      [[ -x /usr/local/sbin/claim2car-staging-deploy ]] || fail "private deployment wrapper is missing"
+      getent passwd ocarun >/dev/null || fail "OCI Run Command ocarun account is missing"
+      visudo -cf /etc/sudoers.d/101-claim2car-runcommand >/dev/null || fail "restricted Run Command sudo rule is invalid"
       getent passwd 10001 >/dev/null || fail "claim2car UID 10001 is missing"
 
       postgres_path="/var/lib/claim2car/postgres"
