@@ -82,6 +82,14 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         self.assertIn("compare/${commit}...main", cloud_init)
 
 
+    def test_private_runcommand_iam_is_compartment_and_secret_scoped(self):
+        terraform = (ROOT / "infra" / "oci" / "staging" / "main.tf").read_text()
+        self.assertIn("instance-agent-command-execution-family", terraform)
+        self.assertIn("target.secret.id", terraform)
+        self.assertIn("in compartment id ${var.compartment_ocid}", terraform)
+        self.assertIn("enable_private_runcommand_deploy", terraform)
+
+
     def test_cloud_init_preflight_checks_distinct_writable_durable_volumes(self):
         cloud_init = (ROOT / "infra" / "oci" / "staging" / "cloud-init.yaml").read_text()
         marker = "    content: |\n"
