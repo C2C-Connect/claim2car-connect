@@ -32,4 +32,5 @@ def test_deploy_script_shell_syntax_and_expanded_variables():
     subprocess.run(["bash","-n",str(script)],check=True)
     content=script.read_text()
     assert "\\${OCI_IMAGE_REF" not in content
-    assert "PGDATA=/var/lib/postgresql/data/pgdata" in content\n    assert "podman-restart.service" in content
+    assert "PGDATA=/var/lib/postgresql/data/pgdata" in content
+    assert "podman-restart.service" in content

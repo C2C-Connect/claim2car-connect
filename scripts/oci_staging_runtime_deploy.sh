@@ -30,4 +30,5 @@ run_app "$IMAGE_REF"; revision="$(echo "$IMAGE_REF" | sed -E 's/.*sha-([0-9a-f]{
 for i in $(seq 1 60); do if curl --fail --silent "http://127.0.0.1:$APP_PORT/health/ready" >/dev/null 2>&1 && curl --fail --silent "http://127.0.0.1:$APP_PORT/health/build" | grep -q "$revision"; then ok=1; break; fi; sleep 3; done
 if [[ "$ok" != 1 ]]; then podman logs "$APP_CONTAINER" >&2 || true; podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true; podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true; [[ -n "$previous" ]] && run_app "$previous"; fail "New deployment failed; rollback attempted."; fi
 printf '%s\n' "$IMAGE_REF" > "$CONFIG/last-image-ref"; chmod 0600 "$CONFIG/last-image-ref"
-systemctl enable --now podman-restart.service >/dev/null 2>&1 || fail "Podman restart service unavailable; reboot persistence cannot be guaranteed."\necho "PASS: image deployed, readiness and revision checked. Loopback HTTP only; TLS/private access remains separate."
+systemctl enable --now podman-restart.service >/dev/null 2>&1 || fail "Podman restart service unavailable; reboot persistence cannot be guaranteed."
+echo "PASS: image deployed, readiness and revision checked. Loopback HTTP only; TLS/private access remains separate."
