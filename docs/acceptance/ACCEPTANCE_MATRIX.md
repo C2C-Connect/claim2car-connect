@@ -8,6 +8,16 @@ This repository is to be executed, not continually replanned. The founder's stan
 
 ---
 
+# Fresh handoff checkpoint — 2026-11-21
+
+This repository is to be executed, not continually replanned. The founder's standing authorization is to implement, test, fix, verify, merge verified increments, deploy to authorized staging, and exercise real end-to-end workflows with proactive autonomy. See [Execution Handoff](../EXECUTION_HANDOFF.md) and [Execution Status Snapshot](../EXECUTION_STATUS.md). This snapshot is deliberately brief; historical milestone sections below are historical evidence and must not be mistaken for the latest branch or release state.
+
+**Observed main:** `1c1a010143ce8c9407fc3299e0eeaa5f623e4c08` (verify live before use).  
+**Latest open validation candidate observed:** PR #125 (Square sandbox webhook reconciliation); PR description reports no workflow runs for its corrected head. Exact head/checks must be revalidated. Do not merge without exact-head required checks green.  
+**Staging:** OCI integrated staging is not deployed; cloud prerequisites remain.
+
+---
+
 ## Current OCI apply-workflow milestone — PR #86 (2026-11-20)
 
 **Status:** merged to `main`; all 14 workflow checks passed.
