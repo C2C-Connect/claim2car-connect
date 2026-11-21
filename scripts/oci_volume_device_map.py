@@ -91,38 +91,33 @@ def _oci_attachments(instance_id: str) -> list[dict[str, Any]]:
     return document["data"]
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--instance-id", required=True)
-    parser.add_argument("--postgres-volume-id", required=True)
-    parser.add_argument("--evidence-volume-id", required=True)
-    parser.add_argument("--json-output", help="Write machine-readable mapping with mode 0600.")
-    args = parser.parse_args()
-    try:
-        result = resolve_volume_devices(
-            _oci_attachments(args.instance_id),
-            args.postgres_volume_id,
-            args.evidence_volume_id,
-        )
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, MappingError) as error:
-        print(f"FAIL OCI_VOLUME_IDENTITY:{type(error).__name__}:{error}", file=sys.stderr)
-        return 2
-    if args.json_output:
-        target = Path(args.json_output)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.is_symlink():
-            raise MappingError("JSON_OUTPUT_SYMLINK_REJECTED")
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=target.parent, prefix=f".{target.name}.", delete=False) as temporary:
-            temporary_path = Path(temporary.name)
-            temporary.write(json.dumps(result, indent=2, sort_keys=True) + "\\n")
-        os.chmod(temporary_path, 0o600)
-        temporary_path.replace(target)
-    print(json.dumps(result, indent=2, sort_keys=True))
-    if args.json_output:
-        print(f"Machine-readable mapping saved: {args.json_output}")
-    print("PASS: both OCI volume OCIDs map to distinct attached guest block devices; no device was modified")
-    return 0
+def write_json_secure(path: str, document: Any) -> None:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink():
+        raise MappingError("JSON_OUTPUT_SYMLINK_REJECTED")
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=target.parent, prefix=f".{target.name}.", delete=False
+    ) as temporary:
+        temporary_path = Path(temporary.name)
+        temporary.write(json.dumps(document, indent=2, sort_keys=True) + "\n")
+    os.chmod(temporary_path, 0o600)
+    temporary_path.replace(target)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main())def write_json_secure(path: str, document: Any) -> None:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink():
+        raise MappingError("JSON_OUTPUT_SYMLINK_REJECTED")
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=target.parent, prefix=f".{target.name}.", delete=False
+    ) as temporary:
+        temporary_path = Path(temporary.name)
+        temporary.write(json.dumps(document, indent=2, sort_keys=True) + "\n")
+    os.chmod(temporary_path, 0o600)
+    temporary_path.replace(target)
+
+
+
