@@ -36,9 +36,9 @@ def validate_authority_migration_inventory(inventory):
     expect('0024_audited_capture_exceptions_pause_resume.sql' in names,'AUDITED_CAPTURE_EXCEPTIONS_MIGRATION_REQUIRED')
     expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql') < names.index('0020_collision_lifecycle_record.sql') < names.index('0021_collision_claim_link.sql') < names.index('0022_collision_vehicle_capture_link.sql') < names.index('0023_consented_vehicle_profile.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql'),
+    expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql') < names.index('0026_square_sandbox_webhook_reconciliation.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names[-1]=='0025_square_sandbox_payment_intents.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0025')
+    expect(names[-1]=='0026_square_sandbox_webhook_reconciliation.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0026')
 
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
@@ -71,12 +71,13 @@ def verify(report,admin,connections,tenants,session):
     report['checks'].append(matrix)
     actual = admin.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='faos' AND c.relkind IN ('r','p') AND a.attname='tenant_id' AND NOT a.attisdropped AND c.relname<>'tenant_login_bindings' AND c.relname NOT IN ('collision_lifecycle_records','vehicles','collision_vehicle_links','collision_participants','collision_claim_links','collision_events','collision_outbox','vehicle_identity_sources','vehicle_decode_snapshots')").fetchall()
     expect({row[0] for row in actual}==set(TABLES),'TENANT_TABLE_SCOPE_CHANGED')
-    ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim','shop_acceptance','shop_partner','shop_intent')}
+    ids = {key:str(uuid.uuid4()) for key in ('user','membership','group','location','brand','extra_brand','request','claim','shop_partner','shop_acceptance','shop_intent')}
     seal = 'matrix-seal-'+uuid.uuid4().hex
     digest = '0'*64
     try:
         for brand in ('brand','extra_brand'):
             admin.execute('INSERT INTO faos.brands VALUES (%s,%s)',(ids[brand],'matrix-'+ids[brand]))
+        shop_entries={}
         for tenant in tenants:
             admin.execute('INSERT INTO faos.claim_cases(tenant_id,claim_id,request_id,created_by,owner_actor_id) VALUES (%s,%s,%s,%s,%s)',(tenant,ids['claim'],ids['request'],'synthetic-matrix','synthetic-matrix'))
             admin.execute('INSERT INTO faos.claim_case_incident_intake(tenant_id,claim_id,owner_actor_id,request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,ids['claim'],'synthetic-matrix',ids['request'],'2026-01-01T00:00:00Z','collision','San Antonio','TX','78201'))
@@ -100,12 +101,14 @@ def verify(report,admin,connections,tenants,session):
                 (tenant,shop_entry,'matrix-shop-idem-'+uuid.uuid4().hex,session,'OBLIGATION_BOOKED','REPAIR_SHOP_ACCEPTANCE_FEE',ids['shop_partner'],ids['shop_acceptance'],'USD_CENTS','synthetic-matrix','2026-01-01T00:00:00Z','synthetic shop obligation','0'*64,'2'*64))
             admin.execute('INSERT INTO faos.financial_ledger_postings VALUES (%s,%s,1,%s,%s,27500),(%s,%s,2,%s,%s,27500)',
                 (tenant,shop_entry,'AR:SHOP:'+ids['shop_partner'],'DEBIT',tenant,shop_entry,'REV:REPAIR_SHOP_ACCEPTANCE','CREDIT'))
-            with tenant_transaction(conn,tenant):
-                register=conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-                    (tenant,ids['shop_intent'],shop_entry,'matrix-link-'+uuid.uuid4().hex,'matrix-order-'+uuid.uuid4().hex,
-                     'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'synthetic-matrix')).fetchone()[0]
-                expect(register=='CREATED','PAYMENT_INTENT_FIXTURE_FAILED')
+            shop_entries[tenant]=shop_entry
         for index,conn in enumerate(connections):
+            tenant=tenants[index]
+            with tenant_transaction(conn,tenant):
+                result=conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
+                    (tenant,ids['shop_intent'],shop_entries[tenant],'matrix-link-'+uuid.uuid4().hex,'matrix-order-'+uuid.uuid4().hex,
+                     'https://sandbox.square.link/u/matrix','matrix-idem-'+uuid.uuid4().hex,'synthetic-matrix')).fetchone()[0]
+                expect(result=='CREATED','PAYMENT_INTENT_FIXTURE_FAILED')
             own,other = tenants[index],tenants[1-index]
             for table in TABLES:
                 target = sql.SQL('faos.{}').format(sql.Identifier(table))
