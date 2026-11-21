@@ -64,7 +64,7 @@ def test_synthetic_live_staging_acceptance_harness_is_16_slot_and_guarded():
     slots=resolve_capture_protocol().slots
     assert len(slots)==16
     assert all(f'"{slot}"' in source for slot in slots)
-    assert "podman restart claim2car-app" in source
+    assert all(part in source for part in ('\"podman\"', '\"restart\"', '\"claim2car-app\"'))
     assert "EVIDENCE_ARTIFACT_CONFLICT" in source
     assert "atexit.register(cleanup_synthetic_consent)" in source
     assert "automatic consent cleanup failed" in source
