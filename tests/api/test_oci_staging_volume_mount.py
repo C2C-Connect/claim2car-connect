@@ -38,7 +38,7 @@ class SafeVolumeMountTests(unittest.TestCase):
         calls=[]
         def fake_run(args,check=True):
             calls.append(args)
-            if args[0]=="lsblk": return CompletedProcess(args,0,"disk\\n","")
+            if args[0]=="lsblk": return CompletedProcess(args,0,"disk\n","")
             if args[0]=="findmnt": return CompletedProcess(args,1,"","")
             if args[0]=="blkid": return CompletedProcess(args,2,"","")
             if args[0]=="wipefs": return CompletedProcess(args,0,"","")
