@@ -58,6 +58,10 @@ assert.ok(browserWorkbenchSource.includes("/v1/claim-cases?limit=50"), "operator
 assert.ok(browserWorkbenchSource.includes("/evidence-readiness"), "resuming a case must use server-authoritative readiness");
 assert.ok(browserWorkbenchSource.includes("registered_artifacts"), "resume must restore registered original artifact metadata");
 assert.ok(browserWorkbenchSource.includes("qualityRecorded"), "resume must avoid duplicating quality records when sealing retries");
+assert.ok(browserWorkbenchSource.includes("/exceptions"), "operator workbench must record capture safety exceptions through the API");
+assert.ok(browserWorkbenchSource.includes("CAPTURED_AFTER_RETRY"), "exception resolution must link a registered retake");
+assert.ok(browserWorkbenchSource.includes("view still required"), "exception closure must not imply required capture is waived");
+assert.ok(readFileSync(new URL("../app/index.html", import.meta.url), "utf8").includes("exception-slot"), "operator interface must expose exception recording controls");
 
 
 console.log(JSON.stringify({ suite: "slice2-workbench", assertions: 12, status: "passed" }));

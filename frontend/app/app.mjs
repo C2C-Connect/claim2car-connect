@@ -19,7 +19,7 @@ const API_CAPTURE_SLOTS = [
   ["14_physical_vin", "Physical VIN plate"],
   ["15_license_and_insurance_docs", "License / insurance documentation"]
 ];
-const state = { token:null, role:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, artifacts:new Map(), previews:new Map() };
+const state = { token:null, role:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map() };
 const byId = (id) => document.getElementById(id);
 const show = (id, visible=true) => { byId(id).hidden = !visible; };
 const message = (id, value, isError=false) => {
@@ -51,7 +51,7 @@ function setConnected(role){
   if(role==="operator")refreshCaseList();
 }
 function disconnect(){
-  state.token=null;state.role=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};
+  state.token=null;state.role=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];
   state.vehicleRecorded=false;state.sealed=false;state.artifacts.clear();
   state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
   byId("access-token").value="";byId("owner-token").value="";byId("vin-input").value="";
@@ -68,6 +68,20 @@ byId("connect-form").addEventListener("submit",(event)=>{
 });
 byId("disconnect-button").addEventListener("click",disconnect);
 byId("refresh-cases").addEventListener("click",refreshCaseList);
+byId("record-exception").addEventListener("click",async()=>{
+  const slot=byId("exception-slot").value,reason=byId("exception-reason").value,explanation=byId("exception-explanation").value.trim();
+  if(!slot||!explanation){message("exception-status","Choose a missing capture slot and explain the condition.",true);return;}
+  const button=byId("record-exception");button.disabled=true;
+  try{
+    await api("/v1/capture-sessions/"+state.sessionId+"/exceptions",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),slot,reason_code:reason,explanation})});
+    byId("exception-explanation").value="";
+    const readiness=await api("/v1/capture-sessions/"+state.sessionId+"/evidence-readiness",state.token);
+    state.activeExceptions=readiness.active_capture_exceptions||[];
+    renderExceptionPanel();
+    message("exception-status","Safety exception recorded in the server audit history. The case remains unsealed until all required evidence slots are satisfied.");
+  }catch(error){message("exception-status",error.message,true);}
+  finally{button.disabled=state.capturePaused||state.qualityRecorded||state.sealed;}
+});
 
 byId("create-case").addEventListener("click",async()=>{
   byId("create-case").disabled=true;
@@ -79,7 +93,7 @@ byId("create-case").addEventListener("click",async()=>{
     if(!created||created.claim_id!==claimId||typeof created.capture_session_id!=="string"||!created.capture_session_id){
       throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
     }
-    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
     refreshCaseList();
     show("consent-panel");message("consent-status","Persistent claim case created using the 16-view capture protocol. Owner consent is required before vehicle identification or evidence capture.");
@@ -118,7 +132,7 @@ function renderCaptureSlots(readiness=null){
   const grid=byId("slot-grid"),quality=byId("quality-grid");grid.replaceChildren();quality.replaceChildren();
   state.artifacts.clear();
   const knownArtifacts=readiness?.registered_artifacts||[];
-  state.qualityResults=readiness?.quality_results||{};
+  state.qualityResults=readiness?.quality_results||{};state.activeExceptions=readiness?.active_capture_exceptions||[];
   API_CAPTURE_SLOTS.forEach(([slot,label])=>{
     const existing=knownArtifacts.find(item=>item.slot===slot);
     if(existing)state.artifacts.set(slot,{artifactId:existing.artifact_id,sha256:existing.sha256,byteLength:existing.byte_length,label});
@@ -140,7 +154,7 @@ function renderCaptureSlots(readiness=null){
         state.artifacts.set(slot,{artifactId,sha256:digest,byteLength:file.size,label});
         const previous=state.previews.get(slot);if(previous)URL.revokeObjectURL(previous);
         const url=URL.createObjectURL(file);state.previews.set(slot,url);preview.src=url;preview.hidden=false;
-        meta.textContent="Uploaded · "+file.size.toLocaleString()+" bytes · SHA-256 verified";meta.classList.add("done");updateSealButton();
+        meta.textContent="Uploaded · "+file.size.toLocaleString()+" bytes · SHA-256 verified";meta.classList.add("done");renderExceptionPanel();updateSealButton();
       }catch(error){meta.textContent=error.message;meta.classList.add("error");}
       finally{input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;}
     });
@@ -155,7 +169,50 @@ function renderCaptureSlots(readiness=null){
   });
   byId("resume-capture").hidden=!state.capturePaused;
   byId("resume-capture").disabled=!state.capturePaused;
+  renderExceptionPanel();
   updateSealButton();
+}
+function renderExceptionPanel(){
+  const select=byId("exception-slot"),list=byId("exception-list");
+  if(!select||!list)return;
+  const activeSlots=new Set(state.activeExceptions.map(item=>item.slot));
+  const available=API_CAPTURE_SLOTS.filter(([slot])=>!state.artifacts.has(slot)&&!activeSlots.has(slot));
+  select.replaceChildren();
+  const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="Select missing required view";select.append(placeholder);
+  available.forEach(([slot,label])=>{const option=document.createElement("option");option.value=slot;option.textContent=label;select.append(option);});
+  select.disabled=state.capturePaused||state.qualityRecorded||state.sealed||available.length===0;
+  byId("exception-reason").disabled=select.disabled;
+  byId("exception-explanation").disabled=select.disabled;
+  byId("record-exception").disabled=select.disabled;
+  list.replaceChildren();
+  if(!state.activeExceptions.length){const empty=document.createElement("p");empty.className="muted";empty.textContent="No active capture exceptions.";list.append(empty);return;}
+  state.activeExceptions.forEach(item=>{
+    const row=document.createElement("article");row.className="case-list-item";
+    const info=document.createElement("div");info.className="case-list-info";
+    const title=document.createElement("strong");title.textContent=item.slot+" · "+item.reason_code;
+    const detail=document.createElement("span");detail.textContent=item.explanation+" · recorded by "+item.recorded_by;
+    info.append(title,detail);row.append(info);
+    const actions=document.createElement("div");actions.className="exception-actions";
+    if(state.artifacts.has(item.slot)){
+      const retry=document.createElement("button");retry.type="button";retry.className="button secondary";retry.textContent="Resolve: captured after retry";
+      retry.disabled=state.capturePaused||state.qualityRecorded||state.sealed;
+      retry.addEventListener("click",()=>resolveException(item.slot,"CAPTURED_AFTER_RETRY","Required view captured after retry."));
+      actions.append(retry);
+    }
+    const close=document.createElement("button");close.type="button";close.className="button quiet";close.textContent="Close exception (view still required)";
+    close.disabled=state.capturePaused||state.qualityRecorded||state.sealed;
+    close.addEventListener("click",()=>resolveException(item.slot,"NO_LONGER_APPLICABLE","Condition no longer applies; required capture remains outstanding."));
+    actions.append(close);row.append(actions);list.append(row);
+  });
+}
+async function resolveException(slot,resolutionCode,explanation){
+  try{
+    await api("/v1/capture-sessions/"+state.sessionId+"/exceptions/resolve",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),slot,resolution_code:resolutionCode,explanation})});
+    const readiness=await api("/v1/capture-sessions/"+state.sessionId+"/evidence-readiness",state.token);
+    state.activeExceptions=readiness.active_capture_exceptions||[];
+    renderExceptionPanel();
+    message("exception-status",resolutionCode==="CAPTURED_AFTER_RETRY"?"Exception resolved with a registered retry capture.":"Exception closed; the required view remains outstanding and cannot be omitted from sealing.");
+  }catch(error){message("exception-status",error.message,true);}
 }
 function updateSealButton(){
   const allUploaded=API_CAPTURE_SLOTS.every(([slot])=>state.artifacts.has(slot));
@@ -185,7 +242,7 @@ byId("resume-capture").addEventListener("click",async()=>{
   try{
     await api("/v1/capture-sessions/"+state.sessionId+"/resume",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),reason:"Operator resumed capture in workbench"})});
     const readiness=await api("/v1/capture-sessions/"+state.sessionId+"/evidence-readiness",state.token);
-    state.capturePaused=Boolean(readiness.capture_paused);state.qualityRecorded=Boolean(readiness.quality_recorded);state.qualityResults=readiness.quality_results||{};state.sealed=Boolean(readiness.sealed);message("seal-status","Capture resumed. Safety remains the operator's responsibility.");
+    state.capturePaused=Boolean(readiness.capture_paused);state.qualityRecorded=Boolean(readiness.quality_recorded);state.qualityResults=readiness.quality_results||{};state.activeExceptions=readiness.active_capture_exceptions||[];state.sealed=Boolean(readiness.sealed);message("seal-status","Capture resumed. Safety remains the operator's responsibility.");
     renderCaptureSlots(readiness);
   }catch(error){message("seal-status",error.message,true);button.disabled=false;}
 });
@@ -218,7 +275,7 @@ async function openClaimCase(item,button){
     state.sealed=Boolean(readiness.sealed);
     state.qualityRecorded=Boolean(readiness.quality_recorded);
     state.capturePaused=Boolean(readiness.capture_paused);
-    state.qualityResults=readiness.quality_results||{};
+    state.qualityResults=readiness.quality_results||{};state.activeExceptions=readiness.active_capture_exceptions||[];
     state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
     byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
     show("consent-panel",!state.consentRecorded);
