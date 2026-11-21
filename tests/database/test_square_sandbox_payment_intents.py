@@ -156,10 +156,11 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
         paid_at=created+timedelta(seconds=2)
         self.assertEqual(self.webhook('event-completed','COMPLETED',created=paid_at),'RECONCILED')
         self.assertEqual(self.webhook('event-completed','COMPLETED',created=paid_at),'DUPLICATE')
-        row=self.conn.execute(
-            'SELECT COALESCE(r.status,i.status),r.provider_payment_id FROM faos.square_sandbox_payment_intents i '
-            'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
-        ).fetchone()
+        with tenant_transaction(self.conn,self.tenant):
+            row=self.conn.execute(
+                'SELECT COALESCE(r.status,i.status),r.provider_payment_id FROM faos.square_sandbox_payment_intents i '
+                'LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id',
+            ).fetchone()
         self.assertEqual(row,('PAID','payment-1'))
         receipt=self.seed.execute(
             'SELECT reconciliation_status FROM faos.square_sandbox_webhook_receipts WHERE provider_event_id=%s',
@@ -204,6 +205,5 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
         timestamp=datetime.now(timezone.utc)
         self.webhook('event-conflict','APPROVED',created=timestamp,body=b'first-payload')
         with self.assertRaises(psycopg.errors.RaiseException) as conflict:
-            with self.conn.transaction():
-                self.webhook('event-conflict','COMPLETED',created=timestamp,body=b'different-payload')
+            self.webhook('event-conflict','COMPLETED',created=timestamp,body=b'different-payload')
         self.assertEqual(conflict.exception.diag.message_primary,'SQUARE_WEBHOOK_EVENT_ID_CONFLICT')
