@@ -39,3 +39,15 @@ def test_deploy_script_shell_syntax_and_expanded_variables():
 def test_host_bootstrap_installs_deploy_dependencies():
     cloud=(ROOT/"infra/oci/staging/cloud-init.yaml").read_text()
     assert "  - git" in cloud and "  - curl" in cloud
+
+
+def test_runtime_deploy_requires_digest_pinned_database_and_distinct_mounts():
+    d=(ROOT/"scripts/oci_staging_runtime_deploy.sh").read_text()
+    assert "C2C_POSTGRES_IMAGE must be pinned by sha256 digest" in d
+    assert "findmnt -rn -o SOURCE --mountpoint" in d
+    assert "PostgreSQL and evidence storage must be distinct mounted volumes" in d
+    assert "Storage mount root must be UID 10001" in d
+    assert "runtime.env must be root-owned mode 0600" in d
+    assert "capture-runtime.json must be root-owned mode 0640" in d
+    assert "Existing PostgreSQL container is bound to unexpected storage" in d
+    assert "Existing PostgreSQL container image differs from requested digest" in d
