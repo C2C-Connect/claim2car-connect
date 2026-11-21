@@ -75,13 +75,13 @@ def build_command_text(values: dict[str, str]) -> str:
     ]
     encoded = base64.b64encode(json.dumps(args, separators=(",", ":")).encode()).decode("ascii")
     text = (
-        "#!/usr/bin/env bash\\n"
-        "set -euo pipefail\\n"
-        f"payload='{encoded}'\\n"
-        'args_json="$(printf \'%s\' "$payload" | base64 --decode)"\\n'
-        "mapfile -t deploy_args < <(jq -r '.[]' <<<\"$args_json\")\\n"
-        '[[ "${#deploy_args[@]}" -eq 8 ]] || { echo "Invalid deployment payload." >&2; exit 1; }\\n'
-        'sudo -n /usr/local/sbin/claim2car-staging-deploy "${deploy_args[@]}"\\n'
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f"payload='{encoded}'\n"
+        'args_json="$(printf \'%s\' "$payload" | base64 --decode)"\n'
+        "mapfile -t deploy_args < <(jq -r '.[]' <<<\"$args_json\")\n"
+        '[[ "${#deploy_args[@]}" -eq 8 ]] || { echo "Invalid deployment payload." >&2; exit 1; }\n'
+        'sudo -n /usr/local/sbin/claim2car-staging-deploy "${deploy_args[@]}"\n'
     )
     if len(text.encode("utf-8")) > 4096:
         raise ValueError("Run Command text exceeds OCI's 4 KB inline script limit.")
