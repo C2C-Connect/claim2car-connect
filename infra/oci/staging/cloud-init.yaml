@@ -81,6 +81,7 @@ write_files:
       command -v findmnt >/dev/null || fail "findmnt is not installed"
       command -v runuser >/dev/null || fail "runuser is not installed"
       command -v python3 >/dev/null || fail "python3 is not installed"
+      systemctl is-active --quiet oracle-cloud-agent || fail "Oracle Cloud Agent service is not active"
       [[ -x /opt/oci-cli-venv/bin/oci ]] || fail "OCI CLI virtualenv is not installed"
       [[ -x /usr/local/sbin/claim2car-staging-deploy ]] || fail "private deployment wrapper is missing"
       getent passwd ocarun >/dev/null || fail "OCI Run Command ocarun account is missing"
