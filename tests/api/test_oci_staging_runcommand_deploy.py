@@ -30,6 +30,13 @@ def _valid_env():
     }
 
 
+def test_runcommand_deploy_rejects_missing_input_mapping_value():
+    env = _valid_env()
+    del env["OCI_STAGING_INSTANCE_OCID"]
+    with pytest.raises(ValueError, match="Missing required deployment input"):
+        deploy.validate_inputs(env)
+
+
 def test_runcommand_deploy_validates_exact_ocir_repository_and_digest():
     values = deploy.validate_inputs(_valid_env())
     assert values["C2C_IMAGE_COMMIT"] == "a" * 40
