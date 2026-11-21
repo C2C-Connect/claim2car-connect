@@ -145,7 +145,9 @@ def verify(report,admin,connections,tenants,session):
                         results['cross_read'] = {'status':'PASS'}
                 privileges = conn.execute("SELECT has_table_privilege(current_user,%s,'INSERT'),has_table_privilege(current_user,%s,'UPDATE'),has_table_privilege(current_user,%s,'DELETE')",('faos.'+table,)*3).fetchone()
                 cursor = admin.execute(sql.SQL('SELECT * FROM {} WHERE tenant_id=%s LIMIT 1').format(target),(other,))
-                values = dict(zip((column.name for column in cursor.description),cursor.fetchone()))
+                fixture_row = cursor.fetchone()
+                expect(fixture_row is not None,'TENANT_MATRIX_FIXTURE_MISSING:'+table)
+                values = dict(zip((column.name for column in cursor.description),fixture_row)
                 key = {'square_sandbox_payment_intents':'payment_intent_id','users':'user_id','memberships':'membership_id','dealer_groups':'group_id','dealer_locations':'location_id','sessions':'session_id','events':'event_id','completion_receipts':'request_id','claim_cases':'claim_id','claim_case_incident_intake':'request_id'}.get(table)
                 if key:
                     values[key] = str(uuid.uuid4())
