@@ -172,8 +172,16 @@ def main():
     config = json.loads(config_path.read_text())
     tenant_id = next((entry["tenant_id"] for entry in config["credentials"]
                       if entry.get("actor_role") == "owner"), None)
+    if not isinstance(tenant_id, str) or not tenant_id or Path(tenant_id).name != tenant_id:
+        raise RuntimeError("Synthetic owner tenant ID is missing or unsafe in runtime configuration.")
+    tenant_dir = evidence_root / tenant_id
+    session_dir = tenant_dir / session_id
+    if evidence_root.is_symlink() or tenant_dir.is_symlink() or session_dir.is_symlink():
+        raise RuntimeError("Evidence storage root or synthetic session directory must not be symlinked.")
     artifact_id = next(iter(originals))
-    artifact_path = evidence_root / tenant_id / session_id / (artifact_id + ".original")
+    artifact_path = session_dir / (artifact_id + ".original")
+    if artifact_path.is_symlink():
+        raise RuntimeError("Synthetic original artifact must not be a symlink.")
     if not artifact_path.is_file():
         raise RuntimeError("Expected synthetic original is absent from persistent evidence storage.")
     artifact_path.write_bytes(b"CLAIM2CAR SYNTHETIC TAMPER CHECK")
@@ -182,9 +190,9 @@ def main():
         raise RuntimeError("Tampered synthetic evidence was not rejected with the integrity conflict.")
     json_request(base, "POST", f"/v1/capture-sessions/{session_id}/consent", owner,
                  {"request_id": rid(), "accepted": False, "scope": "capture_review"}, 200)
-    CLEANUP_CONSENT = False
     if artifact_path.exists():
         raise RuntimeError("Consent withdrawal did not remove synthetic original bytes.")
+    CLEANUP_CONSENT = False
 
     print(json.dumps({
         "status": "PASS",
