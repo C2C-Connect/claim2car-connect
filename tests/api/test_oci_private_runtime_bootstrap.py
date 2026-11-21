@@ -438,3 +438,11 @@ def test_oci_deploy_harness_cleans_root_owned_tmp_paths():
     assert "def _oci_harness_cleanup(tmp_path):" in content
     assert 'sudo,"rm","-rf","--",str(tmp_path)' in content
     assert content.count("_oci_harness_cleanup(tmp_path)") >= 4
+
+
+def test_oci_deploy_harness_uses_privileged_file_read_and_cleanup_helpers():
+    content=(ROOT/"tests/api/test_oci_private_runtime_bootstrap.py").read_text()
+    assert "def _read_root_owned_file(path):" in content
+    assert 'sudo,"cat",str(path)' in content
+    assert "def _oci_harness_cleanup(tmp_path):" in content
+    assert 'sudo,"rm","-rf","--",str(tmp_path)' in content
