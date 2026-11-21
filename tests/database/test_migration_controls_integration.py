@@ -367,6 +367,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0024_audited_capture_exceptions_pause_resume.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0025_square_sandbox_payment_intents.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
