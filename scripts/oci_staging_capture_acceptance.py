@@ -28,6 +28,21 @@ TEST_VIN = "1HGCM82633A004352"
 CLEANUP_BASE = CLEANUP_SESSION = CLEANUP_OWNER = ""
 CLEANUP_CONSENT = False
 
+def synthetic_original_path(evidence_root: Path, tenant_id: str, session_id: str, artifact_id: str) -> Path:
+    """Resolve a synthetic original only after validating each path component."""
+    components = (tenant_id, session_id, artifact_id)
+    if any(not isinstance(value, str) or not value or value in {".", ".."} or Path(value).name != value or "/" in value or "\\\\" in value for value in components):
+        raise RuntimeError("Synthetic evidence identifiers contain unsafe path components.")
+    tenant_dir = evidence_root / tenant_id
+    session_dir = tenant_dir / session_id
+    artifact_path = session_dir / (artifact_id + ".original")
+    if evidence_root.is_symlink() or tenant_dir.is_symlink() or session_dir.is_symlink() or artifact_path.is_symlink():
+        raise RuntimeError("Evidence storage root, tenant, session, and artifact must not be symlinks.")
+    if not artifact_path.is_file():
+        raise RuntimeError("Expected synthetic original is absent from persistent evidence storage.")
+    return artifact_path
+
+
 def cleanup_synthetic_consent():
     if CLEANUP_CONSENT and CLEANUP_BASE and CLEANUP_SESSION and CLEANUP_OWNER:
         try:
@@ -172,18 +187,8 @@ def main():
     config = json.loads(config_path.read_text())
     tenant_id = next((entry["tenant_id"] for entry in config["credentials"]
                       if entry.get("actor_role") == "owner"), None)
-    if not isinstance(tenant_id, str) or not tenant_id or Path(tenant_id).name != tenant_id:
-        raise RuntimeError("Synthetic owner tenant ID is missing or unsafe in runtime configuration.")
-    tenant_dir = evidence_root / tenant_id
-    session_dir = tenant_dir / session_id
-    if evidence_root.is_symlink() or tenant_dir.is_symlink() or session_dir.is_symlink():
-        raise RuntimeError("Evidence storage root or synthetic session directory must not be symlinked.")
     artifact_id = next(iter(originals))
-    artifact_path = session_dir / (artifact_id + ".original")
-    if artifact_path.is_symlink():
-        raise RuntimeError("Synthetic original artifact must not be a symlink.")
-    if not artifact_path.is_file():
-        raise RuntimeError("Expected synthetic original is absent from persistent evidence storage.")
+    artifact_path = synthetic_original_path(evidence_root, tenant_id, session_id, artifact_id)
     artifact_path.write_bytes(b"CLAIM2CAR SYNTHETIC TAMPER CHECK")
     tamper = json_request(base, "GET", f"/v1/review-sessions/{session_id}", reviewer, expected=409)
     if tamper.get("detail") != "EVIDENCE_ARTIFACT_CONFLICT":
