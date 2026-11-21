@@ -2,7 +2,7 @@ import json,subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 
-def _read_root_owned_file(path):
+def _read_root_owned_file(path: Path) -> str:
     sudo=subprocess.run(["sudo","cat",str(path)],check=True,capture_output=True,text=True)
     return sudo.stdout
 def test_bootstrap_credentials_and_permissions(tmp_path):
