@@ -82,6 +82,21 @@ def json_request(base, method, path, token, body=None, expected=200):
     return json.loads(raw) if raw else {}
 
 
+
+
+def verify_source_checkout(expected_revision: str, checkout: Path | None = None) -> None:
+    """Fail if acceptance is run from a checkout that does not match the deployed image."""
+    root = checkout or Path(__file__).resolve().parents[1]
+    if not isinstance(expected_revision, str) or not re.fullmatch(r"[0-9a-f]{40}", expected_revision):
+        raise RuntimeError("Deployed build endpoint must report a full 40-character commit SHA.")
+    current = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+    if current != expected_revision:
+        raise RuntimeError(f"Acceptance source revision mismatch: checkout={current}, deployed={expected_revision}.")
+    dirty = subprocess.run(["git", "status", "--porcelain"], cwd=root, capture_output=True, text=True, check=True).stdout
+    if dirty.strip():
+        raise RuntimeError("Acceptance source checkout has uncommitted or untracked changes; use a clean matching checkout.")
+
+
 def wait_ready(base, revision, seconds=120):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
