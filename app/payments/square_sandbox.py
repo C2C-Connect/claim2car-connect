@@ -40,6 +40,17 @@ class SquareSandboxConfig:
     webhook_notification_url: str
     environment: str = "sandbox"
 
+    @classmethod
+    def from_environment(cls) -> "SquareSandboxConfig":
+        """Load sandbox-only settings from environment variables."""
+        return cls(
+            access_token=os.environ.get("SQUARE_SANDBOX_ACCESS_TOKEN", ""),
+            location_id=os.environ.get("SQUARE_SANDBOX_LOCATION_ID", ""),
+            webhook_signature_key=os.environ.get("SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY", ""),
+            webhook_notification_url=os.environ.get("SQUARE_SANDBOX_WEBHOOK_URL", ""),
+            environment=os.environ.get("SQUARE_ENVIRONMENT", ""),
+        )
+
     def validate(self) -> None:
         if self.environment != "sandbox":
             raise SquareSandboxError("SQUARE_SANDBOX_ENVIRONMENT_REQUIRED")

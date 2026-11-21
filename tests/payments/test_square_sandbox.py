@@ -77,6 +77,18 @@ def test_checkout_link_is_sandbox_only_fixed_fee_and_idempotent():
     ({"webhook_signature_key": ""}, "SQUARE_SANDBOX_WEBHOOK_KEY_REQUIRED"),
     ({"webhook_notification_url": "http://bad.example"}, "SQUARE_SANDBOX_WEBHOOK_URL_MUST_BE_HTTPS"),
 ])
+def test_config_loads_from_environment(monkeypatch):
+    monkeypatch.setenv("SQUARE_ENVIRONMENT", "sandbox")
+    monkeypatch.setenv("SQUARE_SANDBOX_ACCESS_TOKEN", "test-token")
+    monkeypatch.setenv("SQUARE_SANDBOX_LOCATION_ID", "test-location")
+    monkeypatch.setenv("SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY", "test-signature-key")
+    monkeypatch.setenv("SQUARE_SANDBOX_WEBHOOK_URL", "https://sandbox.example.test/hooks/square")
+    loaded = SquareSandboxConfig.from_environment()
+    loaded.validate()
+    assert loaded.environment == "sandbox"
+    assert loaded.location_id == "test-location"
+
+
 def test_config_fail_closed(changes, code):
     with pytest.raises(SquareSandboxError, match=code):
         create_shop_acceptance_checkout(Obligation(), config(**changes), transport=fake_transport()[1])
