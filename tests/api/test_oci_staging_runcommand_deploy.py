@@ -53,6 +53,8 @@ def test_runcommand_payload_is_secret_free_and_shell_safe():
     assert "sudo -n /usr/local/sbin/claim2car-staging-deploy" in text
     assert values["OCI_OCIR_AUTH_SECRET_OCID"] in text
     assert values["C2C_IMAGE_REF"] in text
+    assert values["OCIR_NAMESPACE"] in text
+    assert values["OCIR_REPOSITORY"] in text
     assert "OCI_REGISTRY_TOKEN" not in text
     assert "auth_token" not in text
     assert len(text.encode()) <= 4096
@@ -114,6 +116,8 @@ def test_cloud_init_enables_private_runcommand_without_broad_sudo():
     assert "ocarun ALL=(root) NOPASSWD: /usr/local/sbin/claim2car-staging-deploy" in cloud_init
     assert "NOPASSWD:ALL" not in cloud_init
     assert "ocir_auth_secret" in cloud_init or "secret-bundle get" in cloud_init
+    assert 'registry == "us-chicago-1.ocir.io"' in cloud_init
+    assert 'image == "$registry/$namespace/$repository:"*' in cloud_init
 
 
 def test_terraform_runcommand_secret_access_is_scoped_to_secret_ocid():
