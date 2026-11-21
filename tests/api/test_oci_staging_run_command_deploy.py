@@ -4,8 +4,9 @@ import importlib.util
 import json
 import os
 import subprocess
-import pytest
 from pathlib import Path
+
+import pytest
 
 ROOT=Path(__file__).resolve().parents[2]
 MODULE_PATH=ROOT/"scripts/oci_staging_run_command_deploy.py"
@@ -20,6 +21,7 @@ def _remote_script():
     hashes={name:"c"*64 for name in deploy.SCRIPT_NAMES}
     return deploy.build_remote_script(
         source_sha=sha,
+        region="us-chicago-1",
         registry="us-chicago-1.ocir.io",
         registry_username="test-user",
         image_ref=image,
@@ -29,7 +31,7 @@ def _remote_script():
     )
 
 
-def test_image_reference_requires_source_sha_and_digest_match():
+def test_image_reference_requires_source_sha_digest_and_repository_alignment():
     sha="a"*40
     image=f"us-chicago-1.ocir.io/ns/repo:sha-{sha}@sha256:"+"b"*64
     assert deploy.validate_image_ref(image,"us-chicago-1.ocir.io","ns","repo")==sha
@@ -37,17 +39,22 @@ def test_image_reference_requires_source_sha_and_digest_match():
         deploy.validate_image_ref(image,"us-chicago-1.ocir.io","other","repo")
     with pytest.raises(ValueError):
         deploy.extract_source_sha("repo:latest")
+    with pytest.raises(ValueError):
+        deploy.validate_image_ref(image.replace("sha256:","sha256:bad"),"us-chicago-1.ocir.io","ns","repo")
 
 
-def test_run_command_script_downloads_and_checks_pinned_sources_without_secrets():
+def test_remote_run_command_script_is_small_pinned_and_does_not_embed_token():
     script=_remote_script()
     assert len(script.encode())<3900
     assert "sha256sum -c -" in script
     assert "instance_principal" in script
+    assert "--region" in script
     assert "claim2car-runtime-deploy" in script
     assert "claim2car-runtime-acceptance" in script
     assert "OCI_REGISTRY_TOKEN" in script
     assert "super-secret-token-value" not in script
+    assert "C2C_DEPLOY_SCRIPT_PATH" in script
+    assert "C2C_ACCEPTANCE_SCRIPT_PATH" in script
 
 
 def test_run_command_create_and_execution_polling_success(tmp_path,monkeypatch):
@@ -89,7 +96,7 @@ else:
     assert target=={"instanceId":"ocid1.instance.test"}
 
 
-def test_run_command_failure_reports_state_and_exit_code(tmp_path,monkeypatch):
+def test_run_command_failure_reports_terminal_state_and_exit_code(tmp_path,monkeypatch):
     fakebin=tmp_path/"bin"; fakebin.mkdir()
     cli=fakebin/"oci"
     cli.write_text("""#!/usr/bin/env python3
@@ -107,3 +114,18 @@ else:
     with pytest.raises(RuntimeError,match="FAILED"):
         deploy.execute_command(compartment_ocid="ocid1.compartment.test",instance_ocid="ocid1.instance.test",
                                script=_remote_script(),display_name="fail",poll_seconds=0,max_wait_seconds=10)
+
+
+def test_cloud_init_installs_oci_cli_and_limits_ocarun_sudo_to_wrappers():
+    content=(ROOT/"infra/oci/staging/cloud-init.yaml").read_text()
+    assert "  - oci-cli" in content
+    assert "ocarun ALL=(root) NOPASSWD: SETENV:" in content
+    for wrapper in ("claim2car-runtime-bootstrap","claim2car-runtime-deploy","claim2car-runtime-acceptance"):
+        assert f"/usr/local/sbin/{wrapper}" in content
+
+
+def test_terraform_enables_instance_agent_run_command_plugin():
+    content=(ROOT/"infra/oci/staging/main.tf").read_text()
+    assert 'name          = "Compute Instance Run Command"' in content
+    assert 'desired_state = "ENABLED"' in content
+    assert "is_management_disabled  = false" in content
