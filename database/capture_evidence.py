@@ -162,7 +162,7 @@ class CaptureEvidenceService:
                     if type(payload) is not dict or set(payload) != required:
                         raise CaptureSessionConflict("UNSUPPORTED_ARTIFACT_HISTORY")
                     if (payload.get("slot") not in slots or not isinstance(payload.get("artifact_id"), str)
-                            or not re.fullmatch(r"[0-9a-f]{64}", payload.get("sha256", ""))
+                            or not isinstance(payload.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", payload["sha256"])
                             or type(payload.get("byte_length")) is not int or payload["byte_length"] <= 0):
                         raise CaptureSessionConflict("UNSUPPORTED_ARTIFACT_HISTORY")
                     latest_artifacts[payload["slot"]] = {

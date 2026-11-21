@@ -79,7 +79,7 @@ byId("create-case").addEventListener("click",async()=>{
     if(!created||created.claim_id!==claimId||typeof created.capture_session_id!=="string"||!created.capture_session_id){
       throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
     }
-    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;
+    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
     byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
     refreshCaseList();
     show("consent-panel");message("consent-status","Persistent claim case created using the 16-view capture protocol. Owner consent is required before vehicle identification or evidence capture.");
@@ -184,8 +184,9 @@ byId("resume-capture").addEventListener("click",async()=>{
   const button=byId("resume-capture");button.disabled=true;
   try{
     await api("/v1/capture-sessions/"+state.sessionId+"/resume",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),reason:"Operator resumed capture in workbench"})});
-    state.capturePaused=false;message("seal-status","Capture resumed. Safety remains the operator's responsibility.");
-    renderCaptureSlots();
+    const readiness=await api("/v1/capture-sessions/"+state.sessionId+"/evidence-readiness",state.token);
+    state.capturePaused=Boolean(readiness.capture_paused);state.qualityRecorded=Boolean(readiness.quality_recorded);state.qualityResults=readiness.quality_results||{};state.sealed=Boolean(readiness.sealed);message("seal-status","Capture resumed. Safety remains the operator's responsibility.");
+    renderCaptureSlots(readiness);
   }catch(error){message("seal-status",error.message,true);button.disabled=false;}
 });
 async function refreshCaseList(){
