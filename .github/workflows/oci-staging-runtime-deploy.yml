@@ -53,6 +53,7 @@ jobs:
           [[ "${C2C_POSTGRES_IMAGE}" =~ ^(docker\.io|registry-1\.docker\.io)/postgis/postgis:16-[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}$ ]] || { echo "OCI_STAGING_POSTGRES_IMAGE must be a pinned PostGIS 16 image."; exit 1; }
           [[ "${OCI_IMAGE_REF}" =~ :sha-([a-f0-9]{40})@sha256:([a-f0-9]{64})$ ]] || { echo "Input image must use full source SHA and immutable digest."; exit 1; }
           source_sha="${BASH_REMATCH[1]}"
+          [[ "${source_sha}" == "${GITHUB_SHA}" ]] || { echo "Image source SHA must equal this main workflow commit; publish from the same commit."; exit 1; }
           expected_prefix="${OCI_REGISTRY}/${OCIR_NAMESPACE}/${OCIR_REPOSITORY}:sha-${source_sha}@"
           [[ "${OCI_IMAGE_REF}" == "${expected_prefix}"* ]] || { echo "Image registry/namespace/repository mismatch."; exit 1; }
           echo "source_sha=${source_sha}" >> "${GITHUB_OUTPUT}"
