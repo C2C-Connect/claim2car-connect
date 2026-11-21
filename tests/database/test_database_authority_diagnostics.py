@@ -152,8 +152,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_rejects_unreviewed_migration_after_0025(self):
-        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0025'):
+    def test_rejects_unreviewed_migration_after_0026(self):
+        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0026'):
             validate_authority_migration_inventory(self.inventory([
                 '0017_event_contract_parity.sql',
                 '0018_capture_protocol_session_binding.sql',
@@ -164,11 +164,10 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0023_consented_vehicle_profile.sql',
                 '0024_audited_capture_exceptions_pause_resume.sql',
                 '0025_square_sandbox_payment_intents.sql',
-                '0026_unreviewed.sql',
+                '0026_square_sandbox_webhook_reconciliation.sql',
+                '0027_unreviewed.sql',
             ]))
 
 
 if __name__ == '__main__':
     unittest.main()
-                '0025_square_sandbox_payment_intents.sql',
-                '0026_unreviewed.sql',
