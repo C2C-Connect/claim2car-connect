@@ -128,7 +128,17 @@ def test_synthetic_original_path_guard_rejects_symlinked_tenant_and_artifact(tmp
         raise AssertionError("symlinked evidence root accepted")
     tenant = root / "tenant"
     tenant.mkdir()
+    session_target = tmp_path / "session-target"
+    session_target.mkdir()
     session = tenant / "session"
+    session.symlink_to(session_target, target_is_directory=True)
+    try:
+        module.synthetic_original_path(root, "tenant", "session", "artifact")
+    except RuntimeError as exc:
+        assert "must not be symlinks" in str(exc)
+    else:
+        raise AssertionError("symlinked session directory accepted")
+    session.unlink()
     session.mkdir()
     (session / "artifact.original").symlink_to(target / "payload")
     try:
