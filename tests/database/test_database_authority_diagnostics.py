@@ -165,6 +165,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0023_consented_vehicle_profile.sql',
                 '0024_audited_capture_exceptions_pause_resume.sql',
                 '0026_unreviewed.sql',
+                '0025_square_sandbox_payment_intents.sql',
             ]))
 
 
