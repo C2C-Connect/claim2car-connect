@@ -42,6 +42,10 @@ def test_deploy_script_shell_syntax_and_expanded_variables():
     assert 'cleanup_authfile\ntrap - EXIT' in content
     assert 'unset REGISTRY_TOKEN' in content
     assert 'OCI_IMAGE_REF must use the authenticated OCI_REGISTRY host' in content
+    assert 'podman image inspect "$DB_IMAGE" --format' in content
+    assert 'Expected ARM64 PostgreSQL image' in content
+    assert '--read-only --cap-drop=ALL --security-opt=no-new-privileges' in content
+    assert '--tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001' in content
     assert 'podman login "$REGISTRY"' not in content
 
 
