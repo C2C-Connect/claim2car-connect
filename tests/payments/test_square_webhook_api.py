@@ -36,11 +36,11 @@ def connection_factory(url,connect_timeout=3):
     yield connection
 
 
-def make_body(*,event_id="evt-1",status="COMPLETED",amount=27500):
+def make_body(*,event_id="evt-1",status="COMPLETED",amount=27500,created_at="2026-11-21T18:30:00Z"):
     return json.dumps({
         "event_id":event_id,
         "type":"payment.updated",
-        "created_at":"2026-11-21T18:30:00Z",
+        "created_at":created_at,
         "data":{"object":{"payment":{
             "id":"payment-1","order_id":"order-1","status":status,
             "amount_money":{"amount":amount,"currency":"USD"},
@@ -98,6 +98,17 @@ def test_nonpositive_amount_rejected_before_database():
     response=client().post("/webhooks/square",content=body,headers={"x-square-hmacsha256-signature":signature(body)})
     assert response.status_code==400
     assert response.json()=={"detail":"INVALID_PAYMENT_EVENT"}
+    assert connection.calls==[]
+
+
+
+def test_invalid_provider_timestamp_rejected_before_database():
+    global connection
+    connection=FakeConnection()
+    body=make_body(created_at="not-a-provider-timestamp")
+    response=client().post("/webhooks/square",content=body,headers={"x-square-hmacsha256-signature":signature(body)})
+    assert response.status_code==400
+    assert response.json()=={"detail":"INVALID_SQUARE_WEBHOOK_TIMESTAMP"}
     assert connection.calls==[]
 
 
