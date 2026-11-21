@@ -244,6 +244,8 @@ def test_runtime_deploy_verifies_exact_revision_for_rollback_and_only_records_re
     assert 'data.get("revision")==sys.argv[1]' in content
     assert "grep -Fq \"$expected_revision\"" not in content
     assert 'wait_for_app "$revision"' in content
+    assert 'if ! run_app "$IMAGE_REF" || ! wait_for_app "$revision"; then' in content
+    assert 'if run_app "$previous" && wait_for_app "$previous_revision"; then' in content
     assert 'previous_revision="$(image_revision "$previous")"' in content
     assert 'wait_for_app "$previous_revision"' in content
     assert "rollback image readiness and exact revision verified" in content
