@@ -212,7 +212,10 @@ def test_private_runtime_deploy_workflow_is_manual_main_only_and_secret_free():
     assert "environment: oci-staging-apply" in workflow
     assert "OCI_OCIR_AUTH_SECRET_OCID" in workflow
     assert "OCI_REGISTRY_TOKEN" not in workflow
-    assert "OCIR_AUTH_TOKEN" not in workflow
+    assert "OCIR_AUTH_TOKEN" in workflow
+    assert "docker login" in workflow and "password-stdin" in workflow
+    assert "docker buildx imagetools inspect" in workflow
+    assert "docker-config" in workflow
     assert "scripts/oci_staging_runcommand_deploy.py" in workflow
     assert "persist-credentials: false" in workflow
     assert "Remove temporary OCI API key and config" in workflow
