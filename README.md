@@ -9,6 +9,12 @@ The canonical owner-aligned product vision, Post-Accident Truth Standard, end-to
 
 Current implementation and release evidence are tracked in the [Acceptance & Release Gate Matrix](docs/acceptance/ACCEPTANCE_MATRIX.md). It distinguishes tested code from field validation and deployment authorization.
 
+## Standing execution mandate — product over planning
+
+The founder has expressly authorized high-autonomy, end-to-end execution: sequentially implement, integrate, test, commit, merge verified increments, provision/deploy the platform where access permits, and validate the deployed product. The goal is an operational Claim2Car product—not an endless plan, placeholder, mock, scaffold, or demo presented as production.
+
+The durable handoff and current execution priorities are in **[Standing Execution Mandate & Thread Handoff](docs/EXECUTION_HANDOFF.md)**. It is the first document to read when resuming work in a new chat/thread. This authorization supersedes prior routine approval requirements for engineering sequencing, code changes, CI, verified merges, staging provisioning/deployment, and post-deployment testing. Never treat a deployment as complete without evidence.
+
 ## Canonical product line
 
 C2C-Connect/claim2car-connect is the single canonical product repository.
