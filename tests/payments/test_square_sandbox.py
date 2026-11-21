@@ -4,10 +4,12 @@ import base64
 import hashlib
 import hmac
 import json
-from dataclasses import dataclass
+from dataclasses import replace
+from uuid import UUID
 
 import pytest
 
+from backend.app.anchor.ledger import IntegerFinancialLedger, PartnerAcceptanceRecord
 from app.payments.square_sandbox import (
     SHOP_FEE_CENTS,
     SHOP_FEE_TYPE,
@@ -19,16 +21,21 @@ from app.payments.square_sandbox import (
 )
 
 
-@dataclass
-class Obligation:
-    entry_id: str = "ledger-shop-0001"
-    entry_kind: str = "OBLIGATION_BOOKED"
-    fee_type: str = SHOP_FEE_TYPE
-    amount_cents: int = SHOP_FEE_CENTS
-    currency: str = "USD_CENTS"
-    acceptance_id: str = "acceptance-0001"
-    partner_org_id: str = "shop-tenant-001"
-    tenant_id: str = "tenant-001"
+def make_obligation(tenant_id="10000000-0000-4000-8000-000000000001", idempotency_key="ledger-idem-shop"):
+    ledger = IntegerFinancialLedger()
+    acceptance = PartnerAcceptanceRecord(
+        acceptance_id="acceptance-0001",
+        tenant_id=UUID(tenant_id),
+        session_id="session-0001",
+        party_type="shop",
+        partner_org_id="shop-tenant-001",
+        accepted_by_actor="operator-001",
+        accepted_at="2026-11-21T00:00:00Z",
+    )
+    return ledger.record_partner_acceptance_obligation(
+        acceptance, idempotency_key=idempotency_key, actor_id="operator-001",
+        now_iso="2026-11-21T00:00:00Z",
+    )
 
 
 def config(**changes):
@@ -55,7 +62,7 @@ def fake_transport(response=None, status=200):
 
 def test_checkout_link_is_sandbox_only_fixed_fee_and_idempotent():
     captured, transport = fake_transport()
-    checkout = create_shop_acceptance_checkout(Obligation(), config(), transport=transport)
+    checkout = create_shop_acceptance_checkout(make_obligation(), config(), transport=transport)
     assert captured["url"] == "https://connect.squareupsandbox.com/v2/online-checkout/payment-links"
     assert captured["headers"]["Square-Version"] == "2026-11-18"
     assert captured["headers"]["Authorization"] == "Bearer sandbox-token-test-only"
@@ -68,7 +75,8 @@ def test_checkout_link_is_sandbox_only_fixed_fee_and_idempotent():
     assert checkout.checkout_url == "https://sandbox.square.link/u/test"
     assert checkout.provider_order_id == "order-test"
     assert create_shop_acceptance_checkout(Obligation(), config(), transport=transport).idempotency_key == checkout.idempotency_key
-    other_tenant = Obligation(tenant_id="tenant-002")
+    other_tenant = make_obligation(tenant_id="10000000-0000-4000-8000-000000000002", idempotency_key="ledger-idem-shop")
+    assert other_tenant.entry_id == make_obligation().entry_id
     assert create_shop_acceptance_checkout(other_tenant, config(), transport=transport).idempotency_key != checkout.idempotency_key
 
 
@@ -101,9 +109,10 @@ def test_config_fail_closed(changes, code):
     ({"amount_cents": 37500}, "SHOP_FEE_AMOUNT_MISMATCH"),
     ({"currency": "USD"}, "SHOP_FEE_CURRENCY_INVALID"),
     ({"entry_id": ""}, "SHOP_FEE_OBLIGATION_IDENTITY_REQUIRED"),
+    ({"partner_org_id": ""}, "SHOP_FEE_OBLIGATION_IDENTITY_REQUIRED"),
 ])
 def test_checkout_requires_exact_shop_acceptance_obligation(changes, code):
-    obligation = Obligation(**changes)
+    obligation = replace(make_obligation(), **changes)
     with pytest.raises(SquareSandboxError, match=code):
         create_shop_acceptance_checkout(obligation, config(), transport=fake_transport()[1])
 
@@ -112,6 +121,18 @@ def test_checkout_requires_exact_shop_acceptance_obligation(changes, code):
 def test_checkout_timeout_is_bounded(timeout):
     with pytest.raises(SquareSandboxError, match="TIMEOUT_INVALID"):
         create_shop_acceptance_checkout(Obligation(), config(), transport=fake_transport()[1], timeout_seconds=timeout)
+
+
+def test_checkout_rejects_fake_obligation_object():
+    with pytest.raises(SquareSandboxError, match="SHOP_FEE_OBLIGATION_REQUIRED"):
+        create_shop_acceptance_checkout(object(), config(), transport=fake_transport()[1])
+
+
+def test_checkout_rejects_corrupt_postings():
+    entry = make_obligation()
+    corrupt = replace(entry, lines=(entry.lines[0], replace(entry.lines[1], amount_cents=1)))
+    with pytest.raises(SquareSandboxError, match="SHOP_FEE_POSTINGS_INVALID"):
+        create_shop_acceptance_checkout(corrupt, config(), transport=fake_transport()[1])
 
 
 def test_provider_failure_and_bad_checkout_url_are_redacted_and_rejected():

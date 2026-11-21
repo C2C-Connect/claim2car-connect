@@ -18,6 +18,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import urlparse
 
+from backend.app.anchor.ledger import LedgerJournalEntry, LedgerPostingLine
+
 SQUARE_SANDBOX_API = "https://connect.squareupsandbox.com"
 SQUARE_API_VERSION = "2026-11-18"
 SHOP_FEE_CENTS = 27_500
@@ -115,20 +117,31 @@ def create_shop_acceptance_checkout(
     config.validate()
     if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or not 1 <= timeout_seconds <= 30:
         raise SquareSandboxError("SQUARE_SANDBOX_TIMEOUT_INVALID")
-    if getattr(obligation, "entry_kind", None) != OBLIGATION_KIND:
+    if not isinstance(obligation, LedgerJournalEntry) or obligation.entry_kind != OBLIGATION_KIND:
         raise SquareSandboxError("SHOP_FEE_OBLIGATION_REQUIRED")
-    if getattr(obligation, "fee_type", None) != SHOP_FEE_TYPE:
+    if obligation.fee_type != SHOP_FEE_TYPE:
         raise SquareSandboxError("SHOP_FEE_TYPE_REQUIRED")
-    if getattr(obligation, "amount_cents", None) != SHOP_FEE_CENTS:
+    if obligation.amount_cents != SHOP_FEE_CENTS:
         raise SquareSandboxError("SHOP_FEE_AMOUNT_MISMATCH")
-    if getattr(obligation, "currency", None) != "USD_CENTS":
+    if obligation.currency != "USD_CENTS":
         raise SquareSandboxError("SHOP_FEE_CURRENCY_INVALID")
-    entry_id = getattr(obligation, "entry_id", "")
-    acceptance_id = getattr(obligation, "acceptance_id", "")
-    partner_id = getattr(obligation, "partner_org_id", "")
-    tenant_id = getattr(obligation, "tenant_id", "")
+    entry_id = obligation.entry_id
+    acceptance_id = obligation.acceptance_id
+    partner_id = obligation.partner_org_id
+    tenant_id = obligation.tenant_id
     if not all(isinstance(value, str) and value.strip() for value in (entry_id, acceptance_id, partner_id, tenant_id)):
         raise SquareSandboxError("SHOP_FEE_OBLIGATION_IDENTITY_REQUIRED")
+    lines = obligation.lines
+    if (not isinstance(lines, tuple) or len(lines) != 2
+            or not all(isinstance(line, LedgerPostingLine) for line in lines)):
+        raise SquareSandboxError("SHOP_FEE_POSTINGS_INVALID")
+    expected_postings = {
+        (f"AR:SHOP:{partner_id}", "DEBIT", SHOP_FEE_CENTS),
+        ("REV:REPAIR_SHOP_ACCEPTANCE", "CREDIT", SHOP_FEE_CENTS),
+    }
+    actual_postings = {(line.account_code, line.direction, line.amount_cents) for line in lines}
+    if actual_postings != expected_postings:
+        raise SquareSandboxError("SHOP_FEE_POSTINGS_INVALID")
     # Entry IDs may repeat across tenants; namespace the provider key by tenant.
     key = "c2c-shop-fee-" + hashlib.sha256(f"{tenant_id}|{entry_id}".encode("utf-8")).hexdigest()
     payload = {
