@@ -98,6 +98,30 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         self.assertIn("SECURITY_LIST_IDS_UNVERIFIED:sl-2", findings)
         self.assertTrue(any(item.startswith("PUBLIC_INGRESS:duplicate:0") for item in findings))
 
+    def test_nsg_allowlisted_private_ingress_passes(self):
+        nsg = {"data": {"id": "nsg-1", "vcnId": "vcn-good", "displayName": "staging"}}
+        rules = {"data": [{"direction": "INGRESS", "sourceType": "CIDR_BLOCK", "source": "10.0.0.0/16", "protocol": "6"}]}
+        self.assertEqual(AUDIT.audit_nsg(nsg, rules, "vcn-good"), [])
+
+    def test_nsg_unrestricted_ipv4_ingress_fails(self):
+        nsg = {"data": {"id": "nsg-1", "vcnId": "vcn-good", "displayName": "staging"}}
+        rules = {"data": [{"direction": "INGRESS", "sourceType": "CIDR_BLOCK", "source": "0.0.0.0/0", "protocol": "6"}]}
+        findings = AUDIT.audit_nsg(nsg, rules, "vcn-good")
+        self.assertIn("NSG_PUBLIC_INGRESS:staging:0:source=0.0.0.0/0", findings)
+
+    def test_nsg_unrestricted_ipv6_ingress_fails(self):
+        nsg = {"data": {"id": "nsg-1", "vcnId": "vcn-good", "displayName": "staging"}}
+        rules = {"data": [{"direction": "INGRESS", "sourceType": "CIDR_BLOCK", "source": "::/0", "protocol": "all"}]}
+        findings = AUDIT.audit_nsg(nsg, rules, "vcn-good")
+        self.assertIn("NSG_PUBLIC_INGRESS:staging:0:source=::/0", findings)
+
+    def test_nsg_wrong_vcn_and_unsupported_source_fail_closed(self):
+        nsg = {"data": {"id": "nsg-1", "vcnId": "vcn-other", "displayName": "staging"}}
+        rules = {"data": [{"direction": "INGRESS", "sourceType": "NETWORK_SECURITY_GROUP", "source": "nsg-source", "protocol": "6"}]}
+        findings = AUDIT.audit_nsg(nsg, rules, "vcn-good")
+        self.assertIn("NSG_VCN_MISMATCH:staging", findings)
+        self.assertIn("NSG_INGRESS_SOURCE_UNSUPPORTED:staging:0", findings)
+
     def test_manual_github_network_audit_workflow_is_read_only_and_fail_closed(self):
         workflow = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "oci-staging-network-audit.yml").read_text()
         self.assertIn("workflow_dispatch:", workflow)
@@ -105,6 +129,8 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         self.assertIn("if: github.ref == 'refs/heads/main'", workflow)
         self.assertIn("oci-cli==3.96.3", workflow)
         self.assertIn("scripts/oci_staging_network_audit.py", workflow)
+        self.assertIn("network_security_group_ocids", workflow)
+        self.assertIn("--nsg-id", workflow)
         self.assertIn("OCI_API_PRIVATE_KEY", workflow)
         self.assertIn("no network rule changes were made", workflow.lower())
         for forbidden in ("terraform apply", "oci network security-list update", "oci network security-list create", "oci network security-list delete"):

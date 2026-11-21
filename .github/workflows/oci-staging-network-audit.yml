@@ -11,6 +11,10 @@ on:
         description: Expected Claim2Car VCN OCID
         type: string
         required: true
+      network_security_group_ocids:
+        description: Optional comma-separated NSG OCIDs attached to the staging VNIC
+        type: string
+        required: false
 permissions:
   contents: read
 jobs:
@@ -23,6 +27,7 @@ jobs:
       OCI_REGION: ${{ vars.OCI_REGION || 'us-chicago-1' }}
       SUBNET_OCID: ${{ inputs.subnet_ocid }}
       EXPECTED_VCN_OCID: ${{ inputs.expected_vcn_ocid }}
+      NSG_OCIDS: ${{ inputs.network_security_group_ocids }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,9 +69,18 @@ jobs:
         run: |
           set -euo pipefail
           set +e
+          nsg_args=()
+          if [[ -n "${NSG_OCIDS}" ]]; then
+            IFS=',' read -ra nsg_ids <<< "${NSG_OCIDS}"
+            for nsg_id in "${nsg_ids[@]}"; do
+              [[ "${nsg_id}" =~ ^ocid1\.networksecuritygroup\. ]] || { echo "Invalid NSG OCID"; exit 2; }
+              nsg_args+=(--nsg-id "${nsg_id}")
+            done
+          fi
           python scripts/oci_staging_network_audit.py \
             --subnet-id "${SUBNET_OCID}" \
-            --expected-vcn-id "${EXPECTED_VCN_OCID}" 2>&1 | tee "${RUNNER_TEMP}/network-audit.txt"
+            --expected-vcn-id "${EXPECTED_VCN_OCID}" \
+            "${nsg_args[@]}" 2>&1 | tee "${RUNNER_TEMP}/network-audit.txt"
           rc=${PIPESTATUS[0]}
           set -e
           if [[ "${rc}" -eq 0 ]]; then
@@ -75,6 +89,7 @@ jobs:
               echo "- Subnet belongs to expected VCN"
               echo "- Subnet prohibits public IP assignment"
               echo "- Every attached security list was inspected"
+              if [[ -n "${NSG_OCIDS}" ]]; then echo "- Supplied staging NSGs and their ingress rules were inspected"; fi
               echo "- No IPv4 or IPv6 ingress source is unrestricted"
               echo "- Audit is read-only; no network rule changes were made"
             } >> "${GITHUB_STEP_SUMMARY}"
