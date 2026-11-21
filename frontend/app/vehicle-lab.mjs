@@ -557,6 +557,38 @@ function renderEstimateSummary() {
 }
 $("estimate-labor-rate").addEventListener("input",renderObservations);
 $("estimate-tax-rate").addEventListener("input",renderEstimateSummary);
+function deriveDisposition() {
+  const highRisk = state.observations.filter(item =>
+    item.severity === "Potential safety concern" ||
+    ["Fluid leak observed","Warning indicator illuminated","Crack / broken component","Missing / detached component"].includes(item.type)
+  );
+  const major = state.observations.filter(item => item.severity === "Major visible deformation");
+  const missing = slots.filter(([slot]) => !state.photos.get(slot)?.uploaded).map(([slot,label]) => ({slot,label}));
+  if (highRisk.length) return {code:"ESCALATE_QUALIFIED_INSPECTION",label:"Escalate for qualified inspection",basis:"One or more operator-entered observations were marked as a potential safety concern or a potentially safety-relevant condition.",flagged_observations:highRisk.map(({area,type,severity,notes,photo})=>({area,type,severity,notes,photo_slot:photo||null})),instruction:"Do not use this report to make a roadworthiness or drive-clearance decision. Obtain qualified physical inspection."};
+  if (major.length) return {code:"REPAIR_SCOPE_REVIEW_REQUIRED",label:"Repair scope review required",basis:"An operator recorded major visible deformation.",flagged_observations:major.map(({area,type,severity,notes,photo})=>({area,type,severity,notes,photo_slot:photo||null})),instruction:"Qualified repair assessment is required; concealed damage and safety systems remain unassessed."};
+  if (!state.observations.length) return {code:"NO_CONDITION_FINDINGS",label:"No condition findings recorded",basis:"No operator condition observations were entered.",flagged_observations:[],instruction:"No condition assessment can be inferred from the absence of entries."};
+  if (!state.sealed || missing.length) return {code:"INCOMPLETE_EVIDENCE_DOCUMENTATION_ONLY",label:"Incomplete evidence · documentation only",basis:"The evidence package is not sealed or one or more required views are missing.",flagged_observations:[],instruction:"Missing views are unknown; complete capture or record audited exceptions before review."};
+  return {code:"PRELIMINARY_CONDITION_SUMMARY",label:"Preliminary condition summary",basis:"No operator-entered high-risk flags were found in the recorded observations and the evidence manifest is sealed.",flagged_observations:[],instruction:"This is not roadworthiness clearance, repair authorization, liability determination, or an insurance adjudication."};
+}
+function assessmentPayload() {
+  const disposition=deriveDisposition(),missingViews=slots.filter(([slot])=>!state.photos.get(slot)?.uploaded).map(([slot,label])=>({slot,label}));
+  const estimateTotalsValue=estimateTotals();
+  const evidence=slots.map(([slot,label])=>{const photo=state.photos.get(slot)||null;return {slot,label,captured:Boolean(photo?.uploaded),artifact_id:photo?.artifactId||null,sha256:photo?.sha256||null,byte_length:photo?.byteLength||null,quality:state.qualities.get(slot)||null,localization:photo?.localization||null};});
+  return {schema:"claim2car-assessment-report-v1",report_id:uuid(),generated_at:new Date().toISOString(),claim_id:state.claimId||null,capture_session_id:state.sessionId||null,
+    vehicle:{vin:state.vin,decoded_at:state.retrievedAt||null,provider:"NHTSA vPIC",profile:state.profile},
+    evidence:{protocol_version:"claims2car-16-v1",required_views:slots.length,captured_views:evidence.filter(item=>item.captured).length,missing_views:missingViews,evidence_sealed:state.sealed,manifest_sha256:state.manifestDigest||null,views:evidence},
+    observations:state.observations.map((item,index)=>({observation_number:index+1,...item})),
+    estimate:{currency:"USD",method:"operator-entered worksheet; not an appraisal or verified quote",...estimateTotalsValue,line_items:state.observations.map((item,index)=>({observation_number:index+1,area:item.area,condition:item.type,action:item.estimate?.action||"Not assessed",labor_hours:Number(item.estimate?.laborHours||0),parts_cost:Number(item.estimate?.partsCost||0),materials_sublet_cost:Number(item.estimate?.materialsCost||0),subtotal:estimateLineSubtotal(item.estimate||{},estimateTotalsValue.rate)}))},
+    disposition:{method:"transparent deterministic rules v1; operator observations only",...disposition},
+    limitations:["No trained damage-recognition model or automated repair-cost model was used.","Photo-only review cannot establish concealed damage, structural integrity, roadworthiness, collision causation, fault, liability, coverage, or total-loss status.","Operator observations and estimate assumptions require qualified review."]
+  };
+}
+async function createAssessmentPackage() {const payload=assessmentPayload();payload.integrity={algorithm:"SHA-256",digest_scope:"payload_without_integrity",digest:await sha256Hex(new TextEncoder().encode(JSON.stringify(payload)))};return payload;}
+function downloadAssessmentPackage() {
+  if(!state.assessmentPackage)return;
+  const blob=new Blob([JSON.stringify(state.assessmentPackage,null,2)+"\n"],{type:"application/json"});
+  const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="claim2car-assessment-"+state.assessmentPackage.report_id+".json";document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 function reportHtml() {
   const p = state.profile;
   const missing = slots.filter(([slot]) => !state.photos.has(slot)).map(([slot,label]) => {
@@ -601,6 +633,8 @@ function reportHtml() {
   }).join("");
   const localizationHtml = "<h3>2.1 Image-space contrast baseline (not AI)</h3><p>These are heuristic image-space candidates, not confirmed damage. Detector scores are uncalibrated; normalized boxes and area are image-relative, not physical measurements. A zero-candidate result does not establish absence of damage.</p><ul>" + (localizationRows || "<li>No localization responses recorded.</li>") + "</ul>";
   const estimate = estimateTotals();
+  const disposition = deriveDisposition();
+  const dispositionHtml = "<h3>6. Rule-based disposition</h3><p><strong>" + escapeHtml(disposition.label) + "</strong></p><p>" + escapeHtml(disposition.basis) + "</p><p>" + escapeHtml(disposition.instruction) + "</p>";
   const estimateRows = state.observations.map((x,i) => {
     const e=x.estimate||{}, subtotal=estimateLineSubtotal(e,estimate.rate);
     return "<tr><td>" + (i+1) + ". " + escapeHtml(x.area) + " · " + escapeHtml(x.type) + "</td><td>" + escapeHtml(e.action||"Not assessed") + "</td><td>" + Number(e.laborHours||0).toFixed(1) + "</td><td>$" + Number(e.partsCost||0).toFixed(2) + "</td><td>$" + Number(e.materialsCost||0).toFixed(2) + "</td><td>$" + subtotal.toFixed(2) + "</td></tr>";
@@ -613,17 +647,21 @@ function reportHtml() {
     (missing.length ? missing.map(escapeHtml).join(", ") : "None") + ". Missing views are unknown, not evidence of no damage.</p><div class='report-images'>" + images + "</div>" + localizationHtml +
     "<h3>3. Visible condition observations</h3><ul>" + observations + "</ul>" +
     estimateHtml + "<h3>5. Unresolved questions</h3><ul><li>Concealed structure and components have not been assessed.</li><li>No collision causation, fault, liability, coverage, total-loss status, repair scope, or repair price is determined.</li><li>Severity labels are qualitative operator judgments, not calibrated probabilities or verified engineering classifications.</li><li>Qualified physical inspection and diagnostic procedures may be required.</li></ul>" +
-    "<h3>6. Disposition</h3><p><strong>LIMITED DOCUMENTATION ONLY — NOT ADJUDICATED.</strong> This report is not clearance to drive or repair authorization.</p>" +
+    dispositionHtml +
     "<p>Method: server-recorded NHTSA vPIC vehicle description; user-provided photographs and observations. " + (state.sealed ? "Original evidence bytes are stored and the 16-view manifest is sealed." : "Evidence remains unsealed; no final evidence package is asserted.") + " No trained AI damage model or automated appraisal was used; exterior photos may have received a heuristic contrast baseline.</p>";
 }
-$("generate-report").addEventListener("click",() => {
+$("generate-report").addEventListener("click",async () => {
   if (!state.profile) {
     setMessage("Decode a vehicle before generating a report.",true);
     return;
   }
-  $("report-preview").innerHTML = reportHtml();
-  show("report-preview");
-  show("print-report");
+  try {
+    state.assessmentPackage = await createAssessmentPackage();
+    const disposition = state.assessmentPackage.disposition;
+    $("report-preview").innerHTML = reportHtml() + "<p><strong>Structured report SHA-256:</strong> " + escapeHtml(state.assessmentPackage.integrity.digest) + "</p><p><strong>Disposition:</strong> " + escapeHtml(disposition.label) + " — " + escapeHtml(disposition.basis) + "</p>";
+    show("report-preview"); show("print-report"); show("download-assessment-json");
+  } catch(error) { setMessage("Report package generation failed: " + error.message,true); }
 });
 $("print-report").addEventListener("click",() => window.print());
+$("download-assessment-json").addEventListener("click",downloadAssessmentPackage);
 renderPhotoSlots();
