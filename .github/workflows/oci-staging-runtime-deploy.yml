@@ -19,6 +19,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: claim2car-private-staging-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     if: github.ref == 'refs/heads/main' && inputs.confirm_deploy == 'yes'
