@@ -1,5 +1,42 @@
 -- Durable, deduplicated Square Sandbox payment webhook receipt and reconciliation.
 -- Provider status is separate from financial ledger settlement.
+CREATE TABLE faos.square_sandbox_payment_order_map(
+ provider_order_id text PRIMARY KEY CHECK(length(trim(provider_order_id)) BETWEEN 1 AND 128),
+ tenant_id uuid NOT NULL,
+ payment_intent_id uuid NOT NULL,
+ amount_cents bigint NOT NULL CHECK(amount_cents=27500),
+ currency text NOT NULL CHECK(currency='USD'),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(tenant_id,payment_intent_id),
+ FOREIGN KEY(tenant_id,payment_intent_id)
+  REFERENCES faos.square_sandbox_payment_intents(tenant_id,payment_intent_id)
+);
+ALTER TABLE faos.square_sandbox_payment_order_map ENABLE ROW LEVEL SECURITY;
+ALTER TABLE faos.square_sandbox_payment_order_map FORCE ROW LEVEL SECURITY;
+CREATE POLICY writer_square_sandbox_payment_order_map ON faos.square_sandbox_payment_order_map
+ TO faos_writer USING(true) WITH CHECK(true);
+REVOKE ALL ON faos.square_sandbox_payment_order_map FROM PUBLIC,faos_app,faos_fixture;
+GRANT SELECT,INSERT ON faos.square_sandbox_payment_order_map TO faos_writer;
+INSERT INTO faos.square_sandbox_payment_order_map(provider_order_id,tenant_id,payment_intent_id,amount_cents,currency)
+ SELECT provider_order_id,tenant_id,payment_intent_id,amount_cents,currency
+ FROM faos.square_sandbox_payment_intents;
+
+CREATE FUNCTION faos.capture_square_payment_order_mapping() RETURNS trigger
+ LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,faos,pg_temp
+AS $$
+BEGIN
+ INSERT INTO faos.square_sandbox_payment_order_map(provider_order_id,tenant_id,payment_intent_id,amount_cents,currency)
+ VALUES(NEW.provider_order_id,NEW.tenant_id,NEW.payment_intent_id,NEW.amount_cents,NEW.currency);
+ RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION faos.capture_square_payment_order_mapping() FROM PUBLIC;
+GRANT CREATE ON SCHEMA faos TO faos_writer;
+ALTER FUNCTION faos.capture_square_payment_order_mapping() OWNER TO faos_writer;
+REVOKE CREATE ON SCHEMA faos FROM faos_writer;
+CREATE TRIGGER square_sandbox_payment_order_map_insert
+ AFTER INSERT ON faos.square_sandbox_payment_intents
+ FOR EACH ROW EXECUTE FUNCTION faos.capture_square_payment_order_mapping();
+
 CREATE TABLE faos.square_sandbox_payment_reconciliations(
  tenant_id uuid NOT NULL,
  payment_intent_id uuid NOT NULL,
@@ -57,10 +94,10 @@ CREATE FUNCTION faos.reconcile_square_sandbox_webhook(
 ) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,faos,pg_temp
 AS $$
 DECLARE receipt faos.square_sandbox_webhook_receipts%ROWTYPE;
-        intent faos.square_sandbox_payment_intents%ROWTYPE;
+        order_mapping faos.square_sandbox_payment_order_map%ROWTYPE;
         current_state faos.square_sandbox_payment_reconciliations%ROWTYPE;
         next_status text;
-        state_found boolean;\n        state_found boolean;
+        state_found boolean;
 BEGIN
  IF p_event_id IS NULL OR length(trim(p_event_id))=0 OR length(p_event_id)>128
  OR p_event_type NOT IN ('payment.created','payment.updated')
@@ -87,52 +124,52 @@ BEGIN
  THEN RAISE EXCEPTION 'SQUARE_WEBHOOK_EVENT_ID_CONFLICT'; END IF;
  IF receipt.reconciliation_status='RECONCILED' THEN RETURN 'DUPLICATE'; END IF;
 
- SELECT * INTO intent FROM faos.square_sandbox_payment_intents
+ SELECT * INTO order_mapping FROM faos.square_sandbox_payment_order_map
   WHERE provider_order_id=p_order_id FOR UPDATE;
  IF NOT FOUND THEN
   UPDATE faos.square_sandbox_webhook_receipts SET reconciliation_status='UNMATCHED_ORDER'
    WHERE provider_event_id=p_event_id;
   RETURN 'UNMATCHED_ORDER';
  END IF;
- IF p_amount<>intent.amount_cents OR p_currency<>intent.currency THEN
-  UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=intent.tenant_id,
-   payment_intent_id=intent.payment_intent_id,reconciliation_status='AMOUNT_MISMATCH'
+ IF p_amount<>order_mapping.amount_cents OR p_currency<>order_mapping.currency THEN
+  UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=order_mapping.tenant_id,
+   payment_intent_id=order_mapping.payment_intent_id,reconciliation_status='AMOUNT_MISMATCH'
    WHERE provider_event_id=p_event_id;
   RETURN 'AMOUNT_MISMATCH';
  END IF;
  SELECT * INTO current_state FROM faos.square_sandbox_payment_reconciliations
-  WHERE tenant_id=intent.tenant_id AND payment_intent_id=intent.payment_intent_id FOR UPDATE;
+  WHERE tenant_id=order_mapping.tenant_id AND payment_intent_id=order_mapping.payment_intent_id FOR UPDATE;
  state_found:=FOUND;
  IF state_found AND current_state.provider_payment_id<>p_payment_id THEN
-  UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=intent.tenant_id,
-   payment_intent_id=intent.payment_intent_id,reconciliation_status='PAYMENT_ID_CONFLICT'
+  UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=order_mapping.tenant_id,
+   payment_intent_id=order_mapping.payment_intent_id,reconciliation_status='PAYMENT_ID_CONFLICT'
    WHERE provider_event_id=p_event_id;
   RETURN 'PAYMENT_ID_CONFLICT';
  END IF;
  IF EXISTS(SELECT 1 FROM faos.square_sandbox_payment_reconciliations
     WHERE provider_payment_id=p_payment_id
-      AND (tenant_id,payment_intent_id)<>(intent.tenant_id,intent.payment_intent_id)) THEN
-  UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=intent.tenant_id,
-   payment_intent_id=intent.payment_intent_id,reconciliation_status='PAYMENT_ID_CONFLICT'
+      AND (tenant_id,payment_intent_id)<>(order_mapping.tenant_id,order_mapping.payment_intent_id)) THEN
+  UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=order_mapping.tenant_id,
+   payment_intent_id=order_mapping.payment_intent_id,reconciliation_status='PAYMENT_ID_CONFLICT'
    WHERE provider_event_id=p_event_id;
   RETURN 'PAYMENT_ID_CONFLICT';
  END IF;
  next_status:=CASE p_status WHEN 'APPROVED' THEN 'AUTHORIZED'
   WHEN 'COMPLETED' THEN 'PAID' WHEN 'CANCELED' THEN 'CANCELED' WHEN 'FAILED' THEN 'FAILED' END;
  IF state_found AND (current_state.status='PAID' OR p_event_created_at<=current_state.updated_at) THEN
-  UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=intent.tenant_id,
-   payment_intent_id=intent.payment_intent_id,reconciliation_status='STALE_EVENT'
+  UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=order_mapping.tenant_id,
+   payment_intent_id=order_mapping.payment_intent_id,reconciliation_status='STALE_EVENT'
    WHERE provider_event_id=p_event_id;
   RETURN 'STALE_EVENT';
  END IF;
  INSERT INTO faos.square_sandbox_payment_reconciliations(
   tenant_id,payment_intent_id,provider_payment_id,status,provider_event_id,updated_at)
- VALUES(intent.tenant_id,intent.payment_intent_id,p_payment_id,next_status,p_event_id,p_event_created_at)
+ VALUES(order_mapping.tenant_id,order_mapping.payment_intent_id,p_payment_id,next_status,p_event_id,p_event_created_at)
  ON CONFLICT(tenant_id,payment_intent_id) DO UPDATE SET
   provider_payment_id=excluded.provider_payment_id,status=excluded.status,
   provider_event_id=excluded.provider_event_id,updated_at=excluded.updated_at;
- UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=intent.tenant_id,
-  payment_intent_id=intent.payment_intent_id,reconciliation_status='RECONCILED',reconciled_at=now()
+ UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=order_mapping.tenant_id,
+  payment_intent_id=order_mapping.payment_intent_id,reconciliation_status='RECONCILED',reconciled_at=now()
   WHERE provider_event_id=p_event_id;
  RETURN 'RECONCILED';
 END $$;
