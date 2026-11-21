@@ -215,7 +215,7 @@ def test_capture_acceptance_source_revision_guard(monkeypatch, tmp_path):
             raise AssertionError(f"invalid build revision accepted: {invalid!r}")
 
     def mismatched_run(args, cwd, capture_output, text, check):
-        return subprocess.CompletedProcess(args, 0, "b" * 40 + "\\n", "") if args[-1] == "HEAD" else subprocess.CompletedProcess(args, 0, "", "")
+        return subprocess.CompletedProcess(args, 0, "b" * 40 + "\n", "") if args[-1] == "HEAD" else subprocess.CompletedProcess(args, 0, "", "")
     monkeypatch.setattr(module.subprocess, "run", mismatched_run)
     try:
         module.verify_source_checkout(sha, tmp_path)
@@ -225,7 +225,7 @@ def test_capture_acceptance_source_revision_guard(monkeypatch, tmp_path):
         raise AssertionError("source revision mismatch accepted")
 
     def dirty_run(args, cwd, capture_output, text, check):
-        return subprocess.CompletedProcess(args, 0, sha + "\\n", "") if args[-1] == "HEAD" else subprocess.CompletedProcess(args, 0, " M file.py\\n", "")
+        return subprocess.CompletedProcess(args, 0, sha + "\\n", "") if args[-1] == "HEAD" else subprocess.CompletedProcess(args, 0, " M file.py\n", "")
     monkeypatch.setattr(module.subprocess, "run", dirty_run)
     try:
         module.verify_source_checkout(sha, tmp_path)
