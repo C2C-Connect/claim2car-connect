@@ -174,8 +174,9 @@ def main():
                       if entry.get("actor_role") == "owner"), None)
     if not isinstance(tenant_id, str) or not tenant_id or Path(tenant_id).name != tenant_id:
         raise RuntimeError("Synthetic owner tenant ID is missing or unsafe in runtime configuration.")
-    session_dir = evidence_root / tenant_id / session_id
-    if evidence_root.is_symlink() or session_dir.is_symlink():
+    tenant_dir = evidence_root / tenant_id
+    session_dir = tenant_dir / session_id
+    if evidence_root.is_symlink() or tenant_dir.is_symlink() or session_dir.is_symlink():
         raise RuntimeError("Evidence storage root or synthetic session directory must not be symlinked.")
     artifact_id = next(iter(originals))
     artifact_path = session_dir / (artifact_id + ".original")
