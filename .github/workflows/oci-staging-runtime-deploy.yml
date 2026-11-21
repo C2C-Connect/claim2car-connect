@@ -50,7 +50,7 @@ jobs:
           [[ "${OCI_COMPARTMENT_OCID}" =~ ^ocid1\.compartment\. ]] || { echo "Invalid compartment OCID."; exit 1; }
           [[ "${OCI_STAGING_INSTANCE_OCID}" =~ ^ocid1\.instance\. ]] || { echo "Invalid staging instance OCID."; exit 1; }
           [[ "${OCI_OCIR_VAULT_SECRET_OCID}" =~ ^ocid1\.secret\. ]] || { echo "Invalid Vault secret OCID."; exit 1; }
-          [[ "${C2C_POSTGRES_IMAGE}" =~ @sha256:[a-f0-9]{64}$ ]] || { echo "PostgreSQL image variable must be pinned by digest."; exit 1; }
+          [[ "${C2C_POSTGRES_IMAGE}" =~ ^(docker\.io|registry-1\.docker\.io)/postgis/postgis:16-[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}$ ]] || { echo "OCI_STAGING_POSTGRES_IMAGE must be a pinned PostGIS 16 image."; exit 1; }
           [[ "${OCI_IMAGE_REF}" =~ :sha-([a-f0-9]{40})@sha256:([a-f0-9]{64})$ ]] || { echo "Input image must use full source SHA and immutable digest."; exit 1; }
           source_sha="${BASH_REMATCH[1]}"
           expected_prefix="${OCI_REGISTRY}/${OCIR_NAMESPACE}/${OCIR_REPOSITORY}:sha-${source_sha}@"
