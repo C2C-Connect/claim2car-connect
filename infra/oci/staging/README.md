@@ -44,6 +44,20 @@ The stack is infrastructure code, not evidence of an applied deployment. It does
 The instance receives `cloud-init.yaml` as base64 user data. It installs Podman and storage-inspection utilities, creates the non-login runtime identity UID/GID 10001, prepares the PostgreSQL/evidence mountpoints, and enables the Podman socket. The bootstrap is intentionally non-destructive: it does not partition, format, encrypt, or mount block devices, and it does not install application secrets or start the application. After attaching volumes, identify each device against the OCI volume OCID using the OCI control plane and stable device metadata before any filesystem operation. Then configure persistent mounts, verify ownership, and run `claim2car-host-preflight`; it fails unless both dedicated volumes are mounted at their exact paths.
 
 ## Private runtime deployment via OCI Instance Agent Run Command
+### Exact GitHub/OCI inputs
+
+The private deployment workflow uses the `oci-staging-apply` environment. Set these variables there (and also in `oci-staging` where noted for Terraform plan/apply):
+
+- `OCI_ENABLE_PRIVATE_RUNCOMMAND_DEPLOY=true` and `OCI_OCIR_AUTH_SECRET_OCID` in both protected environments.
+- `OCI_STAGING_INSTANCE_OCID` to the instance OCID output from Terraform in `oci-staging-apply`.
+- `C2C_POSTGRES_IMAGE` to a digest-pinned image. Use an OCIR reference or an explicit public host (`docker.io` / `quay.io`); no mutable tags.
+- `OCI_REGION=us-chicago-1`, `OCIR_NAMESPACE`, and `OCIR_REPOSITORY`.
+- OCI API user key credentials and `OCI_COMPARTMENT_OCID` in `oci-staging-apply`.
+
+The deployer IAM group must have command create/cancel and execution-read permission; use OCI's `instance-agent-command-family` and `instance-agent-command-execution-family` policy resource types. The deployment wrapper itself permits sudo only for its root-owned entry point, validates the fixed registry and exact app repository, and does not accept arbitrary shell commands.
+
+The official OCI Run Command feature executes scripts through Oracle Cloud Agent and does not require inbound SSH. OCI warns not to include credentials in Run Command text; this implementation sends only image metadata and a Vault secret OCID, and retrieves the OCIR token on the instance through its instance principal. See [Oracle Run Command documentation](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/runningcommands.htm).
+
 
 The repo now includes a guarded manual workflow to deploy the integrated ARM64 image to the private instance without SSH or inbound network rules. This path requires the host and IAM setup below and is **not active until the protected environment inputs are configured and Terraform is applied**.
 
