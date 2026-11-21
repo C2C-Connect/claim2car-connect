@@ -42,3 +42,14 @@ assert.match(source,/operator-entered/);
 assert.match(source,/worksheet total/i);
 assert.match(source,/state\.observations\.push\(observation\)/);
 assert.match(source,/estimateHtml/);
+
+assert.match(html,/id="download-assessment-json"/);
+assert.match(source,/claim2car-assessment-report-v1/);
+assert.match(source,/function deriveDisposition/);
+assert.match(source,/ESCALATE_QUALIFIED_INSPECTION/);
+assert.match(source,/REPAIR_SCOPE_REVIEW_REQUIRED/);
+assert.match(source,/INCOMPLETE_EVIDENCE_DOCUMENTATION_ONLY/);
+assert.match(source,/function assessmentPayload/);
+assert.match(source,/manifest_sha256/);
+assert.match(source,/integrity=\{algorithm:"SHA-256"/);
+assert.match(source,/downloadAssessmentPackage/);

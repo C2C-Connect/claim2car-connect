@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 const html = readFileSync(new URL("../../app/vehicle-lab.html", import.meta.url), "utf8");
 const moduleSource = readFileSync(new URL("../../app/vehicle-lab.mjs", import.meta.url), "utf8");
@@ -114,12 +115,44 @@ try {
   await page.locator("#add-observation").click();
   assert.match(await page.locator("#estimate-summary").textContent(),/Worksheet total \$460\.00/);
   await page.locator("#generate-report").click();
+  await page.waitForFunction(() => document.querySelector("#report-preview").textContent.includes("Structured report SHA-256"));
   assert.match(await page.locator("#report-preview").textContent(),/Worksheet total/);
   assert.match(await page.locator("#report-preview").textContent(),/\$460\.00/);
   assert.match(await page.locator("#report-preview").textContent(),/operator-entered/);
   assert.match(await page.locator("#report-preview").textContent(),/Image-space contrast baseline/);
   assert.match(await page.locator("#report-preview").textContent(),/Candidate 1: unknown/);
   assert.match(await page.locator("#report-preview").textContent(),/uncalibrated/);
+  assert.match(await page.locator("#report-preview").textContent(),/Incomplete evidence/);
+  const jsonDownloadPromise=page.waitForEvent("download");
+  await page.locator("#download-assessment-json").click();
+  const jsonDownload=await jsonDownloadPromise;
+  assert.match(jsonDownload.suggestedFilename(),/^claim2car-assessment-.*\.json$/);
+  const downloadStream=await jsonDownload.createReadStream();
+  const downloadChunks=[];
+  for await (const chunk of downloadStream) downloadChunks.push(chunk);
+  const reportPackage=JSON.parse(Buffer.concat(downloadChunks).toString("utf8"));
+  assert.equal(reportPackage.schema,"claim2car-assessment-report-v1");
+  assert.equal(reportPackage.estimate.total,460);
+  assert.equal(reportPackage.observations.length,1);
+  assert.equal(reportPackage.evidence.captured_views,1);
+  assert.equal(reportPackage.disposition.code,"INCOMPLETE_EVIDENCE_DOCUMENTATION_ONLY");
+  assert.equal(reportPackage.integrity.algorithm,"SHA-256");
+  assert.match(reportPackage.integrity.digest,/^[a-f0-9]{64}$/);
+  assert.equal(reportPackage.integrity.digest_scope,"payload_without_integrity");
+  const expectedDigest=createHash("sha256").update(JSON.stringify((()=>{const copy={...reportPackage};delete copy.integrity;return copy;})())).digest("hex");
+  assert.equal(reportPackage.integrity.digest,expectedDigest,"the report digest covers the payload before integrity metadata");
+  // Safety flags are operator-entered, but the transparent rules must escalate them.
+  await page.locator("#damage-area").selectOption("Front-left");
+  await page.locator("#damage-type").selectOption("Fluid leak observed");
+  await page.locator("#damage-severity").selectOption("Potential safety concern");
+  await page.locator("#damage-notes").fill("Synthetic fixture: fluid leak flag");
+  await page.locator("#estimate-action").selectOption("Inspect / diagnose");
+  await page.locator("#add-observation").click();
+  await page.locator("#generate-report").click();
+  await page.waitForFunction(() => document.querySelector("#report-preview").textContent.includes("Escalate for qualified inspection"));
+  assert.match(await page.locator("#report-preview").textContent(),/Escalate for qualified inspection/);
+  assert.match(await page.locator("#report-preview").textContent(),/potential safety concern/);
+  assert.equal(reportPackage.evidence.views.find(view=>view.captured).sha256.length,64);
   assert.deepEqual(errors,[]);
   process.stdout.write(JSON.stringify({outcome:"passed",checks:[
     "authenticated session creation",
@@ -128,6 +161,8 @@ try {
     "pause controls available before consent and VIN decoding",
     "pause enables resume and disables pause",
     "resume enables pause and disables resume",
+    "operator worksheet and rule-based disposition",
+    "structured JSON assessment export with integrity digest",
     "server readiness refreshed after both transitions"
   ]},null,2)+"\n");
 } finally { await browser.close(); }
