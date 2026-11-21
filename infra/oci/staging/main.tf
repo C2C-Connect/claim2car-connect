@@ -138,3 +138,30 @@ resource "oci_core_volume_attachment" "evidence" {
   volume_id                           = oci_core_volume.evidence.id
   is_pv_encryption_in_transit_enabled = true
 }
+
+data "oci_identity_compartment" "existing" {
+  id = var.compartment_ocid
+}
+
+locals {
+  runcommand_dynamic_group_name = "${var.display_name_prefix}-runcommand-dg"
+}
+
+resource "oci_identity_dynamic_group" "staging_runcommand" {
+  count          = var.enable_private_runcommand_deploy ? 1 : 0
+  compartment_id = var.tenancy_ocid
+  name           = local.runcommand_dynamic_group_name
+  description    = "Only the Claim2Car staging compute instance may receive private run commands."
+  matching_rule = "ALL {instance.id = '${oci_core_instance.staging.id}'}"
+}
+
+resource "oci_identity_policy" "staging_runcommand" {
+  count          = var.enable_private_runcommand_deploy ? 1 : 0
+  compartment_id = var.tenancy_ocid
+  name           = "${var.display_name_prefix}-runcommand-policy"
+  description    = "Restricted Run Command execution and read access to the single OCIR Vault secret."
+  statements = [
+    "Allow dynamic-group ${local.runcommand_dynamic_group_name} to use instance-agent-command-execution-family in compartment ${data.oci_identity_compartment.existing.name} where request.instance.id=target.instance.id",
+    "Allow dynamic-group ${local.runcommand_dynamic_group_name} to read secret-bundles in compartment ${data.oci_identity_compartment.existing.name} where target.secret.id='${var.ocir_auth_secret_ocid}'"
+  ]
+}
