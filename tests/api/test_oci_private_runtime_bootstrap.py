@@ -447,3 +447,8 @@ def test_oci_deploy_harness_uses_privileged_file_read_and_cleanup_helpers():
     assert content.count('_read_root_owned_file(config/"last-image-ref")') >= 4
     assert "def _oci_harness_cleanup(tmp_path):" in content
     assert 'sudo,"rm","-rf","--",str(tmp_path)' in content
+
+
+def test_root_owned_last_image_ref_assertions_use_sudo_reader():
+    content=(ROOT/"tests/api/test_oci_private_runtime_bootstrap.py").read_text()
+    assert content.count('_read_root_owned_file(config/"last-image-ref")') >= 4
