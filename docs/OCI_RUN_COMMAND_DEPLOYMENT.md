@@ -42,7 +42,7 @@ Required variables:
 
 - `OCI_REGION` (default `us-chicago-1`)
 - `OCIR_NAMESPACE`, `OCIR_REPOSITORY`
-- `OCI_STAGING_POSTGRES_IMAGE` (full image reference pinned by digest)
+- `OCI_STAGING_POSTGRES_IMAGE` (PostGIS 16 image from `docker.io/postgis/postgis`, full reference pinned by digest)
 
 Keep the existing `OCIR_AUTH_TOKEN` secret for image publication. Store the corresponding pull token in OCI Vault for the instance principal.
 
@@ -50,8 +50,8 @@ Keep the existing `OCIR_AUTH_TOKEN` secret for image publication. Store the corr
 
 1. Publish the integrated ARM64 image with the manual **Publish integrated Claim2Car image to OCIR** workflow.
 2. Copy the exact image reference from its summary (commit tag **and** digest).
-3. Run the manual **Deploy private OCI staging and run synthetic acceptance** workflow from `main`; choose `confirm_deploy=yes` and supply the immutable image reference.
-4. The workflow checks OCI API authentication and source/image SHA alignment, then creates an OCI Run Command. The instance downloads the bootstrap/deploy/acceptance scripts from the exact source commit and verifies their SHA-256 values.
+3. Run the manual **Deploy private OCI staging and run synthetic acceptance** workflow from the exact same `main` commit used to publish the image; choose `confirm_deploy=yes` and supply the immutable image reference. The image's embedded source SHA must equal the workflow SHA/current `main` head.
+4. The workflow checks OCI API authentication and source/image SHA alignment, then creates an OCI Run Command. The privileged host wrappers independently require the source SHA to be the current public `main` head and validate script checksums. The instance downloads the bootstrap/deploy/acceptance scripts from the exact source commit and verifies their SHA-256 values.
 5. If runtime secret files are absent, it generates synthetic-only credentials on the host. It retrieves the OCIR pull token from Vault through instance principal, deploys the digest-pinned image, and runs the 16-slot synthetic acceptance harness.
 6. The workflow reports OCI command execution state and acceptance output. A failed command, deploy, readiness check, revision check, or acceptance exits nonzero. No live payment is enabled.
 
