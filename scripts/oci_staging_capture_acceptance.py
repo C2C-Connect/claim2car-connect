@@ -2,6 +2,7 @@
 """Synthetic live-staging acceptance: 16-slot capture, restart, reviewer retrieval, integrity, withdrawal."""
 from __future__ import annotations
 import argparse
+import atexit
 import base64
 import hashlib
 import json
@@ -24,6 +25,19 @@ SLOTS = (
     "15_license_and_insurance_docs",
 )
 TEST_VIN = "1HGCM82633A004352"
+CLEANUP_BASE = CLEANUP_SESSION = CLEANUP_OWNER = ""
+CLEANUP_CONSENT = False
+
+def cleanup_synthetic_consent():
+    if CLEANUP_CONSENT and CLEANUP_BASE and CLEANUP_SESSION and CLEANUP_OWNER:
+        try:
+            json_request(CLEANUP_BASE, "POST", f"/v1/capture-sessions/{CLEANUP_SESSION}/consent",
+                        CLEANUP_OWNER, {"request_id": rid(), "accepted": False, "scope": "capture_review"}, 200)
+        except Exception as error:
+            print(f"WARNING: automatic consent cleanup failed for synthetic session {CLEANUP_SESSION}: {error}", file=sys.stderr)
+
+
+atexit.register(cleanup_synthetic_consent)
 
 
 def rid():
@@ -101,10 +115,12 @@ def main():
     case = json_request(base, "POST", "/v1/claim-cases", operator,
                         {"claim_id": claim_id, "request_id": rid()}, 201)
     session_id = case["capture_session_id"]
+    CLEANUP_BASE, CLEANUP_SESSION, CLEANUP_OWNER = base, session_id, owner
     json_request(base, "POST", f"/v1/collisions/{collision_id}/claims", operator,
                  {"claim_id": claim_id, "request_id": rid()}, 201)
     json_request(base, "POST", f"/v1/capture-sessions/{session_id}/consent", owner,
                  {"request_id": rid(), "accepted": True, "scope": "capture_review"}, 200)
+    CLEANUP_CONSENT = True
     json_request(base, "POST", f"/v1/capture-sessions/{session_id}/vehicle-reference", operator,
                  {"request_id": rid(), "vin": TEST_VIN}, 200)
 
@@ -165,6 +181,7 @@ def main():
         raise RuntimeError("Tampered synthetic evidence was not rejected with the integrity conflict.")
     json_request(base, "POST", f"/v1/capture-sessions/{session_id}/consent", owner,
                  {"request_id": rid(), "accepted": False, "scope": "capture_review"}, 200)
+    CLEANUP_CONSENT = False
     if artifact_path.exists():
         raise RuntimeError("Consent withdrawal did not remove synthetic original bytes.")
 
