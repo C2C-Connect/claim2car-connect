@@ -38,6 +38,13 @@ def test_runcommand_deploy_rejects_missing_input_mapping_value():
         deploy.validate_inputs(env)
 
 
+def test_runcommand_deploy_rejects_invalid_source_script_checksum():
+    env = _valid_env()
+    env["C2C_DEPLOY_SCRIPT_SHA256"] = "not-a-sha256"
+    with pytest.raises(ValueError, match="lowercase SHA-256"):
+        deploy.validate_inputs(env)
+
+
 def test_runcommand_deploy_validates_exact_ocir_repository_and_digest():
     values = deploy.validate_inputs(_valid_env())
     assert values["C2C_IMAGE_COMMIT"] == "a" * 40
