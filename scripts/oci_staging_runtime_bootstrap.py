@@ -16,7 +16,9 @@ def main():
   creds.append({"actor_id":"staging-"+role,"tenant_id":tenant,"database_role":"faos_app","token_sha256":hashlib.sha256(token.encode()).hexdigest(),"expires_at":int(time.time())+180*86400,"enabled":True,"actor_role":role})
  dsn=lambda u,p:f"postgresql://{u}:{p}@claim2car-db:5432/claim2car"
  cfg={"health_database_url":dsn("faos_app",app),"dsn_by_role":{"faos_app":dsn("faos_app",app)},"credentials":creds}
- write(root/"capture-runtime.json",json.dumps(cfg,indent=2)+"\n"); if os.geteuid()==0: os.chown(root/"capture-runtime.json",0,10001)\n os.chmod(root/"capture-runtime.json",0o640)\n os.chown(root/"capture-runtime.json",0,10001); os.chmod(root/"capture-runtime.json",0o640)
+ write(root/"capture-runtime.json",json.dumps(cfg,indent=2)+"\\n")
+ if os.geteuid()==0: os.chown(root/"capture-runtime.json",0,10001)
+ os.chmod(root/"capture-runtime.json",0o640)
  write(root/"postgres-init.sql",f"""CREATE ROLE faos_migrator LOGIN PASSWORD {lit(mig)};
 CREATE ROLE faos_app LOGIN PASSWORD {lit(app)};
 CREATE ROLE faos_fixture LOGIN PASSWORD {lit(secrets.token_hex(32))};

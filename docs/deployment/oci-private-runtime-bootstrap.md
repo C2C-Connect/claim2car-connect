@@ -4,7 +4,7 @@ Deploys integrated app + PostgreSQL 16/PostGIS to an existing OCI private host. 
 
 Prerequisites: identity-verified volumes mounted at `/var/lib/claim2car/postgres` and `/var/lib/claim2car/evidence`, mount roots UID 10001; Podman/curl/mountpoint; ARM64 host; published immutable OCIR image; least-privilege registry auth token.
 
-First boot as root: `python3 scripts/oci_staging_runtime_bootstrap.py --dir /etc/claim2car/runtime`. Generates high-entropy DB credentials, one synthetic tenant, owner/operator/reviewer tokens (180 days), VIN pepper, internal token, init SQL and runtime config. Files 0600 and directory 0700. Securely deliver tokens, then delete token file. Never rerun on initialized database; generated passwords won't match. Refuses overwriting any non-empty output directory (does not rotate initialized database credentials).
+First boot as root: `python3 scripts/oci_staging_runtime_bootstrap.py --dir /etc/claim2car/runtime`. Generates high-entropy DB credentials, one synthetic tenant, owner/operator/reviewer tokens (180 days), VIN pepper, internal token, init SQL and runtime config. Secret files 0600, runtime config 0640 (group 10001), directory 0700. Securely deliver tokens, then delete token file. Never rerun on initialized database; generated passwords won't match. Refuses overwriting any non-empty output directory (does not rotate initialized database credentials).
 
 Set `OCI_IMAGE_REF` to digest-pinned OCIR ref including `:sha-<40-character-commit>@sha256:<digest>`, `OCI_REGISTRY`, `OCI_REGISTRY_USERNAME`, `OCI_REGISTRY_TOKEN`; optional loopback port `C2C_STAGING_LOOPBACK_PORT`. Source root-only env and run `sudo -E scripts/oci_staging_runtime_deploy.sh`.
 
