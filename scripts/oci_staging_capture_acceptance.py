@@ -7,6 +7,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -137,8 +138,7 @@ def main():
     build_raw, _ = request(base, "GET", "/health/build", operator, expected=200)
     build = json.loads(build_raw)
     revision = str(build.get("revision") or build.get("git_sha") or build.get("commit") or "")
-    if len(revision) < 7:
-        raise RuntimeError("Build endpoint did not identify the deployed revision.")
+    verify_source_checkout(revision)
 
     collision_id, claim_id = rid(), rid()
     collision = json_request(base, "POST", "/v1/collisions", operator,
