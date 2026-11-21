@@ -72,6 +72,43 @@ def audit_network(subnet_document: dict[str, Any], security_list_documents: list
     return findings
 
 
+
+def audit_nsg(nsg_document: dict[str, Any], rules_document: dict[str, Any], expected_vcn_id: str) -> list[str]:
+    """Audit one network security group and its ingress rules; unsupported sources fail closed."""
+    nsg = _data(nsg_document)
+    findings: list[str] = []
+    nsg_id = nsg.get("id")
+    name = str(nsg.get("displayName") or nsg_id or "unnamed")
+    if nsg.get("vcnId") != expected_vcn_id:
+        findings.append(f"NSG_VCN_MISMATCH:{name}")
+    rules = rules_document.get("data", rules_document)
+    if not isinstance(rules, list):
+        findings.append(f"NSG_RULES_INVALID:{name}")
+        return findings
+    for index, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            findings.append(f"NSG_RULE_INVALID:{name}:{index}")
+            continue
+        direction = str(rule.get("direction", "")).upper()
+        if direction not in {"INGRESS", "EGRESS"}:
+            findings.append(f"NSG_RULE_DIRECTION_INVALID:{name}:{index}")
+            continue
+        if direction == "EGRESS":
+            continue
+        source_type = rule.get("sourceType")
+        source = rule.get("source")
+        if source_type != "CIDR_BLOCK" or not isinstance(source, str):
+            findings.append(f"NSG_INGRESS_SOURCE_UNSUPPORTED:{name}:{index}")
+            continue
+        try:
+            network = ipaddress.ip_network(source, strict=False)
+        except ValueError:
+            findings.append(f"NSG_INGRESS_SOURCE_INVALID:{name}:{index}")
+            continue
+        if network.prefixlen == 0:
+            findings.append(f"NSG_PUBLIC_INGRESS:{name}:{index}:source={network}")
+    return findings
+
 def _oci_json(*args: str) -> dict[str, Any]:
     completed = subprocess.run(
         ["oci", *args, "--output", "json"],
@@ -86,26 +123,35 @@ def _oci_json(*args: str) -> dict[str, Any]:
     return value
 
 
-def run_audit(subnet_id: str, expected_vcn_id: str) -> list[str]:
+def run_audit(subnet_id: str, expected_vcn_id: str, nsg_ids: list[str] | None = None) -> list[str]:
     subnet_document = _oci_json("network", "subnet", "get", "--subnet-id", subnet_id)
     subnet = _data(subnet_document)
     ids = subnet.get("securityListIds")
-    if not isinstance(ids, list) or not ids:
-        return audit_network(subnet_document, [], expected_vcn_id)
-    documents = [
-        _oci_json("network", "security-list", "get", "--security-list-id", str(security_id))
-        for security_id in ids
-    ]
-    return audit_network(subnet_document, documents, expected_vcn_id)
+    documents = []
+    if isinstance(ids, list) and ids:
+        documents = [
+            _oci_json("network", "security-list", "get", "--security-list-id", str(security_id))
+            for security_id in ids
+        ]
+    findings = audit_network(subnet_document, documents, expected_vcn_id)
+    for nsg_id in nsg_ids or []:
+        nsg_document = _oci_json("network", "nsg", "get", "--network-security-group-id", nsg_id)
+        rules_document = _oci_json("network", "nsg", "rules", "list", "--network-security-group-id", nsg_id)
+        nsg_data = _data(nsg_document)
+        if nsg_data.get("id") != nsg_id:
+            findings.append("NSG_ID_MISMATCH:" + str(nsg_data.get("displayName") or nsg_data.get("id") or "unnamed"))
+        findings.extend(audit_nsg(nsg_document, rules_document, expected_vcn_id))
+    return findings
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--subnet-id", required=True)
     parser.add_argument("--expected-vcn-id", required=True)
+    parser.add_argument("--nsg-id", action="append", default=[], help="Optional NSG OCID to audit; may be repeated.")
     args = parser.parse_args()
     try:
-        findings = run_audit(args.subnet_id, args.expected_vcn_id)
+        findings = run_audit(args.subnet_id, args.expected_vcn_id, args.nsg_id)
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         print(f"FAIL OCI_NETWORK_AUDIT_ERROR:{type(error).__name__}:{error}", file=sys.stderr)
         return 2
