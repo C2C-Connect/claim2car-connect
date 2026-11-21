@@ -112,7 +112,7 @@ write_files:
       [[ "${OCI_IMAGE_REF:-}" =~ :sha-${C2C_SOURCE_SHA}@sha256:[a-f0-9]{64}$ ]] || fail "Image revision/digest does not match source SHA."
       [[ "${OCI_REGISTRY:-}" =~ ^[a-z0-9.-]+$ && "${OCI_IMAGE_REF}" == "${OCI_REGISTRY}/"* ]] || fail "Image registry host mismatch."
       [[ -n "${OCI_REGISTRY_USERNAME:-}" && -n "${OCI_REGISTRY_TOKEN:-}" ]] || fail "OCIR credentials are missing."
-      [[ "${C2C_POSTGRES_IMAGE:-}" =~ @sha256:[a-f0-9]{64}$ ]] || fail "PostgreSQL image must be digest pinned."
+      [[ "${C2C_POSTGRES_IMAGE:-}" =~ ^(docker\.io|registry-1\.docker\.io)/postgis/postgis:16-[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}$ ]] || fail "PostGIS 16 image must be digest pinned."
       install -d -o root -g root -m 0750 /opt/claim2car/scripts
       install -o root -g root -m 0750 "$path" /opt/claim2car/scripts/oci_staging_runtime_deploy.sh
       export C2C_STAGING_ROOT=/var/lib/claim2car C2C_STAGING_RUNTIME_CONFIG=/etc/claim2car/runtime
