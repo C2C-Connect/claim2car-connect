@@ -56,7 +56,8 @@ def build_remote_script(
     vault_secret_ocid: str,
     hashes: dict[str, str],
 ) -> str:
-    if not re.fullmatch(r\"[a-z0-9-]+\", region):\n        raise ValueError(\"Invalid OCI region.\")\n    if not SHA_RE.fullmatch(source_sha):
+    if not re.fullmatch(r"[a-z0-9-]+", region):
+        raise ValueError("Invalid OCI region.")\n    if not SHA_RE.fullmatch(source_sha):
         raise ValueError("source_sha must be a full 40-character lowercase SHA.")
     if extract_source_sha(image_ref) != source_sha:
         raise ValueError("OCI image source revision and source checkout SHA differ.")
