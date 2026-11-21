@@ -1,0 +1,15 @@
+{
+  "candidate_commit": "9518906815d5b1b2204255d8082c256579f4cab1",
+  "run_id": "44901918776",
+  "run_attempt": "1",
+  "classification": "health-only-api-foundation-not-business-acceptance",
+  "event": "push",
+  "verification_job_result": "success",
+  "reports_present": [
+    "unit-tests.json",
+    "unmigrated.json",
+    "legacy.json",
+    "authority.json",
+    "unavailable.json"
+  ]
+}
