@@ -191,6 +191,7 @@ def test_terraform_runcommand_secret_access_is_scoped_to_secret_ocid():
     variables=(ROOT/"infra/oci/staging/variables.tf").read_text()
     assert "enable_private_runcommand_deploy" in variables
     assert "target.secret.id = '${var.ocir_auth_secret_ocid}'" in terraform
+    assert "in compartment id ${var.compartment_ocid}" in terraform
     assert "instance.id = '${oci_core_instance.staging.id}'" in terraform
 
 
