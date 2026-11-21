@@ -7,8 +7,9 @@ from types import SimpleNamespace
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+import pytest
 
-from app.payments.square_sandbox import SquareSandboxConfig
+from app.payments.square_sandbox import SquareSandboxConfig, SquareSandboxError
 from app.payments.square_webhook_api import create_square_webhook_router
 
 
@@ -63,6 +64,9 @@ def test_webhook_only_credentials_are_sufficient_for_receipt():
     connection=FakeConnection("RECONCILED")
     body=make_body()
     webhook_config=SquareSandboxConfig("", "", KEY, URL, "sandbox")
+    webhook_config.validate_webhook()
+    with pytest.raises(SquareSandboxError,match="SQUARE_SANDBOX_ACCESS_TOKEN_REQUIRED"):
+        webhook_config.validate()
     response=client(config_factory=lambda:webhook_config).post("/webhooks/square",content=body,headers={"x-square-hmacsha256-signature":signature(body)})
     assert response.status_code==200
     assert response.json()=={"status":"RECONCILED"}
