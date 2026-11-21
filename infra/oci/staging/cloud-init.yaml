@@ -27,6 +27,12 @@ write_files:
       [[ $EUID -eq 0 ]] || fail "Must be invoked as root through the restricted OCI Run Command sudo rule."
       [[ $# -eq 6 ]] || fail "Expected commit, app image, script checksum, DB image, registry, and Vault secret OCID."
       commit="$1"; image="$2"; script_sha="$3"; db_image="$4"; registry="$5"; secret_ocid="$6"
+      work=""
+      cleanup() {
+        [[ -z "$work" || ! -d "$work" ]] || rm -rf "$work"
+        unset secret_b64 secret_json registry_user registry_token OCI_REGISTRY_TOKEN
+      }
+      trap cleanup EXIT
       [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Commit SHA is invalid."
       [[ "$script_sha" =~ ^[a-f0-9]{64}$ ]] || fail "Deploy-script SHA-256 is invalid."
       [[ "$registry" =~ ^[a-z0-9.-]+$ ]] || fail "Registry host is invalid."
@@ -42,7 +48,6 @@ write_files:
       registry_token="$(jq -er '.auth_token | select(type == "string" and length > 0)' <<<"$secret_json")" || fail "Vault OCIR secret has no auth_token."
       unset secret_b64 secret_json
       work="$(mktemp -d /run/claim2car-deploy.XXXXXX)"
-      trap 'rm -rf "$work"; unset registry_token' EXIT
       script_url="https://raw.githubusercontent.com/C2C-Connect/claim2car-connect/$commit/scripts/oci_staging_runtime_deploy.sh"
       curl --fail --silent --show-error --location --retry 3 "$script_url" -o "$work/deploy.sh" || fail "Unable to retrieve source-pinned deployment helper."
       printf '%s  %s\n' "$script_sha" "$work/deploy.sh" | sha256sum --check --status || fail "Deployment helper checksum mismatch."
