@@ -9,7 +9,7 @@ The mapping file is mode 0600 and contains verified OCIDs and guest block-device
 \`python3 scripts/oci_staging_volume_mount.py --mapping-json /root/claim2car-volume-map.json --postgres-volume-ocid <pg-ocid> --evidence-volume-ocid <evidence-ocid> --dry-run\`
 It verifies exact volume IDs, block devices, disk/partition state, mount state, filesystems, signatures and mountpoint safety. Blank disks are reported as requiring an explicit format gate. No disk or mount changes occur.
 
-## First format of newly created empty disks (irreversible)
+## Initial format of newly created empty disks (irreversible)
 Only for newly created, verified-empty OCI volumes, add:
 \`--format-empty --confirm-format-ocids <pg-ocid>,<evidence-ocid>\`
 The confirmation must exactly match both OCIDs. Existing XFS volumes mount without formatting. Unknown filesystems/signatures, partitions, already-mounted devices, symlinks, nonempty mountpoints, conflicting fstab entries and OCID mismatch are rejected.
