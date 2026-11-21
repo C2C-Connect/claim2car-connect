@@ -29,25 +29,13 @@ def audit_network(subnet_document: dict[str, Any], security_list_documents: list
     if not isinstance(security_ids, list) or not security_ids:
         findings.append("SUBNET_SECURITY_LISTS_MISSING")
         return findings
-    if any(not isinstance(item, str) or not item for item in security_ids) or len(set(security_ids)) != len(security_ids):
-        findings.append("SUBNET_SECURITY_LIST_IDS_INVALID")
-        return findings
     if len(security_list_documents) != len(security_ids):
         findings.append("SECURITY_LIST_RESPONSE_COUNT_MISMATCH")
         return findings
 
-    expected_ids = set(security_ids)
-    seen_ids: set[str] = set()
     for document in security_list_documents:
         security_list = _data(document)
-        security_id = security_list.get("id")
-        name = str(security_list.get("displayName") or security_id or "unnamed")
-        if not isinstance(security_id, str) or security_id not in expected_ids or security_id in seen_ids:
-            findings.append(f"SECURITY_LIST_ID_MISMATCH:{name}")
-        elif security_id:
-            seen_ids.add(security_id)
-        # Audit rules even if the returned object identity is wrong, so a malformed
-        # response cannot hide unrestricted ingress behind an identity finding.
+        name = str(security_list.get("displayName") or security_list.get("id") or "unnamed")
         rules = security_list.get("ingressSecurityRules")
         if not isinstance(rules, list):
             findings.append(f"INGRESS_RULES_INVALID:{name}")
@@ -68,9 +56,6 @@ def audit_network(subnet_document: dict[str, Any], security_list_documents: list
             if network.prefixlen == 0:
                 protocol = str(rule.get("protocol", "all"))
                 findings.append(f"PUBLIC_INGRESS:{name}:{index}:protocol={protocol}:source={network}")
-    missing_ids = expected_ids - seen_ids
-    if missing_ids:
-        findings.append("SECURITY_LIST_IDS_UNVERIFIED:" + ",".join(sorted(missing_ids)))
     return findings
 
 

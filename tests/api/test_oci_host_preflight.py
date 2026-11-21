@@ -22,7 +22,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_private_subnet_and_allowlisted_ingress_pass(self):
         security_lists = [{"data": {
-            "displayName": "private",
+            "id": "sl-1", "displayName": "private",
             "ingressSecurityRules": [
                 {"protocol": "6", "source": "10.0.0.0/16",
                  "tcpOptions": {"destinationPortRange": {"min": 22, "max": 22}}}
@@ -32,7 +32,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_public_ipv4_ingress_is_rejected(self):
         security_lists = [{"data": {
-            "displayName": "default",
+            "id": "sl-1", "displayName": "default",
             "ingressSecurityRules": [{"protocol": "6", "source": "0.0.0.0/0"}],
         }}]
         findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")
@@ -40,7 +40,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_public_ipv6_ingress_is_rejected(self):
         security_lists = [{"data": {
-            "displayName": "default-v6",
+            "id": "sl-1", "displayName": "default-v6",
             "ingressSecurityRules": [{"protocol": "all", "source": "::/0"}],
         }}]
         findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")
@@ -52,7 +52,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
             "prohibitPublicIpOnVnic": False,
             "securityListIds": ["sl-1"],
         }}
-        security_lists = [{"data": {"ingressSecurityRules": []}}]
+        security_lists = [{"data": {"id": "sl-1", "ingressSecurityRules": []}}]
         findings = AUDIT.audit_network(subnet, security_lists, "vcn-good")
         self.assertIn("SUBNET_VCN_MISMATCH", findings)
         self.assertIn("SUBNET_DOES_NOT_PROHIBIT_PUBLIC_IP", findings)
@@ -63,7 +63,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_malformed_ingress_source_fails_closed(self):
         security_lists = [{"data": {
-            "displayName": "broken",
+            "id": "sl-1", "displayName": "broken",
             "ingressSecurityRules": [{"protocol": "6", "source": "not-a-cidr"}],
         }}]
         findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")

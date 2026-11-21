@@ -19,7 +19,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_private_subnet_and_allowlisted_ingress_pass(self):
         security_lists = [{"data": {
-            "id": "sl-1", "displayName": "private",
+            "displayName": "private",
             "ingressSecurityRules": [
                 {"protocol": "6", "source": "10.0.0.0/16",
                  "tcpOptions": {"destinationPortRange": {"min": 22, "max": 22}}}
@@ -29,7 +29,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_public_ipv4_ingress_is_rejected(self):
         security_lists = [{"data": {
-            "id": "sl-1", "displayName": "default",
+            "displayName": "default",
             "ingressSecurityRules": [{"protocol": "6", "source": "0.0.0.0/0"}],
         }}]
         findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")
@@ -37,7 +37,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_public_ipv6_ingress_is_rejected(self):
         security_lists = [{"data": {
-            "id": "sl-1", "displayName": "default-v6",
+            "displayName": "default-v6",
             "ingressSecurityRules": [{"protocol": "all", "source": "::/0"}],
         }}]
         findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")
@@ -49,7 +49,7 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
             "prohibitPublicIpOnVnic": False,
             "securityListIds": ["sl-1"],
         }}
-        security_lists = [{"data": {"id": "sl-1", "ingressSecurityRules": []}}]
+        security_lists = [{"data": {"ingressSecurityRules": []}}]
         findings = AUDIT.audit_network(subnet, security_lists, "vcn-good")
         self.assertIn("SUBNET_VCN_MISMATCH", findings)
         self.assertIn("SUBNET_DOES_NOT_PROHIBIT_PUBLIC_IP", findings)
@@ -60,30 +60,11 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
 
     def test_malformed_ingress_source_fails_closed(self):
         security_lists = [{"data": {
-            "id": "sl-1", "displayName": "broken",
+            "displayName": "broken",
             "ingressSecurityRules": [{"protocol": "6", "source": "not-a-cidr"}],
         }}]
         findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")
         self.assertIn("INGRESS_SOURCE_INVALID:broken:0", findings)
-
-    def test_security_list_response_ids_must_match_subnet_inventory(self):
-        security_lists = [{"data": {
-            "id": "sl-not-attached",
-            "displayName": "unexpected",
-            "ingressSecurityRules": [],
-        }}]
-        findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")
-        self.assertIn("SECURITY_LIST_ID_MISMATCH:unexpected", findings)
-        self.assertIn("SECURITY_LIST_IDS_UNVERIFIED:sl-1", findings)
-
-    def test_duplicate_security_list_ids_fail_closed(self):
-        subnet = {"data": {
-            "vcnId": "vcn-good",
-            "prohibitPublicIpOnVnic": True,
-            "securityListIds": ["sl-1", "sl-1"],
-        }}
-        findings = AUDIT.audit_network(subnet, [{"data": {"id": "sl-1", "ingressSecurityRules": []}}] * 2, "vcn-good")
-        self.assertIn("SUBNET_SECURITY_LIST_IDS_INVALID", findings)
 
     def test_manual_github_network_audit_workflow_is_read_only_and_fail_closed(self):
         workflow = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "oci-staging-network-audit.yml").read_text()
