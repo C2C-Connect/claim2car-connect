@@ -6,18 +6,18 @@ APP_PORT="\${C2C_STAGING_LOOPBACK_PORT:-8000}"; DB_IMAGE="\${C2C_POSTGRES_IMAGE:
 APP_CONTAINER=claim2car-app; DB_CONTAINER=claim2car-db; NETWORK=claim2car-staging
 fail(){ echo "FAIL: $*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || fail "Run as root."
-[[ "$IMAGE_REF" =~ @sha256:[a-f0-9]{64}$ ]] || fail "OCI_IMAGE_REF must pin sha256 digest."
+[[ "$IMAGE_REF" =~ :sha-[a-f0-9]{40}@sha256:[a-f0-9]{64}$ ]] || fail "OCI_IMAGE_REF must include commit tag and pinned digest."
 [[ -n "$REGISTRY" && -n "$REGISTRY_USER" && -n "$REGISTRY_TOKEN" ]] || fail "Registry credentials missing."
 [[ "$APP_PORT" =~ ^[0-9]{1,5}$ ]] && (( APP_PORT>=1024 && APP_PORT<=65535 )) || fail "Invalid loopback port."
-for p in "$ROOT/postgres" "$ROOT/evidence"; do [[ -d "$p" ]] || fail "Storage path missing: $p"; mountpoint -q "$p" || fail "Storage path not mounted: $p"; [[ "$(stat -c %u "$p")" == 10001 ]] || fail "Storage mount must be UID 10001: $p"; done
+for p in "$ROOT/postgres" "$ROOT/evidence"; do [[ -d "$p" ]] || fail "Storage path missing: $p"; mountpoint -q "$p" || fail "Storage path not mounted: $p"; if [[ "$p" == "$ROOT/evidence" ]]; then [[ "$(stat -c %u "$p")" == 10001 ]] || fail "Evidence storage must be UID 10001."; fi; done
 for f in runtime.env capture-runtime.json postgres-init.sql seed-tenant.sql; do [[ -s "$CONFIG/$f" ]] || fail "Missing secret bootstrap file: $f"; done
 chmod 0600 "$CONFIG/runtime.env"; source "$CONFIG/runtime.env"
 printf '%s' "$REGISTRY_TOKEN" | podman login "$REGISTRY" --username "$REGISTRY_USER" --password-stdin
-podman pull "$DB_IMAGE"; podman pull "$IMAGE_REF"
+podman pull "$DB_IMAGE"; podman pull "$IMAGE_REF"; install -d -o 10001 -g 10001 "$ROOT/postgres/pgdata"
 arch="$(podman image inspect "$IMAGE_REF" --format '{{.Os}}/{{.Architecture}}')"; [[ "$arch" == "linux/arm64" ]] || fail "Expected ARM64 app image; got $arch."
 podman network exists "$NETWORK" || podman network create "$NETWORK"
 if ! podman container exists "$DB_CONTAINER"; then
- podman run -d --name "$DB_CONTAINER" --restart=always --network "$NETWORK" --network-alias claim2car-db -e POSTGRES_PASSWORD="$PG_ADMIN_PASSWORD" -e POSTGRES_DB=postgres -p 127.0.0.1:5432:5432 -v "$ROOT/postgres:/var/lib/postgresql/data:Z" -v "$CONFIG/postgres-init.sql:/docker-entrypoint-initdb.d/00-bootstrap.sql:ro,Z" "$DB_IMAGE"
+ podman run -d --name "$DB_CONTAINER" --restart=always --network "$NETWORK" --network-alias claim2car-db -e POSTGRES_PASSWORD="$PG_ADMIN_PASSWORD" -e POSTGRES_DB=postgres -e PGDATA=/var/lib/postgresql/data/pgdata -p 127.0.0.1:5432:5432 -v "$ROOT/postgres:/var/lib/postgresql/data:Z" -v "$CONFIG/postgres-init.sql:/docker-entrypoint-initdb.d/00-bootstrap.sql:ro,Z" "$DB_IMAGE"
 else podman start "$DB_CONTAINER" >/dev/null || true; fi
 ready=0; for i in $(seq 1 90); do if podman exec "$DB_CONTAINER" pg_isready -U postgres -d postgres >/dev/null 2>&1; then ready=1; break; fi; sleep 2; done
 [[ "$ready" == 1 ]] || fail "PostgreSQL not ready."

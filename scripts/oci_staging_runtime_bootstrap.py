@@ -6,8 +6,8 @@ def write(p,s):
  p=Path(p); p.parent.mkdir(parents=True,exist_ok=True); t=p.with_suffix(p.suffix+".tmp"); t.write_text(s); os.chmod(t,0o600); t.replace(p)
 def lit(v): return "'"+v.replace("'","''")+"'"
 def main():
- a=argparse.ArgumentParser(); a.add_argument("--dir",default="/etc/claim2car/runtime"); a.add_argument("--force",action="store_true"); x=a.parse_args(); root=Path(x.dir)
- if root.exists() and any(root.iterdir()) and not x.force: raise SystemExit("RUNTIME_SECRET_DIRECTORY_NOT_EMPTY; refusing overwrite")
+ a=argparse.ArgumentParser(); a.add_argument("--dir",default="/etc/claim2car/runtime"); x=a.parse_args(); root=Path(x.dir)
+ if root.exists() and any(root.iterdir()): raise SystemExit("RUNTIME_SECRET_DIRECTORY_NOT_EMPTY; refusing overwrite")
  root.mkdir(parents=True,exist_ok=True); os.chmod(root,0o700)
  admin,mig,app=[secrets.token_hex(32) for _ in range(3)]; tenant=str(uuid.uuid4()); service=secrets.token_urlsafe(48); pepper=secrets.token_hex(32)
  creds=[]; tokens=[]
