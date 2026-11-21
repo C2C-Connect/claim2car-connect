@@ -337,15 +337,22 @@ def verify_db_14(context):
     counted = context.get("counted_tests")
     diagnostics = context.get("diagnostics") or {}
     prior = context.get("prior_gate_results", [])
-    if (not _counted_report_ok(counted)
-            or len(prior) != 13
-            or any(row.get("status") != "PASS" for row in prior)
-            or not diagnostics.get("diagnostics_successful")
-            or not diagnostics.get("commit")
-            or not diagnostics.get("candidate_commit")
-            or not diagnostics.get("tested_checkout_commit")
-            or len(diagnostics.get("migration_inventory") or []) != 25):
+    failures = []
+    if not _counted_report_ok(counted):
+        failures.append("COUNTED_TEST_REPORT_INVALID")
+    if len(prior) != 13:
+        failures.append("PRIOR_GATE_RESULT_COUNT_INVALID")
+    if any(row.get("status") != "PASS" for row in prior):
+        failures.append("PRIOR_GATE_FAILURE_PRESENT")
+    if not diagnostics.get("diagnostics_successful"):
+        failures.append("DIAGNOSTICS_NOT_SUCCESSFUL")
+    if not diagnostics.get("commit") or not diagnostics.get("candidate_commit") or not diagnostics.get("tested_checkout_commit"):
+        failures.append("SAME_RUN_COMMIT_METADATA_MISSING")
+    if len(diagnostics.get("migration_inventory") or []) != 25:
+        failures.append("MIGRATION_INVENTORY_COMPLETE")
+    if failures:
         result["status"] = "FAIL"
+        result["failed_sql_checks"].extend(failures)
         result["failed_sql_checks"].append("SAME_RUN_COMPLETE_GATE_EVIDENCE_AND_FAILURE_ACCOUNTING")
     return result
 
