@@ -1,0 +1,11 @@
+{
+  "candidate_commit": "deee623de70a4dc1ed101c4323667eda7f170748",
+  "run_id": "44932819374",
+  "run_attempt": "1",
+  "classification": "offline-vin-decoder-and-mocked-transport-not-browser-or-live-service-validation",
+  "event": "push",
+  "verification_job_result": "success",
+  "report_present": true,
+  "vpic_report_present": true,
+  "transport_report_present": true
+}
