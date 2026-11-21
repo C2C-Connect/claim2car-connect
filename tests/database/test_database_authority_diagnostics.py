@@ -15,7 +15,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
-                    '0021_collision_claim_link.sql',
+            '0021_collision_claim_link.sql',
             '0022_collision_vehicle_capture_link.sql',
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
@@ -64,7 +64,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0019_manifest_root_protocol_binding.sql',
                 '0019_manifest_root_protocol_binding.sql',
                 '0020_collision_lifecycle_record.sql',
-            '0021_collision_claim_link.sql',
+                '0021_collision_claim_link.sql',
             ]))
 
     def test_db01_accepts_the_24_migration_synthetic_environment(self):
@@ -125,7 +125,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0017_event_contract_parity.sql', '0018_capture_protocol_session_binding.sql',
             '0019_manifest_root_protocol_binding.sql',
             '0020_collision_lifecycle_record.sql',
-            '0021_collision_claim_link.sql',
+                '0021_collision_claim_link.sql',
             '0022_collision_vehicle_capture_link.sql',
             '0023_consented_vehicle_profile.sql',
             '0024_audited_capture_exceptions_pause_resume.sql',
@@ -159,7 +159,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0018_capture_protocol_session_binding.sql',
                 '0019_manifest_root_protocol_binding.sql',
                 '0020_collision_lifecycle_record.sql',
-            '0021_collision_claim_link.sql',
+                '0021_collision_claim_link.sql',
                 '0022_collision_vehicle_capture_link.sql',
                 '0023_consented_vehicle_profile.sql',
                 '0024_audited_capture_exceptions_pause_resume.sql',
