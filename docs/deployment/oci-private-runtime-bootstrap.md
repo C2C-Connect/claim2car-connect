@@ -1,0 +1,13 @@
+# OCI private integrated runtime bootstrap
+
+Deploys integrated app + PostgreSQL 16/PostGIS to an existing OCI private host. Does not provision OCI, format disks, expose public ports, configure TLS, or authorize real data.
+
+Prerequisites: identity-verified volumes mounted at \`/var/lib/claim2car/postgres\` and \`/var/lib/claim2car/evidence\`, mount roots UID 10001; Podman/curl/mountpoint; ARM64 host; published immutable OCIR image; least-privilege registry auth token.
+
+First boot as root: \`python3 scripts/oci_staging_runtime_bootstrap.py --dir /etc/claim2car/runtime\`. Generates high-entropy DB credentials, one synthetic tenant, owner/operator/reviewer tokens (180 days), VIN pepper, internal token, init SQL and runtime config. Files 0600 and directory 0700. Securely deliver tokens, then delete token file. Never rerun on initialized database; generated passwords won't match. Refuses non-empty output unless --force (does not rotate DB credentials).
+
+Set \`OCI_IMAGE_REF\` to digest-pinned OCIR ref ending \`@sha256:<digest>\`, \`OCI_REGISTRY\`, \`OCI_REGISTRY_USERNAME\`, \`OCI_REGISTRY_TOKEN\`; optional loopback port \`C2C_STAGING_LOOPBACK_PORT\`. Source root-only env and run \`sudo -E scripts/oci_staging_runtime_deploy.sh\`.
+
+Script checks both persistent mounts and ownership, pulls ARM64 image, starts PostGIS with loopback-only DB port, applies authority migrations, seeds synthetic tenant/login binding, and starts app with evidence volume/runtime config. Verifies readiness/build identity; on failure stops new app and attempts rollback to prior image. Never formats disks or deletes data.
+
+Constraints: single synthetic tenant only; DB login \`faos_app\` is tenant-bound. No multi-tenant production. DB init only on empty volume. App binds loopback only: private TLS/tunnel remains necessary for phone testing. Readiness is not capture acceptance, inference, adjudication, dispatch, payments, or production release.
