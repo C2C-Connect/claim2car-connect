@@ -75,15 +75,13 @@ wait_for_app() {
  return 1
 }
 revision="$(image_revision "$IMAGE_REF")" || fail "Unable to extract exact revision from requested image ref."
-run_app "$IMAGE_REF"
-if ! wait_for_app "$revision"; then
+if ! run_app "$IMAGE_REF" || ! wait_for_app "$revision"; then
  podman logs "$APP_CONTAINER" >&2 || true
  podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true
  podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true
  if [[ -n "$previous" ]]; then
   previous_revision="$(image_revision "$previous")" || fail "New image failed and recorded rollback reference is invalid; no rollback launched."
-  run_app "$previous"
-  if wait_for_app "$previous_revision"; then
+  if run_app "$previous" && wait_for_app "$previous_revision"; then
    echo "PASS: rollback image readiness and exact revision verified: $previous_revision" >&2
   else
    podman logs "$APP_CONTAINER" >&2 || true
