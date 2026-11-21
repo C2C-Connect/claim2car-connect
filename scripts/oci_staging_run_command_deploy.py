@@ -48,6 +48,7 @@ def q(value: str) -> str:
 def build_remote_script(
     *,
     source_sha: str,
+    region: str,
     registry: str,
     registry_username: str,
     image_ref: str,
@@ -55,7 +56,7 @@ def build_remote_script(
     vault_secret_ocid: str,
     hashes: dict[str, str],
 ) -> str:
-    if not SHA_RE.fullmatch(source_sha):
+    if not re.fullmatch(r\"[a-z0-9-]+\", region):\n        raise ValueError(\"Invalid OCI region.\")\n    if not SHA_RE.fullmatch(source_sha):
         raise ValueError("source_sha must be a full 40-character lowercase SHA.")
     if extract_source_sha(image_ref) != source_sha:
         raise ValueError("OCI image source revision and source checkout SHA differ.")
@@ -102,7 +103,7 @@ def build_remote_script(
         f"OCI_IMAGE_REF={q(image_ref)}",
         f"C2C_POSTGRES_IMAGE={q(postgres_image)}",
         f"OCI_VAULT_SECRET_OCID={q(vault_secret_ocid)}",
-        'bundle="$(oci secrets secret-bundle get --secret-id "$OCI_VAULT_SECRET_OCID" --auth instance_principal --output json)"',
+        'bundle="$(oci secrets secret-bundle get --secret-id "$OCI_VAULT_SECRET_OCID" --auth instance_principal --region "$OCI_REGION" --output json)"',
         'token_b64="$(jq -er \'.data["secret-bundle-content"].content // .data.secretBundleContent.content\' <<<"$bundle")"',
         'OCI_REGISTRY_TOKEN="$(printf "%s" "$token_b64" | base64 --decode)"',
         '[[ -n "$OCI_REGISTRY_TOKEN" ]] || { echo "Vault OCIR token secret is empty." >&2; exit 1; }',
