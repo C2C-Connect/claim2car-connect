@@ -17,3 +17,9 @@ boot_volume_size_gbs     = 50
 database_volume_size_gbs = 50
 evidence_volume_size_gbs = 100
 block_volume_budget_gbs  = 200
+
+# Optional secure private deployment. Uncomment after creating the OCIR pull secret
+# in OCI Vault and granting the Terraform user tenancy IAM resource permissions.
+# tenancy_ocid = "ocid1.tenancy.oc1..REPLACE"
+# enable_private_runcommand_deploy = true
+# ocir_auth_secret_ocid = "ocid1.vaultsecret.oc1..REPLACE"
