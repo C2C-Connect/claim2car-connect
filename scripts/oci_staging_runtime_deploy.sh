@@ -8,6 +8,7 @@ fail(){ echo "FAIL: $*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || fail "Run as root."
 [[ "$IMAGE_REF" =~ :sha-[a-f0-9]{40}@sha256:[a-f0-9]{64}$ ]] || fail "OCI_IMAGE_REF must include commit tag and pinned digest."
 [[ -n "$REGISTRY" && -n "$REGISTRY_USER" && -n "$REGISTRY_TOKEN" ]] || fail "Registry credentials missing."
+[[ "$IMAGE_REF" == "$REGISTRY/"* ]] || fail "OCI_IMAGE_REF must use the authenticated OCI_REGISTRY host."
 [[ "$DB_IMAGE" =~ @sha256:[a-f0-9]{64}$ ]] || fail "C2C_POSTGRES_IMAGE must be pinned by sha256 digest."
 [[ "$APP_PORT" =~ ^[0-9]{1,5}$ ]] && (( APP_PORT>=1024 && APP_PORT<=65535 )) || fail "Invalid loopback port."
 [[ -d "$CONFIG" && ! -L "$CONFIG" ]] || fail "Runtime config directory missing or symlinked."

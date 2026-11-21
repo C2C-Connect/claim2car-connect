@@ -41,6 +41,7 @@ def test_deploy_script_shell_syntax_and_expanded_variables():
     assert content.index('trap cleanup_authfile EXIT') < content.index('chmod 0600 "$authfile"')
     assert 'cleanup_authfile\ntrap - EXIT' in content
     assert 'unset REGISTRY_TOKEN' in content
+    assert 'OCI_IMAGE_REF must use the authenticated OCI_REGISTRY host' in content
     assert 'podman login "$REGISTRY"' not in content
 
 
