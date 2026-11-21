@@ -168,3 +168,5 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+                '0025_square_sandbox_payment_intents.sql',
+                '0026_unreviewed.sql',

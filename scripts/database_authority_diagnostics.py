@@ -36,7 +36,9 @@ def validate_authority_migration_inventory(inventory):
     expect('0024_audited_capture_exceptions_pause_resume.sql' in names,'AUDITED_CAPTURE_EXCEPTIONS_MIGRATION_REQUIRED')
     expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql') < names.index('0020_collision_lifecycle_record.sql') < names.index('0021_collision_claim_link.sql') < names.index('0022_collision_vehicle_capture_link.sql') < names.index('0023_consented_vehicle_profile.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql'),\n           'AUTHORITY_MIGRATION_ORDER_INVALID')\n    expect(names[-1]=='0025_square_sandbox_payment_intents.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0025')
+    expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql'),
+           'AUTHORITY_MIGRATION_ORDER_INVALID')
+    expect(names[-1]=='0025_square_sandbox_payment_intents.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0025')
 
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
