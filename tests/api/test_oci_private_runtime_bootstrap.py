@@ -34,6 +34,13 @@ def test_deploy_script_shell_syntax_and_expanded_variables():
     assert "\\${OCI_IMAGE_REF" not in content
     assert "PGDATA=/var/lib/postgresql/data/pgdata" in content
     assert "podman-restart.service" in content
+    assert 'mktemp /run/claim2car-ocir-auth.' in content
+    assert 'podman login --authfile "$authfile"' in content
+    assert 'podman pull --authfile "$authfile"' in content
+    assert 'trap cleanup_authfile EXIT' in content
+    assert 'cleanup_authfile\ntrap - EXIT' in content
+    assert 'unset REGISTRY_TOKEN' in content
+    assert 'podman login "$REGISTRY"' not in content
 
 
 def test_host_bootstrap_installs_deploy_dependencies():
