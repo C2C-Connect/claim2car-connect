@@ -20,6 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends util-linux \
     && chown -R 10001:10001 /var/lib/claim2car
 
 COPY app/ ./app/
+ARG C2C_BUILD_REVISION=unknown
+RUN printf '%s\n' "$C2C_BUILD_REVISION" > app/_build_revision.txt && chmod 0644 app/_build_revision.txt
 COPY frontend/app/ ./frontend/app/
 COPY frontend/src/ ./frontend/src/
 COPY backend/ ./backend/
