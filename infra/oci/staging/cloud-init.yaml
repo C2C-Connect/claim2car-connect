@@ -89,6 +89,8 @@ write_files:
       fail() { echo "FAIL: $*" >&2; exit 1; }
       [[ $EUID -eq 0 ]] || fail "Run Command bootstrap wrapper requires root."
       [[ "${C2C_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid source SHA."
+      main_sha="$(git ls-remote --heads https://github.com/C2C-Connect/claim2car-connect.git refs/heads/main | awk '{print $1}')"
+      [[ "$main_sha" == "$C2C_SOURCE_SHA" ]] || fail "Source SHA must be the current main head."
       path="/tmp/claim2car-runtime-bootstrap-${C2C_SOURCE_SHA}.py"
       [[ "${C2C_BOOTSTRAP_SCRIPT_PATH:-}" == "$path" && -f "$path" && ! -L "$path" ]] || fail "Bootstrap script path mismatch."
       [[ "${C2C_BOOTSTRAP_SCRIPT_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "Invalid bootstrap checksum."
@@ -105,6 +107,8 @@ write_files:
       fail() { echo "FAIL: $*" >&2; exit 1; }
       [[ $EUID -eq 0 ]] || fail "Run Command deployment wrapper requires root."
       [[ "${C2C_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid source SHA."
+      main_sha="$(git ls-remote --heads https://github.com/C2C-Connect/claim2car-connect.git refs/heads/main | awk '{print $1}')"
+      [[ "$main_sha" == "$C2C_SOURCE_SHA" ]] || fail "Source SHA must be the current main head."
       path="/tmp/claim2car-runtime-deploy-${C2C_SOURCE_SHA}.sh"
       [[ "${C2C_DEPLOY_SCRIPT_PATH:-}" == "$path" && -f "$path" && ! -L "$path" ]] || fail "Deployment script path mismatch."
       [[ "${C2C_DEPLOY_SCRIPT_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "Invalid deployment checksum."
@@ -126,6 +130,8 @@ write_files:
       fail() { echo "FAIL: $*" >&2; exit 1; }
       [[ $EUID -eq 0 ]] || fail "Run Command acceptance wrapper requires root."
       [[ "${C2C_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid source SHA."
+      main_sha="$(git ls-remote --heads https://github.com/C2C-Connect/claim2car-connect.git refs/heads/main | awk '{print $1}')"
+      [[ "$main_sha" == "$C2C_SOURCE_SHA" ]] || fail "Source SHA must be the current main head."
       path="/tmp/claim2car-runtime-acceptance-${C2C_SOURCE_SHA}.py"
       [[ "${C2C_ACCEPTANCE_SCRIPT_PATH:-}" == "$path" && -f "$path" && ! -L "$path" ]] || fail "Acceptance script path mismatch."
       [[ "${C2C_ACCEPTANCE_SCRIPT_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] || fail "Invalid acceptance checksum."
