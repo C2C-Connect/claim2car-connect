@@ -69,9 +69,9 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
                  'verified shop acceptance',None,previous,entry_hash,json.dumps(lines,separators=(',',':')))).fetchone()[0]
         self.assertEqual(result,'ACCEPTED')
 
-    def register(self,*,intent_id=None,link='link-1',order='order-1',url='https://sandbox.square.link/u/test',key='c2c-shop-fee-test',actor='operator-1'):
+    def register(self,*,tenant=None,intent_id=None,link='link-1',order='order-1',url='https://sandbox.square.link/u/test',key='c2c-shop-fee-test',actor='operator-1'):
         return self.conn.execute('SELECT faos.register_square_sandbox_payment_intent(%s::uuid,%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::text)',
-            (self.tenant,intent_id or str(uuid.uuid4()),self.entry_id,link,order,url,key,actor)).fetchone()[0]
+            (tenant or self.tenant,intent_id or str(uuid.uuid4()),self.entry_id,link,order,url,key,actor)).fetchone()[0]
 
     def test_create_and_retry_are_idempotent_and_tenant_visible(self):
         with tenant_transaction(self.conn,self.tenant):
@@ -106,5 +106,5 @@ class SquareSandboxPaymentIntentIntegration(unittest.TestCase):
                 self.conn.execute('INSERT INTO faos.square_sandbox_payment_intents(tenant_id,payment_intent_id,obligation_entry_id,session_id,acceptance_id,partner_org_id,provider,provider_link_id,provider_order_id,checkout_url,idempotency_key,amount_cents,currency,status,created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                     (self.tenant,str(uuid.uuid4()),self.entry_id,self.session,self.acceptance,self.partner,'SQUARE_SANDBOX','l','o','https://sandbox.square.link/u/test','k',27500,'USD','LINK_CREATED','operator-1'))
             with self.assertRaises(psycopg.errors.RaiseException) as mismatch:
-                self.register(intent_id=str(uuid.uuid4()),actor='operator-1')
+                self.register(tenant=str(uuid.uuid4()),intent_id=str(uuid.uuid4()),actor='operator-1')
             self.assertEqual(mismatch.exception.diag.message_primary,'TENANT_CONTEXT_MISMATCH')

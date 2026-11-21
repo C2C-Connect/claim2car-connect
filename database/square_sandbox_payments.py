@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from backend.app.anchor.ledger import LedgerJournalEntry
-from app.payments.square_sandbox import SquareSandboxCheckout, SquareSandboxError
+from app.payments.square_sandbox import SquareSandboxCheckout
 
 
 class SquareSandboxPaymentStoreError(ValueError):

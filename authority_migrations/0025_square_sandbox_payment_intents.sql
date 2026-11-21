@@ -55,6 +55,8 @@ BEGIN
  OR p_provider_order IS NULL OR length(trim(p_provider_order))=0
  OR p_idempotency IS NULL OR length(trim(p_idempotency))=0
  OR length(p_idempotency)>192 OR p_actor IS NULL OR length(trim(p_actor))=0
+ OR p_checkout_url IS NULL OR length(trim(p_checkout_url))=0
+ OR length(p_checkout_url)>2048
  OR p_checkout_url !~ '^https://(sandbox\.square\.link|square\.link|checkout\.square\.site)/[^#]+$'
  THEN RAISE EXCEPTION 'INVALID_SQUARE_SANDBOX_PAYMENT_INTENT'; END IF;
 
