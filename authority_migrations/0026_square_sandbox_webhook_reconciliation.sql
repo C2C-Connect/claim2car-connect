@@ -59,7 +59,7 @@ AS $$
 DECLARE receipt faos.square_sandbox_webhook_receipts%ROWTYPE;
         intent faos.square_sandbox_payment_intents%ROWTYPE;
         current_state faos.square_sandbox_payment_reconciliations%ROWTYPE;
-        next_status text;
+        next_status text;\n        state_found boolean;
 BEGIN
  IF p_event_id IS NULL OR length(trim(p_event_id))=0 OR length(p_event_id)>128
  OR p_event_type NOT IN ('payment.created','payment.updated')
@@ -117,7 +117,7 @@ BEGIN
  END IF;
  next_status:=CASE p_status WHEN 'APPROVED' THEN 'AUTHORIZED'
   WHEN 'COMPLETED' THEN 'PAID' WHEN 'CANCELED' THEN 'CANCELED' WHEN 'FAILED' THEN 'FAILED' END;
- IF FOUND AND (current_state.status='PAID' OR p_event_created_at<=current_state.updated_at) THEN
+ IF state_found AND (current_state.status='PAID' OR p_event_created_at<=current_state.updated_at) THEN
   UPDATE faos.square_sandbox_webhook_receipts SET tenant_id=intent.tenant_id,
    payment_intent_id=intent.payment_intent_id,reconciliation_status='STALE_EVENT'
    WHERE provider_event_id=p_event_id;

@@ -64,7 +64,7 @@ class SquareSandboxPaymentIntentStore:
                 "SELECT payment_intent_id::text,tenant_id::text,obligation_entry_id,acceptance_id,"
                 "partner_org_id,provider_link_id,provider_order_id,checkout_url,idempotency_key,"
                 "amount_cents,currency,status,created_by,created_at::text,updated_at::text "
-                "FROM faos.square_sandbox_payment_intents WHERE tenant_id=%s AND idempotency_key=%s",
+                "FROM faos.square_sandbox_payment_intents i LEFT JOIN faos.square_sandbox_payment_reconciliations r ON r.tenant_id=i.tenant_id AND r.payment_intent_id=i.payment_intent_id WHERE i.tenant_id=%s AND i.idempotency_key=%s",
                 (tenant_id,checkout.idempotency_key),
             ).fetchone()
             if row is None:
