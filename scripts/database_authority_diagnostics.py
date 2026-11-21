@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import traceback
 import uuid
 import psycopg
 from psycopg import sql
@@ -359,6 +360,7 @@ if __name__ == '__main__':
         report['diagnostics_successful'] = False
         report['execution_error_type'] = type(error).__name__
         report['execution_error_message'] = str(error)
+        report['execution_error_traceback'] = traceback.format_exc()
     try:
         counted_path, counted_tests = load_counted_database_report()
         report['counted_test_report_path'] = str(counted_path)
