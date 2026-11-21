@@ -39,7 +39,7 @@ write_files:
       [[ "$namespace" =~ ^[a-z0-9]+$ && "$repository" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]] || fail "OCIR namespace or repository is invalid."
       [[ "$image" == "$registry/$namespace/$repository:"* && "$image" =~ :sha-([a-f0-9]{40})@sha256:[a-f0-9]{64}$ ]] || fail "App image must be bound to the configured repository, commit-tagged, and digest-pinned."
       [[ "${BASH_REMATCH[1]}" == "$commit" ]] || fail "App image commit tag does not match requested source commit."
-      [[ "$db_image" =~ @sha256:[a-f0-9]{64}$ && ( "$db_image" == "$registry/"* || "$db_image" == "docker.io/"* || "$db_image" == "quay.io/"* ) ]] || fail "Database image must be digest-pinned and use OCIR or an explicit public registry host."
+      [[ "$db_image" == "docker.io/postgis/postgis:"* && "$db_image" =~ @sha256:[a-f0-9]{64}$ ]] || fail "Database image must be the official docker.io/postgis/postgis image pinned by digest."
       [[ "$secret_ocid" =~ ^ocid1\.vaultsecret\.[a-zA-Z0-9.]+$ ]] || fail "Vault secret OCID is invalid."
       oci_bin="/opt/oci-cli-venv/bin/oci"
       [[ -x "$oci_bin" ]] || fail "OCI CLI is not installed in the staging venv."
