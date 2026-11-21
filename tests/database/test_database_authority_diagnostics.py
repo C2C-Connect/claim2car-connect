@@ -111,7 +111,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_db02_accepts_the_complete_24_migration_inventory(self):
+    def test_db02_accepts_the_complete_25_migration_inventory(self):
         names = [
             '0001_tenant_registry.sql', '0002_event_journal.sql',
             '0003_completion_lock.sql', '0004_manifest_roots.sql',
