@@ -25,8 +25,8 @@ write_files:
       set -Eeuo pipefail
       fail() { echo "FAIL: $*" >&2; exit 1; }
       [[ $EUID -eq 0 ]] || fail "Must be invoked as root through the restricted OCI Run Command sudo rule."
-      [[ $# -eq 6 ]] || fail "Expected commit, app image, script checksum, DB image, registry, and Vault secret OCID."
-      commit="$1"; image="$2"; script_sha="$3"; db_image="$4"; registry="$5"; secret_ocid="$6"
+      [[ $# -eq 8 ]] || fail "Expected commit, app image, script checksum, DB image, registry, Vault secret OCID, OCIR namespace, and repository."
+      commit="$1"; image="$2"; script_sha="$3"; db_image="$4"; registry="$5"; secret_ocid="$6"; namespace="$7"; repository="$8"
       work=""
       cleanup() {
         [[ -z "$work" || ! -d "$work" ]] || rm -rf "$work"
@@ -35,10 +35,11 @@ write_files:
       trap cleanup EXIT
       [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Commit SHA is invalid."
       [[ "$script_sha" =~ ^[a-f0-9]{64}$ ]] || fail "Deploy-script SHA-256 is invalid."
-      [[ "$registry" =~ ^[a-z0-9.-]+$ ]] || fail "Registry host is invalid."
-      [[ "$image" == "$registry/"* && "$image" =~ :sha-([a-f0-9]{40})@sha256:[a-f0-9]{64}$ ]] || fail "App image must be registry-bound, commit-tagged, and digest-pinned."
+      [[ "$registry" == "us-chicago-1.ocir.io" ]] || fail "Registry host must be the configured Chicago OCIR registry."
+      [[ "$namespace" =~ ^[a-z0-9]+$ && "$repository" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]] || fail "OCIR namespace or repository is invalid."
+      [[ "$image" == "$registry/$namespace/$repository:"* && "$image" =~ :sha-([a-f0-9]{40})@sha256:[a-f0-9]{64}$ ]] || fail "App image must be bound to the configured repository, commit-tagged, and digest-pinned."
       [[ "${BASH_REMATCH[1]}" == "$commit" ]] || fail "App image commit tag does not match requested source commit."
-      [[ "$db_image" =~ @sha256:[a-f0-9]{64}$ ]] || fail "Database image must be digest-pinned."
+      [[ "$db_image" =~ @sha256:[a-f0-9]{64}$ && ( "$db_image" == "$registry/"* || "$db_image" == "docker.io/"* || "$db_image" == "quay.io/"* ) ]] || fail "Database image must be digest-pinned and use OCIR or an explicit public registry host."
       [[ "$secret_ocid" =~ ^ocid1\.vaultsecret\.[a-zA-Z0-9.]+$ ]] || fail "Vault secret OCID is invalid."
       oci_bin="/opt/oci-cli-venv/bin/oci"
       [[ -x "$oci_bin" ]] || fail "OCI CLI is not installed in the staging venv."
