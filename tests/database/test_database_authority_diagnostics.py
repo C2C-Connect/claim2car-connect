@@ -67,7 +67,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0021_collision_claim_link.sql',
             ]))
 
-    def test_db01_accepts_the_24_migration_synthetic_environment(self):
+    def test_db01_accepts_the_25_migration_synthetic_environment(self):
         names = [f'{number:04d}_' + suffix for number, suffix in enumerate((
             'tenant_registry.sql', 'event_journal.sql', 'completion_lock.sql',
             'manifest_roots.sql', 'completion_receipts.sql',
@@ -77,7 +77,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             'claim_case_retry_without_update_lock.sql', 'claim_case_capture_session.sql',
             'claim_case_incident_intake.sql', 'incident_event_kinds.sql',
             'claim_case_incident_read_boundary.sql', 'event_contract_parity.sql',
-            'capture_protocol_session_binding.sql', 'manifest_root_protocol_binding.sql', 'collision_lifecycle_record.sql', 'collision_claim_link.sql', 'collision_vehicle_capture_link.sql', 'consented_vehicle_profile.sql', 'audited_capture_exceptions_pause_resume.sql',
+            'capture_protocol_session_binding.sql', 'manifest_root_protocol_binding.sql', 'collision_lifecycle_record.sql', 'collision_claim_link.sql', 'collision_vehicle_capture_link.sql', 'consented_vehicle_profile.sql', 'audited_capture_exceptions_pause_resume.sql', 'square_sandbox_payment_intents.sql',
         ), start=1)]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_unchanged_candidate_compares',
