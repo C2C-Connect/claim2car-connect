@@ -32,7 +32,7 @@ def create_square_webhook_router(*, database_url=None, config_factory=SquareSand
             return JSONResponse({"detail":"WEBHOOK_BODY_TOO_LARGE"},status_code=413)
         try:
             config = config_factory()
-            config.validate()
+            config.validate_webhook()
             if config.environment != "sandbox":
                 return JSONResponse({"detail":"SQUARE_SANDBOX_ONLY"},status_code=503)
             event = verify_and_parse_square_payment_event(
