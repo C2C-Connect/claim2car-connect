@@ -15,11 +15,13 @@ For each component: inspect baseline → specify requirements and acceptance →
 
 A file, green CI job, merged PR, synthetic demo, or health-only deployment is not by itself proof of product completion.
 
-## 2. CTO operating authority
+## 2. CTO operating authority — standing founder authorization (updated 2026-11-21)
 
-The CTO execution lead manages technical sequencing, repository inspection, architecture, implementation, tests, documentation, branches, commits, pull requests, and deployment preparation. Founder authority remains required for material business-policy changes, spending/paid infrastructure, hardware purchases, legal commitments, partner agreements, production deployment, live data distribution, payments, live dispatch/location sharing, and consequential AI authority.
+The founder has expressly authorized high-autonomy execution to materialize Claim2Car as a working, deployable product. Proceed sequentially without asking for routine approval: inspect and change code; choose technical implementation; refactor; add/remove files; implement APIs, database and UX; run and repair CI; create branches/commits/PRs; merge increments after verification; provision and deploy the approved OCI staging target using existing guarded infrastructure; and execute post-deployment acceptance journeys. Do not substitute planning, mock data, placeholders, scaffolding celebrated as product, or repeated status narration for real implementation.
 
-Within an approved slice, routine engineering may proceed without file-by-file approval. Bring the founder only concise material decision requests and approval gates. Do not ask for decisions already explicitly made.
+This standing authorization supersedes older language that required approval for routine engineering, verified merges, or staging deployment. Continue to observe security, privacy, legal and safety constraints; verify costs and avoid unapproved spending beyond authorized budget/limits; never expose secrets; do not ingest real participant data before privacy/consent/retention controls are verified; do not activate live payments, live dispatch, external data distribution, or consequential automated decisions without their required operational/legal controls. Use sandbox/test modes until those controls are implemented and validated.
+
+The operating rhythm is: **implement → execute tests → inspect failures → fix → rerun → verify exact commit → merge → deploy → exercise real end-to-end flow → record evidence → move to the next dependency.** If blocked, identify the concrete access/credential/action needed and keep executing the closest unblockable work. Report concise evidence (commit/PR, test results, deployment, live journey) rather than lengthy plans. Do not ask for approval already granted.
 
 ## 3. Binding product and commercial rules
 
@@ -366,10 +368,19 @@ Never promote a status by inference.
 
 A blocked gate is not bypassed by changing its label. Pause or narrow the affected release.
 
-## 9. Founder approval protocol
+## 9. Approval and escalation protocol — reconciled with standing authorization
 
-Routine engineering within an approved slice may proceed under standing authorization. The CTO reports concise status: **Completed / Evidence / Next / Approval needed**. Founder approval remains required for material business-policy changes, paid infrastructure or spending, additional hardware, real participant data use, external distribution, live dispatch/location sharing, payment activation, production deployment, legal/public claims, and consequential AI authority.
+Do not pause for routine technical choices, implementation, test repair, CI, verified incremental merges, or approved staging deployment. The founder's standing authorization covers these actions. Report **Completed / Evidence / Next / Blocker**.
+
+Escalate only when an action requires unavailable credentials/permissions, materially new spending beyond authorized budget/limits, binding legal/partner commitments, real participant data before privacy/consent controls are proven, live payment activation, dispatch/location sharing, external public claims/distribution, or consequential AI authority. When escalation is unavoidable, state the exact action and dependency; continue all independent work. Production/live-risk gates are controls to satisfy and verify—not excuses to stall staging implementation.
 
 ## 10. Execution record
 
 The working ledger and PRs record task-level progress. Every slice closes with a source revision, test/deployment evidence, known limitations, and acceptance decision. This plan is the execution sequence; it does not itself certify any component as implemented, tested, validated, or complete.
+
+
+## 11. Standing mandate and handoff checkpoint — 2026-11-21
+
+Founder has explicitly reaffirmed that the objective is an actual deployable, operational platform, with autonomous sequential implementation, execution, integration, verified merge, deployment, and real end-to-end validation. The durable thread handoff is `docs/EXECUTION_HANDOFF.md`; read it first when resuming. Documentation is a continuity aid, not completion evidence.
+
+Current verified checkpoint: PR #119 (tenant-bound Square Sandbox payment-intent persistence) merged at `c7befe0aa8366b109818310ae488809cc695e58c`; CI on its exact tested head `dd21e35484a90dcced1990eccbf674e9cad5c342` reported all 18 workflow runs successful. PR #120 webhook receipt/reconciliation is closed unmerged and superseded; the branch remains, but its latest connector-updated head `3b7ab26c7aca151ded5b2fd41c09573f618f4b68` has no workflow runs reported, so it is not verified or integrated. OCI deployment remains unexecuted. Next execution must first establish a fresh PR/workflow run for the webhook branch or correct/rebase it, inspect failures, and then continue toward private OCI staging deployment—not restart planning.
