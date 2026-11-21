@@ -95,7 +95,9 @@ def test_poll_command_fails_closed_for_failed_execution():
 def test_cloud_init_enables_private_runcommand_without_broad_sudo():
     cloud_init=(ROOT/"infra/oci/staging/cloud-init.yaml").read_text()
     assert "oci-cli==3.96.3" in cloud_init
-    assert "Compute Instance Run Command" in cloud_init
+    terraform=(ROOT/"infra/oci/staging/main.tf").read_text()
+    assert 'name = "Compute Instance Run Command"' in terraform
+    assert 'desired_state = "ENABLED"' in terraform
     assert "ocarun ALL=(root) NOPASSWD: /usr/local/sbin/claim2car-staging-deploy" in cloud_init
     assert "NOPASSWD:ALL" not in cloud_init
     assert "ocir_auth_secret" in cloud_init or "secret-bundle get" in cloud_init
@@ -107,3 +109,15 @@ def test_terraform_runcommand_secret_access_is_scoped_to_secret_ocid():
     assert "enable_private_runcommand_deploy" in variables
     assert "target.secret.id='${var.ocir_auth_secret_ocid}'" in terraform
     assert "instance.id = '${oci_core_instance.staging.id}'" in terraform
+
+
+def test_private_runtime_deploy_workflow_is_manual_main_only_and_secret_free():
+    workflow=(ROOT/".github/workflows/oci-staging-runtime-deploy.yml").read_text()
+    assert "workflow_dispatch:" in workflow
+    assert "github.ref == 'refs/heads/main' && inputs.confirm_deploy == 'yes'" in workflow
+    assert "environment: oci-staging-apply" in workflow
+    assert "OCI_OCIR_AUTH_SECRET_OCID" in workflow
+    assert "OCI_REGISTRY_TOKEN" not in workflow
+    assert "OCIR_AUTH_TOKEN" not in workflow
+    assert "scripts/oci_staging_runcommand_deploy.py" in workflow
+    assert "persist-credentials: false" in workflow
