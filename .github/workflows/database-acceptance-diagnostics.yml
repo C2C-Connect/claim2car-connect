@@ -80,7 +80,7 @@ jobs:
                       'classification':'executable-db-01-through-db-14-gate-results','gate_passes_awarded':0,
                       'criteria_passes':0,'overall_acceptance':'NOT ACCEPTED',
                       'component_phase':'legacy primary through0007; isolated full-authority migration and integration databases',
-                      'diagnostic_phase':'primary after full default migration plan through0024'}
+                      'diagnostic_phase':'primary after full default migration plan through0026'}
           metadata['diagnostic_report_present'] = report.is_file()
           if report.is_file():
               metadata['classification'] = value.get('classification', metadata['classification'])
