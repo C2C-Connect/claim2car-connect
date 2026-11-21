@@ -60,7 +60,11 @@ def fstab_rows(path):
     if not path.exists():return []
     return [line.strip().split() for line in path.read_text().splitlines() if line.strip() and not line.lstrip().startswith("#")]
 def validate_fstab(path,uuid,target):
-    for row in fstab_rows(path):
+    rows=fstab_rows(path)
+    target_rows=[row for row in rows if len(row)>=2 and row[1]==target]
+    uuid_rows=[row for row in rows if len(row)>=1 and row[0]=="UUID=" + uuid]
+    if len(target_rows)>1 or len(uuid_rows)>1:raise MountSetupError("FSTAB_DUPLICATE_ENTRY")
+    for row in rows:
         if len(row)<3:raise MountSetupError("FSTAB_ENTRY_MALFORMED")
         source,mountpoint,fs=row[:3]
         if mountpoint==target:
@@ -68,6 +72,9 @@ def validate_fstab(path,uuid,target):
             return True
         if source=="UUID="+uuid:raise MountSetupError("FSTAB_UUID_ALREADY_ASSIGNED:"+uuid)
     return False
+def validate_target_fstab_unassigned(path,target):
+    if any(len(row)>=2 and row[1]==target for row in fstab_rows(path)):
+        raise MountSetupError("FSTAB_TARGET_CONFLICT:"+target)
 def persist_fstab(entries,path):
     original=path.read_text() if path.exists() else ""
     additions=[]
@@ -101,6 +108,7 @@ def setup_mounts(mapping,*,format_empty=False,confirmation="",dry_run=False,fsta
         verify_unmounted(dev);info=filesystem_info(dev)
         if info is None:
             verify_no_signatures(dev)
+            validate_target_fstab_unassigned(fstab,str(target))
             if not dry_run and not format_empty:raise MountSetupError("UNFORMATTED_VOLUME_REQUIRES_EXPLICIT_FORMAT:"+purpose)
             filesystems[purpose]=None
             plan.append({"purpose":purpose,"action":"format-and-mount" if format_empty else "blank-volume-format-gate-required","device":dev,"target":str(target)})
