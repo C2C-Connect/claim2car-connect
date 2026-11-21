@@ -38,7 +38,10 @@ write_files:
         [[ -d "$path" && ! -L "$path" ]] || fail "storage path missing or symlinked: $path"
         source="$(findmnt -rn -o SOURCE --mountpoint "$path")" || fail "persistent volume is not mounted at $path"
         [[ -n "$source" ]] || fail "persistent volume source is empty: $path"
-        [[ "$(stat -c %u "$path")" == "10001" ]] || fail "storage path must be owned by UID 10001: $path"
+        [[ "$(stat -c %u:%g "$path")" == "10001:10001" ]] || fail "storage path must be owned by UID/GID 10001: $path"
+        expected_mode="750"
+        [[ "$path" == "$evidence_path" ]] && expected_mode="700"
+        [[ "$(stat -c %a "$path")" == "$expected_mode" ]] || fail "storage path mode must be $expected_mode: $path"
 
         # Exercise the actual application identity and durable filesystem operations.
         runuser -u 10001 -- python3 - "$path" <<'PY'

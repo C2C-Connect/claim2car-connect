@@ -46,6 +46,14 @@ def test_deploy_script_shell_syntax_and_expanded_variables():
     assert 'Expected ARM64 PostgreSQL image' in content
     assert '--read-only --cap-drop=ALL --security-opt=no-new-privileges' in content
     assert '--tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001' in content
+    assert '--user 10001:10001' in content
+    assert 'PostgreSQL storage mount root must be mode 0750' in content
+    assert 'Evidence storage mount root must be mode 0700' in content
+    entrypoint=ROOT/"config/claim2car-entrypoint.sh"
+    subprocess.run(["sh","-n",str(entrypoint)],check=True)
+    entry_content=entrypoint.read_text()
+    assert "EVIDENCE_STORAGE_OWNER_OR_MODE_INVALID" in entry_content
+    assert 'exec "$@"' in entry_content
     assert 'podman login "$REGISTRY"' not in content
 
 
@@ -59,7 +67,9 @@ def test_runtime_deploy_requires_digest_pinned_database_and_distinct_mounts():
     assert "C2C_POSTGRES_IMAGE must be pinned by sha256 digest" in d
     assert "findmnt -rn -o SOURCE --mountpoint" in d
     assert "PostgreSQL and evidence storage must be distinct mounted volumes" in d
-    assert "Storage mount root must be UID 10001" in d
+    assert "Storage mount root must be UID/GID 10001" in d
+    assert "PostgreSQL storage mount root must be mode 0750" in d
+    assert "Evidence storage mount root must be mode 0700" in d
     assert "runtime.env must be root-owned mode 0600" in d
     assert "capture-runtime.json must be root-owned mode 0640" in d
     assert "Existing PostgreSQL container is bound to unexpected storage" in d

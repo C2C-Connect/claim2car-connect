@@ -15,7 +15,13 @@ fail(){ echo "FAIL: $*" >&2; exit 1; }
 for p in "$ROOT/postgres" "$ROOT/evidence"; do
  [[ -d "$p" && ! -L "$p" ]] || fail "Storage path missing or symlinked: $p"
  mountpoint -q "$p" || fail "Storage path not mounted: $p"
- [[ "$(stat -c %u "$p")" == 10001 ]] || fail "Storage mount root must be UID 10001: $p"
+ [[ "$(stat -c %u:%g "$p")" == 10001:10001 ]] || fail "Storage mount root must be UID/GID 10001: $p"
+ mode="$(stat -c %a "$p")"
+ if [[ "$p" == "$ROOT/postgres" ]]; then
+  [[ "$mode" == 750 ]] || fail "PostgreSQL storage mount root must be mode 0750: $p"
+ else
+  [[ "$mode" == 700 ]] || fail "Evidence storage mount root must be mode 0700: $p"
+ fi
 done
 postgres_source="$(findmnt -rn -o SOURCE --mountpoint "$ROOT/postgres")" || fail "Unable to resolve PostgreSQL mount source."
 evidence_source="$(findmnt -rn -o SOURCE --mountpoint "$ROOT/evidence")" || fail "Unable to resolve evidence mount source."
@@ -54,7 +60,7 @@ podman run --rm --network "$NETWORK" -e MIGRATION_DATABASE_URL="$MIGRATION_DATAB
 podman exec -i "$DB_CONTAINER" psql -U postgres -d claim2car -v ON_ERROR_STOP=1 < "$CONFIG/seed-tenant.sql"
 previous=""; [[ -f "$CONFIG/last-image-ref" ]] && previous="$(cat "$CONFIG/last-image-ref")"
 podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true; podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true
-run_app(){ local ref="$1"; podman run -d --name "$APP_CONTAINER" --restart=always --network "$NETWORK" --read-only --cap-drop=ALL --security-opt=no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001 -p "127.0.0.1:$APP_PORT:8000" -e C2C_RUNTIME_MODE=integrated -e APP_DATABASE_URL="$APP_DATABASE_URL" -e C2C_INTERNAL_SERVICE_TOKEN="$C2C_INTERNAL_SERVICE_TOKEN" -e C2C_VIN_HMAC_PEPPER="$C2C_VIN_HMAC_PEPPER" -e C2C_CAPTURE_CONFIG_FILE=/run/secrets/capture-runtime.json -e C2C_ARTIFACT_STORAGE_ROOT=/var/lib/claim2car/evidence -e C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true -v "$ROOT/evidence:/var/lib/claim2car/evidence:Z" -v "$CONFIG/capture-runtime.json:/run/secrets/capture-runtime.json:ro,Z" "$ref"; }
+run_app(){ local ref="$1"; podman run -d --name "$APP_CONTAINER" --restart=always --network "$NETWORK" --user 10001:10001 --read-only --cap-drop=ALL --security-opt=no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001 -p "127.0.0.1:$APP_PORT:8000" -e C2C_RUNTIME_MODE=integrated -e APP_DATABASE_URL="$APP_DATABASE_URL" -e C2C_INTERNAL_SERVICE_TOKEN="$C2C_INTERNAL_SERVICE_TOKEN" -e C2C_VIN_HMAC_PEPPER="$C2C_VIN_HMAC_PEPPER" -e C2C_CAPTURE_CONFIG_FILE=/run/secrets/capture-runtime.json -e C2C_ARTIFACT_STORAGE_ROOT=/var/lib/claim2car/evidence -e C2C_REQUIRE_PERSISTENT_EVIDENCE_MOUNT=true -v "$ROOT/evidence:/var/lib/claim2car/evidence:Z" -v "$CONFIG/capture-runtime.json:/run/secrets/capture-runtime.json:ro,Z" "$ref"; }
 run_app "$IMAGE_REF"; revision="$(echo "$IMAGE_REF" | sed -E 's/.*sha-([0-9a-f]{40}).*/\1/')"; ok=0
 for i in $(seq 1 60); do if curl --fail --silent "http://127.0.0.1:$APP_PORT/health/ready" >/dev/null 2>&1 && curl --fail --silent "http://127.0.0.1:$APP_PORT/health/build" | grep -q "$revision"; then ok=1; break; fi; sleep 3; done
 if [[ "$ok" != 1 ]]; then podman logs "$APP_CONTAINER" >&2 || true; podman stop "$APP_CONTAINER" >/dev/null 2>&1 || true; podman rm "$APP_CONTAINER" >/dev/null 2>&1 || true; [[ -n "$previous" ]] && run_app "$previous"; fail "New deployment failed; rollback attempted."; fi
