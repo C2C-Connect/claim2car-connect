@@ -53,7 +53,7 @@ assert.ok(browserWorkbenchSource.includes("/v1/capture-protocols"), "workbench m
 assert.ok(browserWorkbenchSource.includes("captureSlots()"), "workbench must render slots from the selected protocol");
 assert.ok(browserWorkbenchSource.includes("capture-protocol-version"), "workbench must allow protocol selection for new cases");
 assert.ok(browserWorkbenchSource.includes("/v1/claim-cases"), "workbench must create a persistent claim-case record");
-assert.ok(browserWorkbenchSource.includes("capture_protocol_version:byId(\"capture-protocol-version\").value||DEFAULT_CAPTURE_PROTOCOL"), "new cases must bind selected protocol with 16-v1 default");
+assert.ok(browserWorkbenchSource.includes("capture_protocol_version:\"claims2car-16-v1\""), "new cases must bind the implemented 16-view protocol");
 assert.ok(!browserWorkbenchSource.includes('api("/v1/capture-sessions",state.token'), "workbench must not create unlinked controlled-test sessions");
 assert.ok(browserWorkbenchSource.includes("/v1/claim-cases?limit=50"), "operator workbench must load persistent case history");
 assert.ok(browserWorkbenchSource.includes("/evidence-readiness"), "resuming a case must use server-authoritative readiness");

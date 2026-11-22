@@ -21,6 +21,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0024_audited_capture_exceptions_pause_resume.sql',
             '0025_square_sandbox_payment_intents.sql',
             '0026_square_sandbox_webhook_reconciliation.sql',
+            '0027_capture_protocol_16_v2.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
@@ -113,7 +114,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_db02_accepts_the_complete_26_migration_inventory(self):
+    def test_db02_accepts_the_complete_27_migration_inventory(self):
         names = [
             '0001_tenant_registry.sql', '0002_event_journal.sql',
             '0003_completion_lock.sql', '0004_manifest_roots.sql',
@@ -155,8 +156,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_rejects_unreviewed_migration_after_0026(self):
-        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0026'):
+    def test_rejects_unreviewed_migration_after_0027(self):
+        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0027'):
             validate_authority_migration_inventory(self.inventory([
                 '0017_event_contract_parity.sql',
                 '0018_capture_protocol_session_binding.sql',
@@ -168,7 +169,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0024_audited_capture_exceptions_pause_resume.sql',
                 '0025_square_sandbox_payment_intents.sql',
                 '0026_square_sandbox_webhook_reconciliation.sql',
-                '0027_unreviewed.sql',
+                '0027_capture_protocol_16_v2.sql',
+                '0028_unreviewed.sql',
             ]))
 
 
