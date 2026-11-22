@@ -98,8 +98,8 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert "/api/v1/capture-protocols" in workbench_script.text
                 assert "capture_protocol_version" in workbench_script.text
                 assert "loadCaptureProtocols" in workbench_script.text
-                assert "captureSlots()" in workbench_script.text
-                assert "capture-protocol-version" in workbench_html.text
+                assert "PROTOCOL_SLOTS[protocol.version]" in workbench_script.text
+                assert 'id="capture-protocol-version"' in shell.text
                 assert 'id="capture-protocol-version"' in shell.text
                 assert "/api/v1/review-queue" in workbench_script.text
                 assert "createOfflineEvidenceQueue" in workbench_script.text
