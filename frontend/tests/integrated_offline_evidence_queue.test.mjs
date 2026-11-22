@@ -8,7 +8,7 @@ const appHtml=await readFile(new URL("../app/index.html",import.meta.url),"utf8"
 assert.match(appSource,/createOfflineEvidenceQueue/);
 assert.match(appSource,/queueFile\(\{sessionId:state\.sessionId,tenantId:state\.tenantId,actorId:state\.actorId,slot,file,keyMaterial:state\.token\}\)/);
 assert.match(appSource,/syncQueuedEvidence/);
-assert.match(appSource,/keyMaterial:state\.token/);
+assert.match(appSource,/keyMaterial:state\.token/);\nassert.match(appSource,/syncSession\(\{\s*sessionId:state\.sessionId,tenantId:state\.tenantId,actorId:state\.actorId,keyMaterial:state\.token,/);
 assert.match(appSource,/window\.addEventListener\("online"/);
 assert.match(appSource,/api\("\/v1\/identity",token\)/);
 assert.match(appHtml,/id="offline-queue-status"/);
