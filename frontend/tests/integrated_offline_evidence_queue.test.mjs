@@ -9,7 +9,7 @@ assert.match(appSource,/createOfflineEvidenceQueue/);
 assert.match(appSource,/queueFile\(\{sessionId:state\.sessionId,tenantId:state\.tenantId,actorId:state\.actorId,slot,file\}\)/);
 assert.match(appSource,/syncQueuedEvidence/);
 assert.match(appSource,/window\.addEventListener\("online"/);
-assert.match(appSource,/state\.tenantId&&state\.actorId/);
+assert.match(appSource,/!state\.tenantId\|\|!state\.actorId/);
 assert.match(appSource,/api\("\/v1\/identity",token\)/);
 assert.match(appHtml,/id="offline-queue-status"/);
 assert.match(appHtml,/id="sync-queued-evidence"/);
