@@ -154,3 +154,8 @@ Only synthetic data is in scope for staging. Live financial and dispatch integra
 Retired prototypes (do not use as canonical): C2C-Connect/C2C and
 claim2car-network/claim2car-faos-core. PR #1 remains Draft pending release review.
 
+
+
+## Governing FAOS engineering manual
+
+The owner-supplied **Claim2Car Connect™ Forensic Operating System (FAOS) Core Engine Implementation Guide & Subsystem Engineering Manual** is now a durable governing engineering reference: [FAOS Core Engine Manual](docs/architecture/FAOS_CORE_ENGINE_IMPLEMENTATION_GUIDE.md). It specifies the target edge capture and quality architecture, VIN, offline FIFO sync, cryptographic evidence provenance, DARCI and multimodal assessment, consensus/human review, jurisdictional triage, commercial routing, reporting/dispatch/settlement, schemas, and acceptance strategy. Its parameters and named technologies are requirements/hypotheses—not proof of implementation or validated forensic/legal authority. The acceptance matrix controls actual status. New sessions must read this manual plus the handoff/status files and resume execution at the exact verified checkpoint.

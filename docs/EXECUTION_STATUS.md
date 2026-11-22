@@ -122,3 +122,10 @@ Run the guarded OCI infrastructure plan from GitHub Actions, review state and co
 ## Start-of-thread checklist
 
 Read this file, `docs/EXECUTION_HANDOFF.md`, `docs/CTO_MASTER_EXECUTION_PLAN.md`, and README; then inspect live main, OCI credentials/configuration, and current deployment workflow. Resume the staging implementation directly—do not re-plan.
+
+
+## FAOS core-engine premise and thread-resume continuity (owner directive — 2026-11-22)
+
+The full target architecture and subsystem requirements are now codified in [FAOS Core Engine Implementation Guide](architecture/FAOS_CORE_ENGINE_IMPLEMENTATION_GUIDE.md) and linked from README. Treat it as governing product direction: managed field sensor baseline; VIN validation/decode lineage; 16-point capture; quality/stability/audio targets; offline session FIFO; cryptographic artifact and chain verification; gateway and durable persistence; DARCI mechanics; multimodal vision/context; proposed 55/45 consensus and override; integrity scoring; jurisdiction-specific loss criteria; BFPI/dealer path; repair auction; ACORD/report/dispatch and sandbox payment. **Do not treat target values, models, sample XML/IDs, equations, blockchain examples, or commercial formulas as implemented/validated.** Actual maturity is evidenced by the gate matrix, code, exact commit and CI/deployment/field results. Consequential disposition remains human-authorized and unvalidated model output advisory only.
+
+**Resume protocol for any new thread:** Read README, docs/EXECUTION_HANDOFF.md, this file, docs/architecture/FAOS_CORE_ENGINE_IMPLEMENTATION_GUIDE.md, and docs/acceptance/ACCEPTANCE_MATRIX.md. Then query GitHub for current main SHA, PRs, latest exact-head workflow results, and deployment status. Continue directly from the next unfinished verified implementation/deployment task; do not re-plan or ask the founder to restate the mandate. Last documented infrastructure blocker is owner-controlled GitHub protected-environment/OCI credentials and manual workflow dispatch; do not request secrets in chat. Continue all unblockable code/test work meanwhile.
