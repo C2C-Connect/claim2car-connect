@@ -1,5 +1,19 @@
 # Claim2Car Standing Execution Mandate & Thread Handoff
 
+## Latest verified state — 2026-11-22
+
+- PR #154 merged: `c77b81d38947621a9f612f0c3402d585e9630ade`. Encrypted offline evidence queue integrated in the authenticated 16-view capture workbench. Local originals are AES-GCM encrypted, tenant/actor/session scoped, FIFO retried with stable IDs, and removed only after server acceptance. Real Chromium IndexedDB reload/recovery and wrong-key tests pass.
+- PR #156 merged: `607a257ac36cc95a224c3f101d46a5884646c40a`. Capture progress meter now separates server-accepted views from local pending originals; queue-unverified state is explicit and sealing is fail-closed.
+- Exact tested heads: 17 checks successful, 3 evidence-publication checks skipped, 0 failures for each. Full pytest: 987 passed, 31 warnings, 208 subtests. CodeQL and integrated container/ARM64 build passed.
+- The capture preview DOM-XSS finding was resolved by canvas preview rendering. No new CodeQL alerts.
+- **Still not deployed:** no user-accessible URL or verified persistent OCI staging host/database/evidence volume. Manual guarded OCI plan/apply/image-publish workflows exist, but this session's GitHub connector cannot dispatch protected workflows or inspect environment secrets. No field/device qualification or live payment/dispatch.
+
+## Standing execution mandate
+
+The concept is finalized. Stop producing high-level plans, placeholders, mock product data, or status-only work. Work directly on functional product increments. Use synthetic fixtures only inside tests/controlled demos and never present them as live cases. Continue with autonomous code changes, branches, commits, PRs, CI diagnosis/fixes, verified merges, and deployment where tools/credentials permit. Batch intermediate commits to avoid workflow spam. Do not bypass gates or claim a deployment/test passed without evidence.
+
+**Next concrete task:** run the guarded OCI staging infrastructure plan, resolve missing inputs/access, apply through the protected gate, provision PostgreSQL/PostGIS and persistent evidence storage, publish the immutable ARM64 image, deploy privately, and execute the authenticated capture/review persistence journey. If dispatch or secrets are inaccessible here, state the exact action needed from the owner and keep advancing deploy tooling and product code.
+
 ## Verified checkpoint — PR #153 merged (2026-11-22)
 
 - PR #153, **Make the Claim2Car secure workspace entry actionable**, merged. Merge commit: `76d5c6795de283be8967978239f2f5b5e59f700f`; tested head: `d550f213766f0512bd46e13ca4782c5b9481f494`.
