@@ -278,7 +278,7 @@ def verify_db_02(context):
     if len(names) != 27 or any(not name.startswith(prefix) for name, prefix in zip(names, expected)):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("ORDERED_COMPLETE_MIGRATION_INVENTORY")
-    if (len(inventory) != 26 or any(
+    if (len(inventory) != 27 or any(
             not isinstance(row, (list, tuple)) or len(row) != 2
             or not isinstance(row[1], str) or len(row[1]) != 64
             or any(character not in "0123456789abcdef" for character in row[1])
