@@ -1,5 +1,6 @@
 import { validateVin } from "../src/modules/capture/vin.mjs";
 import { createIndexedDbEvidenceStore, createOfflineEvidenceQueue } from "./offline_evidence_queue.mjs";
+import { analyzeImageFile, summarizeQualityReport } from "../src/modules/capture/quality_gate.mjs";
 const API = "/api";
 const MAX_BYTES = 25 * 1024 * 1024;
 const API_CAPTURE_SLOTS = [
@@ -250,9 +251,11 @@ function renderCaptureSlots(readiness=null){
       try{
         if(!offlineEvidenceQueue)throw new Error(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
         if(!state.tenantId||!state.actorId)throw new Error("SERVER_IDENTITY_NOT_VERIFIED");
+        let advisoryReport=null;try{advisoryReport=await analyzeImageFile(file);}catch{advisoryReport=null;}
+        const advisoryText=summarizeQualityReport(advisoryReport);
         await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file,keyMaterial:state.token});
         await queuePreview(file,slot,preview);
-        meta.textContent="Saved locally · pending upload · "+file.size.toLocaleString()+" bytes";meta.classList.remove("done");
+        meta.textContent="Saved locally · pending upload · "+file.size.toLocaleString()+" bytes · "+advisoryText;meta.classList.remove("done");if(advisoryReport&&!advisoryReport.passed)meta.classList.add("quality-warning");
         await refreshOfflineQueueStatus();
         if(navigator.onLine)await syncQueuedEvidence();
         renderExceptionPanel();updateSealButton();
