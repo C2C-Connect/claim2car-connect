@@ -12,9 +12,9 @@ Current implementation and release evidence are tracked in the [Acceptance & Rel
 ## Current user-facing application (verified 2026-11-22)
 
 - The canonical integrated application shell is `app/web/index.html` and its JavaScript/CSS assets under `app/web/assets/`; it is served at `/` only in integrated runtime mode. The root CTA directs to authenticated workspace sign-in; the controlled prototype is not the product entry point.
-- The integrated operator workbench code supports persistent case creation/reopen, consent-gated owner flow, VIN reference, 16-slot capture, browser IndexedDB queue-before-upload/FIFO retry, advisory quality checks, and evidence sealing. Reviewer functionality is also implemented in the same integrated shell.
+- The integrated operator workbench code supports persistent case creation/reopen, consent-gated owner flow, VIN reference, 16-slot capture, browser IndexedDB queue-before-upload/FIFO retry, advisory quality checks, evidence sealing, and a server-derived progress dashboard for consent, vehicle reference, registered originals, quality, and seal. Dashboard progress refreshes after upload and consent withdrawal. Reviewer functionality is also implemented in the same integrated shell.
 - Runtime credentials are provisioned out-of-band; no self-service signup exists. Do not create or expose test tokens in repository, chat, or public logs.
-- **The application is not deployed or reachable by the founder yet.** OCI staging provisioning, protected credentials/state bucket, private host, PostgreSQL/PostGIS, persistent volumes, and secure network access remain blockers. Code/CI verification does not substitute for deployment.
+- **The application is not deployed or reachable by the founder yet.** The private OCI Run Command deployment mechanism is merged, but protected OCI environments/secrets/variables, secured state bucket, reviewed Terraform apply, private host, PostgreSQL/PostGIS, verified persistent volumes, image publish/deploy, and secure access remain blockers. Code/CI verification does not substitute for deployment.
 
 Current UI entry change: [PR #153](https://github.com/C2C-Connect/claim2car-connect/pull/153) merged at `76d5c6795de283be8967978239f2f5b5e59f700f` (13/13 workflows passed).
 

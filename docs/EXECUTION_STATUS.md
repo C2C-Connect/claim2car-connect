@@ -1,5 +1,18 @@
 # Claim2Car execution status snapshot / new-thread handoff
 
+## Verified product checkpoint — PR #155 and #152 merged (2026-11-22)
+
+- **PR #155** `Add server-derived operator case progress dashboard` merged: `91753175251bb3a13d00dafe7a2692fbb7b88af6`. Dashboard reflects backend readiness: consent, vehicle reference, accepted originals, advisory quality, and seal; refreshed after upload and consent withdrawal. JavaScript syntax issue was corrected and regression-asserted before merge.
+- Exact PR #155 head: `3e9cf110a78c684c3b577f2d5c49193702ec7d95`. **17 checks successful, 3 publication checks skipped, 0 failures**; full pytest **987 passed, 31 warnings, 208 subtests passed**; integrated runtime/OCI ARM64 build passed.
+- **PR #152** `Add secure private OCI staging deployment through Run Command` merged: `f63788095986b889a8fb83efd4492aa9c437c03f`. Includes protected manual deployment workflow, instance-principal Vault OCIR secret retrieval, restricted sudo wrapper, exact-instance dynamic group and least-privilege secret policy, digest-pinned app image, source-pinned helper checksum, Run Command polling.
+- Exact PR #152 head: `7f179b6f76484c9031be60762d110334fc1f3110`. **18 checks successful, 3 publication checks skipped, 0 failures**; full pytest **1009 passed, 31 warnings, 208 subtests passed**; Terraform, restricted runtime, integrated container, and ARM64 build passed.
+- **Not deployed/operationally accepted:** no public/user-accessible staging URL, live OCI host, PostgreSQL/PostGIS instance, verified persistent evidence volume, backup/restore rehearsal, or field-device qualification. OCI environment secrets/variables and state bucket still require owner configuration; this connector cannot dispatch protected/manual workflows or inspect secrets.
+- No real participant data, live payments, or dispatch activation. CI/synthetic evidence is not field acceptance.
+
+## Next executable task — staging deployment
+
+Configure the protected GitHub environments `oci-staging` and `oci-staging-apply` separately (secrets do not inherit between them), the OCI state bucket/namespace, OCIR configuration, and Vault OCIR pull-secret. Run state bootstrap, inspect a non-destructive plan, apply only after reviewing resources/cost through the protected approval gate, safely identify and mount separate PostgreSQL/evidence volumes, provision PostGIS, publish the immutable ARM64 image, then run private deployment and end-to-end persistence/isolation/restore checks. Manual workflow dispatch is unavailable to this connector; if the owner must click the workflow, give the exact instructions without requesting credentials in chat.
+
 ## Verified product checkpoint — PR #154 and #156 merged (2026-11-22)
 
 - **PR #154** `Persist original capture evidence offline and resume uploads` merged: `c77b81d38947621a9f612f0c3402d585e9630ade`. Tested head: `6a4390750faf7d87213f2eaa9b4876aae22eaded`.
