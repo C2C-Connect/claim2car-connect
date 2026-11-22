@@ -71,7 +71,7 @@
 
           <section class="offline-queue-panel" aria-labelledby="offline-queue-heading">
             <div class="queue-panel-heading"><div><h3 id="offline-queue-heading">Offline evidence queue</h3><p class="muted">Each selected original is saved to this browser before upload is attempted. Retry is FIFO and uses the same artifact/request IDs.</p></div><span class="queue-badge">LOCAL RECOVERY</span></div>
-            <p class="queue-storage-warning">Pending originals reside in this device/browser’s IndexedDB storage. This is not encrypted vault storage; use a trusted device, keep it locked, and do not clear browser data until the queue is empty.</p>
+            <p class="queue-storage-warning">Queued originals are AES-GCM encrypted in this device/browser’s IndexedDB using a key derived from your operator token. Re-enter the same token to resume after reload; the token is never stored. This is not WORM or a device-qualified evidence vault. Keep the device locked and do not clear browser data while items are pending.</p>
             <div id="offline-queue-status" class="inline-status" role="status" aria-live="polite">Queue status unavailable until identity is verified.</div>
             <button id="sync-queued-evidence" class="button secondary" type="button" disabled>Retry pending uploads</button>
           </section>
