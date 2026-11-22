@@ -20,7 +20,7 @@ const API_CAPTURE_SLOTS = [
   ["14_physical_vin", "Physical VIN plate"],
   ["15_license_and_insurance_docs", "License / insurance documentation"]
 ];
-const state = { token:null, role:null, actorId:null, tenantId:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map(), slotRefs:new Map(), queueLastError:null };
+const state = { token:null, role:null, actorId:null, tenantId:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map(), slotRefs:new Map(), queueLastError:null, pendingQueueCount:0, queueStatusUnavailable:false };
 
 let offlineEvidenceQueue = null;
 let offlineEvidenceQueueError = null;
@@ -148,24 +148,24 @@ async function sha256Hex(buffer){
 async function refreshOfflineQueueStatus(){
   const statusNode=byId("offline-queue-status"),button=byId("sync-queued-evidence");
   if(!statusNode||!button)return;
-  if(offlineEvidenceQueueError||!offlineEvidenceQueue){
+  if(offlineEvidenceQueueError||!offlineEvidenceQueue){\n    state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;updateSealButton();
     statusNode.textContent="Local queue unavailable: "+(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
     statusNode.classList.add("error");button.disabled=true;return;
   }
-  if(!state.sessionId||!state.tenantId||!state.actorId){
+  if(!state.sessionId||!state.tenantId||!state.actorId){\n    state.pendingQueueCount=0;state.queueStatusUnavailable=false;updateSealButton();
     statusNode.textContent="Connect with a verified operator identity and open a capture session to use local recovery.";
     button.disabled=true;return;
   }
   try{
     const snapshot=await offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId});
-    const pending=snapshot.pending,uploaded=snapshot.uploaded;
+    const pending=snapshot.pending,uploaded=snapshot.uploaded;\n    state.pendingQueueCount=pending;state.queueStatusUnavailable=false;
     statusNode.textContent=pending
       ? pending+" original"+(pending===1?"":"s")+" pending locally · "+uploaded+" upload-confirmed · "+(navigator.onLine?"ready to retry":"device offline")+(state.queueLastError?" · last error: "+state.queueLastError:"")
       : snapshot.total+" queued record"+(snapshot.total===1?"":"s")+" · all uploads confirmed; original bytes discarded from local queue";
     statusNode.classList.toggle("error",Boolean(state.queueLastError));
-    button.disabled=pending===0||!state.token||!navigator.onLine||state.sealed;
+    button.disabled=pending===0||!state.token||!navigator.onLine||state.sealed;updateSealButton();
   }catch(error){
-    statusNode.textContent="Queue status failed: "+error.message;statusNode.classList.add("error");button.disabled=true;
+    statusNode.textContent="Queue status failed: "+error.message;statusNode.classList.add("error");button.disabled=true;state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;updateSealButton();
   }
 }
 async function syncQueuedEvidence(){
@@ -311,9 +311,9 @@ async function resolveException(slot,resolutionCode,explanation){
 }
 function updateSealButton(){
   const allUploaded=API_CAPTURE_SLOTS.every(([slot])=>state.artifacts.has(slot));
-  const allChecked=state.qualityRecorded||Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");
-  byId("seal-case").disabled=!allUploaded||!allChecked||state.sealed||state.capturePaused;
-  byId("seal-case").textContent=state.qualityRecorded?"Retry evidence sealing":"Record checks and seal evidence";
+  const allChecked=state.qualityRecorded||Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");\n  const queueClear=state.pendingQueueCount===0&&!state.queueStatusUnavailable;
+  byId("seal-case").disabled=!allUploaded||!allChecked||!queueClear||state.sealed||state.capturePaused;
+  byId("seal-case").textContent=state.qualityRecorded?"Retry evidence sealing":!queueClear?"Upload pending originals before sealing":"Record checks and seal evidence";
 }
 byId("seal-case").addEventListener("click",async()=>{
   const button=byId("seal-case");button.disabled=true;
