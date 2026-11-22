@@ -101,6 +101,8 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 assert "/api/v1/review-queue" in workbench_script.text
                 assert "createOfflineEvidenceQueue" in workbench_script.text
                 assert "renderWorkflowProgress" in workbench_script.text
+                assert "renderWorkflowProgress(activeReadiness)" in workbench_script.text
+                assert "await refreshEvidenceReadiness(sessionId)" in workbench_script.text
                 assert 'id="case-progress-dashboard"' in shell.text
                 assert ";\\n    " not in workbench_script.text
                 assert 'id="progress-evidence-bar"' in shell.text

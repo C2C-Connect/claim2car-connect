@@ -258,7 +258,7 @@ async function withdrawCaptureConsent() {
   }
   try {
     const localDeleted = evidenceQueue ? await evidenceQueue.deleteSession(id,{tenantId:identity.tenant_id}) : 0;
-    if (activeSession === id) { activeReadiness = {...result,session_id:id,consent_active:false,vehicle_reference_present:false,capture_allowed:false}; await refreshCaptureQueueStatus(id); }
+    if (activeSession === id) { activeReadiness = {...result,session_id:id,consent_active:false,vehicle_reference_present:false,capture_allowed:false}; renderWorkflowProgress(activeReadiness); await refreshCaptureQueueStatus(id); }
     message("owner-message",`Capture consent withdrawn. Server deleted ${result.deleted_original_artifacts ?? 0} original(s); local browser queue removed ${localDeleted} item(s).`);
   } catch (error) {
     message("owner-message",`Capture consent was withdrawn and the server deleted ${result.deleted_original_artifacts ?? 0} original(s), but local browser deletion failed: ${error.message}. Do not reuse this device until its pending evidence storage is cleared.`,true);
@@ -411,6 +411,10 @@ async function syncPendingUploads(sessionId) {
     }
   });
   await refreshCaptureQueueStatus(sessionId);
+  if (activeSession === sessionId) {
+    try { await refreshEvidenceReadiness(sessionId); }
+    catch { renderWorkflowProgress(null); }
+  }
   if (result.blockedAtQueueId !== null) {
     message("operator-message", `Sync paused at queued original #${result.blockedAtQueueId}: ${result.error}. Earlier items remain recorded; later items were not sent.`, true);
   } else if (result.uploaded > 0) {
