@@ -133,9 +133,78 @@ async function sha256Hex(buffer){
   const digest=await crypto.subtle.digest("SHA-256",buffer);
   return Array.from(new Uint8Array(digest),(value)=>value.toString(16).padStart(2,"0")).join("");
 }
+async function refreshOfflineQueueStatus(){
+  const statusNode=byId("offline-queue-status"),button=byId("sync-queued-evidence");
+  if(!statusNode||!button)return;
+  if(offlineEvidenceQueueError||!offlineEvidenceQueue){
+    statusNode.textContent="Local queue unavailable: "+(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
+    statusNode.classList.add("error");button.disabled=true;return;
+  }
+  if(!state.sessionId||!state.tenantId||!state.actorId){
+    statusNode.textContent="Connect with a verified operator identity and open a capture session to use local recovery.";
+    button.disabled=true;return;
+  }
+  try{
+    const snapshot=await offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId});
+    const pending=snapshot.pending,uploaded=snapshot.uploaded;
+    statusNode.textContent=pending
+      ? pending+" original"+(pending===1?"":"s")+" pending locally · "+uploaded+" upload-confirmed · "+(navigator.onLine?"ready to retry":"device offline")
+      : snapshot.total+" queued record"+(snapshot.total===1?"":"s")+" · all uploads confirmed; original bytes discarded from local queue";
+    statusNode.classList.toggle("error",pending>0);
+    button.disabled=pending===0||!state.token||!navigator.onLine||state.capturePaused||state.sealed;
+  }catch(error){
+    statusNode.textContent="Queue status failed: "+error.message;statusNode.classList.add("error");button.disabled=true;
+  }
+}
+async function syncQueuedEvidence(){
+  if(!offlineEvidenceQueue||!state.sessionId||!state.tenantId||!state.actorId||!state.token)return;
+  const button=byId("sync-queued-evidence");button.disabled=true;
+  message("offline-queue-status","Uploading pending originals in order…");
+  try{
+    const result=await offlineEvidenceQueue.syncSession({
+      sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,
+      upload:async(record)=>{
+        await api("/v1/capture-sessions/"+state.sessionId+"/artifacts",state.token,{method:"POST",body:JSON.stringify({
+          request_id:record.requestId,artifact_id:record.artifactId,slot:record.slot,
+          payload_base64:bytesToBase64(record.bytes),sha256:record.sha256
+        })});
+        const label=API_CAPTURE_SLOTS.find(([slot])=>slot===record.slot)?.[1]||record.slot;
+        state.artifacts.set(record.slot,{artifactId:record.artifactId,sha256:record.sha256,byteLength:record.byteLength,label});
+        const previewUrl=state.previews.get(record.slot);
+        if(previewUrl)URL.revokeObjectURL(previewUrl);
+        const url=URL.createObjectURL(new Blob([record.bytes],{type:record.mimeType||"application/octet-stream"}));
+        state.previews.set(record.slot,url);
+        const refs=state.slotRefs.get(record.slot);
+        if(refs){refs.preview.src=url;refs.preview.hidden=false;refs.meta.textContent="Uploaded · "+record.byteLength.toLocaleString()+" bytes · SHA-256 verified";refs.meta.classList.add("done");refs.meta.classList.remove("error");}
+      }
+    });
+    if(result.error){
+      const label="Upload stopped at queued item "+result.blockedAtQueueId+": "+result.error+". Originals remain stored locally for retry.";
+      message("offline-queue-status",label,true);
+    }else{
+      message("offline-queue-status",result.uploaded+" pending original(s) uploaded and accepted by server.",false);
+      const readiness=await api("/v1/capture-sessions/"+state.sessionId+"/evidence-readiness",state.token);
+      for(const artifact of readiness.registered_artifacts||[]){
+        const label=API_CAPTURE_SLOTS.find(([slot])=>slot===artifact.slot)?.[1]||artifact.slot;
+        state.artifacts.set(artifact.slot,{artifactId:artifact.artifact_id,sha256:artifact.sha256,byteLength:artifact.byte_length,label});
+      }
+      state.activeExceptions=readiness.active_capture_exceptions||[];
+      renderExceptionPanel();updateSealButton();
+    }
+  }catch(error){
+    message("offline-queue-status",error.message+" · queued originals were retained for retry.",true);
+  }finally{
+    await refreshOfflineQueueStatus();
+    button.disabled=button.disabled||state.qualityRecorded||state.sealed||state.capturePaused;
+  }
+}
+function queuePreview(file,slot,preview){
+  const previous=state.previews.get(slot);if(previous)URL.revokeObjectURL(previous);
+  const url=URL.createObjectURL(file);state.previews.set(slot,url);preview.src=url;preview.hidden=false;
+}
 function renderCaptureSlots(readiness=null){
   const grid=byId("slot-grid"),quality=byId("quality-grid");grid.replaceChildren();quality.replaceChildren();
-  state.artifacts.clear();
+  state.artifacts.clear();state.slotRefs=new Map();
   const knownArtifacts=readiness?.registered_artifacts||[];
   state.qualityResults=readiness?.quality_results||{};state.activeExceptions=readiness?.active_capture_exceptions||[];
   API_CAPTURE_SLOTS.forEach(([slot,label])=>{
@@ -149,17 +218,20 @@ function renderCaptureSlots(readiness=null){
     meta.textContent=existing?"Previously uploaded · "+existing.byte_length.toLocaleString()+" bytes · SHA-256 "+existing.sha256.slice(0,12)+"…":"Original image not uploaded";
     if(existing)meta.classList.add("done");
     const preview=document.createElement("img");preview.className="slot-preview";preview.hidden=true;
+    state.slotRefs.set(slot,{meta,preview,input});
     input.addEventListener("change",async()=>{
       const file=input.files&&input.files[0];if(!file)return;
       if(!file.type.startsWith("image/")||file.size<=0||file.size>MAX_BYTES){meta.textContent="Choose a non-empty image no larger than 25 MiB.";meta.classList.add("error");input.value="";return;}
-      input.disabled=true;meta.textContent="Hashing and uploading original bytes…";meta.classList.remove("done","error");
+      input.disabled=true;meta.textContent="Saving original to this browser before upload…";meta.classList.remove("done","error");
       try{
-        const buffer=await file.arrayBuffer(),digest=await sha256Hex(buffer),artifactId=uuid(),encoded=bytesToBase64(new Uint8Array(buffer));
-        await api("/v1/capture-sessions/"+state.sessionId+"/artifacts",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),artifact_id:artifactId,slot,payload_base64:encoded,sha256:digest})});
-        state.artifacts.set(slot,{artifactId,sha256:digest,byteLength:file.size,label});
-        const previous=state.previews.get(slot);if(previous)URL.revokeObjectURL(previous);
-        const url=URL.createObjectURL(file);state.previews.set(slot,url);preview.src=url;preview.hidden=false;
-        meta.textContent="Uploaded · "+file.size.toLocaleString()+" bytes · SHA-256 verified";meta.classList.add("done");renderExceptionPanel();updateSealButton();
+        if(!offlineEvidenceQueue)throw new Error(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
+        if(!state.tenantId||!state.actorId)throw new Error("SERVER_IDENTITY_NOT_VERIFIED");
+        const queued=await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file});
+        queuePreview(file,slot,preview);
+        meta.textContent="Saved locally · pending upload · "+file.size.toLocaleString()+" bytes";meta.classList.remove("done");
+        await refreshOfflineQueueStatus();
+        if(navigator.onLine)await syncQueuedEvidence();
+        renderExceptionPanel();updateSealButton();
       }catch(error){meta.textContent=error.message;meta.classList.add("error");}
       finally{input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;}
     });
