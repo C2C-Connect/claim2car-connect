@@ -4,16 +4,20 @@ import { webcrypto } from "node:crypto";
 import { createOfflineEvidenceQueue } from "../app/offline_evidence_queue.mjs";
 
 const appSource=await readFile(new URL("../app/app.mjs",import.meta.url),"utf8");
+const queueSource=await readFile(new URL("../app/offline_evidence_queue.mjs",import.meta.url),"utf8");
 const appHtml=await readFile(new URL("../app/index.html",import.meta.url),"utf8");
-assert.match(appSource,/createOfflineEvidenceQueue/);\nassert.match(queueSource,/subtle\.encrypt/);\nassert.match(queueSource,/subtle\.decrypt/);\nassert.match(queueSource,/HKDF/);
-assert.match(appSource,/queueFile\(\{sessionId:state\.sessionId,tenantId:state\.tenantId,actorId:state\.actorId,slot,file,keyMaterial:state\.token\}\)/);
-assert.match(appSource,/syncQueuedEvidence/);
-assert.match(appSource,/keyMaterial:state\.token/);\nassert.match(appSource,/syncSession\(\{\s*sessionId:state\.sessionId,tenantId:state\.tenantId,actorId:state\.actorId,keyMaterial:state\.token,/);
-assert.match(appSource,/window\.addEventListener\("online"/);
-assert.match(appSource,/api\("\/v1\/identity",token\)/);
-assert.match(appHtml,/id="offline-queue-status"/);
-assert.match(appHtml,/id="sync-queued-evidence"/);
-assert.match(appHtml,/AES-GCM encrypted/);
+assert.ok(appSource.includes("createOfflineEvidenceQueue"));
+assert.ok(appSource.includes("queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file,keyMaterial:state.token})"));
+const syncAt=appSource.indexOf("syncSession({");
+assert.ok(syncAt>=0&&appSource.slice(syncAt,syncAt+200).includes("keyMaterial:state.token"));
+assert.ok(appSource.includes("window.addEventListener(\"online\""));
+assert.ok(appSource.includes('api("/v1/identity",token)'));
+assert.ok(queueSource.includes("subtle.encrypt"));
+assert.ok(queueSource.includes("subtle.decrypt"));
+assert.ok(queueSource.includes("HKDF"));
+assert.ok(appHtml.includes('id="offline-queue-status"'));
+assert.ok(appHtml.includes('id="sync-queued-evidence"'));
+assert.ok(appHtml.includes("AES-GCM encrypted"));
 
 class MemoryStore {
   constructor(){this.records=[];this.nextId=1;}
@@ -67,4 +71,4 @@ assert.equal(store.records.every(r=>!("bytes" in r)),true);
 const other=await queue.status(scope.sessionId,{tenantId:"tenant-a",actorId:"different-actor"});
 assert.equal(other.total,0);
 await assert.rejects(queue.status(scope.sessionId,{tenantId:"tenant-a"}),/IDENTITY_SCOPE_REQUIRED/);
-process.stdout.write(JSON.stringify({outcome:"passed",checks:["AES-GCM encryption at rest","token-derived key recovery","wrong-key fails closed without deleting originals","scope by tenant/actor/session","FIFO fail-stop on first upload failure","retry preserves artifact/request IDs","queued MIME metadata","discard ciphertext after confirmed upload","identity-scope validation"]},null,2)+"\n");
+process.stdout.write(JSON.stringify({outcome:"passed",checks:["AES-GCM encryption at rest","token-derived key recovery","wrong-key fails closed without deleting queued originals","tenant/actor/session scoping","FIFO stop on upload failure","stable artifact/request IDs across retry","MIME metadata","remove ciphertext after server acceptance","identity-scope validation"]},null,2)+"\n");
