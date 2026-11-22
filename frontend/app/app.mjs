@@ -173,7 +173,7 @@ async function syncQueuedEvidence(){
   message("offline-queue-status","Uploading pending originals in order…");
   try{
     const result=await offlineEvidenceQueue.syncSession({
-      sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,
+      sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,keyMaterial:state.token,
       upload:async(record)=>{
         await api("/v1/capture-sessions/"+state.sessionId+"/artifacts",state.token,{method:"POST",body:JSON.stringify({
           request_id:record.requestId,artifact_id:record.artifactId,slot:record.slot,
