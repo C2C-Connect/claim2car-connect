@@ -372,7 +372,7 @@ async function openClaimCase(item,button){
   if(button)button.disabled=true;
   try{
     const readiness=await api("/v1/capture-sessions/"+item.capture_session_id+"/evidence-readiness",state.token);
-    state.claimId=item.claim_id;state.sessionId=item.capture_session_id;byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.claimId=item.claim_id;state.sessionId=item.capture_session_id;state.queueScopeVerified=false;state.pendingQueueCount=0;state.queueStatusUnavailable=false;byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     state.consentRecorded=Boolean(readiness.consent_active);
     state.vehicleRecorded=Boolean(readiness.vehicle_reference_present);
     state.sealed=Boolean(readiness.sealed);
