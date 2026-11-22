@@ -192,7 +192,7 @@ async function syncQueuedEvidence(){
     if(result.error){
       state.queueLastError=result.error;
       const label="Upload stopped at queued item "+result.blockedAtQueueId+": "+result.error+". Originals remain stored locally for retry.";
-      message("offline-queue-status",label,true);
+      message("offline-queue-status",label,true);renderExceptionPanel();updateSealButton();
     }else{
       state.queueLastError=null;
       message("offline-queue-status",result.uploaded+" pending original(s) uploaded and accepted by server.",false);
@@ -240,7 +240,7 @@ function renderCaptureSlots(readiness=null){
       try{
         if(!offlineEvidenceQueue)throw new Error(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
         if(!state.tenantId||!state.actorId)throw new Error("SERVER_IDENTITY_NOT_VERIFIED");
-        const queued=await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file});
+        await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file});
         queuePreview(file,slot,preview);
         meta.textContent="Saved locally · pending upload · "+file.size.toLocaleString()+" bytes";meta.classList.remove("done");
         await refreshOfflineQueueStatus();
