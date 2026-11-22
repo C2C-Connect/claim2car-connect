@@ -26,3 +26,13 @@
 .slot-meta.pending{color:#d7b987;border-color:#675237;background:#30271b}
 .offline-queue-panel .inline-status{font-size:12px;line-height:1.5}
 #sync-queued-evidence{margin-top:8px}
+
+.capture-progress-panel{margin:12px 0 18px;padding:15px 16px;border:1px solid #35516e;border-radius:12px;background:#0d1929}
+.capture-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}
+#capture-progress-label{color:#e6f0fc;font-size:13px}
+#capture-progress-queue-label{color:var(--muted);text-align:right;font-size:11px}
+.capture-progress-bar{height:9px;margin:12px 0 8px;border-radius:99px;background:#26394f;overflow:hidden}
+.capture-progress-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#75aefc,#62d7c4);transition:width .2s ease}
+#capture-progress-detail{margin:0;font-size:10px}
+@media(max-width:540px){.capture-progress-heading{align-items:flex-start;flex-direction:column;gap:5px}#capture-progress-queue-label{text-align:left}}
+@media(prefers-reduced-motion:reduce){.capture-progress-fill{transition:none}}
