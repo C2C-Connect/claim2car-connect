@@ -29,17 +29,17 @@ class MemoryStore {
 }
 const store=new MemoryStore(),ids=["artifact-1","request-1","artifact-2","request-2"];
 const queue=createOfflineEvidenceQueue({store,cryptoProvider:webcrypto,makeUuid:()=>ids.shift(),now:()=>"2026-11-22T00:00:00.000Z"});
-const scope={sessionId:"session-a",tenantId:"tenant-a",actorId:"operator-a"};
+const scope={sessionId:"session-a",tenantId:"tenant-a",actorId:"operator-a"};\nconst tokenMaterial="operator-token-material-for-offline-recovery-0123456789";
 const file=(text,type="image/jpeg")=>({type,size:Buffer.byteLength(text),arrayBuffer:async()=>Buffer.from(text)});
-const first=await queue.queueFile({...scope,slot:"00_front_exterior",file:file("original-one")});
-const second=await queue.queueFile({...scope,slot:"01_front_right_exterior",file:file("original-two","image/png")});
+const first=await queue.queueFile({...scope,slot:"00_front_exterior",file:file("original-one"),keyMaterial:tokenMaterial});
+const second=await queue.queueFile({...scope,slot:"01_front_right_exterior",file:file("original-two","image/png"),keyMaterial:tokenMaterial});
 assert.equal(first.artifactId,"artifact-1");assert.equal(first.requestId,"request-1");
 assert.equal(second.artifactId,"artifact-2");assert.equal(second.requestId,"request-2");
 assert.equal(first.mimeType,"image/jpeg");assert.equal(second.mimeType,"image/png");
-assert.equal(first.bytes instanceof Uint8Array,true);
+assert.equal(first.bytes instanceof Uint8Array,true);\nassert.notEqual(Buffer.from(first.bytes).toString(),"original-one");\nassert.equal(first.encryptionAlgorithm,"AES-GCM");\nassert.equal(first.bytes.byteLength,first.byteLength+16);
 let snapshot=await queue.status(scope.sessionId,{tenantId:scope.tenantId,actorId:scope.actorId});
 assert.deepEqual({total:snapshot.total,pending:snapshot.pending,uploaded:snapshot.uploaded},{total:2,pending:2,uploaded:0});
-const failed=await queue.syncSession({...scope,upload:async(record)=>{assert.equal(record.queueId,first.queueId);throw new Error("NETWORK_INTERRUPTED");}});
+const failed=await queue.syncSession({...scope,keyMaterial:tokenMaterial,upload:async(record)=>{assert.equal(record.queueId,first.queueId);throw new Error("NETWORK_INTERRUPTED");}});
 assert.equal(failed.uploaded,0);assert.equal(failed.blockedAtQueueId,first.queueId);assert.equal(failed.error,"NETWORK_INTERRUPTED");
 snapshot=await queue.status(scope.sessionId,{tenantId:scope.tenantId,actorId:scope.actorId});
 assert.equal(snapshot.pending,2);assert.equal(store.records.every(r=>r.bytes instanceof Uint8Array),true);
@@ -56,4 +56,4 @@ assert.equal(store.records.every(r=>!("bytes" in r)),true);
 const other=await queue.status(scope.sessionId,{tenantId:"tenant-a",actorId:"different-actor"});
 assert.equal(other.total,0);
 await assert.rejects(queue.status(scope.sessionId,{tenantId:"tenant-a"}),/IDENTITY_SCOPE_REQUIRED/);
-process.stdout.write(JSON.stringify({outcome:"passed",checks:["queue original bytes before network","scope by tenant/actor/session","FIFO fail-stop on first upload failure","retry preserves artifact/request IDs","queued MIME metadata","discard local bytes after confirmed upload","identity-scope validation"]},null,2)+"\n");
+process.stdout.write(JSON.stringify({outcome:"passed",checks:["AES-GCM encrypt originals at rest","key derived from operator token","wrong-key decryption fails without deleting queued originals","scope by tenant/actor/session","FIFO fail-stop on first upload failure","retry preserves artifact/request IDs","queued MIME metadata","discard ciphertext after confirmed upload","identity-scope validation"]},null,2)+"\n");
