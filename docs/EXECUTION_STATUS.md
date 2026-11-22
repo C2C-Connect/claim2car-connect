@@ -1,3 +1,20 @@
+## Latest verified checkpoint — 2026-11-22 (PR #160, #162, #163 merged)
+
+- **Main HEAD:** `03469ee5e95a165639c930cb0d9fd1a4831f659c`.
+- **PR #162** persisted the owner-approved FAOS Core Engine Implementation Guide, architecture doctrine, and new-thread continuity instructions. Merge commit: `8856e5bd7eb0d8c056d2cb9c860ccf381cc24e0f`. README links the manual and handoff sources.
+- **PR #160** made OCI staging persistent-volume mount configuration reboot-durable. Merge commit: `41bd14094bec30a1fbc56912255b20872020c8fa`. Exact tested head: `0022166f99409fcc41fc5e96952b95278bcea89b`; full suite, authority, browser, restricted runtime, and all required CI checks passed.
+- **PR #163** added a browser capture image-quality advisory (blur/Laplacian variance, clipping/exposure, uniformity/occlusion proxy, dynamic range). It does not reject, mutate, or replace original evidence; analysis failures fall back to operator visual review. Thresholds are provisional, not field-calibrated. Merge commit: `03469ee5e95a165639c930cb0d9fd1a4831f659c`; tested head: `941a293a5d00b833e1eac7dcc2132ecd6c79e2e1`; **17 successful checks, 3 expected evidence-publication skips, 0 failures**; full suite **1011 passed, 31 warnings, 208 subtests**; integrated OCI ARM64 build, authority, restricted-container, API, browser, and guided-capture checks passed.
+- **PR #161** was closed as superseded by rebased PR #163; no code was lost.
+- **Actual OCI staging is still NOT deployed/accepted.** Protected OCI environment configuration, remote-state bootstrap, reviewed Terraform plan/apply, instance provisioning, PostgreSQL/PostGIS, persistent volume identity/mount, immutable image publish/deploy, backups/restore, and authenticated end-to-end acceptance remain external prerequisites. Do not claim a live deployment.
+
+### Next implementation task — reconcile the capture protocol with FAOS target
+
+The owner manual target is **8 exterior perspectives + 4 structural points + 2 cabin perspectives + 2 telemetry frames**. Existing `claims2car-16-v1` is versioned and currently consists of 8 exterior angles, 4 wheel assemblies, 2 cabin/cluster views, physical VIN, and license/insurance documents. This is a specification mismatch—not a reason to relabel or mutate historical v1 sessions. Implement an additive, explicit new protocol version after mapping exact slot definitions and optional identity/document evidence; preserve v1 and 12-v1 contracts, sessions, manifests, and audit history. Extend registry, server/API, UI, session creation, evidence validation, tests, and migration only after cross-layer contract is specified. Safety/consent and conditional skip/abort remain mandatory.
+
+**Resume rule:** Read this checkpoint, README, FAOS manual, execution handoff, acceptance matrix, then inspect live main/PRs/checks. Pick up this capture-protocol reconciliation first; continue OCI deployment work when protected configuration becomes available. No planning-only task—produce tested implementation.
+
+---
+
 # Claim2Car execution status snapshot / new-thread handoff
 
 ## Verified product checkpoint — PR #158, #155, #152 merged (2026-11-22)
