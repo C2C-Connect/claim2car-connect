@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from subprocess import CompletedProcess
 from pathlib import Path
-from scripts.oci_staging_volume_mount import MountSetupError,validate_format_confirmation,validate_mapping
+from scripts.oci_staging_volume_mount import MountSetupError,validate_format_confirmation,validate_mapping,persist_fstab
 from scripts.oci_volume_device_map import write_json_secure
 PG="ocid1.volume.oc1..postgres";EV="ocid1.volume.oc1..evidence"
 def sample():
@@ -33,6 +33,25 @@ class SafeVolumeMountTests(unittest.TestCase):
             link=Path(d)/"link.json";link.symlink_to(p)
             with self.assertRaisesRegex(Exception,"SYMLINK"):write_json_secure(str(link),sample())
 
+    def test_fstab_persistence_is_durable_atomic_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/"fstab"
+            path.write_text("# original\nUUID=old /old xfs defaults 0 2\n")
+            entries=[("pg-uuid","/var/lib/claim2car/postgres"),("evidence-uuid","/var/lib/claim2car/evidence")]
+            persist_fstab(entries,path)
+            saved=Path(str(path)+".claim2car-backup")
+            content=path.read_text()
+            self.assertIn("UUID=old /old xfs defaults 0 2",content)
+            self.assertIn("UUID=pg-uuid /var/lib/claim2car/postgres xfs defaults,nofail 0 2",content)
+            self.assertIn("UUID=evidence-uuid /var/lib/claim2car/evidence xfs defaults,nofail 0 2",content)
+            self.assertEqual(path.stat().st_mode&0o777,0o644)
+            self.assertEqual(saved.read_text(),"# original\nUUID=old /old xfs defaults 0 2\n")
+            self.assertEqual(saved.stat().st_mode&0o777,0o600)
+            persist_fstab(entries,path)
+            self.assertEqual(path.read_text(),content)
+            self.assertEqual(len([line for line in content.splitlines() if line.startswith("UUID=")]),3)
+            self.assertEqual(len([line for line in content.splitlines() if "pg-uuid" in line]),1)
+            self.assertEqual(list(Path(d).glob(".fstab.*")),[])
     def test_dry_run_blank_disks_never_formats_or_mounts(self):
         from scripts.oci_staging_volume_mount import setup_mounts
         calls=[]
