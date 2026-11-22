@@ -69,11 +69,34 @@ class OciStagingNetworkAuditTests(unittest.TestCase):
         findings = AUDIT.audit_network(self.subnet, security_lists, "vcn-good")
         self.assertIn("INGRESS_SOURCE_INVALID:broken:0", findings)
 
+    def test_cloud_init_installs_restricted_private_runcommand_deploy_support(self):
+        cloud_init = (ROOT / "infra" / "oci" / "staging" / "cloud-init.yaml").read_text()
+        terraform = (ROOT / "infra" / "oci" / "staging" / "main.tf").read_text()
+        self.assertIn("oci-cli==3.96.3", cloud_init)
+        self.assertIn("claim2car-staging-deploy", cloud_init)
+        self.assertIn("ocarun ALL=(root) NOPASSWD: /usr/local/sbin/claim2car-staging-deploy", cloud_init)
+        self.assertNotIn("NOPASSWD:ALL", cloud_init)
+        self.assertIn('"Compute Instance Run Command"', terraform)
+        self.assertIn('desired_state = "ENABLED"', terraform)
+        self.assertIn("secret-bundle get", cloud_init)
+        self.assertIn("compare/${commit}...main", cloud_init)
+
+
+    def test_private_runcommand_iam_is_compartment_and_secret_scoped(self):
+        terraform = (ROOT / "infra" / "oci" / "staging" / "main.tf").read_text()
+        self.assertIn("instance-agent-command-execution-family", terraform)
+        self.assertIn("target.secret.id", terraform)
+        self.assertIn("in compartment id ${var.compartment_ocid}", terraform)
+        self.assertIn("enable_private_runcommand_deploy", terraform)
+
+
     def test_cloud_init_preflight_checks_distinct_writable_durable_volumes(self):
         cloud_init = (ROOT / "infra" / "oci" / "staging" / "cloud-init.yaml").read_text()
         marker = "    content: |\n"
         self.assertIn(marker, cloud_init)
-        script_start = cloud_init.index(marker) + len(marker)
+        preflight_path = "path: /usr/local/sbin/claim2car-host-preflight\n"
+        self.assertIn(preflight_path, cloud_init)
+        script_start = cloud_init.index(marker, cloud_init.index(preflight_path)) + len(marker)
         script_end = cloud_init.index("\nruncmd:", script_start)
         script = textwrap.dedent(cloud_init[script_start:script_end])
 

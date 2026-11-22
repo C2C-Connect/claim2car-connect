@@ -125,3 +125,27 @@ variable "ssh_authorized_keys" {
   type        = string
   default     = ""
 }
+
+variable "tenancy_ocid" {
+  description = "OCI tenancy OCID. Required when private Run Command deployment IAM is enabled."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "enable_private_runcommand_deploy" {
+  description = "Create least-privilege instance principal policies for OCI Run Command and the pinned OCIR Vault secret."
+  type        = bool
+  default     = false
+}
+
+variable "ocir_auth_secret_ocid" {
+  description = "OCIR pull credential JSON secret OCID in OCI Vault; read access is scoped to this secret."
+  type        = string
+  default     = ""
+  sensitive   = true
+  validation {
+    condition     = var.ocir_auth_secret_ocid == "" || can(regex("^ocid1\\.vaultsecret\\.", var.ocir_auth_secret_ocid))
+    error_message = "ocir_auth_secret_ocid must be a Vault secret OCID or empty."
+  }
+}

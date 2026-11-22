@@ -65,6 +65,14 @@ resource "oci_core_instance" "staging" {
     ocpus         = var.ocpus
     memory_in_gbs = var.memory_in_gbs
   }
+  agent_config {
+    is_management_disabled = false
+    is_monitoring_disabled = false
+    plugins_config {
+      name          = "Compute Instance Run Command"
+      desired_state = "ENABLED"
+    }
+  }
 
   create_vnic_details {
     subnet_id        = data.oci_core_subnet.existing.id
@@ -106,6 +114,10 @@ resource "oci_core_instance" "staging" {
       condition     = var.memory_in_gbs >= var.ocpus * 6
       error_message = "A1 Flex memory must be at least 6 GB per OCPU."
     }
+    precondition {
+      condition     = !var.enable_private_runcommand_deploy || (can(regex("^ocid1\\.tenancy\\.", var.tenancy_ocid)) && can(regex("^ocid1\\.vaultsecret\\.", var.ocir_auth_secret_ocid)))
+      error_message = "Private Run Command deployment requires tenancy_ocid and the exact OCIR Vault secret OCID."
+    }
   }
 }
 
@@ -137,4 +149,27 @@ resource "oci_core_volume_attachment" "evidence" {
   instance_id                         = oci_core_instance.staging.id
   volume_id                           = oci_core_volume.evidence.id
   is_pv_encryption_in_transit_enabled = true
+}
+
+locals {
+  runcommand_dynamic_group_name = "${var.display_name_prefix}-runcommand-dg"
+}
+
+resource "oci_identity_dynamic_group" "staging_runcommand" {
+  count          = var.enable_private_runcommand_deploy ? 1 : 0
+  compartment_id = var.tenancy_ocid
+  name           = local.runcommand_dynamic_group_name
+  description    = "Only the Claim2Car staging compute instance may receive private run commands."
+  matching_rule  = "ALL {instance.id = '${oci_core_instance.staging.id}'}"
+}
+
+resource "oci_identity_policy" "staging_runcommand" {
+  count          = var.enable_private_runcommand_deploy ? 1 : 0
+  compartment_id = var.tenancy_ocid
+  name           = "${var.display_name_prefix}-runcommand-policy"
+  description    = "Restricted Run Command execution and read access to the single OCIR Vault secret."
+  statements = [
+    "Allow dynamic-group ${local.runcommand_dynamic_group_name} to use instance-agent-command-execution-family in compartment id ${var.compartment_ocid} where request.instance.id = target.instance.id",
+    "Allow dynamic-group ${local.runcommand_dynamic_group_name} to read secret-bundles in compartment id ${var.compartment_ocid} where target.secret.id = '${var.ocir_auth_secret_ocid}'"
+  ]
 }

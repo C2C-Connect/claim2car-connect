@@ -12,10 +12,69 @@ packages:
   - lvm2
   - util-linux
   - python3
+  - python3-pip
   - git
   - curl
 
 write_files:
+  - path: /usr/local/sbin/claim2car-staging-deploy
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      fail() { echo "FAIL: $*" >&2; exit 1; }
+      [[ $EUID -eq 0 ]] || fail "Must be invoked as root through the restricted OCI Run Command sudo rule."
+      [[ $# -eq 8 ]] || fail "Expected commit, app image, script checksum, DB image, registry, Vault secret OCID, OCIR namespace, and repository."
+      commit="$1"; image="$2"; script_sha="$3"; db_image="$4"; registry="$5"; secret_ocid="$6"; namespace="$7"; repository="$8"
+      work=""
+      cleanup() {
+        [[ -z "$work" || ! -d "$work" ]] || rm -rf "$work"
+        unset secret_b64 secret_json registry_user registry_token OCI_REGISTRY_TOKEN
+      }
+      trap cleanup EXIT
+      [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Commit SHA is invalid."
+      compare_json="$(curl --fail --silent --show-error --location --retry 2 "https://api.github.com/repos/C2C-Connect/claim2car-connect/compare/${commit}...main")" || fail "Unable to verify source commit against main."
+      compare_status="$(jq -er '.status' <<<"$compare_json")"
+      behind_by="$(jq -er '.behind_by' <<<"$compare_json")"
+      [[ "$behind_by" == "0" && ( "$compare_status" == "ahead" || "$compare_status" == "identical" ) ]] || fail "Source commit is not an ancestor of main."
+      unset compare_json compare_status behind_by
+      [[ "$script_sha" =~ ^[a-f0-9]{64}$ ]] || fail "Deploy-script SHA-256 is invalid."
+      [[ "$registry" == "us-chicago-1.ocir.io" ]] || fail "Registry host must be the configured Chicago OCIR registry."
+      [[ "$namespace" =~ ^[a-z0-9]+$ && "$repository" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]] || fail "OCIR namespace or repository is invalid."
+      [[ "$image" == "$registry/$namespace/$repository:"* && "$image" =~ :sha-([a-f0-9]{40})@sha256:[a-f0-9]{64}$ ]] || fail "App image must be bound to the configured repository, commit-tagged, and digest-pinned."
+      [[ "${BASH_REMATCH[1]}" == "$commit" ]] || fail "App image commit tag does not match requested source commit."
+      [[ "$db_image" == "docker.io/postgis/postgis:"* && "$db_image" =~ @sha256:[a-f0-9]{64}$ ]] || fail "Database image must be the official docker.io/postgis/postgis image pinned by digest."
+      [[ "$secret_ocid" =~ ^ocid1\.vaultsecret\.[a-zA-Z0-9.]+$ ]] || fail "Vault secret OCID is invalid."
+      oci_bin="/opt/oci-cli-venv/bin/oci"
+      [[ -x "$oci_bin" ]] || fail "OCI CLI is not installed in the staging venv."
+      secret_b64="$("$oci_bin" secrets secret-bundle get --secret-id "$secret_ocid" --auth instance_principal --query 'data."secret-bundle-content".content' --raw-output)" || fail "Instance principal cannot read OCIR Vault secret."
+      secret_json="$(printf '%s' "$secret_b64" | base64 --decode)" || fail "Vault secret payload is not valid base64."
+      registry_user="$(jq -er '.username | select(type == "string" and length > 0)' <<<"$secret_json")" || fail "Vault OCIR secret has no username."
+      registry_token="$(jq -er '.auth_token | select(type == "string" and length > 0)' <<<"$secret_json")" || fail "Vault OCIR secret has no auth_token."
+      unset secret_b64 secret_json
+      work="$(mktemp -d /run/claim2car-deploy.XXXXXX)"
+      script_url="https://raw.githubusercontent.com/C2C-Connect/claim2car-connect/$commit/scripts/oci_staging_runtime_deploy.sh"
+      curl --fail --silent --show-error --location --retry 3 "$script_url" -o "$work/deploy.sh" || fail "Unable to retrieve source-pinned deployment helper."
+      printf '%s  %s\n' "$script_sha" "$work/deploy.sh" | sha256sum --check --status || fail "Deployment helper checksum mismatch."
+      chmod 0700 "$work/deploy.sh"
+      export OCI_REGISTRY="$registry" OCI_REGISTRY_USERNAME="$registry_user" OCI_REGISTRY_TOKEN="$registry_token"
+      export OCI_IMAGE_REF="$image" C2C_POSTGRES_IMAGE="$db_image"
+      unset registry_user
+      bash "$work/deploy.sh"
+      unset OCI_REGISTRY_TOKEN
+      echo "PASS: private Run Command deployment completed using source-pinned script and Vault-fed OCIR credentials."
+  - path: /etc/sudoers.d/101-claim2car-runcommand
+    owner: root:root
+    permissions: '0440'
+    content: |
+      ocarun ALL=(root) NOPASSWD: /usr/local/sbin/claim2car-staging-deploy
+  - path: /etc/oracle-cloud-agent/plugins/runcommand/config.yml
+    owner: root:root
+    permissions: '0644'
+    content: |
+      logDir: /var/log/oracle-cloud-agent/plugins/runcommand
+      commandExecutionMaxWorkers: 2
   - path: /usr/local/sbin/claim2car-host-preflight
     owner: root:root
     permissions: '0755'
@@ -27,6 +86,11 @@ write_files:
       command -v findmnt >/dev/null || fail "findmnt is not installed"
       command -v runuser >/dev/null || fail "runuser is not installed"
       command -v python3 >/dev/null || fail "python3 is not installed"
+      systemctl is-active --quiet oracle-cloud-agent || fail "Oracle Cloud Agent service is not active"
+      [[ -x /opt/oci-cli-venv/bin/oci ]] || fail "OCI CLI virtualenv is not installed"
+      [[ -x /usr/local/sbin/claim2car-staging-deploy ]] || fail "private deployment wrapper is missing"
+      getent passwd ocarun >/dev/null || fail "OCI Run Command ocarun account is missing"
+      visudo -cf /etc/sudoers.d/101-claim2car-runcommand >/dev/null || fail "restricted Run Command sudo rule is invalid"
       getent passwd 10001 >/dev/null || fail "claim2car UID 10001 is missing"
 
       postgres_path="/var/lib/claim2car/postgres"
@@ -80,8 +144,12 @@ write_files:
       echo "PASS: private host runtime, distinct persistent volumes, UID 10001 access, and write/fsync/remove probes"
       
 runcmd:
+  - [bash, -lc, "python3 -m venv /opt/oci-cli-venv"]
+  - [bash, -lc, "/opt/oci-cli-venv/bin/pip install --no-cache-dir oci-cli==3.96.3"]
+  - [bash, -lc, "visudo -cf /etc/sudoers.d/101-claim2car-runcommand"]
   - [bash, -lc, "getent group 10001 >/dev/null || groupadd --gid 10001 claim2car"]
   - [bash, -lc, "getent passwd 10001 >/dev/null || useradd --uid 10001 --gid 10001 --system --no-create-home --home-dir /var/lib/claim2car --shell /usr/sbin/nologin claim2car"]
   - [bash, -lc, "install -d -o 10001 -g 10001 -m 0750 /var/lib/claim2car /var/lib/claim2car/postgres /var/lib/claim2car/evidence"]
   - [bash, -lc, "install -d -o root -g root -m 0750 /opt/claim2car /etc/claim2car"]
   - [bash, -lc, "systemctl enable podman.socket"]
+  - [bash, -lc, "systemctl restart oracle-cloud-agent"]
