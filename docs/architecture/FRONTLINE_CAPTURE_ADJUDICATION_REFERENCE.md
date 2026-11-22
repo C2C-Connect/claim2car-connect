@@ -377,3 +377,12 @@ That is how Claim2Car earns the right to coordinate the post-accident economy: b
 The [FAOS Core Engine Implementation Guide](FAOS_CORE_ENGINE_IMPLEMENTATION_GUIDE.md) is the consolidated owner-supplied implementation target for this reference. It extends capture and adjudication into the full operating-system journey: sensor/device qualification, VIN and vehicle provenance, 16-point sequence, quality gates, local cryptographic sealing and FIFO recovery, durable server ingest, DARCI and vision/context models, integrity scoring, consensus/human review, statutory triage, commercial routing, report delivery and settlement. Use the manual for subsystem requirements and acceptance tests.
 
 All supplied numerical values, model names, latency targets, physical overrides, score weights and decision thresholds are provisional until independently validated. They are not current product guarantees and must not become authoritative total-loss, repairability, legal or payment decisions merely because they appear in a specification. Current implemented behavior is determined by code and acceptance evidence.
+
+
+## Current versioned protocol status
+
+- `claims2car-16-v1`: current default, immutable; existing 16-view contract.
+- `claims2car-16-v2`: selectable controlled-test contract, added in merged PR #165; eight exterior, four safe structural corners, front/rear cabin/restraint, instrument-cluster telemetry, physical VIN identity.
+- `claims2car-12-v1`: retained legacy compatibility.
+
+V2 does not yet match the manual's two telemetry-frame category exactly; one slot is VIN identity. Field qualification and disclosure review are pending. Quality analysis is advisory and preserves originals. Non-exterior v2 slots are not damage-zone inputs. Structural shots must be from safe standing positions; unsafe/unavailable shots require an explicit exception, never operator exposure under an unsupported vehicle.

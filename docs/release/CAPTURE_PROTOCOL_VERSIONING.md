@@ -91,3 +91,8 @@ The v2 contract maps the 16 positions as follows:
 - License/insurance documentation is supplemental and is not a mandatory v2 capture slot; obtain it only when separately necessary and consented.
 
 The registry exposes v2 as a selectable version. New sessions remain defaulted to v1 in this increment. Authority migration 0027 permits v2 while preserving the existing default and historical session protocol identity. V2 non-exterior slots are excluded from damage-zone localization/physics input.
+
+
+## Merged implementation checkpoint (2026-11-22)
+
+PR #165 is merged at main `1f18668b2d9f1cc4e19b49e16c1e66c1313fc116`. Tested PR head `766c0bc99e319e830c626c1fa8d7cacdf1822e9d` passed all required workflows: 1026 passed, 31 warnings, 208 subtests passed. Migration 0027 permits v2 while retaining v1 default and historical protocol IDs. V2 is selectable for controlled testing, not field-qualified. Current v2 slots include a VIN identity image in the second telemetry/identity position; the two-telemetry-frame manual target remains a tracked discrepancy.

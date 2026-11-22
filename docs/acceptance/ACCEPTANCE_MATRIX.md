@@ -1,22 +1,12 @@
-## Latest verified checkpoint — 2026-11-22 (PR #160, #162, #163 merged)
+## Latest verified checkpoint — 2026-11-22 (PR #165 merged)
 
-- **Main HEAD:** `03469ee5e95a165639c930cb0d9fd1a4831f659c`.
-- **PR #162** persisted the owner-approved FAOS Core Engine Implementation Guide, architecture doctrine, and new-thread continuity instructions. Merge commit: `8856e5bd7eb0d8c056d2cb9c860ccf381cc24e0f`. README links the manual and handoff sources.
-- **PR #160** made OCI staging persistent-volume mount configuration reboot-durable. Merge commit: `41bd14094bec30a1fbc56912255b20872020c8fa`. Exact tested head: `0022166f99409fcc41fc5e96952b95278bcea89b`; full suite, authority, browser, restricted runtime, and all required CI checks passed.
-- **PR #163** added a browser capture image-quality advisory (blur/Laplacian variance, clipping/exposure, uniformity/occlusion proxy, dynamic range). It does not reject, mutate, or replace original evidence; analysis failures fall back to operator visual review. Thresholds are provisional, not field-calibrated. Merge commit: `03469ee5e95a165639c930cb0d9fd1a4831f659c`; tested head: `941a293a5d00b833e1eac7dcc2132ecd6c79e2e1`; **17 successful checks, 3 expected evidence-publication skips, 0 failures**; full suite **1011 passed, 31 warnings, 208 subtests**; integrated OCI ARM64 build, authority, restricted-container, API, browser, and guided-capture checks passed.
-- **PR #161** was closed as superseded by rebased PR #163; no code was lost.
-- **Actual OCI staging is still NOT deployed/accepted.** Protected OCI environment configuration, remote-state bootstrap, reviewed Terraform plan/apply, instance provisioning, PostgreSQL/PostGIS, persistent volume identity/mount, immutable image publish/deploy, backups/restore, and authenticated end-to-end acceptance remain external prerequisites. Do not claim a live deployment.
-
-### Next implementation task — reconcile the capture protocol with FAOS target
-
-The owner manual target is **8 exterior perspectives + 4 structural points + 2 cabin perspectives + 2 telemetry frames**. Existing `claims2car-16-v1` is versioned and currently consists of 8 exterior angles, 4 wheel assemblies, 2 cabin/cluster views, physical VIN, and license/insurance documents. This is a specification mismatch—not a reason to relabel or mutate historical v1 sessions. Implement an additive, explicit new protocol version after mapping exact slot definitions and optional identity/document evidence; preserve v1 and 12-v1 contracts, sessions, manifests, and audit history. Extend registry, server/API, UI, session creation, evidence validation, tests, and migration only after cross-layer contract is specified. Safety/consent and conditional skip/abort remain mandatory.
-
-**Resume rule:** Read this checkpoint, README, FAOS manual, execution handoff, acceptance matrix, then inspect live main/PRs/checks. Pick up this capture-protocol reconciliation first; continue OCI deployment work when protected configuration becomes available. No planning-only task—produce tested implementation.
-
----
-
-# Fresh handoff checkpoint — 2026-11-21
-
+- **Main HEAD:** `1f18668b2d9f1cc4e19b49e16c1e66c1313fc116` (PR #165 squash merge).
+- **PR #165 — FAOS 16-v2 capture contract:** merged. Tested PR head: `766c0bc99e319e830c626c1fa8d7cacdf1822e9d`. All required workflows passed; full suite: **1026 passed, 31 warnings, 208 subtests passed**. This increment adds migration `0027_capture_protocol_16_v2.sql`, a versioned contract/registry, server API support, browser selection/resume, manifest binding, damage-localization exclusion for non-exterior slots, and compatibility tests.
+- **Protocol status:** `claims2car-16-v2` is selectable for controlled testing. `claims2car-16-v1` remains the default; legacy `claims2car-12-v1` remains supported. V2's current 16 positions are eight exterior views, four accessible structural corners, two cabin/restraint views, instrument-cluster telemetry, and physical VIN identity. The manual's second telemetry frame remains an explicit alignment gap; do not silently relabel or alter this immutable version. Field qualification is not complete.
+- Browser image quality remains advisory only; it never rejects or changes original evidence. Thresholds are not field calibrated.
+- **Next implementation target:** enforce the FAOS forensic integrity contract. Audit found that current `C_hash` can remain nonzero with incomplete/duplicate chains, the backend score uses a weighted geometric mean rather than the manual's weighted sum, and internal dispatch has no strict integrity authorization and falls back to a session ID when photo hashes are absent. Implement fail-closed chain collapse, formula alignment, and dispatch authorization tests before enabling dispatch.
+- **Deployment:** OCI staging is still NOT deployed/accepted. Owner-controlled protected-environment/OCI configuration and workflow dispatch remain external blockers; do not request secrets in chat. Continue all code/test work.
+- **Thread continuity:** read README, this handoff, status, FAOS manual, and acceptance matrix; inspect live main/PR/check/deployment state; resume the next executable task above without replanning.
 ## Verified checkpoint — PR #150 merged (2026-11-21)
 
 - PR #150, **Restrict OCI staging plan workflow to main**, merged. Merge commit: `35f9f3f737b44d2d0d93c40649887782798b1518`; tested head: `82f93313a86a5a93bf80debc4202716ee402dacf`.

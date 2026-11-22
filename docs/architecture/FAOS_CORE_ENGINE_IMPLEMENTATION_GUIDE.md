@@ -116,3 +116,10 @@ Use a gate registry with clear statuses: SPECIFIED → IMPLEMENTED → TESTED �
 Work in dependency order: edge identity/capture/originals/offline reliability; server durable acceptance and isolation; integrity/verification; reviewer and explainable assessment; report generation; authorized routing; settlement; production staging/device/field validation. For each increment, implement actual logic and tests, integrate with the running product, verify exact revision, merge after gates, deploy where authorized, and run a real journey. When blocked by credentials or external owner action, record the precise blocker and continue the next executable code/test task.
 
 **Thread-resume instruction:** Before responding in a new chat, read README, this manual, docs/EXECUTION_HANDOFF.md, docs/EXECUTION_STATUS.md, and acceptance matrix; inspect current main, open PRs, checks, and deployment state; continue from the last unfinished verified increment. Do not re-plan, ask the founder to repeat direction, or claim unverified capability.
+
+
+## Implementation checkpoint — FAOS capture protocol versioning
+
+PR #165 merged the versioned `claims2car-16-v2` contract. It is selectable for controlled tests; `claims2car-16-v1` remains the default and `claims2car-12-v1` remains compatible. The current v2 slot mapping is 8 exterior, 4 accessible structural-corner, 2 cabin/restraint, 1 instrument-cluster telemetry, and 1 physical VIN identity image. The source manual calls for two telemetry frames; that difference is documented as an unresolved protocol-alignment issue. Do not mutate v2 in place; use a new version or a separately typed supplemental telemetry artifact.
+
+The browser quality gate is advisory, not a hard capture rejection. No field calibration/qualification is implied. LiDAR, CoreMotion, acoustic gates, MDM restrictions, DARCI physics, multimodal AI, blockchain anchoring, ACORD live transmission, and live payment settlement remain individually subject to verified implementation and acceptance—not inferred from this manual.
