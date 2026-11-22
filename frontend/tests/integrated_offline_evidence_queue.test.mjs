@@ -5,7 +5,7 @@ import { createOfflineEvidenceQueue } from "../app/offline_evidence_queue.mjs";
 
 const appSource=await readFile(new URL("../app/app.mjs",import.meta.url),"utf8");
 const appHtml=await readFile(new URL("../app/index.html",import.meta.url),"utf8");
-assert.match(appSource,/createOfflineEvidenceQueue/);
+assert.match(appSource,/createOfflineEvidenceQueue/);\nassert.match(queueSource,/subtle\.encrypt/);\nassert.match(queueSource,/subtle\.decrypt/);\nassert.match(queueSource,/HKDF/);
 assert.match(appSource,/queueFile\(\{sessionId:state\.sessionId,tenantId:state\.tenantId,actorId:state\.actorId,slot,file,keyMaterial:state\.token\}\)/);
 assert.match(appSource,/syncQueuedEvidence/);
 assert.match(appSource,/keyMaterial:state\.token/);\nassert.match(appSource,/syncSession\(\{\s*sessionId:state\.sessionId,tenantId:state\.tenantId,actorId:state\.actorId,keyMaterial:state\.token,/);
