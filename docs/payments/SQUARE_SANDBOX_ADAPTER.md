@@ -10,7 +10,7 @@ This adapter is deliberately **Sandbox-only**. It hardcodes Square's Sandbox API
 - Uses a deterministic idempotency key per tenant + internal ledger entry, preventing cross-tenant collisions.
 - Validates returned checkout-link URL hosts and never returns/logs raw provider response bodies.
 - Verifies webhook HMAC-SHA256 against the exact configured notification URL + raw request bytes, using constant-time comparison.
-- Parses payment events into a minimal record after signature verification. It does not reconcile webhook events, post a ledger entry, refund, void, or settle anything. The next increment persists the checkout intent, not payment settlement.
+- Webhook receipts and payment-state reconciliation are integrated with PostgreSQL; settlement/ledger posting, refunds, and voids remain separate and disabled.
 
 ## Configuration (Sandbox only)
 
@@ -24,10 +24,21 @@ Supply through a secret manager/environment; do not commit credentials:
 
 The API host is fixed to `https://connect.squareupsandbox.com`. Sandbox test credentials/resources cannot be used against production. No provider calls are made during unit tests; transport is injected.
 
-## Webhook reconciliation increment (implemented, awaiting CI and real Sandbox verification)\n\n- Exposes `POST /webhooks/square` only in integrated runtime.\n- Verifies HMAC-SHA256 against exact notification URL and raw body before connecting to the database.\n- Stores event identity, minimal payment fields, event time and raw-body SHA-256; raw webhook payload is not stored.\n- Reconciles by provider order against a protected tenant mapping; deduplicates event IDs and payment IDs; checks exact $275 USD.\n- Tenant-readable payment state is separate from the financial ledger. No settlement or ledger posting is implied.
-- The reconciliation path is a restricted `SECURITY DEFINER` function owned by `faos_writer`; the order mapping and reconciliation tables enforce RLS and do not expose provider lookup keys to ordinary application queries.\n- Unmatched orders, amount mismatch, payment ID conflict, stale events are recorded and return stable outcomes.\n- **Still not verified:** CI, live Sandbox delivery, deployment, webhook replay from Square dashboard, or ledger settlement/refunds.\n\n## Next acceptance increment
+## Webhook reconciliation increment (implemented; CI verified; live Sandbox delivery not verified)
 
-1. Complete CI verification for webhook persistence/reconciliation and the updated 26-migration acceptance inventory.
+- Exposes `POST /webhooks/square` only in integrated runtime.
+- Verifies HMAC-SHA256 against exact notification URL and raw body before connecting to the database.
+- Stores event identity, minimal payment fields, event time and raw-body SHA-256; raw webhook payload is not stored.
+- Reconciles by provider order against a protected tenant mapping; deduplicates event IDs and payment IDs; checks exact $275 USD.
+- Tenant-readable payment state is separate from the financial ledger. No settlement or ledger posting is implied.
+- The reconciliation path is a restricted `SECURITY DEFINER` function owned by `faos_writer`; the order mapping and reconciliation tables enforce RLS and do not expose provider lookup keys to ordinary application queries.
+- Unmatched orders, amount mismatch, payment ID conflict, stale events are recorded and return stable outcomes.
+- **Verified:** mainline CI includes synthetic webhook signature, persistence, replay/conflict, payment-state transition and tenant isolation tests.
+- **Not verified:** live Square Sandbox delivery, webhook replay from Square dashboard, refunds/voids, or ledger settlement.
+- The private staging runtime has no public ingress; Square cannot directly deliver a webhook to it. Live provider delivery requires a separately reviewed HTTPS relay/tunnel and secure exposure design.
+## Next acceptance increment
+
+1. Verify live Sandbox webhook delivery only after an approved relay/tunnel path exists; keep direct public ingress disabled.
 2. Exercise the real Square Sandbox using authorized test credentials; verify signature delivery, duplicate replay, amount mismatch, payment status transitions, and tenant isolation with redacted evidence.
 3. Implement refund/void Sandbox workflows and ledger reversal integration as a separate reviewed financial increment.
 4. Keep live Square credentials, payment collection, and settlement disabled pending separate release authorization.

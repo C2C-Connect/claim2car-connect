@@ -16,7 +16,7 @@ Before provisioning, run the manual **OCI staging private-network ingress audit 
 
 The owner has already created an OCI tenancy/compartment foundation and a private VCN/subnet with NAT and Oracle-services egress. Exact OCIDs, private CIDRs, API keys, and resource identifiers are intentionally not stored in this public repository.
 
-A private VCN DNS name is not a public internet domain. Keep the first staging deployment private and access it through OCI Bastion or an approved VPN. Public claimant/operator access requires a separately approved public domain, TLS certificate, and ingress design.
+A private VCN DNS name is not a public internet domain. The integrated runtime currently binds its host port to `127.0.0.1`; direct VCN/VPN traffic cannot reach it. Until a separately reviewed reverse-proxy/TLS ingress is implemented, access the staging app only through OCI Bastion SSH port-forwarding to the loopback listener. Do not configure `app_ingress_cidrs` to expose port 8000; an NSG allow rule alone cannot override the loopback bind. Public claimant/operator access requires a separately approved public domain, TLS certificate, and ingress design.
 
 Before provisioning or exposing any compute instance, review the security lists and restrict administrative ingress. Do not leave broad SSH ingress in place. Prefer Bastion/VPN administration and no public IP on the application/database host.
 
@@ -107,17 +107,17 @@ The manual `OCI staging apply (manual, guarded)` workflow requires dispatch from
 
 Configure the `oci-staging-apply` environment with the same required OCI credentials, Terraform variables, and state-bucket variables as `oci-staging`. Set required reviewers/environment protection there before enabling apply. The plan job also requires the `oci-staging` environment values. The saved plan artifact is sensitive and must be reviewed before approval. Confirm the plan is only for the approved private network, A1 Flex candidate, and bounded 200 GB aggregate volumes. Account eligibility/capacity and actual OCI pricing remain an owner-side check. No apply has been dispatched from this session.
 
-## 12. Outstanding prerequisites
+## 12. Outstanding prerequisites and execution sequence
 
-- Confirm exact compartment, VCN, subnet, image, and OCIDs inside OCI.
-- Confirm Always Free compute and block-volume capacity in the selected region; otherwise obtain explicit cost approval.
-- Provision PostgreSQL/PostGIS and persistent database/evidence volumes.
-- Create and version the OCI Terraform state bucket; configure the state-bucket variables and narrowly scoped IAM access.
-- Confirm or create OCIR repository and configure OCI/GitHub deployment credentials.
-- Choose and configure private administration access (Bastion/VPN).
-- Configure Vault secrets and synthetic owner/operator/reviewer credentials.
-- Manual OCI integrated-image publishing and guarded infrastructure apply workflows are implemented. The host deployment, PostgreSQL/PostGIS initialization, and private-network rollout workflow are still not implemented.
-- Complete backup/restore and authenticated restart-persistence rehearsal.
+1. Confirm exact compartment, VCN, subnet, image, and OCIDs inside OCI; confirm Always Free compute and block-volume capacity in the selected region, or obtain explicit cost approval.
+2. Configure GitHub protected environments `oci-staging` and `oci-staging-apply` separately; secrets/variables do not inherit. Add required reviewers to the apply environment.
+3. Audit the existing subnet security lists with the read-only ingress-audit workflow. After compute is provisioned, verify the actual VNIC-attached NSG IDs in OCI Console and supply them to the audit; the workflow checks supplied NSG identity/VCN/rules but does not independently prove attachment.
+4. Create and version the OCI Terraform state bucket; configure the state-bucket variables and narrowly scoped IAM access. Run the bootstrap and non-destructive plan workflows.
+5. Review the exact plan, quota/free-tier/cost impact, resource counts, ingress, and non-destructive actions; apply only the saved plan through the protected approval gate.
+6. Identify the database/evidence block devices by exact OCI volume OCIDs, run the guarded volume-mount helper, and pass `claim2car-host-preflight`. Verify persistent mounts after reboot.
+7. Provision PostgreSQL 16/PostGIS, migration/runtime roles, runtime Vault credentials, and synthetic owner/operator/reviewer credentials.
+8. Confirm/create OCIR repository, configure publishing/deployment secrets, publish the immutable ARM64 image, and deploy by private Run Command using the digest-pinned reference.
+9. Verify health/build revision, authenticated capture/review, evidence write/read/hash after restart, cross-tenant denial, backup and restore; record evidence and rollback reference.
 
 **Current disposition:** NO-GO for integrated staging deployment until the above prerequisites are provisioned and verified. Continue synthetic CI and implementation work without claiming a cloud deployment.
 
