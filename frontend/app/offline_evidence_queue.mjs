@@ -165,7 +165,7 @@ export function createOfflineEvidenceQueue({
   }
   const activeSyncs = new Map();
 
-  async function queueFile({ sessionId, tenantId, actorId, slot, file }) {
+  async function queueFile({ sessionId, tenantId, actorId, slot, file, keyMaterial }) {
     if (typeof sessionId !== "string" || !sessionId.trim()
         || typeof tenantId !== "string" || !tenantId.trim()
         || typeof actorId !== "string" || !actorId.trim()
@@ -198,7 +198,7 @@ export function createOfflineEvidenceQueue({
     return store.enqueue(record);
   }
 
-  async function syncSession({ sessionId, tenantId, actorId, upload }) {
+  async function syncSession({ sessionId, tenantId, actorId, keyMaterial, upload }) {
     if (typeof sessionId !== "string" || !sessionId.trim()
         || typeof tenantId !== "string" || !tenantId.trim()
         || typeof actorId !== "string" || !actorId.trim()
