@@ -31,7 +31,7 @@ jobs:
         run: node frontend/tests/slice2_workbench.test.mjs > output/guided-capture/slice2-workbench-tests.json
       - name: Browser-persistent original evidence queue assertions
         run: node frontend/tests/offline_evidence_queue.test.mjs > output/guided-capture/offline-evidence-queue-tests.json
-      - name: Encrypted integrated offline queue assertions
+      - name: Encrypted integrated offline queue and token-recovery assertions
         run: node frontend/tests/integrated_offline_evidence_queue.test.mjs > output/guided-capture/integrated-offline-queue-tests.json
       - name: Syntax-check legacy and integrated browser modules
         run: node --check frontend/app/app.mjs && node --check frontend/app/offline_evidence_queue.mjs && node --check app/web/assets/app.js && node --check app/web/assets/offline_evidence_queue.mjs
