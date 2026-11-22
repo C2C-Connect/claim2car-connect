@@ -62,7 +62,7 @@ def main():
   env={"PG_ADMIN_PASSWORD":admin,"PG_MIGRATOR_PASSWORD":mig,"PG_APP_PASSWORD":app,"APP_DATABASE_URL":dsn("faos_app",app),"MIGRATION_DATABASE_URL":dsn("faos_migrator",mig),"C2C_INTERNAL_SERVICE_TOKEN":service,"C2C_VIN_HMAC_PEPPER":pepper,"C2C_STAGING_TENANT_ID":tenant,"SQUARE_ENVIRONMENT":"","SQUARE_SANDBOX_ACCESS_TOKEN":"","SQUARE_SANDBOX_LOCATION_ID":"","SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY":"","SQUARE_SANDBOX_WEBHOOK_URL":""}
   write(root/"runtime.env","\n".join("export "+k+"="+shlex.quote(v) for k,v in env.items())+"\n")
   write(root/"operator-tokens.txt","SYNTHETIC STAGING ONLY. Expiry: 180 days.\n"+"\n".join(tokens)+"\n")
- print("Generated secret files (0600) under",root,"; tenant",tenant)
+  print("Generated secret files (0600) under",root,"; tenant",tenant)
  finally:
   lock.unlink(missing_ok=True)
 if __name__=="__main__": main()
