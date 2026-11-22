@@ -316,7 +316,27 @@ async function resolveException(slot,resolutionCode,explanation){
     message("exception-status",resolutionCode==="CAPTURED_AFTER_RETRY"?"Exception resolved with a registered retry capture.":"Exception closed; the required view remains outstanding and cannot be omitted from sealing.");
   }catch(error){message("exception-status",error.message,true);}
 }
+function updateCaptureProgress(){
+  const accepted=API_CAPTURE_SLOTS.filter(([slot])=>state.artifacts.has(slot)).length;
+  const total=API_CAPTURE_SLOTS.length;
+  const label=byId("capture-progress-label"),queueLabel=byId("capture-progress-queue-label"),detail=byId("capture-progress-detail"),bar=byId("capture-progress-bar"),fill=byId("capture-progress-fill");
+  if(!label||!queueLabel||!detail||!bar||!fill)return;
+  label.textContent=accepted+" of "+total+" originals accepted";
+  bar.setAttribute("aria-valuenow",String(accepted));
+  fill.style.width=(accepted/total*100)+"%";
+  if(state.queueStatusUnavailable||!state.queueScopeVerified){
+    queueLabel.textContent="Queue status not verified";
+    detail.textContent="Local queue status could not be verified. Sealing remains disabled until it is checked.";
+  }else if(state.pendingQueueCount>0){
+    queueLabel.textContent=state.pendingQueueCount+" pending upload"+(state.pendingQueueCount===1?"":"s");
+    detail.textContent="Pending originals are encrypted on this device and must upload successfully before sealing.";
+  }else{
+    queueLabel.textContent="No pending uploads";
+    detail.textContent="An original counts only after the server accepts it.";
+  }
+}
 function updateSealButton(){
+  updateCaptureProgress();
   const allUploaded=API_CAPTURE_SLOTS.every(([slot])=>state.artifacts.has(slot));
   const allChecked=state.qualityRecorded||Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");
   const queueClear=state.pendingQueueCount===0&&!state.queueStatusUnavailable&&state.queueScopeVerified;
