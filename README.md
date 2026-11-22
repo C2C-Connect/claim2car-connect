@@ -159,3 +159,8 @@ claim2car-network/claim2car-faos-core. PR #1 remains Draft pending release revie
 ## Governing FAOS engineering manual
 
 The owner-supplied **Claim2Car Connect™ Forensic Operating System (FAOS) Core Engine Implementation Guide & Subsystem Engineering Manual** is now a durable governing engineering reference: [FAOS Core Engine Manual](docs/architecture/FAOS_CORE_ENGINE_IMPLEMENTATION_GUIDE.md). It specifies the target edge capture and quality architecture, VIN, offline FIFO sync, cryptographic evidence provenance, DARCI and multimodal assessment, consensus/human review, jurisdictional triage, commercial routing, reporting/dispatch/settlement, schemas, and acceptance strategy. Its parameters and named technologies are requirements/hypotheses—not proof of implementation or validated forensic/legal authority. The acceptance matrix controls actual status. New sessions must read this manual plus the handoff/status files and resume execution at the exact verified checkpoint.
+
+
+## Latest verified implementation checkpoint (2026-11-22)
+
+PR #165 is merged at `1f18668b2d9f1cc4e19b49e16c1e66c1313fc116`. Its tested head passed all required workflows: **1026 tests passed, 31 warnings, 208 subtests passed**. FAOS `claims2car-16-v2` is selectable for controlled testing; `claims2car-16-v1` remains default and legacy `claims2car-12-v1` remains supported. V2 field qualification is incomplete. See [execution handoff](docs/EXECUTION_HANDOFF.md) and [status](docs/EXECUTION_STATUS.md) for the precise next implementation task. OCI staging is not deployed.
