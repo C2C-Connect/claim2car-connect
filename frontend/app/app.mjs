@@ -20,7 +20,7 @@ const API_CAPTURE_SLOTS = [
   ["14_physical_vin", "Physical VIN plate"],
   ["15_license_and_insurance_docs", "License / insurance documentation"]
 ];
-const state = { token:null, role:null, actorId:null, tenantId:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map() };
+const state = { token:null, role:null, actorId:null, tenantId:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map(), slotRefs:new Map(), queueLastError:null };
 let offlineEvidenceQueue = null;
 let offlineEvidenceQueueError = null;
 try { offlineEvidenceQueue = createOfflineEvidenceQueue({store:createIndexedDbEvidenceStore()}); }
