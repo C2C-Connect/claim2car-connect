@@ -160,9 +160,9 @@ async function refreshOfflineQueueStatus(){
     const snapshot=await offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId});
     const pending=snapshot.pending,uploaded=snapshot.uploaded;
     statusNode.textContent=pending
-      ? pending+" original"+(pending===1?"":"s")+" pending locally · "+uploaded+" upload-confirmed · "+(navigator.onLine?"ready to retry":"device offline")
+      ? pending+" original"+(pending===1?"":"s")+" pending locally · "+uploaded+" upload-confirmed · "+(navigator.onLine?"ready to retry":"device offline")+(state.queueLastError?" · last error: "+state.queueLastError:"")
       : snapshot.total+" queued record"+(snapshot.total===1?"":"s")+" · all uploads confirmed; original bytes discarded from local queue";
-    statusNode.classList.toggle("error",pending>0);
+    statusNode.classList.toggle("error",Boolean(state.queueLastError));
     button.disabled=pending===0||!state.token||!navigator.onLine||state.capturePaused||state.sealed;
   }catch(error){
     statusNode.textContent="Queue status failed: "+error.message;statusNode.classList.add("error");button.disabled=true;
@@ -191,9 +191,11 @@ async function syncQueuedEvidence(){
       }
     });
     if(result.error){
+      state.queueLastError=result.error;
       const label="Upload stopped at queued item "+result.blockedAtQueueId+": "+result.error+". Originals remain stored locally for retry.";
       message("offline-queue-status",label,true);
     }else{
+      state.queueLastError=null;
       message("offline-queue-status",result.uploaded+" pending original(s) uploaded and accepted by server.",false);
       const readiness=await api("/v1/capture-sessions/"+state.sessionId+"/evidence-readiness",state.token);
       for(const artifact of readiness.registered_artifacts||[]){
@@ -204,6 +206,7 @@ async function syncQueuedEvidence(){
       renderExceptionPanel();updateSealButton();
     }
   }catch(error){
+    state.queueLastError=error.message;
     message("offline-queue-status",error.message+" · queued originals were retained for retry.",true);
   }finally{
     await refreshOfflineQueueStatus();
