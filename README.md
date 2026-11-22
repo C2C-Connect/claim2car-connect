@@ -129,20 +129,27 @@ verifies the exact revision, disabled business capabilities, non-root execution,
 and HTTP safety boundaries. It does not deploy to a cloud provider and is not
 the integrated claims application.
 
-## OCI integrated staging target — not provisioned
+## Current product state — integrated frontend, not yet deployed
 
-The owner-selected infrastructure target is Oracle Cloud Infrastructure (OCI),
-region `us-chicago-1`. Existing OCI network foundations are available, but this
-repository does not yet evidence an integrated compute instance, PostgreSQL/
-PostGIS authority database, persistent evidence volume, backup/restore rehearsal,
-or OCI deployment workflow. The existing OCI MySQL DB System is not compatible
-with the product's PostgreSQL/PostGIS architecture and must not be used as the
-authority database.
+The canonical integrated application is in `frontend/app/`. Main now includes:
 
-See [the OCI integrated-staging runbook](docs/deployment/oci-integrated-staging.md).
-No OCIDs, API keys, private keys, or service credentials belong in this repository.
-Only synthetic data is in scope for the first persistent staging rehearsal; live
-financial and dispatch integrations remain disabled.
+- Authenticated operator/reviewer workspace and persistent case creation/resume.
+- 16-view capture contract, server-accepted evidence readiness and sealing.
+- AES-GCM encrypted browser IndexedDB recovery queue; FIFO retry and network-return sync.
+- Visible accepted-versus-pending capture progress. A view counts as accepted only after server registration.
+- Owner consent, VIN, human QA and reviewer routes.
+
+The UI does not fabricate case counts or demo activity. Synthetic fixtures remain test-only.
+
+**There is still no user-accessible deployed application URL.** The runtime has been verified in CI, including ARM64 image build, but OCI staging has not been provisioned/deployed or field-tested.
+
+## OCI integrated staging — deployment pending
+
+OCI is the selected target in `us-chicago-1`. Existing network foundations are owner-created. Guarded manual Terraform plan/apply and immutable integrated-image publish workflows exist on `main`; they are not evidence that infrastructure was applied or that the app is deployed. The protected environment credentials/state, compute host, PostgreSQL/PostGIS authority DB, durable evidence volume, backup/restore, and private access path remain unverified. The existing OCI MySQL DB System is not compatible with the app authority database.
+
+See [the OCI integrated-staging runbook](docs/deployment/oci-integrated-staging.md) and [release go/no-go](docs/release/PERSISTENT_STAGING_GO_NO_GO.md). This session's GitHub connector cannot dispatch the protected manual workflows or inspect environment secrets. Do not put OCIDs, keys, tokens, or secrets in source.
+
+Only synthetic data is in scope for staging. Live financial and dispatch integrations remain disabled.
 
 Retired prototypes (do not use as canonical): C2C-Connect/C2C and
 claim2car-network/claim2car-faos-core. PR #1 remains Draft pending release review.

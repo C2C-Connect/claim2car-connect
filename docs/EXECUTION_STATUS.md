@@ -1,5 +1,20 @@
 # Claim2Car execution status snapshot / new-thread handoff
 
+## Verified product checkpoint — PR #154 and #156 merged (2026-11-22)
+
+- **PR #154** `Persist original capture evidence offline and resume uploads` merged: `c77b81d38947621a9f612f0c3402d585e9630ade`. Tested head: `6a4390750faf7d87213f2eaa9b4876aae22eaded`.
+- Integrated capture now queues original bytes in IndexedDB before upload, AES-GCM encrypts at rest with HKDF key material derived from the operator token, scopes records by tenant/actor/session, uses stable request/artifact IDs, FIFO fail-stop retry, online auto-retry, and clears ciphertext only after server acceptance. The UI discloses this is not WORM or device-qualified storage.
+- Real Chromium/IndexedDB tests cover page-reload recovery, wrong-key fail-closed behavior, FIFO failure/retry, stable IDs, and scoped purge. The CodeQL DOM-XSS alert was resolved by rendering capture previews on canvas instead of assigning user-selected blob URLs directly to image DOM.
+- **PR #156** `Show accepted and pending evidence progress in capture` merged: `607a257ac36cc95a224c3f101d46a5884646c40a`. Tested head: `60ae5e627399909502bb3e66e4d8bc358aaadeef`.
+- The 16-view progress meter counts only server-accepted originals and separately reports pending local uploads/queue-unverified status; sealing remains blocked until server readiness and local queue scope are verified.
+- Exact tested heads for both increments: **17 checks successful, 3 evidence-publication jobs skipped, 0 failures**. Full suite: **987 passed, 31 warnings, 208 subtests passed**. Integrated container smoke and OCI ARM64 build passed; Browser IndexedDB, guided capture, CodeQL, database authority/legacy, FastAPI, VIN, restricted-container, controlled-demo, and intake checks passed.
+- Main after PR #156: `607a257ac36cc95a224c3f101d46a5884646c40a`.
+- **No deployment/field acceptance:** there is no user-accessible staging URL, live OCI compute, verified PostgreSQL/PostGIS host, durable evidence volume, backup/restore rehearsal, or physical-device qualification. Guarded OCI plan/apply and image-publish workflows exist, but protected environment secrets cannot be inspected or dispatched from this session. Live payments/dispatch remain disabled.
+
+## Next executable task
+
+Run the guarded OCI infrastructure plan from GitHub Actions, review state and cost, then apply only through the protected environment after verifying credentials and approvals. Provision/verify Postgres/PostGIS and durable evidence storage, publish the immutable ARM64 integrated image, deploy privately, and test authenticated case capture, evidence retrieval/integrity, tenant isolation, restart persistence, and backup/restore. If a required protected secret/access path is absent, identify the exact prerequisite; continue product implementation meanwhile.
+
 ## Verified checkpoint — PR #153 merged (2026-11-22)
 
 - PR #153, **Make the Claim2Car secure workspace entry actionable**, merged. Merge commit: `76d5c6795de283be8967978239f2f5b5e59f700f`; tested head: `d550f213766f0512bd46e13ca4782c5b9481f494`.
