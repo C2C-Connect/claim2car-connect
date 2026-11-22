@@ -239,7 +239,7 @@ async function recordConsent() {
       method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({request_id:uuid(),accepted:true,scope:"capture_review"})
     });
-    message("owner-message",result.replayed ? "Consent record confirmed." : "Consent recorded for this case.");
+    message("owner-message",result.replayed ? "Consent record confirmed." : "Consent recorded for this case.");\n    if(activeSession===id)try{await refreshEvidenceReadiness(id);}catch{}
   } catch (error) { message("owner-message",error.message,true); }
 }
 async function withdrawCaptureConsent() {
@@ -335,9 +335,35 @@ async function refreshCaptureQueueStatus(sessionId) {
     $("sync-pending-evidence").textContent = "Capture protocol unavailable";
   }
 }
+function renderWorkflowProgress(readiness=activeReadiness){
+  const caseLabel=$("progress-case-label"),slots=SLOTS.length;
+  if(!activeSession){caseLabel.textContent="No active case";return;}
+  caseLabel.textContent=activeSession+" · "+activeProtocolVersion;
+  if(!readiness||readiness.session_id!==activeSession){
+    for(const id of ["progress-consent-status","progress-vehicle-status","progress-evidence-status","progress-quality-status","progress-seal-status"]){$(id).textContent="Status not loaded";}
+    for(const id of ["progress-consent","progress-vehicle","progress-evidence","progress-quality","progress-seal"]){$(id).classList.remove("is-done","is-pending");}
+    $("progress-evidence-bar").style.width="0%";
+    return;
+  }
+  const set=(card,status,text,done)=>{
+    $(status).textContent=text;
+    $(card).classList.toggle("is-done",Boolean(done));
+    $(card).classList.toggle("is-pending",!done);
+  };
+  set("progress-consent","progress-consent-status",readiness.consent_active?"Recorded":"Required",readiness.consent_active);
+  set("progress-vehicle","progress-vehicle-status",readiness.vehicle_reference_present?"Recorded":"Required",readiness.vehicle_reference_present);
+  const artifacts=Array.isArray(readiness.registered_artifacts)?readiness.registered_artifacts:[];
+  const count=Math.min(artifacts.length,slots);
+  const evidenceDone=slots>0&&count>=slots;
+  set("progress-evidence","progress-evidence-status",count+" / "+slots+" originals registered",evidenceDone);
+  $("progress-evidence-bar").style.width=(slots?Math.round(count*100/slots):0)+"%";
+  set("progress-quality","progress-quality-status",readiness.quality_recorded?"Recorded":"Not yet checked",readiness.quality_recorded);
+  set("progress-seal","progress-seal-status",readiness.sealed?"Sealed":"Not sealed",readiness.sealed);
+}
 async function refreshEvidenceReadiness(sessionId) {
   const readiness = await api(`/api/v1/capture-sessions/${encodeURIComponent(sessionId)}/evidence-readiness`);
   activeReadiness = readiness;
+  renderWorkflowProgress(readiness);
   return readiness;
 }
 async function syncPendingUploads(sessionId) {
@@ -461,7 +487,7 @@ async function recordQuality() {
     await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/quality`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid(),results})
     });
-    message("operator-message","Advisory quality results recorded. These checks do not certify image quality or vehicle condition.");
+    message("operator-message","Advisory quality results recorded. These checks do not certify image quality or vehicle condition.");\n    await refreshEvidenceReadiness(id);
   } catch (error) { message("operator-message",error.message,true); }
 }
 async function sealCase() {
@@ -471,7 +497,7 @@ async function sealCase() {
     const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/seal`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid()})
     });
-    message("operator-message",`Manifest sealed · ${result.manifest_digest}`);
+    message("operator-message",`Manifest sealed · ${result.manifest_digest}`);\n    await refreshEvidenceReadiness(id);
   } catch (error) { message("operator-message",error.message,true); }
 }
 async function refreshQueue() {
