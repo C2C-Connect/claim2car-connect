@@ -75,6 +75,10 @@ def validate_fstab(path,uuid,target):
 def validate_target_fstab_unassigned(path,target):
     if any(len(row)>=2 and row[1]==target for row in fstab_rows(path)):
         raise MountSetupError("FSTAB_TARGET_CONFLICT:"+target)
+def _fsync_directory(directory):
+    fd=os.open(directory,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+    try:os.fsync(fd)
+    finally:os.close(fd)
 def persist_fstab(entries,path):
     original=path.read_text() if path.exists() else ""
     additions=[]
@@ -82,10 +86,21 @@ def persist_fstab(entries,path):
         if not validate_fstab(path,uuid,target):additions.append(f"UUID={uuid} {target} {EXPECTED_FS} defaults,nofail 0 2")
     if not additions:return
     backup=path.with_name(path.name+".claim2car-backup")
-    if path.exists() and not backup.exists():shutil.copy2(path,backup);os.chmod(backup,0o600)
-    with tempfile.NamedTemporaryFile(mode="w",encoding="utf-8",dir=path.parent,prefix=f".{path.name}.",delete=False) as tmp:
-        temp=Path(tmp.name);tmp.write(original.rstrip()+"\n"+"\n".join(additions)+"\n")
-    os.chmod(temp,0o644);temp.replace(path)
+    if path.exists() and not backup.exists():
+        shutil.copy2(path,backup);os.chmod(backup,0o600)
+        with backup.open("rb") as saved:os.fsync(saved.fileno())
+        _fsync_directory(path.parent)
+    temp=None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w",encoding="utf-8",dir=path.parent,prefix=f".{path.name}.",delete=False) as tmp:
+            temp=Path(tmp.name)
+            tmp.write(original.rstrip()+"\\n"+"\\n".join(additions)+"\\n")
+            tmp.flush();os.fsync(tmp.fileno())
+        os.chmod(temp,0o644)
+        temp.replace(path)
+        _fsync_directory(path.parent)
+    finally:
+        if temp is not None and temp.exists():temp.unlink()
 def verify_target(target):
     if target.is_symlink():raise MountSetupError("MOUNTPOINT_SYMLINK_REJECTED:"+str(target))
     if target.exists() and not target.is_dir():raise MountSetupError("MOUNTPOINT_NOT_DIRECTORY:"+str(target))
