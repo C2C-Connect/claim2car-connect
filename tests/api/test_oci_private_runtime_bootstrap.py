@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 def test_bootstrap_credentials_and_permissions(tmp_path):
  s=ROOT/"scripts/oci_staging_runtime_bootstrap.py"; out=tmp_path/"runtime"
- subprocess.run(["python3",str(s),"--dir",str(out)],check=True,capture_output=True,text=True)
+ result=subprocess.run(["python3",str(s),"--dir",str(out)],check=True,capture_output=True,text=True)
  for n in ("runtime.env","postgres-init.sql","seed-tenant.sql","operator-tokens.txt"): assert (out/n).stat().st_mode&0o777==0o600
  runtime_env=(out/"runtime.env").read_text()
  for name in ("SQUARE_ENVIRONMENT","SQUARE_SANDBOX_ACCESS_TOKEN","SQUARE_SANDBOX_LOCATION_ID","SQUARE_SANDBOX_WEBHOOK_SIGNATURE_KEY","SQUARE_SANDBOX_WEBHOOK_URL"):
@@ -13,7 +13,36 @@ def test_bootstrap_credentials_and_permissions(tmp_path):
  c=json.loads((out/"capture-runtime.json").read_text()); assert len(c["credentials"])==3
  assert {x["actor_role"] for x in c["credentials"]}=={"owner","operator","reviewer"}
  assert len({x["token_sha256"] for x in c["credentials"]})==3 and all("token" not in x for x in c["credentials"])
+ assert (out.stat().st_mode&0o777)==0o700
+ tokens=(out/"operator-tokens.txt").read_text().splitlines()
+ assert tokens[0].startswith("SYNTHETIC STAGING ONLY.")
+ token_by_role={line.split(": ",1)[0]:line.split(": ",1)[1] for line in tokens[1:]}
+ assert set(token_by_role)=={"owner","operator","reviewer"}
+ assert all(len(token)>=40 for token in token_by_role.values())
+ import hashlib,time
+ for credential in c["credentials"]:
+  role=credential["actor_role"]
+  assert credential["token_sha256"]==hashlib.sha256(token_by_role[role].encode()).hexdigest()
+  assert credential["actor_id"]==f"staging-{role}"
+  assert credential["expires_at"]>=int(time.time())+179*86400
+  assert token_by_role[role] not in result.stdout
+  assert token_by_role[role] not in (out/"capture-runtime.json").read_text()
+  assert token_by_role[role] not in runtime_env
+ assert not (out/".bootstrap.lock").exists()
  r=subprocess.run(["python3",str(s),"--dir",str(out)],capture_output=True,text=True); assert r.returncode and "NOT_EMPTY" in r.stderr
+
+def test_bootstrap_refuses_symlink_output_and_active_lock(tmp_path):
+ script=ROOT/"scripts/oci_staging_runtime_bootstrap.py"
+ target=tmp_path/"target"; target.mkdir()
+ link=tmp_path/"runtime-link"; link.symlink_to(target)
+ result=subprocess.run(["python3",str(script),"--dir",str(link)],capture_output=True,text=True)
+ assert result.returncode!=0 and "DIRECTORY_SYMLINK" in result.stderr
+ assert not list(target.iterdir())
+ locked=tmp_path/"locked"; locked.mkdir(); (locked/".bootstrap.lock").write_text("pid=999999\\n")
+ result=subprocess.run(["python3",str(script),"--dir",str(locked)],capture_output=True,text=True)
+ assert result.returncode!=0 and "BOOTSTRAP_LOCKED" in result.stderr
+ assert (locked/".bootstrap.lock").exists()
+
 def test_runtime_deployment_guardrails(tmp_path):
  s=ROOT/"scripts/oci_staging_runtime_bootstrap.py"; out=tmp_path/"runtime"; subprocess.run(["python3",str(s),"--dir",str(out)],check=True,capture_output=True,text=True)
  assert "CREATE DATABASE claim2car" in (out/"postgres-init.sql").read_text()
@@ -31,6 +60,7 @@ def test_generated_database_init_is_single_connect_and_postgis(tmp_path):
     subprocess.run(["python3",str(script),"--dir",str(out)],check=True,capture_output=True,text=True)
     sql=(out/"postgres-init.sql").read_text()
     assert sql.count("\\connect claim2car")==1
+    assert next(line for line in sql.splitlines() if "connect claim2car" in line)=="\\connect claim2car"
     assert "CREATE EXTENSION IF NOT EXISTS postgis" in sql
 
 def test_deploy_script_shell_syntax_and_expanded_variables():
