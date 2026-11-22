@@ -240,7 +240,7 @@ function renderCaptureSlots(readiness=null){
       try{
         if(!offlineEvidenceQueue)throw new Error(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
         if(!state.tenantId||!state.actorId)throw new Error("SERVER_IDENTITY_NOT_VERIFIED");
-        await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file});
+        await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file,keyMaterial:state.token});
         queuePreview(file,slot,preview);
         meta.textContent="Saved locally · pending upload · "+file.size.toLocaleString()+" bytes";meta.classList.remove("done");
         await refreshOfflineQueueStatus();
