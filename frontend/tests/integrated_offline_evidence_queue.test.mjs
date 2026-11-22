@@ -56,7 +56,7 @@ assert.equal(first.bytes.byteLength,first.byteLength+16);
 let snapshot=await queue.status(scope.sessionId,{tenantId:scope.tenantId,actorId:scope.actorId});
 assert.deepEqual({total:snapshot.total,pending:snapshot.pending,uploaded:snapshot.uploaded},{total:2,pending:2,uploaded:0});
 const wrongKey=await queue.syncSession({...scope,keyMaterial:"wrong-key-material-not-the-original-token-12345",upload:async()=>{throw new Error("should-not-upload");}});
-assert.equal(wrongKey.uploaded,0);assert.ok(wrongKey.error);
+assert.equal(wrongKey.uploaded,0);assert.equal(wrongKey.error,"EVIDENCE_DECRYPTION_FAILED");
 snapshot=await queue.status(scope.sessionId,{tenantId:scope.tenantId,actorId:scope.actorId});
 assert.equal(snapshot.pending,2);
 const failed=await queue.syncSession({...scope,keyMaterial:tokenMaterial,upload:async(record)=>{assert.equal(record.queueId,first.queueId);throw new Error("NETWORK_INTERRUPTED");}});
