@@ -190,6 +190,7 @@ export function createOfflineEvidenceQueue({
       requestId: makeUuid(),
       sha256: digest,
       byteLength: bytes.byteLength,
+      mimeType: typeof file.type === "string" ? file.type : "application/octet-stream",
       queuedAt: now(),
       uploaded: false,
       bytes,
