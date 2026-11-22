@@ -84,7 +84,9 @@ def test_integrated_runtime_mounts_capture_and_internal_analysis_only():
                 # happen to be mounted at the root.
                 assert '<link rel="stylesheet" href="/assets/app.css">' in shell.text
                 assert '<script type="module" src="/assets/app.js"></script>' in shell.text
-                assert '<a class="intro-link intro-link-primary" href="/prototype/">Open 16-view Capture Workbench</a>' in shell.text
+                assert '<a class="intro-link intro-link-primary" href="#sign-in">Open secure workspace</a>' in shell.text
+                assert "Your workspace is one secure connection away" in shell.text
+                assert "1. Connect" in shell.text and "2. Capture" in shell.text and "3. Review" in shell.text
                 assert '<a class="intro-link" href="/prototype/vehicle-lab.html">Vehicle Intelligence Lab</a>' in shell.text
                 assert "/app.mjs" not in shell.text
                 assert "/styles.css" not in shell.text

@@ -19,7 +19,7 @@
       <h1>From collision to clarity.</h1>
       <p class="muted">A guided workflow to document vehicle condition, preserve original evidence, and move a claim forward with a clear record.</p>
     <nav class="intro-links" aria-label="Claim2Car workbench shortcuts">
-      <a class="intro-link intro-link-primary" href="/prototype/">Open 16-view Capture Workbench</a>
+      <a class="intro-link intro-link-primary" href="#sign-in">Open secure workspace</a>
       <a class="intro-link" href="/prototype/vehicle-lab.html">Vehicle Intelligence Lab</a>
     </nav>
     </section>
@@ -29,16 +29,16 @@
       <article class="highlight-card"><span class="highlight-icon">03</span><h2>Review</h2><p>Human review of sealed evidence with attributable decisions and uncertainty.</p></article>
     </section>
     <section class="workspace-entry" aria-label="Open Claim2Car tools">
-      <div><p class="eyebrow">START WORKING</p><h2>Choose your next step</h2><p class="muted">Open the capture workbench or connect to your secured workspace.</p></div>
+      <div><p class="eyebrow">START WORKING</p><h2>Your workspace is one secure connection away</h2><p class="muted">Sign in with a provisioned operator, owner, or reviewer credential. Your permissions come from the server—not from a role selector.</p><ul class="workspace-steps"><li><strong>1. Connect</strong><span>Authenticate with your assigned access token.</span></li><li><strong>2. Capture</strong><span>Start or resume a claim record and complete the guided 16-view protocol.</span></li><li><strong>3. Review</strong><span>Seal evidence and route it to independent human review.</span></li></ul></div>
     </section>
     <section id="sign-in" class="panel">
-      <h2>Connect securely</h2>
-      <p class="muted">Use the access token provisioned for your assigned role. Tokens are held in memory only and are not saved in browser storage.</p>
+      <h2>Open your secure workspace</h2>
+      <p class="muted">Access is restricted to provisioned credentials. There is no self-service account creation yet. Tokens are held in memory only and are never saved in browser storage.</p>
       <label for="access-token">Access token</label>
       <input id="access-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your provisioned token">
       <button id="connect" class="primary">Connect</button>
       <p id="sign-in-error" class="error" role="alert"></p>
-      <p class="fine">This is a controlled integrated application surface. Access is enforced by the server; selecting a role in the browser does not grant permissions.</p>
+      <p class="fine">If you do not yet have a credential, the runtime administrator must issue one through the secure out-of-band provisioning process. This environment is not yet a public or field-ready service.</p>
     </section>
     <section id="workspace" hidden>
       <div class="workspace-head">
