@@ -22,3 +22,7 @@
 .queue-storage-warning{font-size:11px;line-height:1.55;color:#d7b987;background:#2b261e;border:1px solid #5b4931;border-radius:9px;padding:10px 12px;margin:14px 0}
 #offline-queue-status{margin:8px 0 4px}
 @media(max-width:540px){.queue-panel-heading{display:block}.queue-badge{display:inline-block;margin-top:10px}}
+
+.slot-meta.pending{color:#d7b987;border-color:#675237;background:#30271b}
+.offline-queue-panel .inline-status{font-size:12px;line-height:1.5}
+#sync-queued-evidence{margin-top:8px}
