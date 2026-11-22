@@ -162,7 +162,7 @@ async function refreshOfflineQueueStatus(){
       ? pending+" original"+(pending===1?"":"s")+" pending locally · "+uploaded+" upload-confirmed · "+(navigator.onLine?"ready to retry":"device offline")+(state.queueLastError?" · last error: "+state.queueLastError:"")
       : snapshot.total+" queued record"+(snapshot.total===1?"":"s")+" · all uploads confirmed; original bytes discarded from local queue";
     statusNode.classList.toggle("error",Boolean(state.queueLastError));
-    button.disabled=pending===0||!state.token||!navigator.onLine||state.capturePaused||state.sealed;
+    button.disabled=pending===0||!state.token||!navigator.onLine||state.sealed;
   }catch(error){
     statusNode.textContent="Queue status failed: "+error.message;statusNode.classList.add("error");button.disabled=true;
   }
