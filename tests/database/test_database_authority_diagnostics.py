@@ -22,7 +22,6 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0025_square_sandbox_payment_intents.sql',
             '0026_square_sandbox_webhook_reconciliation.sql',
             '0027_capture_protocol_16_v2.sql',
-            '0027_capture_protocol_16_v2.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
