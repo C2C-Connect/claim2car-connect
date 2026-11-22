@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
-from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 MODEL_VERSION = "damage-localization-v1"
 ANNOTATION_VERSION = "damage-annotation-v1"
@@ -118,7 +118,7 @@ def iou(a: DamageRegion, b: DamageRegion) -> float:
 
 
 def zone_for_slot(slot: str, protocol_version: str = LEGACY_CAPTURE_PROTOCOL) -> str | None:
-    """Map only the eight 16-v1 exterior views to crush zones.
+    """Map only the eight exterior views shared by 16-v1 and 16-v2 to broad crush zones.
 
     Wheel, cabin, odometer, VIN and identity-document slots are deliberately
     excluded from crush physics. Legacy 12-v1 mappings remain available for
@@ -127,7 +127,7 @@ def zone_for_slot(slot: str, protocol_version: str = LEGACY_CAPTURE_PROTOCOL) ->
     protocol = require_implemented_protocol(protocol_version)
     if slot not in protocol.slots:
         return None
-    if protocol_version == DEFAULT_CAPTURE_PROTOCOL:
+    if protocol_version in (DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL):
         exterior = {
             "00_front_exterior": "front",
             "01_front_right_exterior": "front",

@@ -5,10 +5,10 @@ REQUIRED += ['database/authority_migrate.py', 'authority_migrations/0008_tenant_
 REQUIRED += ['authority_migrations/0009_integer_financial_ledger.sql', 'database/financial_ledger.py']
 REQUIRED += ['app/main.py','requirements-api.txt','tests/api/test_health.py','scripts/api_health_acceptance.py','scripts/run_database_acceptance.sh','.github/workflows/api-foundation.yml','docs/api-foundation.md']
 REQUIRED += ['app/identity.py','tests/database/test_identity_boundary.py']
-REQUIRED += ['authority_migrations/0019_manifest_root_protocol_binding.sql','tests/database/test_database_authority_diagnostics.py']
+REQUIRED += ['authority_migrations/0027_capture_protocol_16_v2.sql','authority_migrations/0019_manifest_root_protocol_binding.sql','tests/database/test_database_authority_diagnostics.py']
 REQUIRED += ['authority_migrations/0020_collision_lifecycle_record.sql','database/collision_lifecycle.py','tests/database/test_collision_lifecycle_integration.py']
 REQUIRED += ['authority_migrations/0021_collision_claim_link.sql']
-REQUIRED += ['app/capture_protocols.py','contracts/shot-list-16-v1.json','frontend/src/modules/capture/guided_workflow.mjs','frontend/src/modules/capture/slice2_workbench_controller.mjs','frontend/tests/slice2_workbench.test.mjs','tests/contracts/test_capture_protocol_registry.py','tests/api/test_integrated_runtime.py','app/web/index.html','app/web/assets/app.js']
+REQUIRED += ['app/capture_protocols.py','contracts/shot-list-16-v1.json', 'contracts/shot-list-16-v2.json','frontend/src/modules/capture/guided_workflow.mjs','frontend/src/modules/capture/slice2_workbench_controller.mjs','frontend/tests/slice2_workbench.test.mjs','tests/contracts/test_capture_protocol_registry.py','tests/api/test_integrated_runtime.py','app/web/index.html','app/web/assets/app.js']
 
 REQUIRED += ['database/capture_sessions.py','tests/database/test_capture_sessions_integration.py']
 
@@ -19,7 +19,7 @@ REQUIRED += ['frontend/src/modules/capture/vin.mjs','frontend/src/modules/captur
 REQUIRED += ['frontend/src/modules/capture/vpic.mjs','frontend/src/modules/capture/vpic.d.mts','frontend/tests/vpic.test.mjs']
 
 REQUIRED += ['frontend/src/modules/capture/vpic_transport.mjs','frontend/tests/vpic_transport.test.mjs','.github/workflows/vpic-live-lookup.yml']
-REQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','frontend/app/vehicle-lab.mjs']
+REQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','frontend/app/vehicle-lab.mjs','frontend/app/app.mjs','frontend/app/index.html']
 
 REQUIRED += ['frontend/tests/vpic_transport.test.mjs']
 REQUIRED += [

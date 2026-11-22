@@ -1,0 +1,40 @@
+{
+  "schema_version": "0.1",
+  "shot_list_version": "claims2car-16-v2",
+  "required_angles": [
+    "00_front_exterior",
+    "01_front_right_exterior",
+    "02_right_side_exterior",
+    "03_rear_right_exterior",
+    "04_rear_exterior",
+    "05_rear_left_exterior",
+    "06_left_side_exterior",
+    "07_front_left_exterior",
+    "08_front_left_structural",
+    "09_front_right_structural",
+    "10_rear_right_structural",
+    "11_rear_left_structural",
+    "12_front_cabin_restraints",
+    "13_rear_cabin_restraints",
+    "14_instrument_cluster_telemetry",
+    "15_vehicle_identity_vin"
+  ],
+  "descriptions": {
+    "00_front_exterior": "Front-facing vehicle framing",
+    "01_front_right_exterior": "Front-right 45 degree exterior view",
+    "02_right_side_exterior": "Right profile exterior view",
+    "03_rear_right_exterior": "Rear-right 45 degree exterior view",
+    "04_rear_exterior": "Rear-facing vehicle framing",
+    "05_rear_left_exterior": "Rear-left 45 degree exterior view",
+    "06_left_side_exterior": "Left profile exterior view",
+    "07_front_left_exterior": "Front-left 45 degree exterior view",
+    "08_front_left_structural": "Accessible front-left structural corner; photograph from safe standing position, never under an unsupported vehicle",
+    "09_front_right_structural": "Accessible front-right structural corner; photograph from safe standing position, never under an unsupported vehicle",
+    "10_rear_right_structural": "Accessible rear-right structural corner; photograph from safe standing position, never under an unsupported vehicle",
+    "11_rear_left_structural": "Accessible rear-left structural corner; photograph from safe standing position, never under an unsupported vehicle",
+    "12_front_cabin_restraints": "Front occupant area, steering wheel/dashboard, and visible restraint/airbag indicators",
+    "13_rear_cabin_restraints": "Rear occupant area, seat belts, seating, and visible restraint/airbag indicators",
+    "14_instrument_cluster_telemetry": "Instrument cluster showing odometer and warning indicators; avoid unnecessary personal data",
+    "15_vehicle_identity_vin": "Readable physical VIN plate/sticker; VIN is identity evidence, not damage evidence"
+  }
+}

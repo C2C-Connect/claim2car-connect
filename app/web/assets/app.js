@@ -89,7 +89,7 @@ async function loadCaptureProtocols() {
   }
   select.value = registry.default_protocol_version;
   SLOTS = PROTOCOL_SLOTS[registry.default_protocol_version] || [];
-  $("capture-protocol-help").textContent = "New sessions default to the owner-approved 16-slot protocol. Historical 12-v1 sessions retain their original slot contract and remain selectable for new sessions.";
+  $("capture-protocol-help").textContent = "16-v1 remains the default; FAOS 16-v2 is selectable for controlled capture. Historical 12-v1 sessions retain their original slot contract. V2 supplemental documents are optional and must be separately consented.";
 }
 function disconnect() {
   token = null; identity = null; activeSession = null; activeReadiness = null;

@@ -6,6 +6,7 @@ import pytest
 
 from app.capture_protocols import (
     DEFAULT_CAPTURE_PROTOCOL,
+    FAOS_CAPTURE_PROTOCOL,
     LEGACY_CAPTURE_PROTOCOL,
     resolve_capture_protocol,
 )
@@ -21,6 +22,8 @@ EXPECTED_16 = (
     "15_license_and_insurance_docs",
 )
 
+
+EXPECTED_FAOS_16=("00_front_exterior","01_front_right_exterior","02_right_side_exterior","03_rear_right_exterior","04_rear_exterior","05_rear_left_exterior","06_left_side_exterior","07_front_left_exterior","08_front_left_structural","09_front_right_structural","10_rear_right_structural","11_rear_left_structural","12_front_cabin_restraints","13_rear_cabin_restraints","14_instrument_cluster_telemetry","15_vehicle_identity_vin")
 
 def _entries(slots):
     return tuple(
@@ -106,3 +109,30 @@ def test_16_v1_wheel_cabin_odometer_vin_and_documents_are_not_exterior_damage_vi
                           protocol_version=DEFAULT_CAPTURE_PROTOCOL)
     with pytest.raises(DamageLocalizationError, match="NOT_AN_EXTERIOR_SLOT"):
         DamageObservationAdapter().to_observation(region)
+
+
+def test_faos_16_v2_contract_matches_manual_target_categories_and_is_versioned():
+    protocol=resolve_capture_protocol(FAOS_CAPTURE_PROTOCOL)
+    assert protocol.version == "claims2car-16-v2"
+    assert protocol.status == "implemented"
+    assert protocol.slots == EXPECTED_FAOS_16
+    assert len(protocol.descriptions) == 16
+    assert protocol.slots[:8] == EXPECTED_16[:8]
+    assert protocol.slots[8:12] == ("08_front_left_structural", "09_front_right_structural", "10_rear_right_structural", "11_rear_left_structural")
+    assert protocol.slots[12:14] == ("12_front_cabin_restraints", "13_rear_cabin_restraints")
+    assert protocol.slots[14:] == ("14_instrument_cluster_telemetry", "15_vehicle_identity_vin")
+    manifest = build_manifest("faos-v2-session", _entries(protocol.slots), FAOS_CAPTURE_PROTOCOL)
+    assert manifest.shot_list_version == FAOS_CAPTURE_PROTOCOL
+    assert len(manifest.entries) == 16
+
+@pytest.mark.parametrize("slot",EXPECTED_FAOS_16[8:])
+def test_faos_16_v2_non_exterior_slots_are_not_damage_geometry(slot):
+    assert zone_for_slot(slot, FAOS_CAPTURE_PROTOCOL) is None
+    region = DamageRegion(slot, 0.1, 0.1, 0.4, 0.4, "dent", 0.9, protocol_version=FAOS_CAPTURE_PROTOCOL)
+    with pytest.raises(DamageLocalizationError, match="NOT_AN_EXTERIOR_SLOT"):
+        DamageObservationAdapter().to_observation(region)
+
+def test_faos_16_v2_exterior_slots_keep_vehicle_zone_mapping():
+    assert zone_for_slot("00_front_exterior", FAOS_CAPTURE_PROTOCOL) == "front"
+    assert zone_for_slot("02_right_side_exterior", FAOS_CAPTURE_PROTOCOL) == "side"
+    assert zone_for_slot("04_rear_exterior", FAOS_CAPTURE_PROTOCOL) == "rear"

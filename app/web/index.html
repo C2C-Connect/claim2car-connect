@@ -65,7 +65,7 @@
         <p class="muted">Create and reopen tenant-scoped claim-case records. The register stores case identity, creator/owner binding, and capture-session association. Optional structured incident details are separately consent-gated; claimant and policy details are not collected by this v1 intake.</p>
         <label for="capture-protocol-version">Capture protocol for new sessions</label>
         <select id="capture-protocol-version"><option value="claims2car-16-v1" selected>claims2car-16-v1 · default</option><option value="claims2car-12-v1">claims2car-12-v1 · legacy alternative</option></select>
-        <p id="capture-protocol-help" class="fine">16-v1 is the owner-approved 16-slot default and is enabled for controlled capture. It records eight exterior views, four wheel assemblies, cabin/airbag indicators, odometer, physical VIN, and license/insurance documentation. 12-v1 remains an explicit legacy alternative for compatible historical workflows.</p>
+        <p id="capture-protocol-help" class="fine">16-v1 remains the default. The selectable FAOS 16-v2 contract defines eight exterior views, four structural corners, front/rear cabin views, and instrument telemetry/VIN identity frames. V2 is controlled-test only; supplemental documents are not mandatory capture slots. 12-v1 remains a legacy alternative.</p>
         <div class="actions"><button id="create-claim-case" class="primary">Create claim record</button><span id="claim-case-created" class="fine"></span></div>
         <div id="claim-cases" class="owned-sessions" aria-live="polite"></div>
         <div class="rule"></div>

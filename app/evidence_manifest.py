@@ -4,12 +4,14 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
-from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 VERSION = '0.1'
 DEFAULT_CANONICAL_SLOTS = require_implemented_protocol(DEFAULT_CAPTURE_PROTOCOL).slots
+FAOS_CANONICAL_SLOTS = require_implemented_protocol(FAOS_CAPTURE_PROTOCOL).slots
 LEGACY_CANONICAL_SLOTS = require_implemented_protocol(LEGACY_CAPTURE_PROTOCOL).slots
 CANONICAL_SLOTS = DEFAULT_CANONICAL_SLOTS
+PROTOCOL_CANONICAL_SLOTS = {DEFAULT_CAPTURE_PROTOCOL: DEFAULT_CANONICAL_SLOTS, FAOS_CAPTURE_PROTOCOL: FAOS_CANONICAL_SLOTS, LEGACY_CAPTURE_PROTOCOL: LEGACY_CANONICAL_SLOTS}
 
 @dataclass(frozen=True)
 class ManifestEntry:
@@ -36,8 +38,8 @@ def load_shot_contract(protocol_version=DEFAULT_CAPTURE_PROTOCOL):
         protocol=require_implemented_protocol(protocol_version)
     except (ValueError, OSError, TypeError, KeyError):
         raise ValueError('INVALID_SHOT_CONTRACT') from None
-    canonical = LEGACY_CANONICAL_SLOTS if protocol.version == LEGACY_CAPTURE_PROTOCOL else DEFAULT_CANONICAL_SLOTS
-    if protocol.slots != canonical:
+    canonical = PROTOCOL_CANONICAL_SLOTS.get(protocol.version)
+    if canonical is None or protocol.slots != canonical:
         raise ValueError('INVALID_SHOT_CONTRACT')
     return protocol.version,protocol.slots
 

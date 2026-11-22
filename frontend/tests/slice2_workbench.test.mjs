@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   CANONICAL_SLOTS,
   LEGACY_CANONICAL_SLOTS,
+  FAOS_CAPTURE_PROTOCOL,
   LEGACY_CAPTURE_PROTOCOL,
   OperatorRoadsideController,
   ReviewerWorkbenchController,
@@ -47,12 +48,12 @@ assert.equal(CANONICAL_SLOTS.length, 16);
 assert.equal(LEGACY_CANONICAL_SLOTS.length, 12);
 
 const browserWorkbenchSource = readFileSync(new URL("../app/app.mjs", import.meta.url), "utf8");
-const apiSlotBlock = browserWorkbenchSource.match(/const API_CAPTURE_SLOTS = \[([\s\S]*?)\n\];/);
-assert.ok(apiSlotBlock, "browser workbench must declare its server API capture slots");
-const apiSlots = Array.from(apiSlotBlock[1].matchAll(/\["([a-z0-9_]+)",\s*"[^"]+"\]/g), (match) => match[1]);
-assert.deepEqual(apiSlots, CANONICAL_SLOTS, "browser upload slots must exactly match the server's ordered 16-view protocol");
+assert.ok(browserWorkbenchSource.includes("loadCaptureProtocols"), "browser workbench must load the server protocol registry");
+assert.ok(browserWorkbenchSource.includes("/v1/capture-protocols"), "workbench must request versioned capture protocols");
+assert.ok(browserWorkbenchSource.includes("captureSlots()"), "workbench must render slots from the selected protocol");
+assert.ok(browserWorkbenchSource.includes("capture-protocol-version"), "workbench must allow protocol selection for new cases");
 assert.ok(browserWorkbenchSource.includes("/v1/claim-cases"), "workbench must create a persistent claim-case record");
-assert.ok(browserWorkbenchSource.includes("capture_protocol_version:\"claims2car-16-v1\""), "new cases must bind the implemented 16-view protocol");
+assert.ok(browserWorkbenchSource.includes("capture_protocol_version:byId(\"capture-protocol-version\").value||DEFAULT_CAPTURE_PROTOCOL"), "new cases must bind selected protocol with 16-v1 default");
 assert.ok(!browserWorkbenchSource.includes('api("/v1/capture-sessions",state.token'), "workbench must not create unlinked controlled-test sessions");
 assert.ok(browserWorkbenchSource.includes("/v1/claim-cases?limit=50"), "operator workbench must load persistent case history");
 assert.ok(browserWorkbenchSource.includes("/evidence-readiness"), "resuming a case must use server-authoritative readiness");
@@ -66,3 +67,9 @@ assert.ok(readFileSync(new URL("../app/index.html", import.meta.url), "utf8").in
 
 
 console.log(JSON.stringify({ suite: "slice2-workbench", assertions: 12, status: "passed" }));
+
+const faosV2Operator=new OperatorRoadsideController({sessionId:"faos-v2",tenantId:"tenant-a",operatorId:"operator-a",protocolVersion:FAOS_CAPTURE_PROTOCOL,now});
+assert.equal(faosV2Operator.canonicalSlots.length,16);
+assert.equal(faosV2Operator.canonicalSlots[8],"08_front_left_structural");
+assert.equal(faosV2Operator.canonicalSlots[13],"13_rear_cabin_restraints");
+assert.equal(faosV2Operator.canonicalSlots[15],"15_vehicle_identity_vin");

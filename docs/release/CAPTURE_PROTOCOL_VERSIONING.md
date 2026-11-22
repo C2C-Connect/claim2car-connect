@@ -76,3 +76,18 @@ This does not establish persistent deployment or field acceptance. Real-particip
 5. No 12-v1 slot may be silently substituted for a missing 16-v1 slot.
 6. Only slots 00–07 may feed crush-physics geometry; slots 08–15 are evidence-only for that analysis path.
 7. Conflicting retries, supersession, consent withdrawal, and recovery remain explicit and auditable.
+
+
+## FAOS 16-v2 additive protocol
+
+The owner-supplied FAOS target is now represented by a separate `claims2car-16-v2` contract. It is implemented and selectable for controlled capture, but **does not replace the default 16-v1** until the corresponding disclosure, rollout, and field qualification are reviewed. The immutable 16-v1 and 12-v1 slot IDs remain supported.
+
+The v2 contract maps the 16 positions as follows:
+
+- 00–07: eight exterior perspectives, unchanged.
+- 08–11: four accessible structural corner views (front-left, front-right, rear-right, rear-left). Operators must remain in safe standing positions; no crawling under or approaching an unsupported vehicle. If unsafe/unavailable, use the explicit exception workflow.
+- 12–13: front and rear cabin/restraint perspectives.
+- 14–15: instrument-cluster telemetry and physical VIN/vehicle-identity frame. VIN identity is not damage geometry.
+- License/insurance documentation is supplemental and is not a mandatory v2 capture slot; obtain it only when separately necessary and consented.
+
+The registry exposes v2 as a selectable version. New sessions remain defaulted to v1 in this increment. Authority migration 0027 permits v2 while preserving the existing default and historical session protocol identity. V2 non-exterior slots are excluded from damage-zone localization/physics input.

@@ -18,7 +18,7 @@ from backend.app.anchor.ledger import PartnerAcceptanceRecord
 from app.artifact_storage import OriginalByteStore
 from database.capture_evidence import CaptureEvidenceService
 from app.evidence_manifest import CANONICAL_SLOTS, LEGACY_CANONICAL_SLOTS
-from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 
 class CaptureSessionIntegration(unittest.TestCase):
     def setUp(self):
@@ -284,11 +284,14 @@ class CaptureSessionIntegration(unittest.TestCase):
         with self.assertRaisesRegex(CaptureStorageUnavailable,'^CAPTURE_STORAGE_UNAVAILABLE$'):
             store.create(self.auth(),self.key)
 
-    def test_protocol_registry_exposes_16_default_and_12_legacy_as_executable(self):
+    def test_protocol_registry_exposes_v1_v2_and_legacy_protocols_as_executable(self):
         default = resolve_capture_protocol(DEFAULT_CAPTURE_PROTOCOL)
         legacy = resolve_capture_protocol(LEGACY_CAPTURE_PROTOCOL)
         self.assertEqual((default.status, len(default.slots)), ("implemented", 16))
         self.assertEqual((legacy.status, len(legacy.slots)), ("implemented", 12))
+        faos=resolve_capture_protocol(FAOS_CAPTURE_PROTOCOL)
+        self.assertEqual((faos.status,len(faos.slots)),("implemented",16))
+        self.assertEqual(faos.slots[8],"08_front_left_structural")
 
     def test_claim_case_retry_cannot_change_protocol_version(self):
         claim_id, request_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -409,6 +412,16 @@ class CaptureSessionIntegration(unittest.TestCase):
             self.assertIsNone(self.f.seed.execute(
                 'SELECT 1 FROM faos.claim_case_incident_intake WHERE tenant_id=%s AND claim_id=%s',
                 (self.f.tenants[0],claim_id)).fetchone())
+
+
+    def test_faos_16_v2_claim_case_protocol_is_persisted_immutably(self):
+        claim_id,request_id=str(uuid.uuid4()),str(uuid.uuid4())
+        case=self.claim_cases.create(self.auth(),claim_id=claim_id,request_id=request_id,capture_protocol_version=FAOS_CAPTURE_PROTOCOL)
+        self.assertEqual(self.store.get(self.auth(),case.capture_session_id).capture_protocol_version,FAOS_CAPTURE_PROTOCOL)
+        retry=self.claim_cases.create(self.auth(),claim_id=claim_id,request_id=request_id,capture_protocol_version=FAOS_CAPTURE_PROTOCOL)
+        self.assertFalse(retry.created)
+        with self.assertRaisesRegex(ClaimCaseConflict,"CAPTURE_PROTOCOL_VERSION_MISMATCH"):
+            self.claim_cases.create(self.auth(),claim_id=claim_id,request_id=request_id,capture_protocol_version=DEFAULT_CAPTURE_PROTOCOL)
 
 if __name__=='__main__':
     unittest.main()

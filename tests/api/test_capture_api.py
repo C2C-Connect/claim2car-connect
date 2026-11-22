@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 from fastapi.testclient import TestClient
 from app.capture_api import CaptureRuntime, create_capture_app, load_runtime
-from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL
 from database.claim_cases import ClaimCase, ClaimCaseStore
 from database.collision_lifecycle import CollisionLifecycleRecord, CollisionClaimLink, CollisionLifecycleStore
 from app.identity import ActorBinding, Credential, CredentialResolver
@@ -158,7 +158,7 @@ class CaptureRouteTests(unittest.TestCase):
         self.collision_store.list_review_claims.assert_called_once_with('Bearer '+self.token,collision_id)
         service.return_value.get_review_details.assert_called_once_with('Bearer '+self.token,session_id)
 
-    def test_protocol_registry_is_authenticated_and_exposes_both_executable_versions(self):
+    def test_protocol_registry_is_authenticated_and_exposes_three_executable_versions(self):
         with self.client() as client:
             registry = client.get('/v1/capture-protocols',headers=self.headers)
             unauthorized = client.get('/v1/capture-protocols')
@@ -171,6 +171,12 @@ class CaptureRouteTests(unittest.TestCase):
         self.assertEqual(by_version['claims2car-16-v1']['required_slots'][0],'00_front_exterior')
         self.assertEqual(by_version['claims2car-16-v1']['required_slots'][-1],'15_license_and_insurance_docs')
         self.assertEqual(len(by_version['claims2car-16-v1']['slot_descriptions']),16)
+        self.assertEqual(by_version['claims2car-16-v2']['status'],'implemented')
+        self.assertTrue(by_version['claims2car-16-v2']['capture_enabled'])
+        self.assertEqual(len(by_version['claims2car-16-v2']['required_slots']),16)
+        self.assertEqual(by_version['claims2car-16-v2']['required_slots'][8],'08_front_left_structural')
+        self.assertEqual(by_version['claims2car-16-v2']['required_slots'][13],'13_rear_cabin_restraints')
+        self.assertEqual(by_version['claims2car-16-v2']['required_slots'][-1],'15_vehicle_identity_vin')
         self.assertEqual(by_version['claims2car-12-v1']['status'],'implemented')
         self.assertTrue(by_version['claims2car-12-v1']['capture_enabled'])
         self.assertEqual(len(by_version['claims2car-12-v1']['required_slots']),12)

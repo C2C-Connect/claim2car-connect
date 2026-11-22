@@ -51,7 +51,7 @@
         </article>
         <article class="panel workflow-panel">
           <div class="step-title"><span class="step-dot">1</span><div><h3>Create a case</h3><p class="muted">The server assigns the authenticated operator and tenant.</p></div></div>
-          <button id="create-case" class="button primary" type="button">Create new case</button><div id="case-status" class="inline-status"></div><div id="case-id" class="case-id" hidden></div>
+          <label for="capture-protocol-version">Capture protocol for this new case</label><select id="capture-protocol-version"><option value="claims2car-16-v1">claims2car-16-v1 · current default</option></select><p class="fine-print">FAOS 16-v2 is available for controlled testing. 16-v1 remains the default until disclosure and field qualification are reviewed. Supplemental documents are not mandatory in v2.</p><button id="create-case" class="button primary" type="button">Create new case</button><div id="case-status" class="inline-status"></div><div id="case-id" class="case-id" hidden></div>
         </article>
         <article id="consent-panel" class="panel workflow-panel" hidden>
           <div class="step-title"><span class="step-dot">2</span><div><h3>Owner consent</h3><p class="muted">The vehicle owner must authorize capture and human review using their own provisioned identity.</p></div></div>
