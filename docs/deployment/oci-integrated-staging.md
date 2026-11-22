@@ -16,7 +16,7 @@ Before provisioning, run the manual **OCI staging private-network ingress audit 
 
 The owner has already created an OCI tenancy/compartment foundation and a private VCN/subnet with NAT and Oracle-services egress. Exact OCIDs, private CIDRs, API keys, and resource identifiers are intentionally not stored in this public repository.
 
-A private VCN DNS name is not a public internet domain. Keep the first staging deployment private and access it through OCI Bastion or an approved VPN. Public claimant/operator access requires a separately approved public domain, TLS certificate, and ingress design.
+A private VCN DNS name is not a public internet domain. The integrated runtime currently binds its host port to `127.0.0.1`; direct VCN/VPN traffic cannot reach it. Until a separately reviewed reverse-proxy/TLS ingress is implemented, access the staging app only through OCI Bastion SSH port-forwarding to the loopback listener. Do not configure `app_ingress_cidrs` to expose port 8000; an NSG allow rule alone cannot override the loopback bind. Public claimant/operator access requires a separately approved public domain, TLS certificate, and ingress design.
 
 Before provisioning or exposing any compute instance, review the security lists and restrict administrative ingress. Do not leave broad SSH ingress in place. Prefer Bastion/VPN administration and no public IP on the application/database host.
 
