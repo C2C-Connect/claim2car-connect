@@ -67,6 +67,11 @@
         <article id="capture-panel" class="panel workflow-panel" hidden>
           <div class="step-title"><span class="step-dot">4</span><div><h3>Capture original evidence</h3><p class="muted">Use the device camera or choose an image. Original bytes are uploaded without resizing or recompression. Retaking a slot supersedes its prior artifact.</p></div></div>
           <div class="capture-warning"><strong>Roadside safety comes first.</strong> Never enter traffic or delay emergency response, police direction, stabilization, loading, or scene clearance to complete a capture. If a required angle is unsafe, stop and leave the case unsealed. Record a safety exception below; it is audited but does not waive any required view.</div>
+          <section class="capture-progress-panel" aria-label="Capture completion progress">
+            <div class="capture-progress-heading"><strong id="capture-progress-label">0 of 16 originals accepted</strong><span id="capture-progress-queue-label">Checking local queue…</span></div>
+            <div id="capture-progress-bar" class="capture-progress-bar" role="progressbar" aria-label="Server-accepted evidence views" aria-valuemin="0" aria-valuemax="16" aria-valuenow="0"><div id="capture-progress-fill" class="capture-progress-fill"></div></div>
+            <p id="capture-progress-detail" class="muted">An upload is counted only after the server accepts the original.</p>
+          </section>
           <div id="slot-grid" class="slot-grid"></div>
 
           <section class="offline-queue-panel" aria-labelledby="offline-queue-heading">
