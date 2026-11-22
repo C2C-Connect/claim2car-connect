@@ -49,6 +49,7 @@ class SafeVolumeMountTests(unittest.TestCase):
             self.assertEqual(saved.stat().st_mode&0o777,0o600)
             persist_fstab(entries,path)
             self.assertEqual(path.read_text(),content)
+            self.assertEqual(len([line for line in content.splitlines() if line.startswith("UUID=")]),3)
             self.assertEqual(len([line for line in content.splitlines() if "pg-uuid" in line]),1)
             self.assertEqual(list(Path(d).glob(".fstab.*")),[])
     def test_dry_run_blank_disks_never_formats_or_mounts(self):

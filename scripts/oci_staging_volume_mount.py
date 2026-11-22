@@ -94,7 +94,7 @@ def persist_fstab(entries,path):
     try:
         with tempfile.NamedTemporaryFile(mode="w",encoding="utf-8",dir=path.parent,prefix=f".{path.name}.",delete=False) as tmp:
             temp=Path(tmp.name)
-            tmp.write(original.rstrip()+"\\n"+"\\n".join(additions)+"\\n")
+            tmp.write(original.rstrip()+"\n"+"\n".join(additions)+"\n")
             tmp.flush();os.fsync(tmp.fileno())
         os.chmod(temp,0o644)
         temp.replace(path)
