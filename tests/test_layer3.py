@@ -95,9 +95,6 @@ def test_s_i_weighted_arithmetic_formula():
     mid = compute_s_i(IntegrityInputs(gps_accuracy_m=35, chain_coverage=1.0, chain_uniqueness=1.0, meta_completeness=0.5))
     expected = 0.30 * 0.9 + 0.45 * 1.0 + 0.25 * 0.5
     assert abs(mid.s_i - expected) < 1e-4
-    mid = compute_s_i(IntegrityInputs(gps_accuracy_m=35, chain_coverage=1.0, chain_uniqueness=1.0, meta_completeness=0.5))
-    expected = 0.30 * 0.9 + 0.45 * 1.0 + 0.25 * 0.5
-    assert abs(mid.s_i - expected) < 1e-4
 
 
 def test_catalog_resolver_lines():
