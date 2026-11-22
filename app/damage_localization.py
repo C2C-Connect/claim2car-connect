@@ -118,7 +118,7 @@ def iou(a: DamageRegion, b: DamageRegion) -> float:
 
 
 def zone_for_slot(slot: str, protocol_version: str = LEGACY_CAPTURE_PROTOCOL) -> str | None:
-    """Map only the eight 16-v1 exterior views to crush zones.
+    """Map only the eight exterior views shared by 16-v1 and 16-v2 to broad crush zones.
 
     Wheel, cabin, odometer, VIN and identity-document slots are deliberately
     excluded from crush physics. Legacy 12-v1 mappings remain available for

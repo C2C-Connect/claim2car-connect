@@ -322,6 +322,7 @@ function updateCaptureProgress(){
   const label=byId("capture-progress-label"),queueLabel=byId("capture-progress-queue-label"),detail=byId("capture-progress-detail"),bar=byId("capture-progress-bar"),fill=byId("capture-progress-fill");
   if(!label||!queueLabel||!detail||!bar||!fill)return;
   label.textContent=accepted+" of "+total+" originals accepted";
+  bar.setAttribute("aria-valuemax",String(total));
   bar.setAttribute("aria-valuenow",String(accepted));
   fill.style.width=(accepted/total*100)+"%";
   if(state.queueStatusUnavailable||!state.queueScopeVerified){
@@ -391,8 +392,9 @@ async function refreshCaseList(){
 async function openClaimCase(item,button){
   if(button)button.disabled=true;
   try{
+    const session=await api("/v1/capture-sessions/"+item.capture_session_id,state.token);
     const readiness=await api("/v1/capture-sessions/"+item.capture_session_id+"/evidence-readiness",state.token);
-    state.claimId=item.claim_id;state.sessionId=item.capture_session_id;state.captureProtocolVersion=item.capture_protocol_version||readiness.capture_protocol_version||DEFAULT_CAPTURE_PROTOCOL;byId("capture-protocol-version").value=state.captureProtocolVersion;state.queueScopeVerified=false;state.pendingQueueCount=0;state.queueStatusUnavailable=false;byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.claimId=item.claim_id;state.sessionId=item.capture_session_id;state.captureProtocolVersion=session.capture_protocol_version||item.capture_protocol_version||readiness.capture_protocol_version||DEFAULT_CAPTURE_PROTOCOL;byId("capture-protocol-version").value=state.captureProtocolVersion;state.queueScopeVerified=false;state.pendingQueueCount=0;state.queueStatusUnavailable=false;byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     state.consentRecorded=Boolean(readiness.consent_active);
     state.vehicleRecorded=Boolean(readiness.vehicle_reference_present);
     state.sealed=Boolean(readiness.sealed);
