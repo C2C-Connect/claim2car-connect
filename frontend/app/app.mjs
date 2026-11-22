@@ -1,4 +1,5 @@
 import { validateVin } from "../src/modules/capture/vin.mjs";
+import { createIndexedDbEvidenceStore, createOfflineEvidenceQueue } from "./offline_evidence_queue.mjs";
 const API = "/api";
 const MAX_BYTES = 25 * 1024 * 1024;
 const API_CAPTURE_SLOTS = [
@@ -19,7 +20,12 @@ const API_CAPTURE_SLOTS = [
   ["14_physical_vin", "Physical VIN plate"],
   ["15_license_and_insurance_docs", "License / insurance documentation"]
 ];
-const state = { token:null, role:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map() };
+const state = { token:null, role:null, actorId:null, tenantId:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map(), slotRefs:new Map(), queueLastError:null, pendingQueueCount:0, queueStatusUnavailable:false, queueScopeVerified:false };
+
+let offlineEvidenceQueue = null;
+let offlineEvidenceQueueError = null;
+try { offlineEvidenceQueue = createOfflineEvidenceQueue({store:createIndexedDbEvidenceStore()}); }
+catch (error) { offlineEvidenceQueueError = error; }
 const byId = (id) => document.getElementById(id);
 const show = (id, visible=true) => { byId(id).hidden = !visible; };
 const message = (id, value, isError=false) => {
@@ -51,7 +57,7 @@ function setConnected(role){
   if(role==="operator")refreshCaseList();
 }
 function disconnect(){
-  state.token=null;state.role=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];
+  state.token=null;state.role=null;state.actorId=null;state.tenantId=null;state.claimId=null;state.sessionId=null;state.queueScopeVerified=false;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];
   state.vehicleRecorded=false;state.sealed=false;state.artifacts.clear();
   state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
   byId("access-token").value="";byId("owner-token").value="";byId("vin-input").value="";
@@ -59,14 +65,25 @@ function disconnect(){
   byId("connection-indicator").textContent="Not connected";
   byId("connection-indicator").classList.remove("connected");
   ["consent-panel","vin-panel","capture-panel"].forEach((id)=>show(id,false));
-  byId("case-id").textContent="";show("case-id",false);
+  byId("case-id").textContent="";show("case-id",false);void refreshOfflineQueueStatus();
 }
-byId("connect-form").addEventListener("submit",(event)=>{
-  event.preventDefault();const token=byId("access-token").value.trim();
+byId("connect-form").addEventListener("submit",async(event)=>{
+  event.preventDefault();const token=byId("access-token").value.trim(),requestedRole=byId("role").value;
   if(!/^[A-Za-z0-9_-]{43,128}$/.test(token)){message("connect-message","The token format is invalid. Check the credential issued for this role.",true);return;}
-  state.token=token;message("connect-message","");setConnected(byId("role").value);
+  const button=event.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
+  try{
+    const identity=await api("/v1/identity",token);
+    if(identity.actor_role!==requestedRole)throw new Error("TOKEN_ROLE_MISMATCH: selected role does not match server-authenticated identity.");
+    if(!identity.actor_id||!identity.tenant_id)throw new Error("SERVER_IDENTITY_CONTEXT_INCOMPLETE");
+    state.token=token;state.actorId=identity.actor_id;state.tenantId=identity.tenant_id;
+    message("connect-message","");setConnected(identity.actor_role);await refreshOfflineQueueStatus();
+  }catch(error){state.token=null;state.actorId=null;state.tenantId=null;message("connect-message",error.message,true);}
+  finally{button.disabled=false;}
 });
 byId("disconnect-button").addEventListener("click",disconnect);
+byId("sync-queued-evidence").addEventListener("click",syncQueuedEvidence);
+window.addEventListener("online",()=>{void refreshOfflineQueueStatus();if(state.sessionId&&state.token)void syncQueuedEvidence();});
+window.addEventListener("offline",()=>{void refreshOfflineQueueStatus();});
 byId("refresh-cases").addEventListener("click",refreshCaseList);
 byId("record-exception").addEventListener("click",async()=>{
   const slot=byId("exception-slot").value,reason=byId("exception-reason").value,explanation=byId("exception-explanation").value.trim();
@@ -93,7 +110,7 @@ byId("create-case").addEventListener("click",async()=>{
     if(!created||created.claim_id!==claimId||typeof created.capture_session_id!=="string"||!created.capture_session_id){
       throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
     }
-    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;state.queueScopeVerified=false;await refreshOfflineQueueStatus();state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
     refreshCaseList();
     show("consent-panel");message("consent-status","Persistent claim case created using the 16-view capture protocol. Owner consent is required before vehicle identification or evidence capture.");
@@ -128,13 +145,93 @@ async function sha256Hex(buffer){
   const digest=await crypto.subtle.digest("SHA-256",buffer);
   return Array.from(new Uint8Array(digest),(value)=>value.toString(16).padStart(2,"0")).join("");
 }
+async function refreshOfflineQueueStatus(){
+  const statusNode=byId("offline-queue-status"),button=byId("sync-queued-evidence");
+  if(!statusNode||!button)return;
+  if(offlineEvidenceQueueError||!offlineEvidenceQueue){
+    state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;state.queueScopeVerified=false;updateSealButton();
+    statusNode.textContent="Local queue unavailable: "+(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
+    statusNode.classList.add("error");button.disabled=true;return;
+  }
+  if(!state.sessionId||!state.tenantId||!state.actorId){
+    state.pendingQueueCount=0;state.queueStatusUnavailable=false;state.queueScopeVerified=false;updateSealButton();
+    statusNode.textContent="Connect with a verified operator identity and open a capture session to use local recovery.";
+    button.disabled=true;return;
+  }
+  try{
+    const snapshot=await offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId});
+    const pending=snapshot.pending,uploaded=snapshot.uploaded;
+    state.pendingQueueCount=pending;state.queueStatusUnavailable=false;state.queueScopeVerified=true;
+    statusNode.textContent=pending
+      ? pending+" original"+(pending===1?"":"s")+" pending locally · "+uploaded+" upload-confirmed · "+(navigator.onLine?"ready to retry":"device offline")+(state.queueLastError?" · last error: "+state.queueLastError:"")
+      : snapshot.total+" queued record"+(snapshot.total===1?"":"s")+" · all uploads confirmed; original bytes discarded from local queue";
+    statusNode.classList.toggle("error",Boolean(state.queueLastError));
+    button.disabled=pending===0||!state.token||!navigator.onLine||state.sealed;updateSealButton();
+  }catch(error){
+    statusNode.textContent="Queue status failed: "+error.message;statusNode.classList.add("error");button.disabled=true;state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;state.queueScopeVerified=false;updateSealButton();
+  }
+}
+async function syncQueuedEvidence(){
+  if(!offlineEvidenceQueue||!state.sessionId||!state.tenantId||!state.actorId||!state.token)return;
+  const button=byId("sync-queued-evidence");button.disabled=true;
+  message("offline-queue-status","Uploading pending originals in order…");
+  try{
+    const result=await offlineEvidenceQueue.syncSession({
+      sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,keyMaterial:state.token,
+      upload:async(record)=>{
+        await api("/v1/capture-sessions/"+state.sessionId+"/artifacts",state.token,{method:"POST",body:JSON.stringify({
+          request_id:record.requestId,artifact_id:record.artifactId,slot:record.slot,
+          payload_base64:bytesToBase64(record.bytes),sha256:record.sha256
+        })});
+        const label=API_CAPTURE_SLOTS.find(([slot])=>slot===record.slot)?.[1]||record.slot;
+        state.artifacts.set(record.slot,{artifactId:record.artifactId,sha256:record.sha256,byteLength:record.byteLength,label});
+        const refs=state.slotRefs.get(record.slot);
+        if(refs){await queuePreview(new Blob([record.bytes],{type:record.mimeType||"application/octet-stream"}),record.slot,refs.preview);refs.meta.textContent="Uploaded · "+record.byteLength.toLocaleString()+" bytes · SHA-256 verified";refs.meta.classList.add("done");refs.meta.classList.remove("error");}
+      }
+    });
+    if(result.error){
+      state.queueLastError=result.error;
+      const label="Upload stopped at queued item "+result.blockedAtQueueId+": "+result.error+". Originals remain stored locally for retry.";
+      message("offline-queue-status",label,true);renderExceptionPanel();updateSealButton();
+    }else{
+      state.queueLastError=null;
+      message("offline-queue-status",result.uploaded+" pending original(s) uploaded and accepted by server.",false);
+      const readiness=await api("/v1/capture-sessions/"+state.sessionId+"/evidence-readiness",state.token);
+      for(const artifact of readiness.registered_artifacts||[]){
+        const label=API_CAPTURE_SLOTS.find(([slot])=>slot===artifact.slot)?.[1]||artifact.slot;
+        state.artifacts.set(artifact.slot,{artifactId:artifact.artifact_id,sha256:artifact.sha256,byteLength:artifact.byte_length,label});
+      }
+      state.activeExceptions=readiness.active_capture_exceptions||[];
+      renderExceptionPanel();updateSealButton();
+    }
+  }catch(error){
+    state.queueLastError=error.message;
+    message("offline-queue-status",error.message+" · queued originals were retained for retry.",true);
+  }finally{
+    await refreshOfflineQueueStatus();
+    button.disabled=button.disabled||state.qualityRecorded||state.sealed||state.capturePaused;
+  }
+}
+async function queuePreview(file,slot,preview){
+  if(!(preview instanceof HTMLCanvasElement))return false;
+  let bitmap;
+  try{
+    bitmap=await createImageBitmap(file);
+    const scale=Math.min(1,480/Math.max(bitmap.width,bitmap.height));
+    preview.width=Math.max(1,Math.round(bitmap.width*scale));preview.height=Math.max(1,Math.round(bitmap.height*scale));
+    const context=preview.getContext("2d",{alpha:false});if(!context)return false;
+    context.drawImage(bitmap,0,0,preview.width,preview.height);preview.hidden=false;return true;
+  }catch{return false;}
+  finally{bitmap?.close?.();}
+}
 function renderCaptureSlots(readiness=null){
   const grid=byId("slot-grid"),quality=byId("quality-grid");grid.replaceChildren();quality.replaceChildren();
-  state.artifacts.clear();
+  state.artifacts.clear();state.slotRefs=new Map();
   const knownArtifacts=readiness?.registered_artifacts||[];
   state.qualityResults=readiness?.quality_results||{};state.activeExceptions=readiness?.active_capture_exceptions||[];
   API_CAPTURE_SLOTS.forEach(([slot,label])=>{
     const existing=knownArtifacts.find(item=>item.slot===slot);
+    const localQueueRecords=offlineEvidenceQueue&&state.sessionId&&state.tenantId&&state.actorId?offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId}).then(s=>s.records.filter(r=>r.slot===slot&&!r.uploaded)):Promise.resolve([]);
     if(existing)state.artifacts.set(slot,{artifactId:existing.artifact_id,sha256:existing.sha256,byteLength:existing.byte_length,label});
     const card=document.createElement("div");card.className="slot-card";
     const heading=document.createElement("h4");heading.textContent=label;
@@ -142,20 +239,24 @@ function renderCaptureSlots(readiness=null){
     input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;
     const meta=document.createElement("div");meta.className="slot-meta";
     meta.textContent=existing?"Previously uploaded · "+existing.byte_length.toLocaleString()+" bytes · SHA-256 "+existing.sha256.slice(0,12)+"…":"Original image not uploaded";
+    void localQueueRecords.then(records=>{if(!existing&&records.length){meta.textContent="Saved locally · "+records[records.length-1].byteLength.toLocaleString()+" bytes · awaiting retry";meta.classList.add("pending");input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;}});
     if(existing)meta.classList.add("done");
-    const preview=document.createElement("img");preview.className="slot-preview";preview.hidden=true;
+    const preview=document.createElement("canvas");preview.className="slot-preview";preview.setAttribute("aria-label","Safe local preview for "+label);preview.hidden=true;
+    state.slotRefs.set(slot,{meta,preview,input});
     input.addEventListener("change",async()=>{
       const file=input.files&&input.files[0];if(!file)return;
       if(!file.type.startsWith("image/")||file.size<=0||file.size>MAX_BYTES){meta.textContent="Choose a non-empty image no larger than 25 MiB.";meta.classList.add("error");input.value="";return;}
-      input.disabled=true;meta.textContent="Hashing and uploading original bytes…";meta.classList.remove("done","error");
+      input.disabled=true;meta.textContent="Saving original to this browser before upload…";meta.classList.remove("done","error");
       try{
-        const buffer=await file.arrayBuffer(),digest=await sha256Hex(buffer),artifactId=uuid(),encoded=bytesToBase64(new Uint8Array(buffer));
-        await api("/v1/capture-sessions/"+state.sessionId+"/artifacts",state.token,{method:"POST",body:JSON.stringify({request_id:uuid(),artifact_id:artifactId,slot,payload_base64:encoded,sha256:digest})});
-        state.artifacts.set(slot,{artifactId,sha256:digest,byteLength:file.size,label});
-        const previous=state.previews.get(slot);if(previous)URL.revokeObjectURL(previous);
-        const url=URL.createObjectURL(file);state.previews.set(slot,url);preview.src=url;preview.hidden=false;
-        meta.textContent="Uploaded · "+file.size.toLocaleString()+" bytes · SHA-256 verified";meta.classList.add("done");renderExceptionPanel();updateSealButton();
-      }catch(error){meta.textContent=error.message;meta.classList.add("error");}
+        if(!offlineEvidenceQueue)throw new Error(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
+        if(!state.tenantId||!state.actorId)throw new Error("SERVER_IDENTITY_NOT_VERIFIED");
+        await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file,keyMaterial:state.token});
+        await queuePreview(file,slot,preview);
+        meta.textContent="Saved locally · pending upload · "+file.size.toLocaleString()+" bytes";meta.classList.remove("done");
+        await refreshOfflineQueueStatus();
+        if(navigator.onLine)await syncQueuedEvidence();
+        renderExceptionPanel();updateSealButton();
+      }catch(error){state.queueLastError=error.message;state.queueStatusUnavailable=true;state.pendingQueueCount=Number.POSITIVE_INFINITY;meta.textContent=error.message;meta.classList.add("error");updateSealButton();}
       finally{input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;}
     });
     card.append(heading,input,meta,preview);grid.append(card);
@@ -171,6 +272,7 @@ function renderCaptureSlots(readiness=null){
   byId("resume-capture").disabled=!state.capturePaused;
   renderExceptionPanel();
   updateSealButton();
+  void refreshOfflineQueueStatus();
 }
 function renderExceptionPanel(){
   const select=byId("exception-slot"),list=byId("exception-list");
@@ -217,8 +319,9 @@ async function resolveException(slot,resolutionCode,explanation){
 function updateSealButton(){
   const allUploaded=API_CAPTURE_SLOTS.every(([slot])=>state.artifacts.has(slot));
   const allChecked=state.qualityRecorded||Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");
-  byId("seal-case").disabled=!allUploaded||!allChecked||state.sealed||state.capturePaused;
-  byId("seal-case").textContent=state.qualityRecorded?"Retry evidence sealing":"Record checks and seal evidence";
+  const queueClear=state.pendingQueueCount===0&&!state.queueStatusUnavailable&&state.queueScopeVerified;
+  byId("seal-case").disabled=!allUploaded||!allChecked||!queueClear||state.sealed||state.capturePaused;
+  byId("seal-case").textContent=state.qualityRecorded?"Retry evidence sealing":!queueClear?"Upload pending originals before sealing":"Record checks and seal evidence";
 }
 byId("seal-case").addEventListener("click",async()=>{
   const button=byId("seal-case");button.disabled=true;
@@ -269,7 +372,7 @@ async function openClaimCase(item,button){
   if(button)button.disabled=true;
   try{
     const readiness=await api("/v1/capture-sessions/"+item.capture_session_id+"/evidence-readiness",state.token);
-    state.claimId=item.claim_id;state.sessionId=item.capture_session_id;byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.claimId=item.claim_id;state.sessionId=item.capture_session_id;state.queueScopeVerified=false;state.pendingQueueCount=0;state.queueStatusUnavailable=false;byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     state.consentRecorded=Boolean(readiness.consent_active);
     state.vehicleRecorded=Boolean(readiness.vehicle_reference_present);
     state.sealed=Boolean(readiness.sealed);

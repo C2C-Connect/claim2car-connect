@@ -55,6 +55,44 @@ try {
   assert.equal(await page.evaluate(() => window.c2cQueueHarness.purge()), 3);
   assert.equal((await page.evaluate(() => window.c2cQueueHarness.status())).total, 0);
   assert.equal((await page.evaluate(() => window.c2cQueueHarness.status("browser-test-other-actor"))).total, 0);
+  // Integrated frontend queue: actual IndexedDB, encrypted originals, token recovery, and retry.
+  await page.waitForFunction(() => Boolean(window.c2cIntegratedQueueHarness));
+  await page.evaluate(() => window.c2cIntegratedQueueHarness.reset());
+  const integratedIds=await page.evaluate(() => window.c2cIntegratedQueueHarness.seed());
+  assert.equal(integratedIds.length,2);
+  await page.reload();
+  await page.waitForFunction(() => Boolean(window.c2cIntegratedQueueHarness));
+  let integratedStatus=await page.evaluate(() => window.c2cIntegratedQueueHarness.status());
+  assert.equal(integratedStatus.total,2);
+  assert.equal(integratedStatus.pending,2);
+  assert.deepEqual(integratedStatus.records.map(record=>record.queueId),integratedIds);
+  assert.equal(integratedStatus.records.every(record=>record.encryptionAlgorithm==="AES-GCM"),true);
+  assert.equal(integratedStatus.records.every(record=>!("bytes" in record)),true);
+  const wrongKey=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false,"wrong-operator-token-material-0123456789ABCDEFGHIJKLMN"));
+  assert.equal(wrongKey.result.uploaded,0);
+  assert.equal(wrongKey.result.error,"EVIDENCE_DECRYPTION_FAILED");
+  assert.equal((await page.evaluate(() => window.c2cIntegratedQueueHarness.status())).pending,2);
+  const integratedFailed=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(true));
+  assert.equal(integratedFailed.result.uploaded,0);
+  assert.equal(integratedFailed.result.error,"SYNTHETIC_NETWORK_INTERRUPTION");
+  assert.equal(integratedFailed.attempted.length,1);
+  assert.equal(integratedFailed.attempted[0].queueId,integratedIds[0]);
+  assert.equal((await page.evaluate(() => window.c2cIntegratedQueueHarness.status())).pending,2);
+  const integratedRetry=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false));
+  assert.equal(integratedRetry.result.uploaded,2);
+  assert.deepEqual(integratedRetry.attempted.map(item=>item.queueId),integratedIds);
+  assert.deepEqual(integratedRetry.attempted.map(item=>item.artifactId),integratedStatus.records.map(record=>record.artifactId));
+  assert.deepEqual(integratedRetry.attempted.map(item=>item.requestId),integratedStatus.records.map(record=>record.requestId));
+  assert.deepEqual(integratedRetry.attempted.map(item=>item.bytes),["integrated-original-front","integrated-original-corner"]);
+  assert.equal(integratedRetry.attempted[0].artifactId,integratedFailed.attempted[0].artifactId);
+  assert.equal(integratedRetry.attempted[0].requestId,integratedFailed.attempted[0].requestId);
+  integratedStatus=await page.evaluate(() => window.c2cIntegratedQueueHarness.status());
+  assert.equal(integratedStatus.pending,0);
+  assert.equal(integratedStatus.uploaded,2);
+  assert.equal(integratedStatus.records.every(record=>!("bytes" in record)),true);
+  assert.equal(await page.evaluate(() => window.c2cIntegratedQueueHarness.purge()),2);
+  assert.equal((await page.evaluate(() => window.c2cIntegratedQueueHarness.status())).total,0);
+
   assert.deepEqual(pageErrors, []);
   await context.close();
   process.stdout.write(JSON.stringify({

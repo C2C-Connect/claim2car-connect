@@ -13,3 +13,16 @@
 .overview-card p{font-size:12px;color:var(--muted);line-height:1.6;margin:0}
 .connect-panel{border-color:#3a506b;box-shadow:0 22px 60px rgba(0,0,0,.18)}
 @media(max-width:700px){.workflow-overview{grid-template-columns:1fr;margin:0 0 22px}.overview-card{padding:16px}.hero{padding:22px}.hero h1{font-size:clamp(38px,11vw,58px)}}
+
+.offline-queue-panel{margin:18px 0 22px;padding:18px;border:1px solid #35516e;border-radius:14px;background:linear-gradient(145deg,#13283d,#101d2e)}
+.queue-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.queue-panel-heading h3{font-size:17px;margin:0 0 5px}
+.queue-panel-heading p{font-size:12px;margin:0;max-width:600px}
+.queue-badge{flex-shrink:0;font-size:9px;letter-spacing:.12em;font-weight:800;color:#7bd9c6;border:1px solid #356b65;border-radius:99px;padding:7px 9px}
+.queue-storage-warning{font-size:11px;line-height:1.55;color:#d7b987;background:#2b261e;border:1px solid #5b4931;border-radius:9px;padding:10px 12px;margin:14px 0}
+#offline-queue-status{margin:8px 0 4px}
+@media(max-width:540px){.queue-panel-heading{display:block}.queue-badge{display:inline-block;margin-top:10px}}
+
+.slot-meta.pending{color:#d7b987;border-color:#675237;background:#30271b}
+.offline-queue-panel .inline-status{font-size:12px;line-height:1.5}
+#sync-queued-evidence{margin-top:8px}

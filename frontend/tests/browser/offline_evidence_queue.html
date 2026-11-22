@@ -76,5 +76,39 @@
     });
     document.getElementById("status").textContent = "Ready";
   </script>
-</body>
+
+    <script type="module">
+      import {
+        createIndexedDbEvidenceStore,
+        createOfflineEvidenceQueue,
+      } from "../../../frontend/app/offline_evidence_queue.mjs";
+      const sessionId="integrated-browser-test-session",tenantId="integrated-browser-test-tenant",actorId="integrated-browser-test-actor";
+      const store=createIndexedDbEvidenceStore();
+      const queue=createOfflineEvidenceQueue({store});
+      const keyMaterial="integrated-browser-test-operator-token-material-0123456789ABCDEF";
+      window.c2cIntegratedQueueHarness=Object.freeze({
+        async reset(){
+          const request=indexedDB.deleteDatabase("claim2car-integrated-evidence");
+          await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error||new Error("TEST_DATABASE_DELETE_FAILED"));request.onblocked=()=>reject(new Error("TEST_DATABASE_DELETE_BLOCKED"));});
+          return true;
+        },
+        async seed(){
+          const a=await queue.queueFile({sessionId,tenantId,actorId,slot:"00_front_exterior",file:new File(["integrated-original-front"],"front.jpg",{type:"image/jpeg"}),keyMaterial});
+          const b=await queue.queueFile({sessionId,tenantId,actorId,slot:"01_front_right_exterior",file:new File(["integrated-original-corner"],"corner.jpg",{type:"image/jpeg"}),keyMaterial});
+          return [a.queueId,b.queueId];
+        },
+        async status(forActor=actorId){return queue.status(sessionId,{tenantId,actorId:forActor});},
+        async sync(failFirst=false,token=keyMaterial){
+          const attempted=[];
+          const result=await queue.syncSession({sessionId,tenantId,actorId,keyMaterial:token,upload:async record=>{
+            attempted.push({queueId:record.queueId,artifactId:record.artifactId,requestId:record.requestId,bytes:new TextDecoder().decode(record.bytes)});
+            if(failFirst)throw new Error("SYNTHETIC_NETWORK_INTERRUPTION");
+            return {ok:true};
+          }});
+          return {result,attempted};
+        },
+        async purge(){return queue.deleteSession(sessionId,{tenantId});}
+      });
+    </script>
+\n</body>
 </html>
