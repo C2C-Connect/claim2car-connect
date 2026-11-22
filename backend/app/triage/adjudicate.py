@@ -101,7 +101,9 @@ class Adjudicator:
         layer2_notes: Optional[Sequence[str]] = None,
         physics_ai_disagree: bool = False,
         gps_accuracy_m: Optional[float] = 15.0,
+        gps_spoof_suspected: bool = False,
         master_hash_valid: bool = True,
+        hash_tamper_suspected: bool = False,
         chain_coverage: float = 1.0,
         chain_uniqueness: float = 1.0,
         meta_completeness: float = 1.0,
@@ -135,7 +137,9 @@ class Adjudicator:
         integrity = compute_s_i(
             IntegrityInputs(
                 gps_accuracy_m=gps_accuracy_m,
+                gps_spoof_suspected=gps_spoof_suspected,
                 master_hash_valid=master_hash_valid,
+                hash_tamper_suspected=hash_tamper_suspected,
                 chain_coverage=chain_coverage,
                 chain_uniqueness=chain_uniqueness,
                 meta_completeness=meta_completeness,
@@ -174,7 +178,7 @@ class Adjudicator:
                 "p_s": "min(0.45, R_struct * 0.6)",
                 "acv_adjusted": "ACV * (1 - P_s)",
                 "rtv": "total_repair_cost / ACV_adjusted (or TLF)",
-                "s_i": "C_gps^0.30 * C_hash^0.45 * C_meta^0.25",
+                "s_i": "0.30*C_gps + 0.45*C_hash + 0.25*C_meta; strict chain defect -> S_i=0",
             },
         }
 

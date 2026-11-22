@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.app.anchor.ledger import AnchorLedger, merkle_root  # noqa: E402
-from backend.app.dispatch.dispatcher import build_dispatch  # noqa: E402
+from backend.app.dispatch.dispatcher import DispatchBlocked, build_dispatch  # noqa: E402
 from backend.app.dispatch.redaction import mask_vin, redact_payload, vin_last4  # noqa: E402
 from backend.app.reports.acord_xml import build_acord_autoloss  # noqa: E402
 from backend.app.reports.forensic_pdf import build_dossier  # noqa: E402
@@ -50,7 +50,7 @@ def _sample_adj():
             "tier": "review",
             "reason": "rtv_review_band",
         },
-        "integrity": {"s_i": 0.92, "tier": "pass", "c_gps": 1.0, "c_hash": 1.0, "c_meta": 1.0},
+        "integrity": {"s_i": 0.92, "tier": "pass", "c_gps": 1.0, "c_hash": 1.0, "c_chain": 1.0, "c_meta": 1.0, "all_or_nothing_collapse": False},
         "fraud": {"flags": [], "risk_score": 0.0},
         "physics": {"e_k_kj": 120.0, "r_y_max": 1.2, "p_tl_physics": 0.7},
         "detections": [{"class_name": "crush", "zone": "front", "confidence": 0.9}],
@@ -168,3 +168,36 @@ def test_no_owner_payout():
     assert not hasattr(C, "OPERATOR_PAYOUT_USD")
     assert not hasattr(C, "OWNER_PAYOUT_USD")
     assert not hasattr(C, "OWNER_CONSENT_PAYOUT_USD")
+
+
+def test_dispatch_fails_closed_without_integrity_or_evidence_hashes():
+    import pytest
+    sample = _sample_adj()
+    sample.pop("integrity")
+    with pytest.raises(DispatchBlocked, match="DISPATCH_INTEGRITY_REQUIRED"):
+        build_dispatch(sample, photo_hashes=["a" * 64])
+    with pytest.raises(DispatchBlocked, match="DISPATCH_EVIDENCE_HASHES_REQUIRED"):
+        build_dispatch(_sample_adj(), photo_hashes=[])
+
+
+def test_dispatch_fails_closed_for_duplicate_or_invalid_photo_hashes():
+    import pytest
+    sample = _sample_adj()
+    with pytest.raises(DispatchBlocked, match="DISPATCH_DUPLICATE_EVIDENCE_HASH"):
+        build_dispatch(sample, photo_hashes=["a" * 64, "a" * 64])
+    with pytest.raises(DispatchBlocked, match="DISPATCH_INVALID_EVIDENCE_HASH"):
+        build_dispatch(sample, photo_hashes=["not-a-hash"])
+
+
+def test_dispatch_fails_closed_for_integrity_review_and_chain_collapse():
+    import pytest
+    sample = _sample_adj()
+    sample["integrity"]["c_chain"] = 0.0
+    sample["integrity"]["c_hash"] = 0.0
+    sample["integrity"]["all_or_nothing_collapse"] = True
+    with pytest.raises(DispatchBlocked, match="DISPATCH_INTEGRITY_NOT_PASSED"):
+        build_dispatch(sample, photo_hashes=["a" * 64])
+    sample = _sample_adj()
+    sample["hold_for_review"] = True
+    with pytest.raises(DispatchBlocked, match="DISPATCH_REVIEW_HOLD"):
+        build_dispatch(sample, photo_hashes=["a" * 64])
