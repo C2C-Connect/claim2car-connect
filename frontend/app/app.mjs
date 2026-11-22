@@ -263,6 +263,7 @@ function renderCaptureSlots(readiness=null){
   state.qualityResults=readiness?.quality_results||{};state.activeExceptions=readiness?.active_capture_exceptions||[];
   API_CAPTURE_SLOTS.forEach(([slot,label])=>{
     const existing=knownArtifacts.find(item=>item.slot===slot);
+    const localQueueRecords=offlineEvidenceQueue&&state.sessionId&&state.tenantId&&state.actorId?offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId}).then(s=>s.records.filter(r=>r.slot===slot&&!r.uploaded)):Promise.resolve([]);
     if(existing)state.artifacts.set(slot,{artifactId:existing.artifact_id,sha256:existing.sha256,byteLength:existing.byte_length,label});
     const card=document.createElement("div");card.className="slot-card";
     const heading=document.createElement("h4");heading.textContent=label;
@@ -270,6 +271,7 @@ function renderCaptureSlots(readiness=null){
     input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;
     const meta=document.createElement("div");meta.className="slot-meta";
     meta.textContent=existing?"Previously uploaded · "+existing.byte_length.toLocaleString()+" bytes · SHA-256 "+existing.sha256.slice(0,12)+"…":"Original image not uploaded";
+    void localQueueRecords.then(records=>{if(!existing&&records.length){meta.textContent="Saved locally · "+records[records.length-1].byteLength.toLocaleString()+" bytes · awaiting retry";meta.classList.add("pending");input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;}});
     if(existing)meta.classList.add("done");
     const preview=document.createElement("img");preview.className="slot-preview";preview.hidden=true;
     state.slotRefs.set(slot,{meta,preview,input});
