@@ -36,7 +36,7 @@ class SafeVolumeMountTests(unittest.TestCase):
     def test_fstab_persistence_is_durable_atomic_and_idempotent(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/"fstab"
-            path.write_text("# original\\nUUID=old /old xfs defaults 0 2\\n")
+            path.write_text("# original\nUUID=old /old xfs defaults 0 2\n")
             entries=[("pg-uuid","/var/lib/claim2car/postgres"),("evidence-uuid","/var/lib/claim2car/evidence")]
             persist_fstab(entries,path)
             saved=Path(str(path)+".claim2car-backup")
@@ -45,7 +45,7 @@ class SafeVolumeMountTests(unittest.TestCase):
             self.assertIn("UUID=pg-uuid /var/lib/claim2car/postgres xfs defaults,nofail 0 2",content)
             self.assertIn("UUID=evidence-uuid /var/lib/claim2car/evidence xfs defaults,nofail 0 2",content)
             self.assertEqual(path.stat().st_mode&0o777,0o644)
-            self.assertEqual(saved.read_text(),"# original\\nUUID=old /old xfs defaults 0 2\\n")
+            self.assertEqual(saved.read_text(),"# original\nUUID=old /old xfs defaults 0 2\n")
             self.assertEqual(saved.stat().st_mode&0o777,0o600)
             persist_fstab(entries,path)
             self.assertEqual(path.read_text(),content)
