@@ -14,7 +14,7 @@ assert.ok(appSource.includes("window.addEventListener(\"online\""));
 assert.ok(appSource.includes('api("/v1/identity",token)'));
 assert.ok(queueSource.includes("subtle.encrypt"));
 assert.ok(queueSource.includes("subtle.decrypt"));
-assert.ok(queueSource.includes("HKDF"));
+assert.ok(queueSource.includes("HKDF"));\nassert.ok(queueSource.includes("claim2car-integrated-evidence"));
 assert.ok(appHtml.includes('id="offline-queue-status"'));
 assert.ok(appHtml.includes('id="sync-queued-evidence"'));
 assert.ok(appHtml.includes("AES-GCM encrypted"));
