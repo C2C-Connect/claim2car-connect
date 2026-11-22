@@ -1,6 +1,5 @@
 import { validateVin } from "../src/modules/capture/vin.mjs";
 import { createIndexedDbEvidenceStore, createOfflineEvidenceQueue } from "./offline_evidence_queue.mjs";
-import { createIndexedDbEvidenceStore, createOfflineEvidenceQueue } from "./offline_evidence_queue.mjs";
 const API = "/api";
 const MAX_BYTES = 25 * 1024 * 1024;
 const API_CAPTURE_SLOTS = [
