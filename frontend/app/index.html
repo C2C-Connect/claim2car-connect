@@ -68,6 +68,14 @@
           <div class="step-title"><span class="step-dot">4</span><div><h3>Capture original evidence</h3><p class="muted">Use the device camera or choose an image. Original bytes are uploaded without resizing or recompression. Retaking a slot supersedes its prior artifact.</p></div></div>
           <div class="capture-warning"><strong>Roadside safety comes first.</strong> Never enter traffic or delay emergency response, police direction, stabilization, loading, or scene clearance to complete a capture. If a required angle is unsafe, stop and leave the case unsealed. Record a safety exception below; it is audited but does not waive any required view.</div>
           <div id="slot-grid" class="slot-grid"></div>
+
+          <section class="offline-queue-panel" aria-labelledby="offline-queue-heading">
+            <div class="queue-panel-heading"><div><h3 id="offline-queue-heading">Offline evidence queue</h3><p class="muted">Each selected original is saved to this browser before upload is attempted. Retry is FIFO and uses the same artifact/request IDs.</p></div><span class="queue-badge">LOCAL RECOVERY</span></div>
+            <p class="queue-storage-warning">Pending originals reside in this device/browser’s IndexedDB storage. This is not encrypted vault storage; use a trusted device, keep it locked, and do not clear browser data until the queue is empty.</p>
+            <div id="offline-queue-status" class="inline-status" role="status" aria-live="polite">Queue status unavailable until identity is verified.</div>
+            <button id="sync-queued-evidence" class="button secondary" type="button" disabled>Retry pending uploads</button>
+          </section>
+
           <div class="capture-exception-panel">
             <h3>Record an unavailable or unsafe required view</h3>
             <p class="muted">Record why a required view could not be captured. This is an audit event—not a waiver—and the case cannot be sealed with missing required evidence.</p>
