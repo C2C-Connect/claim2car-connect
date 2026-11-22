@@ -48,6 +48,19 @@
       <nav id="role-nav" class="tabs" aria-label="Workspace sections"></nav>
       <section id="operator-view" class="panel" hidden>
         <h3>Operator workspace</h3>
+        <section id="case-progress-dashboard" class="case-progress-dashboard" aria-live="polite" aria-label="Current case progress">
+          <p class="eyebrow">CASE WORKFLOW</p>
+          <h4>Progress at a glance</h4>
+          <p id="progress-case-label" class="progress-case-label">No active case</p>
+          <div class="progress-grid">
+            <article class="progress-step" id="progress-consent"><strong>Owner consent</strong><span id="progress-consent-status">Awaiting case</span></article>
+            <article class="progress-step" id="progress-vehicle"><strong>Vehicle reference</strong><span id="progress-vehicle-status">Awaiting case</span></article>
+            <article class="progress-step" id="progress-evidence"><strong>Original evidence</strong><span id="progress-evidence-status">Awaiting case</span><div class="progress-track"><div id="progress-evidence-bar" class="progress-fill" style="width:0%"></div></div></article>
+            <article class="progress-step" id="progress-quality"><strong>Quality checks</strong><span id="progress-quality-status">Awaiting case</span></article>
+            <article class="progress-step" id="progress-seal"><strong>Evidence manifest</strong><span id="progress-seal-status">Awaiting case</span></article>
+          </div>
+          <p class="fine">Statuses are server-derived where available. Upload count reflects registered original evidence; advisory quality checks do not certify vehicle condition.</p>
+        </section>
         <h4>Persistent claim-case register</h4>
         <p class="muted">Create and reopen tenant-scoped claim-case records. The register stores case identity, creator/owner binding, and capture-session association. Optional structured incident details are separately consent-gated; claimant and policy details are not collected by this v1 intake.</p>
         <label for="capture-protocol-version">Capture protocol for new sessions</label>
