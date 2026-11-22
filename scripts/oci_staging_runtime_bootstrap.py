@@ -27,7 +27,7 @@ def main():
   raise SystemExit("RUNTIME_BOOTSTRAP_LOCKED; another bootstrap or abandoned lock exists")
  try:
   with os.fdopen(fd,"w",encoding="utf-8") as stream:
-   stream.write(f"pid={os.getpid()}\\n"); stream.flush(); os.fsync(stream.fileno())
+   stream.write(f"pid={os.getpid()}\n"); stream.flush(); os.fsync(stream.fileno())
   if any(p!=lock for p in root.iterdir()):
    raise SystemExit("RUNTIME_SECRET_DIRECTORY_NOT_EMPTY; refusing overwrite")
   admin,mig,app=[secrets.token_hex(32) for _ in range(3)]; tenant=str(uuid.uuid4()); service=secrets.token_urlsafe(48); pepper=secrets.token_hex(32)
