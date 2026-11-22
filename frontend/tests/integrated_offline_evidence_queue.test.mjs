@@ -26,6 +26,9 @@ assert.ok(queueSource.includes("claim2car-integrated-evidence"));
 assert.ok(appHtml.includes('id="offline-queue-status"'));
 assert.ok(appHtml.includes('id="sync-queued-evidence"'));
 assert.ok(appHtml.includes("AES-GCM encrypted"));
+assert.ok(appSource.includes("document.createElement(\"canvas\")"));
+assert.ok(appSource.includes("context.drawImage(bitmap"));
+assert.ok(!appSource.includes("preview.src=url"));
 
 class MemoryStore {
   constructor(){this.records=[];this.nextId=1;}
