@@ -252,7 +252,7 @@ function renderCaptureSlots(readiness=null){
         await refreshOfflineQueueStatus();
         if(navigator.onLine)await syncQueuedEvidence();
         renderExceptionPanel();updateSealButton();
-      }catch(error){meta.textContent=error.message;meta.classList.add("error");}
+      }catch(error){state.queueLastError=error.message;state.queueStatusUnavailable=true;state.pendingQueueCount=Number.POSITIVE_INFINITY;meta.textContent=error.message;meta.classList.add("error");updateSealButton();}
       finally{input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;}
     });
     card.append(heading,input,meta,preview);grid.append(card);
