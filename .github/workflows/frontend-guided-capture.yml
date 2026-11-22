@@ -1,3 +1,7 @@
+              "frontend/app/index.html",
+              "frontend/app/styles.css",
+              "frontend/app/offline_evidence_queue.mjs",
+              "frontend/tests/integrated_offline_evidence_queue.test.mjs",
 name: Offline guided capture workflow tests
 on:
   pull_request:
@@ -31,6 +35,8 @@ jobs:
         run: node frontend/tests/slice2_workbench.test.mjs > output/guided-capture/slice2-workbench-tests.json
       - name: Browser-persistent original evidence queue assertions
         run: node frontend/tests/offline_evidence_queue.test.mjs > output/guided-capture/offline-evidence-queue-tests.json
+      - name: Integrated app offline queue unit assertions
+        run: node frontend/tests/integrated_offline_evidence_queue.test.mjs > output/guided-capture/integrated-offline-queue-tests.json
       - name: Integrated browser module syntax checks
         run: node --check frontend/app/app.mjs && node --check frontend/app/offline_evidence_queue.mjs && node --check app/web/assets/app.js && node --check app/web/assets/offline_evidence_queue.mjs
       - name: Verify candidate and guided-capture sources unchanged
