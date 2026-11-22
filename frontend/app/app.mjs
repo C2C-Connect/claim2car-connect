@@ -56,7 +56,7 @@ function setConnected(role){
   if(role==="operator")refreshCaseList();
 }
 function disconnect(){
-  state.token=null;state.role=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];
+  state.token=null;state.role=null;state.actorId=null;state.tenantId=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];
   state.vehicleRecorded=false;state.sealed=false;state.artifacts.clear();
   state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
   byId("access-token").value="";byId("owner-token").value="";byId("vin-input").value="";
@@ -64,14 +64,25 @@ function disconnect(){
   byId("connection-indicator").textContent="Not connected";
   byId("connection-indicator").classList.remove("connected");
   ["consent-panel","vin-panel","capture-panel"].forEach((id)=>show(id,false));
-  byId("case-id").textContent="";show("case-id",false);
+  byId("case-id").textContent="";show("case-id",false);void refreshOfflineQueueStatus();
 }
-byId("connect-form").addEventListener("submit",(event)=>{
-  event.preventDefault();const token=byId("access-token").value.trim();
+byId("connect-form").addEventListener("submit",async(event)=>{
+  event.preventDefault();const token=byId("access-token").value.trim(),requestedRole=byId("role").value;
   if(!/^[A-Za-z0-9_-]{43,128}$/.test(token)){message("connect-message","The token format is invalid. Check the credential issued for this role.",true);return;}
-  state.token=token;message("connect-message","");setConnected(byId("role").value);
+  const button=event.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
+  try{
+    const identity=await api("/v1/identity",token);
+    if(identity.actor_role!==requestedRole)throw new Error("TOKEN_ROLE_MISMATCH: selected role does not match server-authenticated identity.");
+    if(!identity.actor_id||!identity.tenant_id)throw new Error("SERVER_IDENTITY_CONTEXT_INCOMPLETE");
+    state.token=token;state.actorId=identity.actor_id;state.tenantId=identity.tenant_id;
+    message("connect-message","");setConnected(identity.actor_role);await refreshOfflineQueueStatus();
+  }catch(error){state.token=null;state.actorId=null;state.tenantId=null;message("connect-message",error.message,true);}
+  finally{button.disabled=false;}
 });
 byId("disconnect-button").addEventListener("click",disconnect);
+byId("sync-queued-evidence").addEventListener("click",syncQueuedEvidence);
+window.addEventListener("online",()=>{void refreshOfflineQueueStatus();if(state.sessionId&&state.token)void syncQueuedEvidence();});
+window.addEventListener("offline",()=>{void refreshOfflineQueueStatus();});
 byId("refresh-cases").addEventListener("click",refreshCaseList);
 byId("record-exception").addEventListener("click",async()=>{
   const slot=byId("exception-slot").value,reason=byId("exception-reason").value,explanation=byId("exception-explanation").value.trim();
@@ -248,6 +259,7 @@ function renderCaptureSlots(readiness=null){
   byId("resume-capture").disabled=!state.capturePaused;
   renderExceptionPanel();
   updateSealButton();
+  void refreshOfflineQueueStatus();
 }
 function renderExceptionPanel(){
   const select=byId("exception-slot"),list=byId("exception-list");
