@@ -185,12 +185,8 @@ async function syncQueuedEvidence(){
         })});
         const label=API_CAPTURE_SLOTS.find(([slot])=>slot===record.slot)?.[1]||record.slot;
         state.artifacts.set(record.slot,{artifactId:record.artifactId,sha256:record.sha256,byteLength:record.byteLength,label});
-        const previewUrl=state.previews.get(record.slot);
-        if(previewUrl)URL.revokeObjectURL(previewUrl);
-        const url=URL.createObjectURL(new Blob([record.bytes],{type:record.mimeType||"application/octet-stream"}));
-        state.previews.set(record.slot,url);
         const refs=state.slotRefs.get(record.slot);
-        if(refs){refs.preview.src=url;refs.preview.hidden=false;refs.meta.textContent="Uploaded · "+record.byteLength.toLocaleString()+" bytes · SHA-256 verified";refs.meta.classList.add("done");refs.meta.classList.remove("error");}
+        if(refs){await queuePreview(new Blob([record.bytes],{type:record.mimeType||"application/octet-stream"}),record.slot,refs.preview);refs.meta.textContent="Uploaded · "+record.byteLength.toLocaleString()+" bytes · SHA-256 verified";refs.meta.classList.add("done");refs.meta.classList.remove("error");}
       }
     });
     if(result.error){
@@ -216,9 +212,17 @@ async function syncQueuedEvidence(){
     button.disabled=button.disabled||state.qualityRecorded||state.sealed||state.capturePaused;
   }
 }
-function queuePreview(file,slot,preview){
-  const previous=state.previews.get(slot);if(previous)URL.revokeObjectURL(previous);
-  const url=URL.createObjectURL(file);state.previews.set(slot,url);preview.src=url;preview.hidden=false;
+async function queuePreview(file,slot,preview){
+  if(!(preview instanceof HTMLCanvasElement))return false;
+  let bitmap;
+  try{
+    bitmap=await createImageBitmap(file);
+    const scale=Math.min(1,480/Math.max(bitmap.width,bitmap.height));
+    preview.width=Math.max(1,Math.round(bitmap.width*scale));preview.height=Math.max(1,Math.round(bitmap.height*scale));
+    const context=preview.getContext("2d",{alpha:false});if(!context)return false;
+    context.drawImage(bitmap,0,0,preview.width,preview.height);preview.hidden=false;return true;
+  }catch{return false;}
+  finally{bitmap?.close?.();}
 }
 function renderCaptureSlots(readiness=null){
   const grid=byId("slot-grid"),quality=byId("quality-grid");grid.replaceChildren();quality.replaceChildren();
@@ -237,7 +241,7 @@ function renderCaptureSlots(readiness=null){
     meta.textContent=existing?"Previously uploaded · "+existing.byte_length.toLocaleString()+" bytes · SHA-256 "+existing.sha256.slice(0,12)+"…":"Original image not uploaded";
     void localQueueRecords.then(records=>{if(!existing&&records.length){meta.textContent="Saved locally · "+records[records.length-1].byteLength.toLocaleString()+" bytes · awaiting retry";meta.classList.add("pending");input.disabled=state.qualityRecorded||state.sealed||state.capturePaused;}});
     if(existing)meta.classList.add("done");
-    const preview=document.createElement("img");preview.className="slot-preview";preview.hidden=true;
+    const preview=document.createElement("canvas");preview.className="slot-preview";preview.setAttribute("aria-label","Safe local preview for "+label);preview.hidden=true;
     state.slotRefs.set(slot,{meta,preview,input});
     input.addEventListener("change",async()=>{
       const file=input.files&&input.files[0];if(!file)return;
@@ -247,7 +251,7 @@ function renderCaptureSlots(readiness=null){
         if(!offlineEvidenceQueue)throw new Error(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
         if(!state.tenantId||!state.actorId)throw new Error("SERVER_IDENTITY_NOT_VERIFIED");
         await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file,keyMaterial:state.token});
-        queuePreview(file,slot,preview);
+        await queuePreview(file,slot,preview);
         meta.textContent="Saved locally · pending upload · "+file.size.toLocaleString()+" bytes";meta.classList.remove("done");
         await refreshOfflineQueueStatus();
         if(navigator.onLine)await syncQueuedEvidence();
