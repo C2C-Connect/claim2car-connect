@@ -240,7 +240,8 @@ async function recordConsent() {
       method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({request_id:uuid(),accepted:true,scope:"capture_review"})
     });
-    message("owner-message",result.replayed ? "Consent record confirmed." : "Consent recorded for this case.");\n    if(activeSession===id)try{await refreshEvidenceReadiness(id);}catch{}
+    message("owner-message",result.replayed ? "Consent record confirmed." : "Consent recorded for this case.");
+    if(activeSession===id)try{await refreshEvidenceReadiness(id);}catch{}
   } catch (error) { message("owner-message",error.message,true); }
 }
 async function withdrawCaptureConsent() {
@@ -488,7 +489,8 @@ async function recordQuality() {
     await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/quality`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid(),results})
     });
-    message("operator-message","Advisory quality results recorded. These checks do not certify image quality or vehicle condition.");\n    await refreshEvidenceReadiness(id);
+    message("operator-message","Advisory quality results recorded. These checks do not certify image quality or vehicle condition.");
+    await refreshEvidenceReadiness(id);
   } catch (error) { message("operator-message",error.message,true); }
 }
 async function sealCase() {
@@ -498,7 +500,8 @@ async function sealCase() {
     const result = await api(`/api/v1/capture-sessions/${encodeURIComponent(id)}/seal`,{
       method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request_id:uuid()})
     });
-    message("operator-message",`Manifest sealed · ${result.manifest_digest}`);\n    await refreshEvidenceReadiness(id);
+    message("operator-message",`Manifest sealed · ${result.manifest_digest}`);
+    await refreshEvidenceReadiness(id);
   } catch (error) { message("operator-message",error.message,true); }
 }
 async function refreshQueue() {
