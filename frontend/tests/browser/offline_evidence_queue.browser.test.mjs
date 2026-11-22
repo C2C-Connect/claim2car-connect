@@ -70,7 +70,7 @@ try {
   assert.equal(integratedStatus.records.every(record=>!("bytes" in record)),true);
   const wrongKey=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false,"wrong-operator-token-material-0123456789ABCDEFGHIJKLMN"));
   assert.equal(wrongKey.result.uploaded,0);
-  assert.ok(wrongKey.result.error);
+  assert.equal(wrongKey.result.error,"EVIDENCE_DECRYPTION_FAILED");
   assert.equal((await page.evaluate(() => window.c2cIntegratedQueueHarness.status())).pending,2);
   const integratedFailed=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(true));
   assert.equal(integratedFailed.result.uploaded,0);
