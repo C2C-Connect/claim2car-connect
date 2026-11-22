@@ -230,7 +230,12 @@ export function createOfflineEvidenceQueue({
         }
         try {
           const key=await deriveStorageKey(keyMaterial,record.salt,cryptoProvider);
-          const original=new Uint8Array(await cryptoProvider.subtle.decrypt({name:"AES-GCM",iv:record.iv},key,record.bytes));
+          let original;
+          try {
+            original=new Uint8Array(await cryptoProvider.subtle.decrypt({name:"AES-GCM",iv:record.iv},key,record.bytes));
+          } catch {
+            return {uploaded,blockedAtQueueId:record.queueId,error:"EVIDENCE_DECRYPTION_FAILED"};
+          }
           if(original.byteLength!==record.byteLength||toHex(await cryptoProvider.subtle.digest("SHA-256",original))!==record.sha256){
             return {uploaded,blockedAtQueueId:record.queueId,error:"LOCAL_ORIGINAL_INTEGRITY_FAILED"};
           }
@@ -244,7 +249,7 @@ export function createOfflineEvidenceQueue({
           return {
             uploaded,
             blockedAtQueueId: record.queueId,
-            error: error instanceof Error ? error.message : "EVIDENCE_UPLOAD_FAILED",
+            error: error instanceof Error && error.message.trim() ? error.message : "EVIDENCE_UPLOAD_FAILED",
           };
         }
       }
