@@ -48,10 +48,10 @@ assert.equal(CANONICAL_SLOTS.length, 16);
 assert.equal(LEGACY_CANONICAL_SLOTS.length, 12);
 
 const browserWorkbenchSource = readFileSync(new URL("../app/app.mjs", import.meta.url), "utf8");
-const apiSlotBlock = browserWorkbenchSource.match(/const API_CAPTURE_SLOTS = \[([\s\S]*?)\n\];/);
-assert.ok(apiSlotBlock, "browser workbench must declare its server API capture slots");
-const apiSlots = Array.from(apiSlotBlock[1].matchAll(/\["([a-z0-9_]+)",\s*"[^"]+"\]/g), (match) => match[1]);
-assert.deepEqual(apiSlots, CANONICAL_SLOTS, "browser upload slots must exactly match the server's ordered 16-view protocol");
+assert.ok(browserWorkbenchSource.includes("loadCaptureProtocols"), "browser workbench must load the server protocol registry");
+assert.ok(browserWorkbenchSource.includes("/v1/capture-protocols"), "workbench must request versioned capture protocols");
+assert.ok(browserWorkbenchSource.includes("captureSlots()"), "workbench must render slots from the selected protocol");
+assert.ok(browserWorkbenchSource.includes("capture-protocol-version"), "workbench must allow protocol selection for new cases");
 assert.ok(browserWorkbenchSource.includes("/v1/claim-cases"), "workbench must create a persistent claim-case record");
 assert.ok(browserWorkbenchSource.includes("capture_protocol_version:\"claims2car-16-v1\""), "new cases must bind the implemented 16-view protocol");
 assert.ok(!browserWorkbenchSource.includes('api("/v1/capture-sessions",state.token'), "workbench must not create unlinked controlled-test sessions");
