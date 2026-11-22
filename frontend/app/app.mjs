@@ -149,7 +149,7 @@ byId("create-case").addEventListener("click",async()=>{
     if(!created||created.claim_id!==claimId||typeof created.capture_session_id!=="string"||!created.capture_session_id){
       throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
     }
-    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;await updateOfflineQueueStatus();state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
     refreshCaseList();
     show("consent-panel");message("consent-status","Persistent claim case created using the 16-view capture protocol. Owner consent is required before vehicle identification or evidence capture.");
