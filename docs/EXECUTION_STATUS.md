@@ -1,5 +1,14 @@
 # Claim2Car execution status snapshot / new-thread handoff
 
+## Verified checkpoint — PR #153 merged (2026-11-22)
+
+- PR #153, **Make the Claim2Car secure workspace entry actionable**, merged. Merge commit: `76d5c6795de283be8967978239f2f5b5e59f700f`; tested head: `d550f213766f0512bd46e13ca4782c5b9481f494`.
+- Root landing UI directs to authenticated workspace, explains Connect → Capture → Review, and notes credential provisioning/no self-service signup. The primary CTA no longer sends users to the controlled prototype.
+- Exact-head CI: **13/13 workflows successful**. Full suite and integrated runtime smoke passed, including non-root container, route/security boundary checks, and ARM64 image build; database authority, IndexedDB, guided capture, VIN, synthetic demo, and container checks passed.
+- The integrated root workbench code includes persistent case creation/resume, owner consent, VIN, 16-slot evidence capture, browser IndexedDB original queue, quality attestation, manifest seal, and reviewer workflow. This is code/CI verification only.
+- **No staging deployment or user-accessible URL exists yet.** The OCI protected environments, credentials/state bucket, private host, PostgreSQL/PostGIS, durable evidence volume, and secure access path still need provisioning/verification.
+- Main after merge: `76d5c6795de283be8967978239f2f5b5e59f700f`.
+
 ## Verified checkpoint — PR #150 merged (2026-11-21)
 
 - PR #150, **Restrict OCI staging plan workflow to main**, merged. Merge commit: `35f9f3f737b44d2d0d93c40649887782798b1518`; tested head: `82f93313a86a5a93bf80debc4202716ee402dacf`.
