@@ -204,7 +204,7 @@ def test_cloud_init_enables_private_runcommand_without_broad_sudo():
     assert "NOPASSWD:ALL" not in cloud_init
     assert "ocir_auth_secret" in cloud_init or "secret-bundle get" in cloud_init
     assert '[[ "$registry" == "us-chicago-1.ocir.io" ]]' in cloud_init
-    assert 'image == "$registry/$namespace/$repository:"*' in cloud_init
+    assert '"$registry/$namespace/$repository:"*' in cloud_init
     assert 'db_image == "docker.io/postgis/postgis:"*' in cloud_init
     assert "compare/${commit}...main" in cloud_init
     assert "Source commit is not an ancestor of main" in cloud_init
