@@ -89,9 +89,12 @@ def test_s_i_all_or_nothing():
     assert r.tier == "reject"
 
 
-def test_s_i_weighted_geometric():
+def test_s_i_weighted_arithmetic_formula():
     r = compute_s_i(IntegrityInputs(gps_accuracy_m=5, master_hash_valid=True, chain_coverage=1, chain_uniqueness=1, meta_completeness=1))
     assert abs(r.s_i - 1.0) < 0.02
+    mid = compute_s_i(IntegrityInputs(gps_accuracy_m=35, chain_coverage=1.0, chain_uniqueness=1.0, meta_completeness=0.5))
+    expected = 0.30 * 0.9 + 0.45 * 1.0 + 0.25 * 0.5
+    assert abs(mid.s_i - expected) < 1e-4
 
 
 def test_catalog_resolver_lines():
@@ -149,3 +152,24 @@ def test_adjudicator_end_to_end():
 def test_no_owner_payout_constant():
     assert not hasattr(C, "OPERATOR_PAYOUT_USD")
     assert not hasattr(C, "OWNER_PAYOUT_USD")
+
+
+def test_s_i_incomplete_chain_and_duplicate_hashes_hard_collapse():
+    for coverage, uniqueness, reason in ((0.99,1.0,"CHAIN_COVERAGE_INCOMPLETE"),(1.0,0.99,"CHAIN_HASH_DUPLICATE")):
+        result=compute_s_i(IntegrityInputs(gps_accuracy_m=5,chain_coverage=coverage,chain_uniqueness=uniqueness,meta_completeness=1.0))
+        assert result.c_chain == 0.0 and result.c_hash == 0.0 and result.s_i == 0.0
+        assert result.c_chain_geometric == round((coverage*uniqueness)**0.5,4)
+        assert result.all_or_nothing_collapse and result.tier == "reject"
+        assert result.chain_failure_reason == reason
+
+def test_s_i_spoof_and_master_hash_failure_collapse():
+    spoof=compute_s_i(IntegrityInputs(gps_accuracy_m=5,gps_spoof_suspected=True))
+    assert spoof.s_i == 0.0 and spoof.all_or_nothing_collapse and spoof.tier == "reject"
+    bad_master=compute_s_i(IntegrityInputs(gps_accuracy_m=5,master_hash_valid=False))
+    assert bad_master.c_hash == 0.0 and bad_master.s_i == 0.0 and bad_master.all_or_nothing_collapse
+
+def test_s_i_rejects_nonfinite_and_out_of_range_integrity_fractions():
+    import pytest
+    for bad in (float("nan"),float("inf"),-0.01,1.01,True):
+        with pytest.raises(ValueError): compute_s_i(IntegrityInputs(chain_coverage=bad))
+        with pytest.raises(ValueError): compute_s_i(IntegrityInputs(meta_completeness=bad))

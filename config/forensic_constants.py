@@ -3,7 +3,7 @@ Claim2Car Connect — versioned forensic constants.
 Single source of truth for weights, thresholds, and commercial parameters.
 """
 
-VERSION = "2026.11.06.1"  # Owner fee decision 2026-11-06: flat dealer $375, shop $275
+VERSION = "2026.11.22.1"  # Owner fee decision 2026-11-06: flat dealer $375, shop $275
 
 # --- Commercial ---
 # OWNER payout intentionally absent — permanently excluded per legal counsel.
@@ -17,9 +17,9 @@ DEALER_ACQUISITION_FEE_USD = 375.0  # flat, due on qualified-acquisition close (
 SHOP_FEE_USD = 275.0  # flat repair-shop fee — supersedes $250 auction floor
 FEE_FACTOR_CAP_USD = 500.0
 
-# --- Integrity (S_i weighted geometric) ---
+# --- Integrity (S_i weighted sum; strict hash-chain collapse) ---
 S_I_PASS = 0.65
-S_I_REVIEW = 0.65
+S_I_REVIEW = 0.30
 S_I_REJECT = 0.30
 S_I_WEIGHTS = {"gps": 0.30, "hash": 0.45, "meta": 0.25}
 
