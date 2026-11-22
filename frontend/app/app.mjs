@@ -20,7 +20,7 @@ const API_CAPTURE_SLOTS = [
   ["14_physical_vin", "Physical VIN plate"],
   ["15_license_and_insurance_docs", "License / insurance documentation"]
 ];
-const state = { token:null, role:null, actorId:null, tenantId:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map(), slotRefs:new Map(), queueLastError:null, pendingQueueCount:0, queueStatusUnavailable:false };
+const state = { token:null, role:null, actorId:null, tenantId:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map(), slotRefs:new Map(), queueLastError:null, pendingQueueCount:0, queueStatusUnavailable:false, queueScopeVerified:false };
 
 let offlineEvidenceQueue = null;
 let offlineEvidenceQueueError = null;
@@ -57,7 +57,7 @@ function setConnected(role){
   if(role==="operator")refreshCaseList();
 }
 function disconnect(){
-  state.token=null;state.role=null;state.actorId=null;state.tenantId=null;state.claimId=null;state.sessionId=null;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];
+  state.token=null;state.role=null;state.actorId=null;state.tenantId=null;state.claimId=null;state.sessionId=null;state.queueScopeVerified=false;state.consentRecorded=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];
   state.vehicleRecorded=false;state.sealed=false;state.artifacts.clear();
   state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();
   byId("access-token").value="";byId("owner-token").value="";byId("vin-input").value="";
@@ -110,7 +110,7 @@ byId("create-case").addEventListener("click",async()=>{
     if(!created||created.claim_id!==claimId||typeof created.capture_session_id!=="string"||!created.capture_session_id){
       throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
     }
-    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;await refreshOfflineQueueStatus();state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;state.queueScopeVerified=false;await refreshOfflineQueueStatus();state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
     refreshCaseList();
     show("consent-panel");message("consent-status","Persistent claim case created using the 16-view capture protocol. Owner consent is required before vehicle identification or evidence capture.");
@@ -149,26 +149,26 @@ async function refreshOfflineQueueStatus(){
   const statusNode=byId("offline-queue-status"),button=byId("sync-queued-evidence");
   if(!statusNode||!button)return;
   if(offlineEvidenceQueueError||!offlineEvidenceQueue){
-    state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;updateSealButton();
+    state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;state.queueScopeVerified=false;updateSealButton();
     statusNode.textContent="Local queue unavailable: "+(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
     statusNode.classList.add("error");button.disabled=true;return;
   }
   if(!state.sessionId||!state.tenantId||!state.actorId){
-    state.pendingQueueCount=0;state.queueStatusUnavailable=false;updateSealButton();
+    state.pendingQueueCount=0;state.queueStatusUnavailable=false;state.queueScopeVerified=false;updateSealButton();
     statusNode.textContent="Connect with a verified operator identity and open a capture session to use local recovery.";
     button.disabled=true;return;
   }
   try{
     const snapshot=await offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId});
     const pending=snapshot.pending,uploaded=snapshot.uploaded;
-    state.pendingQueueCount=pending;state.queueStatusUnavailable=false;
+    state.pendingQueueCount=pending;state.queueStatusUnavailable=false;state.queueScopeVerified=true;
     statusNode.textContent=pending
       ? pending+" original"+(pending===1?"":"s")+" pending locally · "+uploaded+" upload-confirmed · "+(navigator.onLine?"ready to retry":"device offline")+(state.queueLastError?" · last error: "+state.queueLastError:"")
       : snapshot.total+" queued record"+(snapshot.total===1?"":"s")+" · all uploads confirmed; original bytes discarded from local queue";
     statusNode.classList.toggle("error",Boolean(state.queueLastError));
     button.disabled=pending===0||!state.token||!navigator.onLine||state.sealed;updateSealButton();
   }catch(error){
-    statusNode.textContent="Queue status failed: "+error.message;statusNode.classList.add("error");button.disabled=true;state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;updateSealButton();
+    statusNode.textContent="Queue status failed: "+error.message;statusNode.classList.add("error");button.disabled=true;state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;state.queueScopeVerified=false;updateSealButton();
   }
 }
 async function syncQueuedEvidence(){
@@ -315,7 +315,7 @@ async function resolveException(slot,resolutionCode,explanation){
 function updateSealButton(){
   const allUploaded=API_CAPTURE_SLOTS.every(([slot])=>state.artifacts.has(slot));
   const allChecked=state.qualityRecorded||Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");
-  const queueClear=state.pendingQueueCount===0&&!state.queueStatusUnavailable;
+  const queueClear=state.pendingQueueCount===0&&!state.queueStatusUnavailable&&state.queueScopeVerified;
   byId("seal-case").disabled=!allUploaded||!allChecked||!queueClear||state.sealed||state.capturePaused;
   byId("seal-case").textContent=state.qualityRecorded?"Retry evidence sealing":!queueClear?"Upload pending originals before sealing":"Record checks and seal evidence";
 }
