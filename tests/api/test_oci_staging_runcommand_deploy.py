@@ -16,6 +16,12 @@ deploy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(deploy)
 
 
+def _decode_command_payload(script_text: str) -> list[str]:
+    payload_line = next(line for line in script_text.splitlines() if line.startswith("payload="))
+    encoded = payload_line.split("=", 1)[1].strip("'")
+    return json.loads(base64.b64decode(encoded))
+
+
 def _valid_env():
     commit = "a" * 40
     return {
@@ -68,7 +74,7 @@ def test_runcommand_deploy_rejects_image_from_wrong_repository():
 def test_runcommand_deploy_rejects_unpinned_database_image():
     env = _valid_env()
     env["C2C_POSTGRES_IMAGE"] = "us-chicago-1.ocir.io/namespace/postgres:latest"
-    with unittest.TestCase().assertRaisesRegex(ValueError, "digest-pinned"):
+    with unittest.TestCase().assertRaisesRegex(ValueError, "pinned by digest"):
         deploy.validate_inputs(env)
 
 
@@ -89,11 +95,13 @@ def test_runcommand_deploy_rejects_non_postgis_public_image():
 def test_runcommand_payload_is_secret_free_and_shell_safe():
     values = deploy.validate_inputs(_valid_env())
     text = deploy.build_command_text(values)
+    decoded_args = _decode_command_payload(text)
     assert "sudo -n /usr/local/sbin/claim2car-staging-deploy" in text
-    assert values["OCI_OCIR_AUTH_SECRET_OCID"] in text
-    assert values["C2C_IMAGE_REF"] in text
-    assert values["OCIR_NAMESPACE"] in text
-    assert values["OCIR_REPOSITORY"] in text
+    assert values["OCI_OCIR_AUTH_SECRET_OCID"] in decoded_args
+    assert values["C2C_IMAGE_REF"] in decoded_args
+    assert values["OCIR_NAMESPACE"] in decoded_args
+    assert values["OCIR_REPOSITORY"] in decoded_args
+    assert values["OCI_OCIR_AUTH_SECRET_OCID"] not in text
     assert "OCI_REGISTRY_TOKEN" not in text
     assert "auth_token" not in text
     assert len(text.encode()) <= 4096
@@ -135,7 +143,9 @@ def test_submit_command_sends_text_content_and_exact_instance_target(tmp_path):
         command_id = deploy.submit_command(values, script_text)
     assert command_id == "ocid1.instanceagentcommand.oc1..command"
     assert captured["content"]["source"]["sourceType"] == "TEXT"
-    assert values["OCI_OCIR_AUTH_SECRET_OCID"] in captured["content"]["source"]["text"]
+    decoded_args = _decode_command_payload(captured["content"]["source"]["text"])
+    assert values["OCI_OCIR_AUTH_SECRET_OCID"] in decoded_args
+    assert values["OCI_OCIR_AUTH_SECRET_OCID"] not in captured["content"]["source"]["text"]
     assert "OCI_REGISTRY_TOKEN" not in captured["content"]["source"]["text"]
     assert "auth_token" not in captured["content"]["source"]["text"]
     assert captured["target"] == {"instanceId": values["OCI_STAGING_INSTANCE_OCID"]}
@@ -193,7 +203,7 @@ def test_cloud_init_enables_private_runcommand_without_broad_sudo():
     assert "ocarun ALL=(root) NOPASSWD: /usr/local/sbin/claim2car-staging-deploy" in cloud_init
     assert "NOPASSWD:ALL" not in cloud_init
     assert "ocir_auth_secret" in cloud_init or "secret-bundle get" in cloud_init
-    assert 'registry == "us-chicago-1.ocir.io"' in cloud_init
+    assert '[[ "$registry" == "us-chicago-1.ocir.io" ]]' in cloud_init
     assert 'image == "$registry/$namespace/$repository:"*' in cloud_init
     assert 'db_image == "docker.io/postgis/postgis:"*' in cloud_init
     assert "compare/${commit}...main" in cloud_init
