@@ -148,17 +148,20 @@ async function sha256Hex(buffer){
 async function refreshOfflineQueueStatus(){
   const statusNode=byId("offline-queue-status"),button=byId("sync-queued-evidence");
   if(!statusNode||!button)return;
-  if(offlineEvidenceQueueError||!offlineEvidenceQueue){\n    state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;updateSealButton();
+  if(offlineEvidenceQueueError||!offlineEvidenceQueue){
+    state.pendingQueueCount=Number.POSITIVE_INFINITY;state.queueStatusUnavailable=true;updateSealButton();
     statusNode.textContent="Local queue unavailable: "+(offlineEvidenceQueueError?.message||"INDEXEDDB_UNAVAILABLE");
     statusNode.classList.add("error");button.disabled=true;return;
   }
-  if(!state.sessionId||!state.tenantId||!state.actorId){\n    state.pendingQueueCount=0;state.queueStatusUnavailable=false;updateSealButton();
+  if(!state.sessionId||!state.tenantId||!state.actorId){
+    state.pendingQueueCount=0;state.queueStatusUnavailable=false;updateSealButton();
     statusNode.textContent="Connect with a verified operator identity and open a capture session to use local recovery.";
     button.disabled=true;return;
   }
   try{
     const snapshot=await offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId});
-    const pending=snapshot.pending,uploaded=snapshot.uploaded;\n    state.pendingQueueCount=pending;state.queueStatusUnavailable=false;
+    const pending=snapshot.pending,uploaded=snapshot.uploaded;
+    state.pendingQueueCount=pending;state.queueStatusUnavailable=false;
     statusNode.textContent=pending
       ? pending+" original"+(pending===1?"":"s")+" pending locally · "+uploaded+" upload-confirmed · "+(navigator.onLine?"ready to retry":"device offline")+(state.queueLastError?" · last error: "+state.queueLastError:"")
       : snapshot.total+" queued record"+(snapshot.total===1?"":"s")+" · all uploads confirmed; original bytes discarded from local queue";
@@ -311,7 +314,8 @@ async function resolveException(slot,resolutionCode,explanation){
 }
 function updateSealButton(){
   const allUploaded=API_CAPTURE_SLOTS.every(([slot])=>state.artifacts.has(slot));
-  const allChecked=state.qualityRecorded||Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");\n  const queueClear=state.pendingQueueCount===0&&!state.queueStatusUnavailable;
+  const allChecked=state.qualityRecorded||Array.from(byId("quality-grid").querySelectorAll("select")).every((node)=>node.value!=="");
+  const queueClear=state.pendingQueueCount===0&&!state.queueStatusUnavailable;
   byId("seal-case").disabled=!allUploaded||!allChecked||!queueClear||state.sealed||state.capturePaused;
   byId("seal-case").textContent=state.qualityRecorded?"Retry evidence sealing":!queueClear?"Upload pending originals before sealing":"Record checks and seal evidence";
 }
