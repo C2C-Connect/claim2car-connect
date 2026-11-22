@@ -11,6 +11,10 @@ assert.ok(appSource.includes("queueFile({sessionId:state.sessionId,tenantId:stat
 const syncAt=appSource.indexOf("syncSession({");
 assert.ok(syncAt>=0&&appSource.slice(syncAt,syncAt+200).includes("keyMaterial:state.token"));
 assert.ok(appSource.includes("window.addEventListener(\"online\""));
+assert.ok(appSource.includes("await refreshOfflineQueueStatus()"));
+assert.ok(appSource.includes("await offlineEvidenceQueue.syncSession"));
+assert.ok(appSource.includes("keyMaterial:state.token"));
+assert.ok(appSource.includes("evidence-readiness"));
 assert.ok(appSource.includes('api("/v1/identity",token)'));
 assert.ok(queueSource.includes("subtle.encrypt"));
 assert.ok(queueSource.includes("subtle.decrypt"));
