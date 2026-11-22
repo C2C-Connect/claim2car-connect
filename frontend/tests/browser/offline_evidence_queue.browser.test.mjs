@@ -81,6 +81,8 @@ try {
   const integratedRetry=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false));
   assert.equal(integratedRetry.result.uploaded,2);
   assert.deepEqual(integratedRetry.attempted.map(item=>item.queueId),integratedIds);
+  assert.deepEqual(integratedRetry.attempted.map(item=>item.artifactId),integratedStatus.records.map(record=>record.artifactId));
+  assert.deepEqual(integratedRetry.attempted.map(item=>item.requestId),integratedStatus.records.map(record=>record.requestId));
   assert.deepEqual(integratedRetry.attempted.map(item=>item.bytes),["integrated-original-front","integrated-original-corner"]);
   assert.equal(integratedRetry.attempted[0].artifactId,integratedFailed.attempted[0].artifactId);
   assert.equal(integratedRetry.attempted[0].requestId,integratedFailed.attempted[0].requestId);
