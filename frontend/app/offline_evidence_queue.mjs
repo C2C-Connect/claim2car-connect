@@ -152,6 +152,13 @@ export function createIndexedDbEvidenceStore(indexedDb = globalThis.indexedDB) {
 function toHex(buffer) {
   return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
+const encoder = new TextEncoder();
+async function deriveStorageKey(keyMaterial, salt, cryptoProvider) {
+  const imported = await cryptoProvider.subtle.importKey("raw", encoder.encode(keyMaterial), "HKDF", false, ["deriveKey"]);
+  return cryptoProvider.subtle.deriveKey({
+    name:"HKDF",hash:"SHA-256",salt,info:encoder.encode("Claim2Car offline evidence queue v1")
+  },imported,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+}
 
 export function createOfflineEvidenceQueue({
   store,
@@ -170,6 +177,7 @@ export function createOfflineEvidenceQueue({
         || typeof tenantId !== "string" || !tenantId.trim()
         || typeof actorId !== "string" || !actorId.trim()
         || typeof slot !== "string" || !slot.trim()
+        || typeof keyMaterial !== "string" || keyMaterial.length < 43
         || !file || typeof file.arrayBuffer !== "function") {
       throw new Error("INVALID_EVIDENCE_QUEUE_INPUT");
     }
@@ -181,6 +189,9 @@ export function createOfflineEvidenceQueue({
       throw new Error("ORIGINAL_SIZE_OUT_OF_RANGE");
     }
     const digest = toHex(await cryptoProvider.subtle.digest("SHA-256", bytes));
+    const salt=cryptoProvider.getRandomValues(new Uint8Array(16)),iv=cryptoProvider.getRandomValues(new Uint8Array(12));
+    const key=await deriveStorageKey(keyMaterial,salt,cryptoProvider);
+    const encrypted=new Uint8Array(await cryptoProvider.subtle.encrypt({name:"AES-GCM",iv},key,bytes));
     const record = {
       sessionId,
       tenantId,
@@ -191,9 +202,10 @@ export function createOfflineEvidenceQueue({
       sha256: digest,
       byteLength: bytes.byteLength,
       mimeType: typeof file.type === "string" ? file.type : "application/octet-stream",
+      encryptionAlgorithm:"AES-GCM",salt,iv,
       queuedAt: now(),
       uploaded: false,
-      bytes,
+      bytes:encrypted,
     };
     return store.enqueue(record);
   }
@@ -202,6 +214,7 @@ export function createOfflineEvidenceQueue({
     if (typeof sessionId !== "string" || !sessionId.trim()
         || typeof tenantId !== "string" || !tenantId.trim()
         || typeof actorId !== "string" || !actorId.trim()
+        || typeof keyMaterial !== "string" || keyMaterial.length < 43
         || typeof upload !== "function") {
       throw new Error("INVALID_EVIDENCE_SYNC_INPUT");
     }
@@ -212,11 +225,16 @@ export function createOfflineEvidenceQueue({
       const records = (await store.list(sessionId, {tenantId,actorId,includeBytes:true})).filter((record) => !record.uploaded);
       let uploaded = 0;
       for (const record of records) {
-        if (!(record.bytes instanceof Uint8Array) || record.bytes.byteLength !== record.byteLength) {
+        if (!(record.bytes instanceof Uint8Array) || !record.iv || !record.salt || record.encryptionAlgorithm!=="AES-GCM") {
           return { uploaded, blockedAtQueueId: record.queueId, error: "LOCAL_ORIGINAL_UNAVAILABLE" };
         }
         try {
-          const result = await upload(record);
+          const key=await deriveStorageKey(keyMaterial,record.salt,cryptoProvider);
+          const original=new Uint8Array(await cryptoProvider.subtle.decrypt({name:"AES-GCM",iv:record.iv},key,record.bytes));
+          if(original.byteLength!==record.byteLength||toHex(await cryptoProvider.subtle.digest("SHA-256",original))!==record.sha256){
+            return {uploaded,blockedAtQueueId:record.queueId,error:"LOCAL_ORIGINAL_INTEGRITY_FAILED"};
+          }
+          const result = await upload({...record,bytes:original});
           if (result === false || result?.ok === false) {
             throw new Error(result?.error || "EVIDENCE_UPLOAD_REJECTED");
           }
