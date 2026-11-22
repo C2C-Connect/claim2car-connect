@@ -15,7 +15,7 @@ assert.ok(appSource.includes("await refreshOfflineQueueStatus()"));
 assert.ok(appSource.includes("await offlineEvidenceQueue.syncSession"));
 assert.ok(appSource.includes("keyMaterial:state.token"));
 assert.ok(appSource.includes("evidence-readiness"));
-assert.ok(appSource.includes("state.pendingQueueCount===0&&!state.queueStatusUnavailable"));
+assert.ok(appSource.includes("state.pendingQueueCount===0&&!state.queueStatusUnavailable&&state.queueScopeVerified"));
 assert.ok(appSource.includes("Upload pending originals before sealing"));
 assert.ok(!appSource.includes("retryOfflineQueue"));
 assert.ok(appSource.includes('api("/v1/identity",token)'));
