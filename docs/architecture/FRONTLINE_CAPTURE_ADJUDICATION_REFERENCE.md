@@ -370,3 +370,10 @@ No hard-coded threshold, probability, safety verdict, or total-loss rule becomes
 The field workflow should make it easier to collect better evidence, not make weak evidence look conclusive. The backend should turn validated evidence into reproducible, explainable findings—not turn model scores into unquestionable verdicts. Reports should tell each authorized recipient exactly what is known, how it is known, what remains uncertain, and what action is justified.
 
 That is how Claim2Car earns the right to coordinate the post-accident economy: by making the record trustworthy first.
+
+
+## Owner FAOS manual traceability (2026-11-22)
+
+The [FAOS Core Engine Implementation Guide](FAOS_CORE_ENGINE_IMPLEMENTATION_GUIDE.md) is the consolidated owner-supplied implementation target for this reference. It extends capture and adjudication into the full operating-system journey: sensor/device qualification, VIN and vehicle provenance, 16-point sequence, quality gates, local cryptographic sealing and FIFO recovery, durable server ingest, DARCI and vision/context models, integrity scoring, consensus/human review, statutory triage, commercial routing, report delivery and settlement. Use the manual for subsystem requirements and acceptance tests.
+
+All supplied numerical values, model names, latency targets, physical overrides, score weights and decision thresholds are provisional until independently validated. They are not current product guarantees and must not become authoritative total-loss, repairability, legal or payment decisions merely because they appear in a specification. Current implemented behavior is determined by code and acceptance evidence.

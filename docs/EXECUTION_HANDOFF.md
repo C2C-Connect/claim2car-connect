@@ -183,3 +183,12 @@ Keep it compact and factual:
 - **Blocker / action needed:** only if access/credentials/approval is truly needed; specify exactly.
 
 No victory claims without evidence. No status-only tasks.
+
+
+## Governing FAOS core-engine premise (owner directive, 2026-11-22)
+
+The owner supplied and adopted the **FAOS Core Engine Implementation Guide & Subsystem Engineering Manual** as persistent product direction. Read [the manual](architecture/FAOS_CORE_ENGINE_IMPLEMENTATION_GUIDE.md) before architecture or implementation decisions. It covers the sensor edge and managed-device target, VIN/check digit and source-attributed decode, 16-point AR walkaround, quality gates, session-isolated FIFO/offline evidence, first-mile SHA-256/chain/Merkle provenance, durable gateway/persistence, DARCI mechanics, multimodal AI, proposed 55/45 consensus and overrides, integrity scoring, jurisdictional triage, BFPI/dealer and repair-auction economics, ACORD/report dispatch, and sandbox settlement.
+
+**Important acceptance boundary:** owner-provided numerical thresholds, performance claims, model names, legal references, example identifiers, blockchain anchors, and financial formulas are targets/hypotheses unless the acceptance matrix records implementation and validation evidence. Physics/AI cannot autonomously make legally or financially consequential determinations in the unvalidated state. Preserve originals and uncertainty; critical integrity defects stop dispatch. Do not introduce vendor/database complexity without a verified need; PostgreSQL/PostGIS remains the target persistence architecture and existing architecture decisions prevail unless deliberately changed.
+
+**Thread continuation:** when this conversation ends, use README + this handoff + docs/EXECUTION_STATUS.md + FAOS manual + acceptance matrix; inspect live main/PR/check/deployment state; then continue the last unfinished executable increment without another planning cycle or asking the founder to repeat these directives.

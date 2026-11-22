@@ -316,3 +316,10 @@ When continuing this project:
 Claim2Car should give people a dependable account of what can responsibly be known after a collision—and a clear, accountable path from that knowledge to the next action and eventual resolution.
 
 The platform earns the right to coordinate the post-accident economy by first earning trust in the record it creates. Accuracy, transparency, explainability, consent, and accountability are not supporting features. They are the foundation of the product.
+
+
+## 13. FAOS Core Engine and subsystem target (owner directive, 2026-11-22)
+
+The owner-provided [FAOS Core Engine Implementation Guide](FAOS_CORE_ENGINE_IMPLEMENTATION_GUIDE.md) is an additional binding technical target under this governing product premise. It expands the intended end-to-end architecture to the managed sensor-edge baseline; validated VIN and source lineage; 16-point capture contract; quality, stability and optional acoustic gates; original-preserving session FIFO sync; cryptographic manifest/chain and optional public anchoring; durable ingestion; deterministic DARCI mechanics and multimodal AI; proposed 55/45 consensus and integrity score; jurisdiction-aware statutory assessment; BFPI/dealer routing and repair auction; role-gated ACORD/report dispatch; and sandboxed idempotent settlement.
+
+These details do not supersede the Post-Accident Truth Standard or authorize unsupported conclusions. Owner-provided weights, thresholds, named models, timing targets, economics and legal/forensic claims are hypotheses/requirements pending reproducible implementation, calibration, external validation, legal review and field acceptance. AI/physics outputs remain advisory and human-reviewed; unknowns are disclosed; hard integrity failures stop dispatch; originals are retained. Acceptance matrix and execution snapshot are authoritative for the current implementation state.
