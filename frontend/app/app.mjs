@@ -22,45 +22,6 @@ const API_CAPTURE_SLOTS = [
 ];
 const state = { token:null, role:null, actorId:null, tenantId:null, claimId:null, sessionId:null, consentRecorded:false, vehicleRecorded:false, sealed:false, qualityRecorded:false, capturePaused:false, qualityResults:{}, activeExceptions:[], artifacts:new Map(), previews:new Map(), slotRefs:new Map(), queueLastError:null };
 
-function queueStatusText(status){
-  if(!status)return "No pending evidence queued for this capture session.";
-  return status.total+" queued · "+status.uploaded+" uploaded · "+status.pending+" awaiting upload";
-}
-async function updateOfflineQueueStatus(){
-  const statusNode=byId("offline-queue-status"),retry=byId("sync-queued-evidence");
-  if(!statusNode||!retry)return;
-  if(offlineEvidenceQueueError){statusNode.textContent="Offline queue unavailable: "+offlineEvidenceQueueError.message;retry.disabled=true;return;}
-  if(!state.sessionId||!state.tenantId||!state.actorId){statusNode.textContent="Queue identity scope not yet available. Connect and create/resume a case.";retry.disabled=true;return;}
-  try{
-    const status=await offlineEvidenceQueue.status(state.sessionId,{tenantId:state.tenantId,actorId:state.actorId});
-    statusNode.textContent=queueStatusText(status);retry.disabled=status.pending===0||state.sealed||state.capturePaused;
-  }catch(error){statusNode.textContent="Queue status unavailable: "+error.message;retry.disabled=true;}
-}
-async function queueEvidenceForUpload({file,slot,label,artifactId,requestId,digest}){
-  if(!offlineEvidenceQueue)throw offlineEvidenceQueueError||new Error("OFFLINE_QUEUE_UNAVAILABLE");
-  if(!state.tenantId||!state.actorId||!state.sessionId)throw new Error("QUEUE_IDENTITY_SCOPE_REQUIRED");
-  const bytes=new Uint8Array(await file.arrayBuffer());
-  const queueId=await offlineEvidenceQueue.queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file,bytes,artifactId,requestId,sha256:digest});
-  await updateOfflineQueueStatus();
-  return queueId;
-}
-async function uploadQueuedRecord(record){
-  const encoded=bytesToBase64(record.bytes);
-  return api("/v1/capture-sessions/"+state.sessionId+"/artifacts",state.token,{method:"POST",body:JSON.stringify({request_id:record.requestId,artifact_id:record.artifactId,slot:record.slot,payload_base64:encoded,sha256:record.sha256})});
-}
-async function retryOfflineQueue(){
-  const button=byId("sync-queued-evidence"),statusNode=byId("offline-queue-status");
-  if(!offlineEvidenceQueue||!state.sessionId)return;
-  button.disabled=true;statusNode.textContent="Retrying uploads in original queue order…";
-  try{
-    const result=await offlineEvidenceQueue.syncSession({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,upload:uploadQueuedRecord});
-    statusNode.textContent=result.error?("Uploaded "+result.uploaded+" · blocked: "+result.error):("Upload retry complete · "+result.uploaded+" originals uploaded.");
-    await refreshCaptureReadiness();
-  }catch(error){statusNode.textContent="Retry failed: "+error.message;}
-  finally{await updateOfflineQueueStatus();}
-}
-byId("sync-queued-evidence")?.addEventListener("click",retryOfflineQueue);
-
 let offlineEvidenceQueue = null;
 let offlineEvidenceQueueError = null;
 try { offlineEvidenceQueue = createOfflineEvidenceQueue({store:createIndexedDbEvidenceStore()}); }
@@ -149,7 +110,7 @@ byId("create-case").addEventListener("click",async()=>{
     if(!created||created.claim_id!==claimId||typeof created.capture_session_id!=="string"||!created.capture_session_id){
       throw new Error("PERSISTENT_CLAIM_CASE_RESPONSE_INVALID");
     }
-    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;await updateOfflineQueueStatus();state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
+    state.claimId=created.claim_id;state.sessionId=created.capture_session_id;await refreshOfflineQueueStatus();state.sealed=false;state.qualityRecorded=false;state.capturePaused=false;state.qualityResults={};state.activeExceptions=[];state.artifacts.clear();state.previews.forEach((url)=>URL.revokeObjectURL(url));state.previews.clear();show("vin-panel",false);show("capture-panel",false);byId("owner-token").value="";byId("consent-check").checked=false;byId("vin-input").value="";
     byId("case-id").textContent="CLAIM ID  "+state.claimId+"\nCAPTURE SESSION  "+state.sessionId;show("case-id");
     refreshCaseList();
     show("consent-panel");message("consent-status","Persistent claim case created using the 16-view capture protocol. Owner consent is required before vehicle identification or evidence capture.");
