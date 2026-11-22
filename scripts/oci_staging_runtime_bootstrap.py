@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate one-time synthetic staging runtime credentials."""
-import argparse,hashlib,json,os,secrets,shlex,tempfile,time,uuid
+import argparse,hashlib,json,os,secrets,shlex,tempfile,textwrap,time,uuid
 from pathlib import Path
 def write(p,s):
  p=Path(p); p.parent.mkdir(parents=True,exist_ok=True)
@@ -40,7 +40,7 @@ def main():
   write(root/"capture-runtime.json",json.dumps(cfg,indent=2)+"\n")
   if os.geteuid()==0: os.chown(root/"capture-runtime.json",0,10001)
   os.chmod(root/"capture-runtime.json",0o640)
-  write(root/"postgres-init.sql",f"""CREATE ROLE faos_migrator LOGIN PASSWORD {lit(mig)};
+  write(root/"postgres-init.sql",textwrap.dedent(f"""CREATE ROLE faos_migrator LOGIN PASSWORD {lit(mig)};
  CREATE ROLE faos_app LOGIN PASSWORD {lit(app)};
  CREATE ROLE faos_fixture LOGIN PASSWORD {lit(secrets.token_hex(32))};
  CREATE ROLE faos_writer NOLOGIN;
@@ -51,7 +51,7 @@ def main():
  GRANT CONNECT, CREATE ON DATABASE claim2car TO faos_migrator;
  GRANT faos_writer TO faos_migrator;
  """)
-  write(root/"seed-tenant.sql",f"""INSERT INTO faos.organizations(tenant_id,name) VALUES ({lit(tenant)}::uuid,'Claim2Car synthetic staging tenant') ON CONFLICT(tenant_id) DO NOTHING;
+  write(root/"seed-tenant.sql",textwrap.dedent(f"""INSERT INTO faos.organizations(tenant_id,name) VALUES ({lit(tenant)}::uuid,'Claim2Car synthetic staging tenant') ON CONFLICT(tenant_id) DO NOTHING;
  INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled)
  SELECT oid,rolname,{lit(tenant)}::uuid,true FROM pg_roles WHERE rolname='faos_app'
  ON CONFLICT(role_oid) DO UPDATE SET enabled=EXCLUDED.enabled WHERE faos.tenant_login_bindings.role_name=EXCLUDED.role_name AND faos.tenant_login_bindings.tenant_id=EXCLUDED.tenant_id;

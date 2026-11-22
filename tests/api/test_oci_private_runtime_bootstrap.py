@@ -59,7 +59,7 @@ def test_generated_database_init_is_single_connect_and_postgis(tmp_path):
     script=ROOT/"scripts/oci_staging_runtime_bootstrap.py"; out=tmp_path/"runtime"
     subprocess.run(["python3",str(script),"--dir",str(out)],check=True,capture_output=True,text=True)
     sql=(out/"postgres-init.sql").read_text()
-    assert sql.count("\\connect claim2car")==1
+    assert sql.count("\\connect claim2car")==1\n assert sql.splitlines()[3]=="\\connect claim2car"
     assert "CREATE EXTENSION IF NOT EXISTS postgis" in sql
 
 def test_deploy_script_shell_syntax_and_expanded_variables():
