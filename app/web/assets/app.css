@@ -28,3 +28,17 @@ button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 12px #14
 button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:760px){.product-highlights{grid-template-columns:1fr}.highlight-card{padding:16px}.intro{padding:24px 20px}.shell{padding-top:24px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}}
+
+/* Secure entry flow: clear access path and practical onboarding */
+.workspace-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;list-style:none;padding:0;margin:18px 0 4px}
+.workspace-steps li{background:#fff;border:1px solid #dce3ec;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.workspace-steps li strong{font-size:13px;color:#172a43}
+.workspace-steps li span{font-size:12px;color:#607086;line-height:1.5}
+#sign-in{max-width:620px;border:1px solid #cbd8e8;box-shadow:0 12px 34px #143a6810}
+#sign-in h2{font-size:26px}
+#sign-in .primary{min-width:140px;min-height:44px}
+.intro-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.intro-link{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 16px;border:1px solid #cbd8e8;border-radius:10px;background:#fff;color:#1c3553;text-decoration:none;font-size:13px;font-weight:700}
+.intro-link-primary{background:#155eef;border-color:#155eef;color:white}
+.intro-link:focus-visible{outline:3px solid #155eef66;outline-offset:3px}
+@media(max-width:760px){.workspace-steps{grid-template-columns:1fr}.workspace-steps li{padding:12px}.intro-links{flex-direction:column;align-items:stretch}.intro-link{width:100%}}
