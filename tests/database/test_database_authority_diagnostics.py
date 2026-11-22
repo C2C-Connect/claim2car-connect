@@ -133,6 +133,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0024_audited_capture_exceptions_pause_resume.sql',
             '0025_square_sandbox_payment_intents.sql',
             '0026_square_sandbox_webhook_reconciliation.sql',
+            '0027_capture_protocol_16_v2.sql',
         ]
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
