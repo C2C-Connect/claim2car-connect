@@ -1,7 +1,3 @@
-              "frontend/app/index.html",
-              "frontend/app/styles.css",
-              "frontend/app/offline_evidence_queue.mjs",
-              "frontend/tests/integrated_offline_evidence_queue.test.mjs",
 name: Offline guided capture workflow tests
 on:
   pull_request:
