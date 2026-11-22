@@ -7,7 +7,7 @@
  * its existing idempotency contract. This is a browser recovery aid, not a
  * WORM store, encrypted vault, or field-qualified device-storage guarantee.
  */
-const DATABASE_NAME = "claim2car-evidence";
+const DATABASE_NAME = "claim2car-integrated-evidence";
 const DATABASE_VERSION = 2;
 const STORE_NAME = "originals";
 const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
