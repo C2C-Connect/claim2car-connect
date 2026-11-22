@@ -172,30 +172,32 @@ def test_no_owner_payout():
 
 def test_dispatch_fails_closed_without_integrity_or_evidence_hashes():
     import pytest
-    sample=_sample_adj()
+    sample = _sample_adj()
     sample.pop("integrity")
-    with pytest.raises(DispatchBlocked,match="DISPATCH_INTEGRITY_REQUIRED"):
-        build_dispatch(sample,photo_hashes=["a"*64])
-    with pytest.raises(DispatchBlocked,match="DISPATCH_EVIDENCE_HASHES_REQUIRED"):
-        build_dispatch(_sample_adj(),photo_hashes=[])
+    with pytest.raises(DispatchBlocked, match="DISPATCH_INTEGRITY_REQUIRED"):
+        build_dispatch(sample, photo_hashes=["a" * 64])
+    with pytest.raises(DispatchBlocked, match="DISPATCH_EVIDENCE_HASHES_REQUIRED"):
+        build_dispatch(_sample_adj(), photo_hashes=[])
+
 
 def test_dispatch_fails_closed_for_duplicate_or_invalid_photo_hashes():
     import pytest
-    sample=_sample_adj()
-    with pytest.raises(DispatchBlocked,match="DISPATCH_DUPLICATE_EVIDENCE_HASH"):
-        build_dispatch(sample,photo_hashes=["a"*64,"a"*64])
-    with pytest.raises(DispatchBlocked,match="DISPATCH_INVALID_EVIDENCE_HASH"):
-        build_dispatch(sample,photo_hashes=["not-a-hash"])
+    sample = _sample_adj()
+    with pytest.raises(DispatchBlocked, match="DISPATCH_DUPLICATE_EVIDENCE_HASH"):
+        build_dispatch(sample, photo_hashes=["a" * 64, "a" * 64])
+    with pytest.raises(DispatchBlocked, match="DISPATCH_INVALID_EVIDENCE_HASH"):
+        build_dispatch(sample, photo_hashes=["not-a-hash"])
+
 
 def test_dispatch_fails_closed_for_integrity_review_and_chain_collapse():
     import pytest
-    sample=_sample_adj()
-    sample["integrity"]["c_chain"]=0.0
-    sample["integrity"]["c_hash"]=0.0
-    sample["integrity"]["all_or_nothing_collapse"]=True
-    with pytest.raises(DispatchBlocked,match="DISPATCH_INTEGRITY_NOT_PASSED"):
-        build_dispatch(sample,photo_hashes=["a"*64])
-    sample=_sample_adj()
-    sample["hold_for_review"]=True
-    with pytest.raises(DispatchBlocked,match="DISPATCH_REVIEW_HOLD"):
-        build_dispatch(sample,photo_hashes=["a"*64])
+    sample = _sample_adj()
+    sample["integrity"]["c_chain"] = 0.0
+    sample["integrity"]["c_hash"] = 0.0
+    sample["integrity"]["all_or_nothing_collapse"] = True
+    with pytest.raises(DispatchBlocked, match="DISPATCH_INTEGRITY_NOT_PASSED"):
+        build_dispatch(sample, photo_hashes=["a" * 64])
+    sample = _sample_adj()
+    sample["hold_for_review"] = True
+    with pytest.raises(DispatchBlocked, match="DISPATCH_REVIEW_HOLD"):
+        build_dispatch(sample, photo_hashes=["a" * 64])
