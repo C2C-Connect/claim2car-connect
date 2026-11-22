@@ -34,7 +34,7 @@ def test_bootstrap_credentials_and_permissions(tmp_path):
 def test_bootstrap_refuses_symlink_output_and_active_lock(tmp_path):
  script=ROOT/"scripts/oci_staging_runtime_bootstrap.py"
  target=tmp_path/"target"; target.mkdir()
- link=tmp_path/"runtime-link"; link.symlink_to(target,directory=True)
+ link=tmp_path/"runtime-link"; link.symlink_to(target)
  result=subprocess.run(["python3",str(script),"--dir",str(link)],capture_output=True,text=True)
  assert result.returncode!=0 and "DIRECTORY_SYMLINK" in result.stderr
  assert not list(target.iterdir())
