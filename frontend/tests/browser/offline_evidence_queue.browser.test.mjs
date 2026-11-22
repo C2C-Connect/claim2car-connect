@@ -82,7 +82,8 @@ try {
   assert.equal(integratedRetry.result.uploaded,2);
   assert.deepEqual(integratedRetry.attempted.map(item=>item.queueId),integratedIds);
   assert.deepEqual(integratedRetry.attempted.map(item=>item.bytes),["integrated-original-front","integrated-original-corner"]);
-  assert.deepEqual(integratedRetry.attempted.map(item=>item.artifactId),integratedFailed.attempted.concat(integratedRetry.attempted).map(item=>item.artifactId).slice(0,2));
+  assert.equal(integratedRetry.attempted[0].artifactId,integratedFailed.attempted[0].artifactId);
+  assert.equal(integratedRetry.attempted[0].requestId,integratedFailed.attempted[0].requestId);
   integratedStatus=await page.evaluate(() => window.c2cIntegratedQueueHarness.status());
   assert.equal(integratedStatus.pending,0);
   assert.equal(integratedStatus.uploaded,2);
