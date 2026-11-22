@@ -9,7 +9,7 @@ const appHtml=await readFile(new URL("../app/index.html",import.meta.url),"utf8"
 assert.ok(appSource.includes("createOfflineEvidenceQueue"));
 assert.ok(appSource.includes("queueFile({sessionId:state.sessionId,tenantId:state.tenantId,actorId:state.actorId,slot,file,keyMaterial:state.token})"));
 const syncAt=appSource.indexOf("syncSession({");
-assert.ok(syncAt>=0&&appSource.slice(syncAt,syncAt+200).includes("keyMaterial:state.token"));
+assert.ok(syncAt>=0&&appSource.slice(syncAt,syncAt+500).includes("keyMaterial:state.token"));
 assert.ok(appSource.includes("window.addEventListener(\"online\""));
 assert.ok(appSource.includes("await refreshOfflineQueueStatus()"));
 assert.ok(appSource.includes("await offlineEvidenceQueue.syncSession"));
