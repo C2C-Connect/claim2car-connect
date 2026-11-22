@@ -1,5 +1,15 @@
 # Claim2Car Standing Execution Mandate & Thread Handoff
 
+## Verified checkpoint — PR #153 merged (2026-11-22)
+
+- PR #153, **Make the Claim2Car secure workspace entry actionable**, merged. Merge commit: `76d5c6795de283be8967978239f2f5b5e59f700f`; tested head: `d550f213766f0512bd46e13ca4782c5b9481f494`.
+- The root landing page now directs users to the authenticated workspace (not the separate controlled prototype), explains Connect → Capture → Review, and clearly states that access credentials are provisioned out-of-band and self-service signup is not available.
+- Exact-head CI: **13/13 workflows passed**, including full test suite, integrated runtime container smoke (non-root + route/security checks + OCI ARM64 image build), database authority, IndexedDB queue, guided capture, VIN, controlled synthetic demo, and intake/container verification.
+- This is a product-entry UX increment in the canonical integrated frontend. **It is still not deployed.** No public URL, live OCI staging, owner/operator credentials, field acceptance, or real participant-data use is established by this merge.
+- Main after merge: `76d5c6795de283be8967978239f2f5b5e59f700f`.
+
+**Next product blocker:** provision the protected OCI GitHub environments/secrets and state bucket, run the reviewed guarded infrastructure apply, set up identity-verified persistent volumes and PostgreSQL/PostGIS, generate synthetic staging actor credentials on-host, publish the immutable integrated ARM64 image, and deploy through the private host path. The founder cannot see or use the app until a deployment and secure access path exist.
+
 ## Verified checkpoint — PR #150 merged (2026-11-21)
 
 - PR #150, **Restrict OCI staging plan workflow to main**, merged. Merge commit: `35f9f3f737b44d2d0d93c40649887782798b1518`; tested head: `82f93313a86a5a93bf80debc4202716ee402dacf`.
