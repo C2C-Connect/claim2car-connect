@@ -141,7 +141,7 @@ The canonical integrated application is in `frontend/app/`. Main now includes:
 
 The UI does not fabricate case counts or demo activity. Synthetic fixtures remain test-only.
 
-**There is still no user-accessible deployed application URL.** The runtime has been verified in CI, including ARM64 image build, but OCI staging has not been provisioned/deployed or field-tested.
+**There is still no user-accessible deployed application URL.** The runtime has been verified in CI, including ARM64 image build and 1,010 passing full-suite tests. The one-time synthetic staging credential bootstrap now uses atomic restrictive writes, refuses symlinked output, and locks concurrent runs. OCI staging has not yet been provisioned/deployed or field-tested.
 
 ## OCI integrated staging — deployment pending
 

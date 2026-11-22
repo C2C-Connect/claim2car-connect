@@ -1,17 +1,18 @@
 # Claim2Car execution status snapshot / new-thread handoff
 
-## Verified product checkpoint — PR #155 and #152 merged (2026-11-22)
+## Verified product checkpoint — PR #158, #155, #152 merged (2026-11-22)
 
-- **PR #155** `Add server-derived operator case progress dashboard` merged: `91753175251bb3a13d00dafe7a2692fbb7b88af6`. Dashboard reflects backend readiness: consent, vehicle reference, accepted originals, advisory quality, and seal; refreshed after upload and consent withdrawal. JavaScript syntax issue was corrected and regression-asserted before merge.
-- Exact PR #155 head: `3e9cf110a78c684c3b577f2d5c49193702ec7d95`. **17 checks successful, 3 publication checks skipped, 0 failures**; full pytest **987 passed, 31 warnings, 208 subtests passed**; integrated runtime/OCI ARM64 build passed.
-- **PR #152** `Add secure private OCI staging deployment through Run Command` merged: `f63788095986b889a8fb83efd4492aa9c437c03f`. Includes protected manual deployment workflow, instance-principal Vault OCIR secret retrieval, restricted sudo wrapper, exact-instance dynamic group and least-privilege secret policy, digest-pinned app image, source-pinned helper checksum, Run Command polling.
-- Exact PR #152 head: `7f179b6f76484c9031be60762d110334fc1f3110`. **18 checks successful, 3 publication checks skipped, 0 failures**; full pytest **1009 passed, 31 warnings, 208 subtests passed**; Terraform, restricted runtime, integrated container, and ARM64 build passed.
-- **Not deployed/operationally accepted:** no public/user-accessible staging URL, live OCI host, PostgreSQL/PostGIS instance, verified persistent evidence volume, backup/restore rehearsal, or field-device qualification. OCI environment secrets/variables and state bucket still require owner configuration; this connector cannot dispatch protected/manual workflows or inspect secrets.
-- No real participant data, live payments, or dispatch activation. CI/synthetic evidence is not field acceptance.
+- **PR #158** hardened the one-time synthetic runtime credential bootstrap; merged `f96732ec9ecea957aa2bb286a8d824db4b8a220c`, tested head `ce924d5f338cda40e0358ae44a75834c1b1a649f`. Atomic mode-0600 temp writes, fsync, replace, directory sync, symlink refusal, and exclusive lock are implemented.
+- Exact PR #158 checks: **16 passed, 3 expected publication skips, 0 failed**. Full suite **1010 passed / 31 warnings / 208 subtests**; restricted containment **224 passed / 20 warnings / 87 subtests**.
+- **PR #155** operator progress dashboard merged: `91753175251bb3a13d00dafe7a2692fbb7b88af6`. It reports backend-derived consent, vehicle reference, accepted original count, advisory quality and seal state.
+- Exact PR #155 head: `3e9cf110a78c684c3b577f2d5c49193702ec7d95`. **17 successful, 3 skipped, 0 failed**; pytest **987 passed, 31 warnings, 208 subtests**.
+- **PR #152** private OCI Run Command deploy mechanism merged: `f63788095986b889a8fb83efd4492aa9c437c03f`. Exact tested head `7f179b6f76484c9031be60762d110334fc1f3110`; **18 successful, 3 skipped, 0 failed**; pytest **1009 passed, 31 warnings, 208 subtests**.
+- **Not deployed/operationally accepted:** no public/user-accessible staging URL, live OCI host, PostgreSQL/PostGIS, verified persistent evidence volume, backup/restore rehearsal, or field qualification. OCI environment secrets/variables and state bucket require owner configuration; protected manual workflows cannot be dispatched from this connector.
+- Synthetic-only testing; no real participant data, live payments, or dispatch.
 
-## Next executable task — staging deployment
+## Next executable task — protected OCI staging provisioning
 
-Configure the protected GitHub environments `oci-staging` and `oci-staging-apply` separately (secrets do not inherit between them), the OCI state bucket/namespace, OCIR configuration, and Vault OCIR pull-secret. Run state bootstrap, inspect a non-destructive plan, apply only after reviewing resources/cost through the protected approval gate, safely identify and mount separate PostgreSQL/evidence volumes, provision PostGIS, publish the immutable ARM64 image, then run private deployment and end-to-end persistence/isolation/restore checks. Manual workflow dispatch is unavailable to this connector; if the owner must click the workflow, give the exact instructions without requesting credentials in chat.
+Configure GitHub environments `oci-staging` and `oci-staging-apply` separately (secrets/variables do not inherit), the OCI state bucket/namespace, OCIR configuration and Vault OCIR pull-secret. Run state bootstrap and non-destructive plan, review resource counts/cost, then apply only the saved non-destructive plan through required approval. Audit the existing private-subnet security lists, identify/mount the exact PostgreSQL/evidence volume OCIDs, run host preflight, provision PostGIS, publish the immutable ARM64 image, deploy privately, then verify authenticated capture/review, tenant isolation, restart persistence and restore. Manual workflow dispatch is unavailable through this connector; if the founder must click, give precise UI steps and do not request credentials in chat.
 
 ## Verified product checkpoint — PR #154 and #156 merged (2026-11-22)
 
