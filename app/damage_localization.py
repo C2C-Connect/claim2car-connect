@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
-from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, require_implemented_protocol
 
 MODEL_VERSION = "damage-localization-v1"
 ANNOTATION_VERSION = "damage-annotation-v1"
@@ -127,7 +127,7 @@ def zone_for_slot(slot: str, protocol_version: str = LEGACY_CAPTURE_PROTOCOL) ->
     protocol = require_implemented_protocol(protocol_version)
     if slot not in protocol.slots:
         return None
-    if protocol_version == DEFAULT_CAPTURE_PROTOCOL:
+    if protocol_version in (DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL):
         exterior = {
             "00_front_exterior": "front",
             "01_front_right_exterior": "front",

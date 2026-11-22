@@ -5,6 +5,7 @@
  */
 
 export const DEFAULT_CAPTURE_PROTOCOL = "claims2car-16-v1";
+export const FAOS_CAPTURE_PROTOCOL = "claims2car-16-v2";
 export const LEGACY_CAPTURE_PROTOCOL = "claims2car-12-v1";
 export const CAPTURE_PROTOCOL_SLOTS = Object.freeze({
   [DEFAULT_CAPTURE_PROTOCOL]: Object.freeze([
@@ -13,6 +14,7 @@ export const CAPTURE_PROTOCOL_SLOTS = Object.freeze({
     "08_wheel_front_left", "09_wheel_front_right", "10_wheel_rear_right", "11_wheel_rear_left",
     "12_cabin_front_airbags", "13_instrument_cluster_odometer", "14_physical_vin", "15_license_and_insurance_docs",
   ]),
+  [FAOS_CAPTURE_PROTOCOL]: Object.freeze(['00_front_exterior','01_front_right_exterior','02_right_side_exterior','03_rear_right_exterior','04_rear_exterior','05_rear_left_exterior','06_left_side_exterior','07_front_left_exterior','08_front_left_structural','09_front_right_structural','10_rear_right_structural','11_rear_left_structural','12_front_cabin_restraints','13_rear_cabin_restraints','14_instrument_cluster_telemetry','15_vehicle_identity_vin']),
   [LEGACY_CAPTURE_PROTOCOL]: Object.freeze([
     "front_center", "front_left", "left_side", "rear_left", "rear_center", "rear_right",
     "right_side", "front_right", "vin_plate", "odometer_cluster",

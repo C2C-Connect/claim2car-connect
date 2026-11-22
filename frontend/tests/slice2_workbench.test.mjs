@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   CANONICAL_SLOTS,
   LEGACY_CANONICAL_SLOTS,
+  FAOS_CAPTURE_PROTOCOL,
   LEGACY_CAPTURE_PROTOCOL,
   OperatorRoadsideController,
   ReviewerWorkbenchController,
@@ -66,3 +67,9 @@ assert.ok(readFileSync(new URL("../app/index.html", import.meta.url), "utf8").in
 
 
 console.log(JSON.stringify({ suite: "slice2-workbench", assertions: 12, status: "passed" }));
+
+const faosV2Operator=new OperatorRoadsideController({sessionId:"faos-v2",tenantId:"tenant-a",operatorId:"operator-a",protocolVersion:FAOS_CAPTURE_PROTOCOL,now});
+assert.equal(faosV2Operator.canonicalSlots.length,16);
+assert.equal(faosV2Operator.canonicalSlots[8],"08_front_left_structural");
+assert.equal(faosV2Operator.canonicalSlots[13],"13_rear_cabin_restraints");
+assert.equal(faosV2Operator.canonicalSlots[15],"15_vehicle_identity_vin");

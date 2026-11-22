@@ -37,7 +37,7 @@ from app.artifact_storage import (
     ArtifactStorageUnavailable, OriginalByteStore,
 )
 from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
-from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
+from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 from app.damage_localization import zone_for_slot
 from app.vision.photo_baseline import PhotoBaselineError, analyze_photo_bytes
 from app.vehicle_intelligence.vpic import VpicClient
@@ -350,7 +350,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
     @api.get('/v1/capture-protocols')
     def capture_protocol_registry(authorization: str = Depends(authorize)):
         protocols = []
-        for version in (DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL):
+        for version in (DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL):
             definition = resolve_capture_protocol(version)
             protocols.append({
                 "version": definition.version,

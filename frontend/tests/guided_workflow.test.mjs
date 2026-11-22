@@ -2,7 +2,7 @@
 // with an injected localStorage-shaped storage; no images, no network, no
 // vehicle decoding. Mirrors backend capture_workflow semantics.
 import assert from 'node:assert/strict';
-import { createGuidedCapture, resumeGuidedCapture, DISCLOSURE_VERSION, WORKFLOW_STORAGE_KEY, DEFAULT_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, CAPTURE_PROTOCOL_SLOTS } from '../src/modules/capture/guided_workflow.mjs';
+import { createGuidedCapture, resumeGuidedCapture, DISCLOSURE_VERSION, WORKFLOW_STORAGE_KEY, DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, CAPTURE_PROTOCOL_SLOTS } from '../src/modules/capture/guided_workflow.mjs';
 import { validateVin } from '../src/modules/capture/vin.mjs';
 
 const SHOT_LIST = ['vin_ocr','doc_ocr','front','front_left','driver_side','rear_left','rear','rear_right','passenger_side','front_right','interior_front','undercarriage_engine'];
@@ -195,3 +195,8 @@ const failures = records.filter(r => r.outcome !== 'passed').length;
 const successful = records.length > 0 && new Set(records.map(r => r.id)).size === records.length && failures === 0;
 console.log(JSON.stringify({ classification: 'offline-guided-capture-controller-tests', commit: process.env.GITHUB_SHA ?? null, runtime: process.version, executed: records.length, failures, successful, tests: records }, null, 2));
 process.exitCode = successful ? 0 : 1;
+
+assert.equal(CAPTURE_PROTOCOL_SLOTS[FAOS_CAPTURE_PROTOCOL].length,16);
+assert.equal(CAPTURE_PROTOCOL_SLOTS[FAOS_CAPTURE_PROTOCOL][8],"08_front_left_structural");
+assert.equal(CAPTURE_PROTOCOL_SLOTS[FAOS_CAPTURE_PROTOCOL][13],"13_rear_cabin_restraints");
+assert.equal(CAPTURE_PROTOCOL_SLOTS[FAOS_CAPTURE_PROTOCOL][15],"15_vehicle_identity_vin");
