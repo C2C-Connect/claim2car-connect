@@ -27,6 +27,7 @@ REQUIRED += [
     'tests/database/test_event_hash_chain_unit.py',
     'tests/database/test_event_hash_chain_integration.py',
     'authority_migrations/0028_persistent_event_hash_chain.sql',
+    'tests/database/test_persisted_chain_readback.py',
 ]
 REQUIRED += [
     'authority_migrations/0022_collision_vehicle_capture_link.sql',
