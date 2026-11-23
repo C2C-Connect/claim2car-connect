@@ -4,9 +4,9 @@
 
 **Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows green**. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests and DB-01–DB-14 14/14 PASS. This is database acceptance, not forensic M1 acceptance.
 
-**Current M1 code:** migration 0028 persists SHA-256 hashes; server-owned readback recomputes the chain from PostgreSQL; invalid authority-schema chains fail closed before replay/locked consumers; legacy unhashed status is explicit and partial hash schemas fail closed. M1 remains incomplete: migration 0029 chain-tip/context binding, registered-original/artifact binding, independent verifier, recovery/adversarial/fork tests and external checkpoint remain. No deployment/field qualification/participant evidence/payment/dispatch.
+**Current M1 code:** migration 0028 persists SHA-256 hashes; server-owned readback recomputes chain from PostgreSQL; invalid authority-schema chains fail closed before replay/locked consumers; legacy-unhashed status explicit and partial schema fails closed. M1 remains incomplete: migration 0029 chain-tip/context binding, registered-original/artifact binding, independent verifier, recovery/adversarial/fork tests and external checkpoint remain. No deployment/field qualification/participant evidence/payment/dispatch.
 
-**Next implementation:** migration 0029 manifest-root chain-tip/context binding, verified registration and consumers, artifact provenance, independent/recovery/adversarial tests. Continue in code, not planning.
+**Next implementation:** migration 0029 manifest-root chain-tip/context binding and verified registration/consumers, artifact provenance, independent/recovery/adversarial tests. Continue in code, not planning.
 
 ## Active engineering focus — forensic substantiation
 
