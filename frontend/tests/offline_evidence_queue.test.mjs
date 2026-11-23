@@ -88,7 +88,7 @@ await test("fifo_sync_stops_at_first_failure_and_retry_reuses_ids", async () => 
   await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "rear", file: makeFile("second"), keyMaterial });
   const attempted = [];
   const first = await queue.syncSession({
-    sessionId: "session-a", tenantId:"tenant-a", actorId:"actor-a",
+    sessionId: "session-a", tenantId:"tenant-a", actorId:"actor-a", keyMaterial,
     upload: async (record) => {
       attempted.push(record.artifactId);
       throw new Error("NETWORK_UNAVAILABLE");
@@ -120,7 +120,7 @@ await test("session_queues_are_isolated", async () => {
   await queue.queueFile({ sessionId: "session-b", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("b"), keyMaterial });
   const uploaded = [];
   const result = await queue.syncSession({
-    sessionId: "session-b", tenantId:"tenant-a", actorId:"actor-a",
+    sessionId: "session-b", tenantId:"tenant-a", actorId:"actor-a", keyMaterial,
     upload: async (record) => { uploaded.push(record.sessionId); return { ok: true }; },
   });
   assert.equal(result.uploaded, 1);
