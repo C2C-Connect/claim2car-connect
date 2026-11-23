@@ -259,7 +259,7 @@ def verify_db_01(context):
     env_ok = bool(
         database and database[0] == "claim2car_test"
         and "PostgreSQL" in str(database[1] if len(database) > 1 else "")
-        and {"plpgsql", "postgis"}.issubset(extensions)
+        and {"plpgsql", "postgis", "pgcrypto"}.issubset(extensions)
         and len(inventory) == 28
         and connections_ok
         and context.get("environment_is_synthetic") is True
