@@ -1,5 +1,6 @@
 import unittest
 import uuid
+from unittest.mock import patch
 
 import psycopg
 
@@ -72,6 +73,18 @@ class PersistedChainReadbackIntegration(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"^EVENT_CHAIN_INVALID:EVENT_HASH_MISMATCH$"):
             with locked_journal(self.conn,self.tenant,self.session):
                 self.fail("tampered history must not yield a locked journal")
+
+    def test_legacy_compatibility_is_explicit_and_partial_hash_schema_fails_closed(self):
+        self.assertEqual(append(self.conn,self.tenant,self.event),"ACCEPTED")
+        with patch("database.readback._hash_column_count",return_value=0):
+            legacy=read_persisted_journal(self.conn,self.tenant,self.session)
+        self.assertEqual(legacy.status,"LEGACY_UNHASHED")
+        self.assertFalse(legacy.verified)
+        self.assertEqual(legacy.chain_verification["reason"],"HASH_COLUMNS_NOT_PRESENT")
+        self.assertEqual(legacy.journal.events,(self.event,))
+        with patch("database.readback._hash_column_count",return_value=1):
+            with self.assertRaisesRegex(ValueError,"^HASH_SCHEMA_INCOMPLETE$"):
+                read_persisted_journal(self.conn,self.tenant,self.session)
 
     def test_cross_tenant_readback_is_not_visible(self):
         self.assertEqual(append(self.conn,self.tenant,self.event),"ACCEPTED")
