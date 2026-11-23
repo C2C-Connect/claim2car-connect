@@ -1,4 +1,4 @@
-"""Regression tests for strict 0017-0028 inventory and DB-01/DB-02 acceptance diagnostics."""
+"""Regression tests for strict 0017-0029 inventory and DB-01/DB-02 acceptance diagnostics."""
 import unittest
 
 from scripts.database_authority_diagnostics import validate_authority_migration_inventory
@@ -71,7 +71,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0021_collision_claim_link.sql',
             ]))
 
-    def test_db01_accepts_the_28_migration_synthetic_environment(self):
+    def test_db01_accepts_the_29_migration_synthetic_environment(self):
         names = [f'{number:04d}_' + suffix for number, suffix in enumerate((
             'tenant_registry.sql', 'event_journal.sql', 'completion_lock.sql',
             'manifest_roots.sql', 'completion_receipts.sql',
@@ -116,7 +116,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_db02_accepts_the_complete_28_migration_inventory(self):
+    def test_db02_accepts_the_complete_29_migration_inventory(self):
         names = [
             '0001_tenant_registry.sql', '0002_event_journal.sql',
             '0003_completion_lock.sql', '0004_manifest_roots.sql',
