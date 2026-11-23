@@ -15,6 +15,12 @@ class ManifestContextBindingHashTests(unittest.TestCase):
             "ac4532ff1c5cf92b4fe0655df768a6215663ea23f6818eaf2af63f0094e6d9cc",
         )
 
+    def test_uuid_case_canonicalizes_to_same_binding(self):
+        lower = '12345678-1234-5678-1234-567812345678'
+        upper = lower.upper()
+        args = ('session', 'protocol', 5, 'b' * 64)
+        self.assertEqual(manifest_context_binding_hash(lower,*args),manifest_context_binding_hash(upper,*args))
+
     def test_rejects_invalid_tenant_context_or_chain_commitment(self):
         with self.assertRaisesRegex(ValueError, "INVALID_TENANT_ID"):
             manifest_context_binding_hash("not-a-uuid", "session", "protocol", 1, "a" * 64)
