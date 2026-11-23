@@ -342,6 +342,19 @@ class MigrationControlsIntegration(unittest.TestCase):
             (tenant, session),
         ).fetchone()
         self.assertEqual(after, before, 'MIGRATION_REWROTE_HISTORICAL_EVENT_BYTES')
+        hashes = self.admin_db.execute(
+            'SELECT previous_hash,entry_hash,hash_version FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+            (tenant,session),
+        ).fetchone()
+        genesis = self.admin_db.execute(
+            'SELECT faos.event_chain_genesis_hash(%s::uuid,%s)',(tenant,session),
+        ).fetchone()[0]
+        expected = self.admin_db.execute(
+            'SELECT faos.event_chain_entry_hash(%s::uuid,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+            (tenant,session,'preserved-event',1,'SESSION_CREATED','synthetic-test',
+             '2026-01-01T00:00:00Z','preserve exact bytes',payload,'0.1',genesis),
+        ).fetchone()[0]
+        self.assertEqual(hashes,(genesis,expected,'event-hash-v1'),'BACKFILL_HASH_MISMATCH')
 
     def test_noncanonical_historical_event_blocks_parity_migration_without_rewrite(self):
         plan = self.authority_plan()
