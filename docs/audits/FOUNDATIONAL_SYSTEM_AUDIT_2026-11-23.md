@@ -164,7 +164,7 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-013 | CONFIRMED | Triage API has default synthetic values that can yield a result from a session ID alone |
 | AUD-014 | CONFIRMED limitation | Anchor ledger is process-local; no persistent/external anchor established |
 | AUD-015 | CONFIRMED limitation | Photo baseline is heuristic and result is not persisted |
-| AUD-016 | CONFIRMED / corrective design identified | Offline ciphertext lacks AES-GCM AAD binding for record metadata; bind metadata in the next encrypted-queue iteration |
+| AUD-016 | CONFIRMED / remediation in PR #171 (pending exact-head CI) | PR #171 binds canonical metadata as AES-GCM AAD and upgrades prior plaintext/v1 queue records before upload |
 
 ## Change log
 
