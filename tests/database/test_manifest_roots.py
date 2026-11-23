@@ -55,137 +55,33 @@ class ManifestRootTests(unittest.TestCase):
                 'SELECT seal_sequence,seal_chain_hash,context_binding_hash,binding_version,'
                 'faos.verify_manifest_root_binding(tenant_id,session_id,seal_event_id) '
                 'FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s',
-                (self.tenant,self.session,self.seal),
+                (self.tenant, self.session, self.seal),
             ).fetchone()
         self.assertEqual(row[0], len(self.events))
-        self.assertRegex(row[1], r'^[0-9a-f]{64}
-        attempts = [(REGISTER, self.values),
-                    ('INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) VALUES (%s,%s,%s,%s,%s)', self.values)]
-        for statement, values in attempts:
-            with self.subTest(statement=statement):
-                with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
-                    with tenant_transaction(self.conn, self.tenant):
-                        self.conn.execute(statement, values)
-                self.assertEqual(caught.exception.sqlstate, '42501')
-        self.assertEqual(self.roots(self.tenant), [])
-
-    def test_application_cannot_update_delete_or_truncate_registered_root(self):
-        self.assertEqual(self.register(), 'REGISTERED')
-        expected = [(self.seal, self.digest, self.version)]
-        keys = (self.tenant, self.session, self.seal)
-        statements = (
-            ('UPDATE faos.manifest_roots SET manifest_digest=manifest_digest WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s', keys),
-            ('DELETE FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s', keys),
-            ('TRUNCATE faos.manifest_roots', ()),
-        )
-        for statement, values in statements:
-            with self.subTest(statement=statement):
-                with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
-                    with tenant_transaction(self.conn, self.tenant):
-                        self.conn.execute(statement, values)
-                        raise AssertionError('UNEXPECTED_ROOT_MUTATION_ALLOWED')
-                self.assertEqual(caught.exception.sqlstate, '42501')
-                self.assertEqual(self.roots(self.tenant), expected)
-
-    def assert_registration_rejected(self, values, message, context=True):
-        with self.assertRaises(psycopg.errors.RaiseException) as caught:
-            self.register(values, context=context)
-        self.assertEqual(caught.exception.sqlstate, 'P0001')
-        self.assertEqual(caught.exception.diag.message_primary, message)
-        self.assertEqual(self.roots(self.tenant), [])
-
-    def test_digest_must_match_persisted_seal(self):
-        self.assert_registration_rejected((self.tenant, self.session, self.seal, '0' * 64, self.version), 'ROOT_SEAL_MISMATCH')
-
-    def test_nonseal_event_rejected(self):
-        self.assert_registration_rejected((self.tenant, self.session, self.events[0].event_id, self.digest, self.version), 'INVALID_SEAL_EVENT')
-
-    def test_other_tenant_cannot_read_registered_root(self):
-        self.assertEqual(self.register(), 'REGISTERED')
-        self.assertEqual(self.roots(str(uuid.uuid4())), [])
-        self.assertEqual(self.roots(self.tenant), [(self.seal, self.digest, self.version)])
-
-    def test_missing_context_cannot_register(self):
-        self.assert_registration_rejected(self.values, 'TENANT_CONTEXT_MISMATCH', context=False)
-
-
-if __name__ == '__main__':
-    unittest.main()
-)
-        self.assertRegex(row[2], r'^[0-9a-f]{64}
-        attempts = [(REGISTER, self.values),
-                    ('INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) VALUES (%s,%s,%s,%s,%s)', self.values)]
-        for statement, values in attempts:
-            with self.subTest(statement=statement):
-                with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
-                    with tenant_transaction(self.conn, self.tenant):
-                        self.conn.execute(statement, values)
-                self.assertEqual(caught.exception.sqlstate, '42501')
-        self.assertEqual(self.roots(self.tenant), [])
-
-    def test_application_cannot_update_delete_or_truncate_registered_root(self):
-        self.assertEqual(self.register(), 'REGISTERED')
-        expected = [(self.seal, self.digest, self.version)]
-        keys = (self.tenant, self.session, self.seal)
-        statements = (
-            ('UPDATE faos.manifest_roots SET manifest_digest=manifest_digest WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s', keys),
-            ('DELETE FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s', keys),
-            ('TRUNCATE faos.manifest_roots', ()),
-        )
-        for statement, values in statements:
-            with self.subTest(statement=statement):
-                with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
-                    with tenant_transaction(self.conn, self.tenant):
-                        self.conn.execute(statement, values)
-                        raise AssertionError('UNEXPECTED_ROOT_MUTATION_ALLOWED')
-                self.assertEqual(caught.exception.sqlstate, '42501')
-                self.assertEqual(self.roots(self.tenant), expected)
-
-    def assert_registration_rejected(self, values, message, context=True):
-        with self.assertRaises(psycopg.errors.RaiseException) as caught:
-            self.register(values, context=context)
-        self.assertEqual(caught.exception.sqlstate, 'P0001')
-        self.assertEqual(caught.exception.diag.message_primary, message)
-        self.assertEqual(self.roots(self.tenant), [])
-
-    def test_digest_must_match_persisted_seal(self):
-        self.assert_registration_rejected((self.tenant, self.session, self.seal, '0' * 64, self.version), 'ROOT_SEAL_MISMATCH')
-
-    def test_nonseal_event_rejected(self):
-        self.assert_registration_rejected((self.tenant, self.session, self.events[0].event_id, self.digest, self.version), 'INVALID_SEAL_EVENT')
-
-    def test_other_tenant_cannot_read_registered_root(self):
-        self.assertEqual(self.register(), 'REGISTERED')
-        self.assertEqual(self.roots(str(uuid.uuid4())), [])
-        self.assertEqual(self.roots(self.tenant), [(self.seal, self.digest, self.version)])
-
-    def test_missing_context_cannot_register(self):
-        self.assert_registration_rejected(self.values, 'TENANT_CONTEXT_MISMATCH', context=False)
-
-
-if __name__ == '__main__':
-    unittest.main()
-)
+        self.assertRegex(row[1], r'^[0-9a-f]{64}$')
+        self.assertRegex(row[2], r'^[0-9a-f]{64}$')
         self.assertEqual(row[3], 'manifest-context-v1')
         self.assertTrue(row[4])
 
     def test_privileged_context_binding_tamper_fails_verification(self):
         self.assertEqual(self.register(), 'REGISTERED')
-        with psycopg.connect(self.admin_url,autocommit=True) as admin:
+        with psycopg.connect(self.admin_url, autocommit=True) as admin:
             admin.execute(
                 "UPDATE faos.manifest_roots SET context_binding_hash=%s WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s",
-                ('0'*64,self.tenant,self.session,self.seal),
+                ('0' * 64, self.tenant, self.session, self.seal),
             )
-        with tenant_transaction(self.conn,self.tenant):
-            verified=self.conn.execute(
+        with tenant_transaction(self.conn, self.tenant):
+            verified = self.conn.execute(
                 'SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)',
-                (self.tenant,self.session,self.seal),
+                (self.tenant, self.session, self.seal),
             ).fetchone()[0]
         self.assertFalse(verified)
 
     def test_application_cannot_register_or_insert_root(self):
-        attempts = [(REGISTER, self.values),
-                    ('INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) VALUES (%s,%s,%s,%s,%s)', self.values)]
+        attempts = [
+            (REGISTER, self.values),
+            ('INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) VALUES (%s,%s,%s,%s,%s)', self.values),
+        ]
         for statement, values in attempts:
             with self.subTest(statement=statement):
                 with self.assertRaises(psycopg.errors.InsufficientPrivilege) as caught:
