@@ -157,7 +157,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_rejects_unreviewed_migration_after_0027(self):
+    def test_rejects_unreviewed_migration_after_0028(self):
         with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0027'):
             validate_authority_migration_inventory(self.inventory([
                 '0017_event_contract_parity.sql',
