@@ -182,6 +182,21 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 **Remediation:** Implement authoritative lifecycle state transitions and a persistent outbox relay/consumer contract with locking/lease, idempotent delivery, bounded retry/dead-letter, observability, replay/reconciliation, and restart/tenant-isolation tests. External dispatch remains disabled until the trust and release gates pass.
 
+
+### AUD-023 — OCI staging network security has permissive public SSH ingress (P1 deployment blocker)
+**Evidence:** The previously reviewed OCI default security list allowed SSH ingress from `0.0.0.0/0` and `::/0`. Staging is not deployed, and this rule must be revalidated in the current OCI console/network configuration before any instance is exposed.
+
+**Impact:** Public SSH ingress expands the attack surface and is inconsistent with a private staging environment unless a separately verified control restricts effective access.
+
+**Remediation:** Remove broad SSH ingress; use a controlled admin IP/NSG, bastion or approved managed access path; audit IPv4 and IPv6 effective rules; verify private-subnet routing and ingress; capture a read-only security audit before apply.
+
+### AUD-024 — Oracle MySQL Free resource does not match the PostgreSQL/PostGIS authority architecture (P2)
+**Evidence:** User-created OCI infrastructure includes an Oracle MySQL.Free DB System, while the repository architecture and deployment workflows require PostgreSQL authority and PostGIS. The MySQL resource is not an architectural substitute and its status/usage must be reconciled.
+
+**Impact:** Using the wrong database service would create schema/authority divergence and invalidate acceptance evidence; an unused resource can also create operational confusion.
+
+**Remediation:** Confirm the MySQL resource is unused and safely retire it if appropriate; deploy the required PostgreSQL/PostGIS authority in the approved private network. Do not migrate the application to MySQL or treat the MySQL instance as a completed staging dependency.
+
 ## Initial priority order for corrective work
 
 1. **AUD-001 + AUD-002 + AUD-016:** Canonical offline evidence encryption, authenticated metadata, legacy migration, and frontend drift—PR #171 is implementing this slice.
@@ -191,7 +206,7 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 5. **AUD-007:** Owner identity assurance, credential rotation/revocation, and recovery.
 6. **AUD-010 + AUD-020:** Durable financial obligations, postings, reconciliation, refunds/disputes, and sandbox-to-release controls.
 7. **AUD-011 + AUD-022:** Complete collision lifecycle transitions and operational persistent outbox relay/consumer.
-8. **AUD-012:** Private staging deployment, backup/restore, monitoring, incident response, and field qualification.
+8. **AUD-012 + AUD-023 + AUD-024:** Private staging deployment, least-privilege network ingress, correct PostgreSQL/PostGIS authority, backup/restore, monitoring, incident response, and field qualification.
 
 ## Audit status tracking
 
@@ -219,6 +234,8 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-020 | CONFIRMED | Financial journal is process-local and sandbox webhook receipts are not full ledger posting/reconciliation |
 | AUD-021 | CONFIRMED | Default v1 requires license/insurance docs; newer v2 has structural evidence and no mandatory document slot |
 | AUD-022 | CONFIRMED | Collision lifecycle has root/link/read operations; persistent outbox has no relay consumer; app outbox is in-memory abstraction |
+| AUD-023 | CONFIRMED / must revalidate before staging | OCI default security list previously allowed public SSH IPv4 and IPv6 |
+| AUD-024 | CONFIRMED infrastructure mismatch | OCI MySQL.Free resource is not the PostgreSQL/PostGIS authority required by the product |
 
 ## Change log
 
