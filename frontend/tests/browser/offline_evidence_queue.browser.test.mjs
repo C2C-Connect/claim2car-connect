@@ -71,7 +71,7 @@ try {
   assert.equal(migrationStatus.records.find(record=>record.queueId===legacy.queueId).encryptionAlgorithm,"AES-GCM-HKDF-SHA256-v2");
   assert.equal("bytes" in migrationStatus.records.find(record=>record.queueId===legacy.queueId),false);
 
-  // Same session in another actor scope is isolated; tenant/session purge clears both.
+  // Queue metadata, actor isolation, and tenant/session purge cover all four local records.
   await page.evaluate(() => window.c2cQueueHarness.addOtherActor());
   const otherActor = await page.evaluate(() => window.c2cQueueHarness.status("browser-test-other-actor"));
   assert.equal(otherActor.total, 1);
