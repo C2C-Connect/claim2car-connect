@@ -34,11 +34,11 @@ try {
   assert.equal(wrongKey.result.error, "EVIDENCE_DECRYPTION_FAILED");
   assert.equal(wrongKey.attempted.length, 0);
   assert.equal((await page.evaluate(() => window.c2cQueueHarness.status())).pending, 2);
-  await page.evaluate(() => window.c2cQueueHarness.tamperSlot(queueIds[0],"tampered-slot"));
+  await page.evaluate((queueId) => window.c2cQueueHarness.tamperSlot(queueId,"tampered-slot"),queueIds[0]);
   const metadataTamper=await page.evaluate(() => window.c2cQueueHarness.sync(false));
   assert.equal(metadataTamper.result.error,"EVIDENCE_DECRYPTION_FAILED");
   assert.equal(metadataTamper.attempted.length,0);
-  await page.evaluate(() => window.c2cQueueHarness.tamperSlot(queueIds[0],"front"));
+  await page.evaluate((queueId) => window.c2cQueueHarness.tamperSlot(queueId,"front"),queueIds[0]);
 
   // A failed first upload must halt FIFO processing without deleting either original.
   const failed = await page.evaluate(() => window.c2cQueueHarness.sync(true));
