@@ -1,5 +1,9 @@
 ## Authoritative latest checkpoint (2026-11-23; supersedes older deployment-only next-task entries)
 
+## Authoritative latest checkpoint (2026-11-23; supersedes older deployment-only next-task entries)
+
+See [complete thread handoff](THREAD_HANDOFF_2026-11-23.md). Current focus is M1 persistent forensic provenance on PR #176; initial Python hash-chain slice is in draft and exact-head CI was 13/13 successful. M1 is **not complete**: SQL persistence/parity/backfill, manifest chain-tip binding, server verifier, adversarial DB/restart/concurrency/tenant tests and independent verifier agreement remain. The full M0–M8 sequence and trust rules are in docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Do not merge PR #176 yet. Staging remains undeployed but is not the immediate focus. Check exact current GitHub state before resume.
+
 See [complete thread handoff](THREAD_HANDOFF_2026-11-23.md). Current focus is M1 persistent forensic provenance on PR #176; initial Python hash-chain slice is in draft and exact-head CI was 13/13 successful. M1 is **not complete**: SQL persistence/parity/backfill, manifest chain-tip binding, server verifier, adversarial DB/restart/concurrency/tenant tests and independent verifier agreement remain. The full M0–M8 sequence and trust rules are in docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Do not merge PR #176 yet. Staging remains undeployed but is not the immediate focus. Check exact current GitHub state before resume.
 # Current mission focus — forensic substantiation (2026-11-23)
 
