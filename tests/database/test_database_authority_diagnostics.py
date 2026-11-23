@@ -70,7 +70,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0021_collision_claim_link.sql',
             ]))
 
-    def test_db01_accepts_the_27_migration_synthetic_environment(self):
+    def test_db01_accepts_the_28_migration_synthetic_environment(self):
         names = [f'{number:04d}_' + suffix for number, suffix in enumerate((
             'tenant_registry.sql', 'event_journal.sql', 'completion_lock.sql',
             'manifest_roots.sql', 'completion_receipts.sql',
@@ -135,6 +135,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0025_square_sandbox_payment_intents.sql',
             '0026_square_sandbox_webhook_reconciliation.sql',
             '0027_capture_protocol_16_v2.sql',
+            '0028_persistent_event_hash_chain.sql',
         ]
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
