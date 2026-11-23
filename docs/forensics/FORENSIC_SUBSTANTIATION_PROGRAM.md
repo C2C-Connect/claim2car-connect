@@ -145,3 +145,28 @@ The current application and capture protocols are controlled-test implementation
 ## New-chat handoff
 
 Read this document first, then `README.md`, `docs/EXECUTION_HANDOFF.md`, `docs/EXECUTION_STATUS.md`, `docs/audits/FOUNDATIONAL_SYSTEM_AUDIT_2026-11-23.md`, and `docs/architecture/PRODUCT_PREMISE_FORENSIC_INTELLIGENCE.md`. Verify current main/PR/check status. Resume **M1 persistent provenance and independent full-chain verification**—do not re-plan or pivot away from forensic substantiation.
+
+## M1 reconnaissance — verified current-state facts (2026-11-23)
+
+This source trace confirms existing database mechanisms that should be reused rather than replaced:
+
+- `migrations/0002_event_journal.sql` defines tenant/session-scoped `faos.events`, unique event IDs and sequence, FK to session, RLS/FORCE RLS, and `faos.append_event`. The SQL function locks the session row, returns `DUPLICATE` for an identical event ID/payload, rejects conflicting duplicate IDs, and requires next sequence. **Rows have no prev/event hashes.**
+- `database/journal.py` calls the SQL append function under tenant transaction. `database/readback.py` loads and replays sequence history; this validates event structure/order but does not cryptographically recompute an event chain.
+- `app/domain_events.py` has a deterministic Python canonical JSON dialect. `migrations/0007_event_payload_compactness.sql` only compacts whitespace outside strings; its own comments explicitly leave key ordering, Unicode escaping, and numeric spelling parity unresolved. Do not assume cross-runtime canonical parity without known-answer tests.
+- `migrations/0004_manifest_roots.sql` registers manifest digest, capture protocol, seal event ID, and database registration timestamp, with tenant controls. `0019_manifest_root_protocol_binding.sql` enforces protocol/session binding. The root does **not** bind a verified event-chain tip, full manifest context, consent/quality/exception commitments, or an external trusted checkpoint.
+- `app/evidence_manifest.py` identifies itself as synthetic byte-integrity checks, not authenticity or durable trusted sealing. Its manifest commits to session, protocol, entries (artifact IDs, slots, original SHA-256 values), and schema version.
+- `app/review_pipeline.py` recomputes original artifact hashes during controlled sealing/review, but the module's documented boundary is local durable storage/synthetic events, no notary, and no trusted durable seal.
+- `backend/app/anchor/ledger.py` remains a process-local singleton with its own in-memory entry list and chain-tip. `verify()` compares supplied Merkle/master hashes to a session record; it does not walk and recompute the stored prior-entry chain. Restart loses it.
+- `backend/app/api/dispatch.py` public verify endpoints read this singleton and accept client-supplied roots; HTTP dispatch build is explicitly disabled pending trusted provenance. Keep that disabled.
+
+### M1 design constraints from this trace
+
+1. **Reuse the persistent event journal and manifest-root authority.** Extend existing records/functions with a versioned hash commitment; do not add another event store or new database.
+2. **Do not silently change event hash/canonicalization semantics.** Choose a versioned, unambiguous byte encoding; publish test vectors; compare independent Python and PostgreSQL implementations. Migration/backfill must preserve exact historical payload bytes and clearly identify the version.
+3. **Session-scoped chain, tenant included in commitment.** Every event hash binds tenant, session, event ID, sequence, kind, actor, event time, reason, exact payload bytes/commitment, schema/hash version, and previous hash. Genesis must be deterministic and domain-separated. The SQL append operation calculates/verifies the hashes under the existing session lock and idempotency behavior.
+4. **Append-only controls need adversarial tests.** Test app/writer/admin boundaries, row/column mutation, function ownership, RLS, direct SQL, migration rollback, and privileged tamper limitations. A hash chain stored in the same mutable database is not external notarization.
+5. **Manifest seal binds more than an artifact list.** At seal, bind manifest digest, event-chain tip/sequence, capture protocol, actor and server seal time, consent state/reference, quality results, exceptions, registered originals and their hashes. Preserve prior immutable seal versions; corrections append new events/seals, never overwrite.
+6. **Verifier must derive inputs from server-owned persisted records and registered bytes.** It must report separate outcomes for event chain, trusted checkpoint/anchor, manifest, original artifacts, tenant/session binding, completeness, consent/authorization and limitations. Do not accept caller-supplied hashes as authorization or truth.
+7. **Trust/checkpoint semantics remain explicit.** Define the threat model: DB role/ordinary-row tamper detection, administrator compromise, restore/replay, and external anchor. An independently verified chain with no independently trusted checkpoint cannot detect rewriting the entire chain. External signing/anchoring is a separate design/gate, not a marketing claim.
+8. **Existing consumers must be traced.** Capture/review/report/verify and dispatch/payment integrations. Dispatch is currently HTTP-disabled; preserve the disabled boundary until the server-owned verifier and independent authorization contract are implemented and accepted.
+
