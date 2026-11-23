@@ -107,6 +107,44 @@ class MigrationControlsIntegration(unittest.TestCase):
         )
         self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
 
+    def test_manifest_binding_migration_backfills_existing_root_and_restores_rls(self):
+        plan=self.authority_plan()
+        apply(self.conn,plan[:-1])
+        from test_manifest_roots import ManifestRootTests
+        admin_base=os.getenv('MIGRATION_TEST_ADMIN_URL','postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test')
+        app_base=os.getenv('APP_DATABASE_URL','postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
+        fixture=ManifestRootTests()
+        env={
+            'MIGRATION_DATABASE_URL':self.url,
+            'MIGRATION_TEST_ADMIN_URL':make_conninfo(admin_base,dbname=self.db),
+            'APP_DATABASE_URL':make_conninfo(app_base,dbname=self.db),
+            'RECOVERY_DATABASE_URL':make_conninfo(app_base,dbname=self.db),
+        }
+        with patch.dict(os.environ,env):
+            fixture.setUp()
+            try:
+                self.assertEqual(fixture.register(),'REGISTERED')
+                self.assertEqual(run_migrations(),('0029_manifest_root_chain_context_binding.sql',))
+                with patch.dict(os.environ,env):
+                    with __import__('database.journal',fromlist=['tenant_transaction']).tenant_transaction(fixture.conn,fixture.tenant):
+                        row=fixture.conn.execute(
+                            'SELECT seal_sequence,seal_chain_hash,context_binding_hash,binding_version,'
+                            'faos.verify_manifest_root_binding(tenant_id,session_id,seal_event_id) '
+                            'FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s',
+                            (fixture.tenant,fixture.session,fixture.seal),
+                        ).fetchone()
+                        self.assertTrue(row[4])
+                        self.assertEqual(row[3],'manifest-context-v1')
+                        self.assertTrue(__import__('database.manifest_binding',fromlist=['verify_registered_manifest_binding']).verify_registered_manifest_binding(
+                            fixture.conn,fixture.tenant,fixture.session,fixture.seal)['valid'])
+                rls=self.admin_db.execute(
+                    "SELECT c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+                    "WHERE n.nspname='faos' AND c.relname IN ('events','sessions','manifest_roots') ORDER BY c.relname"
+                ).fetchall()
+                self.assertEqual(rls,[(True,True),(True,True),(True,True)])
+            finally:
+                fixture.doCleanups()
+
     def test_default_entry_point_upgrades_legacy_seven_migration_schema(self):
         legacy = discover(Path(__file__).resolve().parents[2]/'migrations')
         self.assertEqual(len(legacy),7)
