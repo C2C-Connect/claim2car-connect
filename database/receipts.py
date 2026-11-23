@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 from database.readback import locked_journal
+from database.manifest_binding import verify_registered_manifest_binding
 
 @dataclass(frozen=True)
 class ReceiptInspection:
@@ -25,7 +26,7 @@ class ReceiptInspection:
 
 
 def inspect_completion_receipt(conn, tenant, session_id, request_id):
-    """Read receipt/root metadata under the session lock; never assert eligibility."""
+    """Read receipt/root metadata under session lock; fail closed on root-binding tamper."""
     tenant = str(UUID(str(tenant)))
     request_id = str(UUID(str(request_id)))
     with locked_journal(conn, tenant, session_id) as journal:
@@ -40,6 +41,7 @@ def inspect_completion_receipt(conn, tenant, session_id, request_id):
         ).fetchone()
         if row is None:
             raise ValueError('RECEIPT_NOT_FOUND_OR_NOT_VISIBLE')
+        verify_registered_manifest_binding(conn, tenant, session_id, row[1])
         current = journal.events[-1].sequence if journal.events else 0
         result = ReceiptInspection(tenant, session_id, *row, current, row[2] == current)
     return result
