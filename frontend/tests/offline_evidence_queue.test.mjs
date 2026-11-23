@@ -105,7 +105,7 @@ await test("fifo_sync_stops_at_first_failure_and_retry_reuses_ids", async () => 
 
   const retryIds = [];
   const second = await queue.syncSession({
-    sessionId: "session-a", tenantId:"tenant-a", actorId:"actor-a",
+    sessionId: "session-a", tenantId:"tenant-a", actorId:"actor-a", keyMaterial,
     upload: async (record) => { retryIds.push([record.artifactId, record.requestId]); return { ok: true }; },
   });
   assert.deepEqual(retryIds, [["artifact-1", "request-1"], ["artifact-2", "request-2"]]);
