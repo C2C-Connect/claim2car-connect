@@ -1,15 +1,14 @@
 # Current mission focus — forensic substantiation (2026-11-23)
 
-## Latest verified checkpoint — PR #180 merged (2026-11-23)
+## Latest verified checkpoint — PR #182 merged (2026-11-23)
 
-PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, **13/13 workflows passed**. Full suite: **1,050 passed, 31 warnings, 219 subtests**. Isolated synthetic PostgreSQL acceptance: **386/386 counted tests**, DB-01–DB-14 **14/14 PASS**, diagnostics successful and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
+PR #182 merged to main as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows passed**. Full suite: **1,054 passed, 31 warnings, 219 subtests**. Isolated synthetic PostgreSQL acceptance: **390/390 counted tests**, DB-01–DB-14 **14/14 PASS**, diagnostics successful and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
 
-Migration 0028 implements persistent SHA-256 event/genesis hashes, transactional backfill, append-time full-chain recomputation, direct-insert validation and update/delete immutability. Python/SQL parity, backfill rollback, tamper and database tests passed.
+Migration 0028 persists SHA-256 event hashes and transactionally backfills. PR #182 adds server-owned persisted-chain readback from PostgreSQL; invalid authority-schema history fails closed in `load_journal` and locked consumers; legacy schemas report `LEGACY_UNHASHED`; partial hash schema fails closed. Tamper, tenant, legacy and locked-consumer tests passed.
 
-**M1 remains incomplete:** server-owned readback verification; manifest-root chain-tip/sequence/version/context binding; registered-original/artifact binding; independent verifier agreement; restart/restore/concurrency/fork and external checkpoint. No deployment, field qualification, participant evidence, payment or dispatch.
+**M1 remains incomplete:** manifest-root chain-tip/sequence/hash-version/context binding, registered original/artifact binding, independent verifier agreement, restart/restore/concurrency/fork and external checkpoint. No deployment, field qualification, participant evidence, payment or dispatch.
 
-**Next code target:** server-owned PostgreSQL readback recomputation and chain-tip/context binding; then registered-original/artifact provenance and independent/adversarial/recovery tests. Continue in code, not planning.
-
+**Next code target:** migration 0029 for seal/root chain-tip and context binding; recompute/validate the persisted chain at registration; make root/readback/completion/receipt consumers verify the binding. Then artifact provenance and independent/recovery/adversarial tests.
 
 ## Historical checkpoint before PR #180 (superseded)
 
@@ -22,7 +21,7 @@ This checkpoint described the initial PR #176 Python-only slice before merged PR
 
 **Program/acceptance gates:** `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md` is the current mission and method contract. Read it first on resume. The initial vertical slice is one controlled vehicle/component/damage region/validated measurement/evidence-linked finding/reproducible report.
 
-**Next code target (M1):** integrate server-owned persisted-chain readback verification and bind manifest roots to the verified chain tip/context; then registered-original/artifact binding and independent/recovery/adversarial verification. Inspect existing migrations, PostgreSQL authority, event/seal/manifest, integrity API, verifier, and callers; reuse existing components rather than create a competing ledger. Fail closed on incomplete/altered/orphaned/reordered/forked provenance. Tenant isolation, restart recovery, idempotency, concurrency and tamper tests. Keep forensic integrity separate from dispatch/payment authorization. Establish contract and tests, then implement a narrow verified PR.
+**Next code target (M1):** implement manifest-root chain-tip/context binding in migration 0029, then registered-original/artifact binding and independent/recovery/adversarial verification. Inspect existing migrations, PostgreSQL authority, event/seal/manifest, integrity API, verifier, and callers; reuse existing components rather than create a competing ledger. Fail closed on incomplete/altered/orphaned/reordered/forked provenance. Tenant isolation, restart recovery, idempotency, concurrency and tamper tests. Keep forensic integrity separate from dispatch/payment authorization. Establish contract and tests, then implement a narrow verified PR.
 
 **Focus sequence:** M0 claim/observation/measurement/finding contracts as needed → M1 persistent provenance → M2 artifact provenance → M3 VIN/configuration source substantiation → M4 camera calibration/alignment/coordinate frame → M5 damage localization and one calibrated measurement → M6 source-backed parts/OEM technical assessment → M7 report generator → M8 blind validation/qualification. Synthetic data first; controlled non-participant vehicle validation later. No unsupported precision or causation assertions.
 
