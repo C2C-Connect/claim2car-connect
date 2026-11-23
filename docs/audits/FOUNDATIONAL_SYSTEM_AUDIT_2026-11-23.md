@@ -71,11 +71,11 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 **Remediation:** Design and implement a bounded user identity lifecycle; keep tenant/role binding server-side and database-authoritative; add revocation/rotation and audit; threat-model lost/stolen devices and compromised tokens.
 
 ### AUD-008 — Persistent deletion and retention semantics need end-to-end proof (P1)
-**Evidence:** Capture withdrawal/deletion flows exist, but browser offline queues, remote devices, server originals, backups, logs, and retention exceptions are distinct stores. Offline devices cannot immediately receive a revocation. Current documentation does not establish a complete end-to-end deletion SLA/receipt covering every copy.
+**Evidence:** In `database/capture_evidence.py`, owner consent withdrawal appends the consent event within the tenant-authorized DB transaction, then deletes registered originals from filesystem storage after that transaction has ended. A storage failure can therefore leave the consent event committed while deletion is incomplete; retry is possible, but the receipt is currently a count, not a per-artifact deletion proof. The operator's local IndexedDB queue is purged when its next online readiness check observes inactive consent; an offline device cannot receive immediate revocation and may retain queued files until reconnection. Browser offline queues, server originals, backups, logs, and retention exceptions are distinct stores.
 
-**Impact:** Consent withdrawal could be misunderstood as immediate deletion of all copies; legal/operational retention and forensic preservation requirements may conflict.
+**Impact:** Consent withdrawal does not imply simultaneous deletion from all copies. Partial server deletion can occur after consent is committed; local offline copies can remain pending until reconnect. Legal/operational retention and forensic preservation requirements may conflict.
 
-**Remediation:** Define data inventory, retention schedule, deletion semantics, tombstones/receipts, pending remote cleanup, backup expiration, legal hold, and exception handling. Test every store and make the receipt precise.
+**Remediation:** Define data inventory, retention schedule, deletion semantics, tombstones/receipts, pending remote cleanup, backup expiration, legal hold, and exception handling. Add failure injection proving each storage deletion outcome is recorded and retried, and make the receipt precise. Never promise secure erasure from flash storage or backups without evidence.
 
 ### AUD-009 — Valuation and jurisdictional outputs require provenance and validation (P1)
 **Evidence:** `backend/app/valuation/acv.py` contains a tri-source 40/40/20 blend and a fallback depreciation curve; jurisdiction thresholds are coded in `backend/app/jurisdiction/thresholds.py`. The inspected ACV module states it has no runtime dependency on commercial market datasets.
@@ -105,6 +105,28 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 **Remediation:** Keep staging private; run reviewed deployment; validate network boundaries, least privilege, storage, migrations, backup restore, restart recovery, monitoring, security response, and evidence retrieval. No real participant evidence before release gates.
 
+
+### AUD-013 — Triage API contains synthetic assessment defaults (P1)
+**Evidence:** `backend/app/api/triage.py` defaults detection/depth inputs to empty lists, structural risk to 0.3, age to 5, jurisdiction to Texas, GPS accuracy to 15 m, hash/chain/master validity to true/full, metadata completeness to 1.0, and three internal ACV values to $18,500/$17,800/$19,200. An authenticated internal caller can submit only a session ID and receive a result calculated from these defaults.
+
+**Impact:** A downstream consumer may mistake a synthetic/default calculation for an evidence-backed assessment. Internal authentication is not a substitute for explicit source provenance or complete input validation.
+
+**Remediation:** Remove consequential defaults or require an explicit controlled-demo mode. Require server-owned evidence verification and provenance binding for integrity inputs; require market-source identity/timestamp/coverage for ACV comps; represent unknown values as unknown; mark fallback/demo calculations clearly and prevent them from routing or financial decisions.
+
+### AUD-014 — Public anchor verification relies on process-local memory (P1 for persistent verification)
+**Evidence:** `backend/app/anchor/ledger.py` defines `AnchorLedger` as an in-process append-only list/dictionary singleton (`LEDGER`). Its own module comment describes this as internal and replaceable. A runtime restart loses entries and the ledger tip; no durable DB or external anchor is established by this implementation.
+
+**Impact:** Anchors created in one process are not a durable long-term verification service. Restart, process replacement, or horizontal scaling can yield missing or divergent ledger state.
+
+**Remediation:** Do not claim durable anchoring. Implement a persistent, transactionally serialized append-only authority (or qualified external anchor) with restart, concurrency, tamper, retention, and cross-instance tests before exposing this as a production trust mechanism.
+
+### AUD-015 — Photo analysis is heuristic and non-persistent (P2)
+**Evidence:** `app/vision/photo_baseline.py` uses a deterministic contrast baseline and labels the method `heuristic_contrast_baseline`; the result states `persisted: false`. It is not a trained/validated damage-detection model or a persisted forensic observation.
+
+**Impact:** Results may be over-interpreted as AI damage findings or a persistent analysis record.
+
+**Remediation:** Label the capability clearly, preserve limitations and uncertainty, validate against representative imagery, persist versioned observations only when intended, and keep model outputs from consequential decisions absent validation and human review.
+
 ## Initial priority order for corrective work
 
 1. **AUD-001 + AUD-002:** Canonical root offline queue encryption and frontend discrepancy—verify actual served path; resolve legacy plaintext records safely; regression tests.
@@ -131,6 +153,9 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-010 | CONFIRMED limitation | Sandbox workflow does not post/settle ledger |
 | AUD-011 | OPEN / deeper trace required | Verify aggregate events, outbox, retries, and transactional transitions |
 | AUD-012 | CONFIRMED release boundary | Staging/field acceptance still unperformed |
+| AUD-013 | CONFIRMED | Triage API has default synthetic values that can yield a result from a session ID alone |
+| AUD-014 | CONFIRMED limitation | Anchor ledger is process-local; no persistent/external anchor established |
+| AUD-015 | CONFIRMED limitation | Photo baseline is heuristic and result is not persisted |
 
 ## Change log
 
