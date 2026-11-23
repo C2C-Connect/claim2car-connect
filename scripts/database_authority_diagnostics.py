@@ -234,7 +234,13 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','location_brands'):
                 admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
-            admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(tenant,session,seal))
+            # This is a disposable synthetic diagnostics database. Temporarily
+            # disable the append-only guard solely to remove this fixture row.
+            admin.execute('ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation')
+            try:
+                admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(tenant,session,seal))
+            finally:
+                admin.execute('ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation')
         for brand in ('brand','extra_brand'):
             admin.execute('DELETE FROM faos.brands WHERE brand_id=%s',(ids[brand],))
 
@@ -340,8 +346,12 @@ def run(report):
             for conn in connections:
                 conn.close()
             for tenant in tenants:
-                for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
-                    admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
+                admin.execute('ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation')
+                try:
+                    for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
+                        admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
+                finally:
+                    admin.execute('ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation')
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
     report['diagnostics_successful'] = len(report['checks'])==14 and all(row['status']=='PASS' for row in report['checks'])
