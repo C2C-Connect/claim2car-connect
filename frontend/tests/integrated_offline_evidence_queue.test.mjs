@@ -11,6 +11,8 @@ assert.ok(canonicalAppSource.includes("keyMaterial:token"));
 assert.ok(canonicalAppSource.includes('$("access-token").value = "";'));
 assert.ok(canonicalQueueSource.includes("subtle.encrypt"));
 assert.ok(canonicalQueueSource.includes("subtle.decrypt"));
+assert.ok(canonicalQueueSource.includes("additionalData:recordAad"));
+assert.ok(canonicalQueueSource.includes("function recordAad"));
 assert.ok(canonicalQueueSource.includes("prior plaintext queue"));
 assert.ok(canonicalQueueSource.includes("updateRecord"));
 assert.ok(canonicalQueueSource.includes("One-time migration for records written by the prior plaintext queue"));
