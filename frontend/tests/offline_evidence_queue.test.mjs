@@ -172,7 +172,21 @@ await test("legacy_plaintext_queue_record_migrates_to_encryption_before_upload",
   assert.equal("bytes" in stored,false);
 });
 
-await test("missing_indexeddb_fails_closed", async () => {
+await test("legacy_plaintext_with_bad_digest_is_not_uploaded_or_migrated", async () => {
+  const store=makeStore(),queue=makeQueue(store);
+  const bytes=new TextEncoder().encode("corrupted-legacy");
+  await store.enqueue({sessionId:"session-bad",tenantId:"tenant-a",actorId:"actor-a",slot:"front",
+    artifactId:"bad-artifact",requestId:"bad-request",sha256:"0".repeat(64),byteLength:bytes.byteLength,
+    queuedAt:"2026-11-10T00:00:00.000Z",uploaded:false,bytes});
+  let attempted=false;
+  const result=await queue.syncSession({sessionId:"session-bad",tenantId:"tenant-a",actorId:"actor-a",keyMaterial,
+    upload:async()=>{attempted=true;return {ok:true};}});
+  assert.equal(result.error,"LOCAL_ORIGINAL_INTEGRITY_FAILED");
+  assert.equal(attempted,false);
+  assert.equal(store.records[0].encryptionAlgorithm,undefined);
+  assert.equal(store.records[0].bytes instanceof Uint8Array,true);
+});
+\nawait test("missing_indexeddb_fails_closed", async () => {
   assert.throws(() => createIndexedDbEvidenceStore(null), /INDEXEDDB_UNAVAILABLE/);
 });
 
