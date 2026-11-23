@@ -82,6 +82,7 @@ await test("canonical_queue_encrypts_originals_and_requires_same_token", async (
   assert.equal(wrongKey.uploaded,0);
   const status = await queue.status("session-a",{tenantId:"tenant-a",actorId:"actor-a"});
   assert.equal(status.pending, 1);
+  assert.equal(status.records[0].encryptionAlgorithm,"AES-GCM");
   assert.equal("bytes" in status.records[0], false);
 });
 
