@@ -34,7 +34,7 @@ def normalize_tenant_id(tenant_id: str) -> str:
 
 def genesis_hash(tenant_id: str, session_id: str) -> str:
     tenant = normalize_tenant_id(tenant_id)
-    if not isinstance(session_id, str) or not session_id:
+    if not isinstance(session_id, str) or not session_id.strip():
         raise ValueError("INVALID_SESSION_ID")
     material = "\n".join((GENESIS_DOMAIN, tenant, _hex_text(session_id))).encode("ascii")
     return hashlib.sha256(material).hexdigest()
@@ -71,7 +71,8 @@ def event_hash(tenant_id: str, event: DomainEvent, previous_hash: str) -> str:
 
 
 def _row_event(row: Mapping) -> DomainEvent:
-    return DomainEvent(
+    try:
+        return DomainEvent(
         session_id=row["session_id"],
         event_id=row["event_id"],
         sequence=row["sequence"],
@@ -81,7 +82,9 @@ def _row_event(row: Mapping) -> DomainEvent:
         reason=row["reason"],
         payload_json=row["payload_json"],
         schema_version=row["schema_version"],
-    )
+        )
+    except KeyError:
+        raise ValueError("MISSING_CONTEXT") from None
 
 
 def verify_event_chain(tenant_id: str, session_id: str, rows: Iterable[Mapping]) -> dict:
@@ -109,10 +112,11 @@ def verify_event_chain(tenant_id: str, session_id: str, rows: Iterable[Mapping])
                 return {"valid": False, "reason": "UNSUPPORTED_EVENT_HASH_VERSION", "failed_sequence": expected_sequence}
             if row["previous_hash"] != previous:
                 return {"valid": False, "reason": "PREVIOUS_HASH_MISMATCH", "failed_sequence": expected_sequence}
-            if not _HASH_RE.fullmatch(row["entry_hash"]):
+            stored_hash = row.get("entry_hash")
+            if not isinstance(stored_hash, str) or not _HASH_RE.fullmatch(stored_hash):
                 return {"valid": False, "reason": "INVALID_STORED_ENTRY_HASH", "failed_sequence": expected_sequence}
             computed = event_hash(tenant, _row_event(row), previous)
-            if not hmac.compare_digest(computed, row["entry_hash"]):
+            if not hmac.compare_digest(computed, stored_hash):
                 return {"valid": False, "reason": "EVENT_HASH_MISMATCH", "failed_sequence": expected_sequence}
             previous = computed
         except (KeyError, TypeError, ValueError) as error:
