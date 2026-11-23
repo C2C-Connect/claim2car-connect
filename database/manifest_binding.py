@@ -10,6 +10,15 @@ from database.event_hash_chain import verify_event_chain
 _HEX_256 = re.compile(r"^[0-9a-f]{64}$")
 
 
+def manifest_binding_schema_available(conn):
+    count = conn.execute(
+        "SELECT count(*) FROM information_schema.columns WHERE table_schema='faos' "
+        "AND table_name='manifest_roots' AND column_name IN "
+        "('seal_sequence','seal_chain_hash','context_binding_hash','binding_version')"
+    ).fetchone()[0]
+    return count == 4
+
+
 def manifest_context_binding_hash(tenant, session_id, protocol, sequence, chain_hash):
     try:
         tenant = str(UUID(str(tenant)))
