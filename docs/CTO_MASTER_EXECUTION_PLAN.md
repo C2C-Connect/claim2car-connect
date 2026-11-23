@@ -1,5 +1,14 @@
 # Claim2Car Connect — CTO Master Execution Plan
 
+## Updated execution priority — forensic substantiation (2026-11-23)
+
+This document’s older broad slices/deployment sequence are subordinate to the current owner-directed focus in docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md and docs/THREAD_HANDOFF_2026-11-23.md. Execute M1 persistent provenance first (PR #176 draft initial Python hash/verifier slice; exact-head CI 13/13 green, but not accepted), then M2 artifact binding, M3 VIN/configuration source substantiation, M4 camera geometry/calibration, M5 one validated damage measurement, M6 source-backed technical assessment, M7 reproducible report, M8 held-out qualification. Staging remains undeployed but is not the active next task. Do not merge M1 until its full acceptance criteria pass.
+
+
+## Updated execution priority — forensic substantiation (2026-11-23)
+
+This document’s older broad slices/deployment sequence are subordinate to the current owner-directed focus in docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md and docs/THREAD_HANDOFF_2026-11-23.md. Execute M1 persistent provenance first (PR #176 draft initial Python hash/verifier slice; exact-head CI 13/13 green, but not accepted), then M2 artifact binding, M3 VIN/configuration source substantiation, M4 camera geometry/calibration, M5 one validated damage measurement, M6 source-backed technical assessment, M7 reproducible report, M8 held-out qualification. Staging remains undeployed but is not the active next task. Do not merge M1 until its full acceptance criteria pass.
+
 **Document ID:** C2C-CTO-EXEC-001  
 **Version:** 1.0  
 **Effective:** 2026-11-07  

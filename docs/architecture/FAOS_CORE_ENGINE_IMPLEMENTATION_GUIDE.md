@@ -1,4 +1,14 @@
 # Claim2Car Connect™ Forensic Operating System (FAOS)
+
+## Active engineering handoff: forensic substantiation (2026-11-23)
+
+The owner has narrowed active work to substantiating claims, starting M1 persistent provenance. Read docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md for current implementation status and ordered gates. Initial PR #176 Python hash/verifier code is only a draft slice; SQL persistence, manifest chain-tip binding, DB adversarial testing and independent verification remain. This manual’s target capabilities, thresholds, equations, models, examples and vendor references are requirements/hypotheses—not evidence of implementation or validation. Do not claim forensic certification, accuracy, causation, trusted timestamping or independent notarization. Dispatch and payments remain gated.
+
+
+## Active engineering handoff: forensic substantiation (2026-11-23)
+
+The owner has narrowed active work to substantiating claims, starting M1 persistent provenance. Read docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md for current implementation status and ordered gates. Initial PR #176 Python hash/verifier code is only a draft slice; SQL persistence, manifest chain-tip binding, DB adversarial testing and independent verification remain. This manual’s target capabilities, thresholds, equations, models, examples and vendor references are requirements/hypotheses—not evidence of implementation or validation. Do not claim forensic certification, accuracy, causation, trusted timestamping or independent notarization. Dispatch and payments remain gated.
+
 ## Core Engine Implementation Guide & Subsystem Engineering Manual
 
 **Owner-supplied governing target:** 2026-11-22  
