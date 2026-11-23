@@ -37,6 +37,7 @@ class ReceiptInspectionTests(unittest.TestCase):
         self.assertTrue(result.authority_session)
         self.assertIsNotNone(result.recorded_at.utcoffset())
         self.assertTrue(result.snapshot_matches_current_history)
+        self.assertEqual(result.binding_status,'LEGACY_UNBOUND')
         self.assertEqual(result.current_event_sequence, len(f.events))
         self.assertIsNone(f.conn.execute('SELECT faos.tenant_id()').fetchone()[0])
 
