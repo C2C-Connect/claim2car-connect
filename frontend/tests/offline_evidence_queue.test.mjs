@@ -166,7 +166,7 @@ await test("authenticated_metadata_tampering_fails_decryption", async () => {
   assert.equal(attempted,false);
   assert.equal(store.records[0].queueId,queued.queueId);
 });
-\nawait test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_before_upload", async () => {
+await test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_before_upload", async () => {
   const store=makeStore(),queue=makeQueue(store,["legacy-artifact","legacy-request"]);
   const bytes=new TextEncoder().encode("legacy-original");
   const legacy=await store.enqueue({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",slot:"front",
