@@ -73,16 +73,14 @@ Reuse the current PostgreSQL authority and event/manifest systems; do **not** cr
 - Its vector remains valid: tenant 12345678-1234-5678-1234-567812345678, session sess-α; genesis `3caf4b5b5be75332e7483650e6450531bf17a203e7bb917483f93c3ef9236cff`; event 1 `6be67e7eca3721355e15440ef7a7ae9477bc0acd8ca62879355ce58f8bef9dbd`.
 - PR #180 carries that contract into PostgreSQL migration 0028, SQL parity, backfill, append enforcement and trigger controls. See section 0 for exact-head verification and merged SHA.
 
-## 6. M1 implementation constraints and next concrete work (updated after PR #180)
+## 6. M1 implementation constraints and next concrete work (updated after PR #182)
 
-1. **Already implemented/verified:** Python hash/genesis contract; SQL parity; migration 0028 persistent hashes; deterministic transactional backfill; append full-chain recomputation; direct-insert validation and event update/delete guard. Exact CI and test evidence are in section 0.
-2. Integrate persisted-chain verification into server-owned journal/readback so the verifier derives tenant/session/event records from PostgreSQL, not caller-supplied hashes. Fail closed on missing columns/rows, gap, duplicate, reorder, payload/field tamper, invalid previous/entry hash or unsupported version.
-3. Bind immutable manifest/seal/root to verified chain tip and sequence/hash version, manifest digest, protocol, seal time/actor, consent reference/state, quality, exceptions, registered original IDs/hashes. New seal/version for corrections; never overwrite.
-4. Bind original artifacts and registered bytes to verified session/manifest chain; verify artifact ID, bytes/hash, provenance, tenant and session relationship.
-5. Replace caller-supplied-root verification with server-derived records and registered bytes; privacy-safe verification identifiers and explicit limitations.
-6. Add PostgreSQL tests for independent verifier agreement, tenant isolation, direct privileged paths, restart/restore, concurrent writers, idempotency/conflicts, missing/deleted/reordered/forked rows, tampering, seal/context mismatch and artifact mismatch. Extend diagnostics for chain checks without changing unrelated acceptance.
-7. Execute M1 acceptance gate with exact-head CI and independent verification. External signer/checkpoint/trusted timestamp is separate and must be specified as its own trust boundary.
-8. Update consumers/docs/gate matrix after verified results. Keep dispatch/payment and participant evidence disabled.
+1. **Implemented/verified:** Python hash/genesis contract; SQL parity; migration 0028 persistent hashes; deterministic transactional backfill; append full-chain recomputation; direct-insert validation and update/delete guard; server-owned readback recomputation from PostgreSQL; `load_journal` and locked consumers fail closed on invalid authority-schema chains; explicit legacy-unhashed status; partial schema fails closed. Exact CI/test evidence is in section 0.
+2. **Next:** migration 0029 to bind manifest roots/seals to verified chain tip, sequence, hash version and deterministic capture-context commitment. Registration must recompute/validate persisted chain and seal event before idempotent root registration. Readback/completion/receipt consumers must verify stored root binding.
+3. Bind registered original artifacts/bytes to tenant/session/manifest/chain; verify ID, bytes/hash, provenance and relationship.
+4. Independent verifier must derive DB event records and registered originals, not accept client-supplied roots/hashes. Return privacy-safe results with explicit limitations.
+5. Add tests for independent agreement, restart/restore, concurrent writers, missing/deleted/reordered/forked rows, privileged paths, seal/context mismatch, artifact mismatch and chain checkpoint behavior. Keep external signer/checkpoint/trusted timestamp separate.
+6. Execute full M1 acceptance gate on exact head after criteria complete. Keep dispatch/payment and participant evidence disabled.
 
 ## 7. Acceptance and trust semantics
 
