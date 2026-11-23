@@ -55,6 +55,17 @@ try {
   assert.equal(uploaded.pending, 0);
   assert.equal("bytes" in uploaded.records[0], false);
 
+  // Old plaintext IndexedDB records are encrypted in-place before the upload attempt.
+  const legacy=await page.evaluate(() => window.c2cQueueHarness.seedLegacyPlaintext());
+  const migrated=await page.evaluate(() => window.c2cQueueHarness.sync(false));
+  assert.equal(migrated.result.uploaded,1);
+  assert.equal(migrated.attempted.length,1);
+  assert.equal(migrated.attempted[0].queueId,legacy.queueId);
+  const migrationStatus=await page.evaluate(() => window.c2cQueueHarness.status());
+  assert.equal(migrationStatus.uploaded,3);
+  assert.equal(migrationStatus.records.find(record=>record.queueId===legacy.queueId).encryptionAlgorithm,"AES-GCM");
+  assert.equal("bytes" in migrationStatus.records.find(record=>record.queueId===legacy.queueId),false);
+
   // Same session in another actor scope is isolated; tenant/session purge clears both.
   await page.evaluate(() => window.c2cQueueHarness.addOtherActor());
   const otherActor = await page.evaluate(() => window.c2cQueueHarness.status("browser-test-other-actor"));
