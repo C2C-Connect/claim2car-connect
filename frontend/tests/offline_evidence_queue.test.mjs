@@ -185,7 +185,7 @@ await test("prior_aes_gcm_queue_record_upgrades_to_aad_format_before_upload", as
   assert.equal(store.records[0].uploaded,true);
   assert.equal("bytes" in store.records[0],false);
 });
-\nawait test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_before_upload", async () => {
+await test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_before_upload", async () => {
   const store=makeStore(),queue=makeQueue(store,["legacy-artifact","legacy-request"]);
   const bytes=new TextEncoder().encode("legacy-original");
   const legacy=await store.enqueue({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",slot:"front",
