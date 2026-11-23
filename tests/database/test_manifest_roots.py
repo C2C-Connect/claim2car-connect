@@ -24,12 +24,11 @@ class ManifestRootTests(unittest.TestCase):
         self.assertEqual(self.conn.execute('SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone(), ('faos_app', False, False))
         with psycopg.connect(self.admin_url, autocommit=True) as admin:
             admin.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)', (self.tenant, 'synthetic root fixture'))
-        with tenant_transaction(self.conn, self.tenant):
-            has_protocol_column = self.conn.execute("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')").fetchone()[0]
+            has_protocol_column = admin.execute("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')").fetchone()[0]
             if has_protocol_column:
-                self.conn.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)', (self.tenant, self.session, self.version))
+                admin.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)', (self.tenant, self.session, self.version))
             else:
-                self.conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)', (self.tenant, self.session))
+                admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)', (self.tenant, self.session))
         for event in self.events:
             self.assertEqual(append(self.conn, self.tenant, event), 'ACCEPTED')
 
