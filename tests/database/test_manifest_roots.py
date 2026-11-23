@@ -60,9 +60,9 @@ class ManifestRootTests(unittest.TestCase):
             ).fetchone()
             sql_hash = self.conn.execute(
                 'SELECT faos.manifest_context_binding_hash(%s::uuid,%s::text,%s::text,%s::bigint,%s::text)',
-                (self.tenant,self.session,self.version,row[0],row[1]),
+                (self.tenant, self.session, self.version, row[0], row[1]),
             ).fetchone()[0]
-            python_verified = verify_registered_manifest_binding(self.conn,self.tenant,self.session,self.seal)
+            python_verified = verify_registered_manifest_binding(self.conn, self.tenant, self.session, self.seal)
         self.assertEqual(row[0], len(self.events))
         self.assertEqual(len(row[1]), 64)
         self.assertTrue(all(ch in '0123456789abcdef' for ch in row[1]))
@@ -70,8 +70,8 @@ class ManifestRootTests(unittest.TestCase):
         self.assertTrue(all(ch in '0123456789abcdef' for ch in row[2]))
         self.assertEqual(row[3], 'manifest-context-v1')
         self.assertTrue(row[4])
-        self.assertEqual(row[2],sql_hash)
-        self.assertEqual(row[2],manifest_context_binding_hash(self.tenant,self.session,self.version,row[0],row[1]))
+        self.assertEqual(row[2], sql_hash)
+        self.assertEqual(row[2], manifest_context_binding_hash(self.tenant, self.session, self.version, row[0], row[1]))
         self.assertTrue(python_verified['valid'])
         self.assertTrue(python_verified['python_sql_agreement'])
 
