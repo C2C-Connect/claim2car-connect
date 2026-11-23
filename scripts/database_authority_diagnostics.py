@@ -38,7 +38,8 @@ def validate_authority_migration_inventory(inventory):
            'AUTHORITY_MIGRATION_ORDER_INVALID')
     expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql') < names.index('0026_square_sandbox_webhook_reconciliation.sql') < names.index('0027_capture_protocol_16_v2.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names.index('0027_capture_protocol_16_v2.sql') < names.index('0028_persistent_event_hash_chain.sql'),'AUTHORITY_MIGRATION_ORDER_INVALID')\n    expect(names[-1]=='0028_persistent_event_hash_chain.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0028')
+    expect(names.index('0027_capture_protocol_16_v2.sql') < names.index('0028_persistent_event_hash_chain.sql'),'AUTHORITY_MIGRATION_ORDER_INVALID')
+    expect(names[-1]=='0028_persistent_event_hash_chain.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0028')
 
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
