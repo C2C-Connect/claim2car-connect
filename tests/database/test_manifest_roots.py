@@ -32,9 +32,10 @@ class ManifestRootTests(unittest.TestCase):
         if has_protocol_column:
             # Authority schema uses the privileged writer only for synthetic test events.
             with psycopg.connect(self.admin_url, autocommit=True) as fixture_conn:
-                with fixture_conn.transaction():
+                with tenant_transaction(fixture_conn,self.tenant):
                     fixture_conn.execute('SET LOCAL ROLE faos_writer')
-                    fixture_conn.execute("SELECT set_config('faos.tenant_id',%s,true)",(self.tenant,))
+                    context=fixture_conn.execute('SELECT faos.tenant_id(),current_setting(\'faos.tenant_id\',true)').fetchone()
+                    self.assertEqual(context,(self.tenant,self.tenant))
                     for event in self.events:
                         args=(self.tenant,event.session_id,event.event_id,event.sequence,event.kind,event.actor,event.occurred_at,event.reason,event.payload_json,event.schema_version)
                         self.assertEqual(fixture_conn.execute('SELECT faos.append_event(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',args).fetchone()[0],'ACCEPTED')
