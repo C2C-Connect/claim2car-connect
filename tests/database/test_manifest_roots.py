@@ -5,7 +5,7 @@ from dataclasses import replace
 import uuid
 import psycopg
 from database.journal import append, tenant_transaction
-from database.manifest_binding import manifest_context_binding_hash, verify_registered_manifest_binding
+from database.manifest_binding import manifest_binding_schema_available, manifest_context_binding_hash, verify_registered_manifest_binding
 
 REGISTER = 'SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)'
 
@@ -51,6 +51,8 @@ class ManifestRootTests(unittest.TestCase):
         self.assertEqual(self.roots(self.tenant), [(self.seal, self.digest, self.version)])
 
     def test_registered_root_contains_and_verifies_seal_chain_binding(self):
+        if not manifest_binding_schema_available(self.conn):
+            self.skipTest('requires authority migration 0029')
         self.assertEqual(self.register(), 'REGISTERED')
         with tenant_transaction(self.conn, self.tenant):
             row = self.conn.execute(
@@ -77,6 +79,8 @@ class ManifestRootTests(unittest.TestCase):
         self.assertTrue(python_verified['python_sql_agreement'])
 
     def test_privileged_context_binding_tamper_fails_verification(self):
+        if not manifest_binding_schema_available(self.conn):
+            self.skipTest('requires authority migration 0029')
         self.assertEqual(self.register(), 'REGISTERED')
         with psycopg.connect(self.admin_url, autocommit=True) as admin:
             admin.execute(
@@ -94,6 +98,8 @@ class ManifestRootTests(unittest.TestCase):
         self.assertFalse(verified)
 
     def test_registered_binding_rejects_tampered_chain_tail(self):
+        if not manifest_binding_schema_available(self.conn):
+            self.skipTest('requires authority migration 0029')
         post_seal = replace(
             self.events[-1],
             event_id='post-seal-event',
