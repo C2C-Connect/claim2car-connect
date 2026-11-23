@@ -398,3 +398,8 @@ The working ledger and PRs record task-level progress. Every slice closes with a
 Founder has explicitly reaffirmed that the objective is an actual deployable, operational platform, with autonomous sequential implementation, execution, integration, verified merge, deployment, and real end-to-end validation. The durable thread handoff is `docs/EXECUTION_HANDOFF.md`; read it first when resuming. Documentation is a continuity aid, not completion evidence.
 
 Current verified checkpoint: PR #119 (tenant-bound Square Sandbox payment-intent persistence) merged at `c7befe0aa8366b109818310ae488809cc695e58c`; CI on its exact tested head `dd21e35484a90dcced1990eccbf674e9cad5c342` reported all 18 workflow runs successful. PR #120 webhook receipt/reconciliation is closed unmerged and superseded; the branch remains, but its latest connector-updated head `3b7ab26c7aca151ded5b2fd41c09573f618f4b68` has no workflow runs reported, so it is not verified or integrated. OCI deployment remains unexecuted. Next execution must first establish a fresh PR/workflow run for the webhook branch or correct/rebase it, inspect failures, and then continue toward private OCI staging deployment—not restart planning.
+
+
+## Canonical forensic requirements source
+
+The complete owner-directed forensic substantiation specification is [COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md](../forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md) (relative path may be adjusted for document location). Use it as the detailed requirement and acceptance baseline; it is not implementation evidence. Keep the active focus on M1 PR #176 until accepted.
