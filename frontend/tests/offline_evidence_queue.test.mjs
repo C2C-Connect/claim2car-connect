@@ -24,6 +24,7 @@ function makeStore() {
       records.push(stored);
       return stored;
     },
+    async updateRecord(queueId,replacement){const record=records.find(item=>item.queueId===queueId);if(!record)throw new Error('EVIDENCE_QUEUE_RECORD_NOT_FOUND');Object.assign(record,replacement,{queueId});return record;},
     async list(sessionId, { tenantId, actorId, includeBytes = true } = {}) {
       const matching = records.filter((record) => record.sessionId === sessionId
         && record.tenantId === tenantId && record.actorId === actorId)
@@ -49,9 +50,10 @@ function makeStore() {
     },
   };
 }
-function makeFile(text) {
+const keyMaterial='operator-token-material-for-offline-recovery-0123456789';
+function makeFile(text,type='image/jpeg') {
   const bytes = new TextEncoder().encode(text);
-  return { arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
+  return { type, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
 }
 function makeQueue(store, ids = ["artifact-1", "request-1", "artifact-2", "request-2"]) {
   let index = 0;
@@ -66,10 +68,13 @@ function makeQueue(store, ids = ["artifact-1", "request-1", "artifact-2", "reque
 await test("queue_persists_original_bytes_and_server_digest", async () => {
   const store = makeStore();
   const queue = makeQueue(store);
-  const item = await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("original-image") });
+  const item = await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("original-image"), keyMaterial });
   assert.equal(item.uploaded, false);
   assert.equal(item.byteLength, 14);
   assert.equal(item.bytes instanceof Uint8Array, true);
+  assert.equal(item.encryptionAlgorithm,"AES-GCM");
+  assert.notEqual(new TextDecoder().decode(item.bytes),"original-image");
+  assert.equal(item.bytes.byteLength,item.byteLength+16);
   assert.equal(item.sha256, "27f0c6997c0fc4780eb0d9a0e8a1f5f02418196494e213a91911b54bea2816cb");
   const status = await queue.status("session-a",{tenantId:"tenant-a",actorId:"actor-a"});
   assert.equal(status.pending, 1);
@@ -79,8 +84,8 @@ await test("queue_persists_original_bytes_and_server_digest", async () => {
 await test("fifo_sync_stops_at_first_failure_and_retry_reuses_ids", async () => {
   const store = makeStore();
   const queue = makeQueue(store);
-  await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("first") });
-  await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "rear", file: makeFile("second") });
+  await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("first"), keyMaterial });
+  await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "rear", file: makeFile("second"), keyMaterial });
   const attempted = [];
   const first = await queue.syncSession({
     sessionId: "session-a", tenantId:"tenant-a", actorId:"actor-a",
@@ -111,8 +116,8 @@ await test("fifo_sync_stops_at_first_failure_and_retry_reuses_ids", async () => 
 await test("session_queues_are_isolated", async () => {
   const store = makeStore();
   const queue = makeQueue(store, ["artifact-a", "request-a", "artifact-b", "request-b"]);
-  await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("a") });
-  await queue.queueFile({ sessionId: "session-b", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("b") });
+  await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("a"), keyMaterial });
+  await queue.queueFile({ sessionId: "session-b", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("b"), keyMaterial });
   const uploaded = [];
   const result = await queue.syncSession({
     sessionId: "session-b", tenantId:"tenant-a", actorId:"actor-a",
@@ -126,8 +131,8 @@ await test("session_queues_are_isolated", async () => {
 await test("tenant_and_actor_scopes_isolate_same_session", async () => {
   const store = makeStore();
   const queue = makeQueue(store, ["artifact-owner-a", "request-owner-a", "artifact-owner-b", "request-owner-b"]);
-  await queue.queueFile({ sessionId:"shared-session", tenantId:"tenant-a", actorId:"actor-a", slot:"front", file:makeFile("actor-a") });
-  await queue.queueFile({ sessionId:"shared-session", tenantId:"tenant-a", actorId:"actor-b", slot:"front", file:makeFile("actor-b") });
+  await queue.queueFile({ sessionId:"shared-session", tenantId:"tenant-a", actorId:"actor-a", slot:"front", file:makeFile("actor-a"), keyMaterial });
+  await queue.queueFile({ sessionId:"shared-session", tenantId:"tenant-a", actorId:"actor-b", slot:"front", file:makeFile("actor-b"), keyMaterial });
   assert.equal((await queue.status("shared-session",{tenantId:"tenant-a",actorId:"actor-a"})).total, 1);
   assert.equal((await queue.status("shared-session",{tenantId:"tenant-a",actorId:"actor-b"})).total, 1);
   assert.equal((await queue.status("shared-session",{tenantId:"tenant-b",actorId:"actor-a"})).total, 0);
@@ -138,10 +143,29 @@ await test("tenant_and_actor_scopes_isolate_same_session", async () => {
 await test("consent_withdrawal_purges_local_originals", async () => {
   const store = makeStore();
   const queue = makeQueue(store);
-  await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("pending-original") });
+  await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("pending-original"), keyMaterial });
   const removed = await queue.deleteSession("session-a",{tenantId:"tenant-a"});
   assert.equal(removed, 1);
   assert.equal((await queue.status("session-a",{tenantId:"tenant-a",actorId:"actor-a"})).total, 0);
+});
+
+
+await test("legacy_plaintext_queue_record_migrates_to_encryption_before_upload", async () => {
+  const store=makeStore(),queue=makeQueue(store,["legacy-artifact","legacy-request"]);
+  const bytes=new TextEncoder().encode("legacy-original");
+  const legacy=await store.enqueue({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",slot:"front",
+    artifactId:"legacy-artifact-id",requestId:"legacy-request-id",sha256:"",byteLength:bytes.byteLength,queuedAt:"2026-11-10T00:00:00.000Z",uploaded:false,bytes});
+  legacy.sha256="";legacy.sha256=Array.from(await webcrypto.subtle.digest("SHA-256",bytes),b=>b.toString(16).padStart(2,"0")).join("");
+  const uploaded=[];
+  const result=await queue.syncSession({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",keyMaterial,
+    upload:async record=>{uploaded.push(new TextDecoder().decode(record.bytes));return {ok:true};}});
+  assert.equal(result.uploaded,1);
+  assert.deepEqual(uploaded,["legacy-original"]);
+  const stored=store.records[0];
+  assert.equal(stored.encryptionAlgorithm,"AES-GCM");
+  assert.notEqual(new TextDecoder().decode(stored.bytes),"legacy-original");
+  assert.equal(stored.uploaded,true);
+  assert.equal("bytes" in stored,false);
 });
 
 await test("missing_indexeddb_fails_closed", async () => {
