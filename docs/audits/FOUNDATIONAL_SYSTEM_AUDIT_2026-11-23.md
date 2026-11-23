@@ -158,6 +158,14 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 **Remediation:** Establish and verify encrypted-at-rest storage for originals, including volume/snapshot/backup coverage, key custody/rotation, least-privilege access, restore testing, and documented retention. Consider envelope encryption with tenant/session-scoped keys if the deployment threat model requires protection beyond provider-managed disk encryption.
 
+
+### AUD-020 — Financial journal implementation is in-memory and not connected to the persistent authority (P1)
+**Evidence:** `backend/app/anchor/ledger.py` defines `IntegerFinancialLedger` with process-local entry storage. The Square Sandbox client is deliberately restricted to checkout-link creation and verified webhook receipt; it does not post/settle/refund or mutate this ledger. Database webhook reconciliation records receipts/outcomes but is not the completed financial lifecycle.
+
+**Impact:** Passing unit tests for the in-memory journal does not establish durable obligations, ledger postings, restart recovery, reconciliation, reversals/refunds, or accounting integrity. Current sandbox flows are not financial production readiness.
+
+**Remediation:** Establish PostgreSQL as the financial authority; implement transactionally idempotent obligations, postings, verified payment event linkage, reconciliation, refunds/reversals/disputes, actor/tenant authorization, and restart/recovery tests. Keep real-money transactions behind a separate approved release gate.
+
 ## Initial priority order for corrective work
 
 1. **AUD-001 + AUD-002:** Canonical root offline queue encryption and frontend discrepancy—verify actual served path; resolve legacy plaintext records safely; regression tests.
@@ -191,6 +199,7 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-017 | CONFIRMED | Persistent events enforce sequence but have no cryptographic event hash chain |
 | AUD-018 | CONFIRMED | Sealed v0.1 manifest does not commit to event-chain tip or full capture context |
 | AUD-019 | CONFIRMED / deployment config unverified | Server originals are filesystem plaintext at application layer; at-rest volume/snapshot encryption not yet accepted |
+| AUD-020 | CONFIRMED | Financial journal is process-local and sandbox webhook receipts are not full ledger posting/reconciliation |
 
 ## Change log
 
