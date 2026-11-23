@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from config import forensic_constants as C
@@ -31,7 +31,7 @@ class IntegrityResult:
     c_chain: float = 1.0
     c_chain_geometric: float = 1.0
     chain_failure_reason: Optional[str] = None
-    integrity_failure_reasons: List[str] = None
+    integrity_failure_reasons: List[str] = field(default_factory=list)
 
 
 def _fraction(value: float, name: str) -> float:
