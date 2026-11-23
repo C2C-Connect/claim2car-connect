@@ -82,7 +82,7 @@ ALTER TABLE faos.events ADD CONSTRAINT events_hash_version_supported
  CHECK(hash_version='event-hash-v1');
 
 CREATE FUNCTION faos.event_chain_guard()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+RETURNS trigger LANGUAGE plpgsql
 SET search_path=pg_catalog,faos,public,pg_temp
 AS $guard$
 DECLARE last_sequence bigint; last_hash text; expected_previous text; expected_entry text;
