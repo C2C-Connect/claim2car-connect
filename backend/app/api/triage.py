@@ -41,7 +41,9 @@ class AdjudicateRequest(BaseModel):
     layer2_notes: Optional[List[str]] = None
     physics_ai_disagree: bool = False
     gps_accuracy_m: Optional[float] = 15.0
+    gps_spoof_suspected: bool = False
     master_hash_valid: bool = True
+    hash_tamper_suspected: bool = False
     chain_coverage: float = 1.0
     chain_uniqueness: float = 1.0
     meta_completeness: float = 1.0
@@ -62,7 +64,7 @@ def triage_health() -> Dict[str, Any]:
             "parts_catalog_resolver",
             "internal_acv",
             "rtv_51_jurisdictions",
-            "s_i_geometric",
+            "s_i_weighted_sum_strict_chain",
             "fraud_flags",
             "adjudicator",
         ],
@@ -83,7 +85,9 @@ def adjudicate(body: AdjudicateRequest) -> Dict[str, Any]:
         layer2_notes=body.layer2_notes,
         physics_ai_disagree=body.physics_ai_disagree,
         gps_accuracy_m=body.gps_accuracy_m,
+        gps_spoof_suspected=body.gps_spoof_suspected,
         master_hash_valid=body.master_hash_valid,
+        hash_tamper_suspected=body.hash_tamper_suspected,
         chain_coverage=body.chain_coverage,
         chain_uniqueness=body.chain_uniqueness,
         meta_completeness=body.meta_completeness,
@@ -156,7 +160,11 @@ def adjudicate(body: AdjudicateRequest) -> Dict[str, Any]:
             "s_i": result.integrity.s_i,
             "c_gps": result.integrity.c_gps,
             "c_hash": result.integrity.c_hash,
+            "c_chain": result.integrity.c_chain,
+            "c_chain_geometric": result.integrity.c_chain_geometric,
             "c_meta": result.integrity.c_meta,
+            "chain_failure_reason": result.integrity.chain_failure_reason,
+            "integrity_failure_reasons": result.integrity.integrity_failure_reasons or [],
             "tier": result.integrity.tier,
             "all_or_nothing_collapse": result.integrity.all_or_nothing_collapse,
         },
