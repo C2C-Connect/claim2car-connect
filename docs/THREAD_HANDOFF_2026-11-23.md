@@ -100,3 +100,7 @@ Verification output must separately represent event-chain validity, trusted chec
 6. Next focus after M1 acceptance: M2, then M3–M8 in order. Only advance when gate evidence exists.
 
 **This snapshot supersedes stale “next task = OCI staging” or broader roadmap statements wherever they conflict. OCI deployment remains a real blocker, but it is not the current forensic implementation priority.**
+
+## Complete owner-provided requirements
+
+Read [complete forensic substantiation specification](docs/forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md) for the expanded requirements in full: truth architecture; observation/measurement/finding distinctions; exact finding schema; M1 persistence and trust model; VIN and parts lineage; camera calibration, alignment, coordinate frame and projection; damage detection/localization/quantification and uncertainty equations; causation boundaries; OEM/hidden-damage limits; deterministic report; validation dataset and blind evaluation; first vertical slice; gates. This is requirements, not a claim that every capability is implemented.

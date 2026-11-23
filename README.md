@@ -185,3 +185,8 @@ The owner-supplied **Claim2Car Connect™ Forensic Operating System (FAOS) Core 
 ## Latest verified implementation checkpoint (2026-11-22)
 
 PR #165 is merged at `1f18668b2d9f1cc4e19b49e16c1e66c1313fc116`. Its tested head passed all required workflows: **1026 tests passed, 31 warnings, 208 subtests passed**. FAOS `claims2car-16-v2` is selectable for controlled testing; `claims2car-16-v1` remains default and legacy `claims2car-12-v1` remains supported. V2 field qualification is incomplete. See [execution handoff](docs/EXECUTION_HANDOFF.md) and [status](docs/EXECUTION_STATUS.md) for the precise next implementation task. OCI staging is not deployed.
+
+
+## Canonical forensic requirements (complete)
+
+The detailed owner-directed requirements, forensic truth architecture, all phases, equations, schemas, validation discipline, first vertical slice, release gates, limitations, and current truth checkpoint are consolidated in the [complete forensic substantiation specification](docs/forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md). It is the complete specification; the shorter program/handoff documents are navigational summaries.

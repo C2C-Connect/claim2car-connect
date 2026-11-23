@@ -133,3 +133,8 @@ Work in dependency order: edge identity/capture/originals/offline reliability; s
 PR #165 merged the versioned `claims2car-16-v2` contract. It is selectable for controlled tests; `claims2car-16-v1` remains the default and `claims2car-12-v1` remains compatible. The current v2 slot mapping is 8 exterior, 4 accessible structural-corner, 2 cabin/restraint, 1 instrument-cluster telemetry, and 1 physical VIN identity image. The source manual calls for two telemetry frames; that difference is documented as an unresolved protocol-alignment issue. Do not mutate v2 in place; use a new version or a separately typed supplemental telemetry artifact.
 
 The browser quality gate is advisory, not a hard capture rejection. No field calibration/qualification is implied. LiDAR, CoreMotion, acoustic gates, MDM restrictions, DARCI physics, multimodal AI, blockchain anchoring, ACORD live transmission, and live payment settlement remain individually subject to verified implementation and acceptance—not inferred from this manual.
+
+
+## Canonical forensic requirements source
+
+The complete owner-directed forensic substantiation specification is [COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md](../forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md) (relative path may be adjusted for document location). Use it as the detailed requirement and acceptance baseline; it is not implementation evidence. Keep the active focus on M1 PR #176 until accepted.
