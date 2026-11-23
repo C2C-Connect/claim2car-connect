@@ -41,7 +41,9 @@ class AdjudicateRequest(BaseModel):
     layer2_notes: Optional[List[str]] = None
     physics_ai_disagree: bool = False
     gps_accuracy_m: Optional[float] = 15.0
+    gps_spoof_suspected: bool = False
     master_hash_valid: bool = True
+    hash_tamper_suspected: bool = False
     chain_coverage: float = 1.0
     chain_uniqueness: float = 1.0
     meta_completeness: float = 1.0
