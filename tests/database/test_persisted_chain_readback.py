@@ -76,7 +76,7 @@ class PersistedChainReadbackIntegration(unittest.TestCase):
     def test_cross_tenant_readback_is_not_visible(self):
         self.assertEqual(append(self.conn,self.tenant,self.event),"ACCEPTED")
         with self.assertRaisesRegex(ValueError,"^SESSION_NOT_FOUND_OR_NOT_VISIBLE$"):
-            read_persisted_journal(self.other_conn,self.tenant,self.session)
+            read_persisted_journal(self.other_conn,self.other_tenant,self.session)
 
 
 if __name__ == "__main__":
