@@ -99,6 +99,29 @@ class CompletionReceiptTests(unittest.TestCase):
         self.assert_rejected((f.tenant, f.session, self.request, f.seal, note.sequence), 'RECEIPT_CONFLICT')
         self.assertEqual(self.receipts(), [(self.request, f.seal, len(f.events), 'faos_writer')])
 
+    def test_receipt_inspection_fails_closed_on_root_binding_tamper(self):
+        f=self.fixture
+        self.assertEqual(self.record(),'RECORDED')
+        with psycopg.connect(f.admin_url,autocommit=True) as admin:
+            admin.execute(
+                "UPDATE faos.manifest_roots SET context_binding_hash=%s WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s",
+                ('0'*64,f.tenant,f.session,f.seal),
+            )
+        from database.receipts import inspect_completion_receipt
+        with self.assertRaisesRegex(ValueError,'^MANIFEST_ROOT_BINDING_INVALID
+        self.assertEqual(self.record(), 'RECORDED')
+        self.assertEqual(self.receipts(str(uuid.uuid4())), [])
+        self.assertEqual(len(self.receipts()), 1)
+
+    def test_missing_context_rejected(self):
+        self.assert_rejected(self.values(), 'TENANT_CONTEXT_MISMATCH', context=False)
+        self.assertEqual(self.receipts(), [])
+
+if __name__ == '__main__':
+    unittest.main()
+):
+            inspect_completion_receipt(f.conn,f.tenant,f.session,self.request)
+
     def test_other_tenant_cannot_read_receipt(self):
         self.assertEqual(self.record(), 'RECORDED')
         self.assertEqual(self.receipts(str(uuid.uuid4())), [])
