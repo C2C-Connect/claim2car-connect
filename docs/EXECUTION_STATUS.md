@@ -1,6 +1,6 @@
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
-- **Main HEAD:** `785bef6242c768b91bfa7ecde0dc17f7a8e009d4` (PR #172 docs merge).
+- **Main branch:** `main` (verify the live head on resume). **Last verified code merge:** PR #171 at `beb72950081201e891a7a3e66f42addd13c9f528`; audit/handoff docs PRs #172 and #173 are merged.
 - **PR #171** canonical offline evidence queue encryption merged; tested head `086cf77d71da42342c3ec1c3dd348085014e15f3`.
 - **Exact-head CI:** **13/13 workflows passed**; full suite **1,035 passed, 31 warnings, 208 subtests**; offline queue unit tests **11/11**; Chromium IndexedDB verification passed.
 - Canonical root queue now uses HKDF/AES-GCM with authenticated metadata, migrates legacy plaintext and previous ciphertext formats before upload, and fails closed on wrong-token, digest, or metadata-tamper errors. Credential input is cleared after successful sign-in. This remains controlled-test only; no real participant data.
