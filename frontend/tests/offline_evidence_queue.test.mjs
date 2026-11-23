@@ -166,7 +166,26 @@ await test("aad_metadata_tampering_fails_closed_before_upload", async () => {
   assert.equal(attempted,false);
   assert.equal(store.records[0].queueId,queued.queueId);
 });
-await test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_before_upload", async () => {
+await test("prior_aes_gcm_queue_record_upgrades_to_aad_format_before_upload", async () => {
+  const store=makeStore(),queue=makeQueue(store);
+  const bytes=new TextEncoder().encode("prior-encrypted-original");
+  const digest=Array.from(new Uint8Array(await webcrypto.subtle.digest("SHA-256",bytes)),b=>b.toString(16).padStart(2,"0")).join("");
+  const salt=webcrypto.getRandomValues(new Uint8Array(16)),iv=webcrypto.getRandomValues(new Uint8Array(12));
+  const imported=await webcrypto.subtle.importKey("raw",new TextEncoder().encode(keyMaterial),"HKDF",false,["deriveKey"]);
+  const oldKey=await webcrypto.subtle.deriveKey({name:"HKDF",hash:"SHA-256",salt,info:new TextEncoder().encode("Claim2Car offline evidence queue v1")},imported,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+  const ciphertext=new Uint8Array(await webcrypto.subtle.encrypt({name:"AES-GCM",iv},oldKey,bytes));
+  await store.enqueue({sessionId:"session-v1",tenantId:"tenant-a",actorId:"actor-a",slot:"front",artifactId:"v1-artifact",requestId:"v1-request",
+    sha256:digest,byteLength:bytes.byteLength,mimeType:"image/jpeg",queuedAt:"2026-11-10T00:00:00.000Z",uploaded:false,
+    encryptionAlgorithm:"AES-GCM",salt,iv,bytes:ciphertext});
+  const result=await queue.syncSession({sessionId:"session-v1",tenantId:"tenant-a",actorId:"actor-a",keyMaterial,
+    upload:async record=>{assert.equal(new TextDecoder().decode(record.bytes),"prior-encrypted-original");return {ok:true};}});
+  assert.equal(result.error,null);
+  assert.equal(result.uploaded,1);
+  assert.equal(store.records[0].encryptionAlgorithm,"AES-GCM-HKDF-SHA256-v2");
+  assert.equal(store.records[0].uploaded,true);
+  assert.equal("bytes" in store.records[0],false);
+});
+\nawait test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_before_upload", async () => {
   const store=makeStore(),queue=makeQueue(store,["legacy-artifact","legacy-request"]);
   const bytes=new TextEncoder().encode("legacy-original");
   const legacy=await store.enqueue({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",slot:"front",
