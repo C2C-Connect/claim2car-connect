@@ -1,13 +1,13 @@
-# Claim2Car Connect / FAOS - San Antonio pilot
+# Claim2Car Connect / FAOS — San Antonio pilot
 
-## Verified checkpoint — 2026-11-23 (PR #168 merged)
+## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
-- **Main HEAD:** `44a40af41ef4f20366ac66227f431a900ba0cd83`.
-- **PR #168:** merged. It completes the triage API integrity contract: explicit GPS-spoof/hash-tamper inputs; returned chain score/diagnostics and failure reasons; health metadata aligned to the weighted-sum strict-chain implementation. Dispatch remains disabled.
-- **Exact tested PR head:** `21b79a49f43177341a86c28aaa55b68832ef75d7`. All 13 distinct required workflow types passed. Full suite: **1,035 passed, 31 warnings, 208 subtests passed**. Database authority, legacy DB, FastAPI, restricted runtime, integrated runtime including ARM64 build, capture, VIN, IndexedDB, intake, and controlled-demo checks passed.
-- **Current release boundary:** no OCI integrated staging deployment, no user-accessible URL, no real participant data/field acceptance, and no live payments or dispatch.
-- **Next blocking execution:** owner-controlled GitHub protected environment setup and OCI staging credentials/configuration. Configure `oci-staging` and `oci-staging-apply` separately, provision the versioned private state bucket, run read-only ingress audit, execute the guarded plan, review costs/changes, then apply the saved plan through its approval gate. The connector cannot inspect protected secrets or dispatch manual workflows; do not request secrets in chat. Continue executable engineering that does not depend on these credentials.
-
+- **Main HEAD:** `beb72950081201e891a7a3e66f42addd13c9f528`.
+- **PR #171:** canonical root offline evidence queue encryption and authenticated metadata merged. Exact tested head `086cf77d71da42342c3ec1c3dd348085014e15f3`.
+- **Exact-head CI:** **13/13 workflows green**; full suite **1,035 passed, 31 warnings, 208 subtests passed**; queue unit tests **11/11**; Chromium/IndexedDB verification passed.
+- The canonical root queue encrypts originals before IndexedDB persistence using HKDF-derived AES-GCM keys and authenticated metadata. Legacy plaintext and prior ciphertext formats are integrity-checked and migrated before upload; wrong token, digest mismatch, and metadata tampering fail closed.
+- **Release boundary:** no OCI integrated staging deployment, user-accessible URL, field/device acceptance, real participant evidence, live payments, or dispatch.
+- **System audit:** 24 findings documented. Two queue-integrity findings and the README mismatch are remediated; remaining audit priorities are persistent evidence provenance, deletion/retention, server storage encryption, source-backed decisions, financial/outbox lifecycle, and staging hardening. See [audit ledger](docs/audits/FOUNDATIONAL_SYSTEM_AUDIT_2026-11-23.md) and [execution handoff](docs/EXECUTION_HANDOFF.md).
 
 ## Governing product premise
 
@@ -18,10 +18,10 @@ The canonical owner-aligned product vision, Post-Accident Truth Standard, end-to
 
 Current implementation and release evidence are tracked in the [Acceptance & Release Gate Matrix](docs/acceptance/ACCEPTANCE_MATRIX.md). It distinguishes tested code from field validation and deployment authorization.
 
-## Current user-facing application (verified 2026-11-22)
+## Current user-facing application (verified 2026-11-23)
 
 - The canonical integrated application shell is `app/web/index.html` and its JavaScript/CSS assets under `app/web/assets/`; it is served at `/` only in integrated runtime mode. The root CTA directs to authenticated workspace sign-in; the controlled prototype is not the product entry point.
-- The integrated operator workbench code supports persistent case creation/reopen, consent-gated owner flow, VIN reference, 16-slot capture, browser IndexedDB queue-before-upload/FIFO retry, advisory quality checks, evidence sealing, and a server-derived progress dashboard for consent, vehicle reference, registered originals, quality, and seal. Dashboard progress refreshes after upload and consent withdrawal. Reviewer functionality is also implemented in the same integrated shell.
+- The integrated operator workbench code supports persistent case creation/reopen, consent-gated owner flow, VIN reference, 16-slot capture, browser IndexedDB queue-before-upload/FIFO retry, advisory quality checks, evidence sealing, and a server-derived progress dashboard for consent, vehicle reference, registered originals, quality, and seal. Dashboard progress refreshes after upload and consent withdrawal. Reviewer functionality is also implemented in the same integrated shell. The canonical offline queue now encrypts originals at rest with HKDF/AES-GCM and authenticated capture metadata, migrates legacy queue records before upload, and fails closed on credential or metadata tampering; it remains a controlled-test feature, not field-qualified storage.
 - Runtime credentials are provisioned out-of-band; no self-service signup exists. Do not create or expose test tokens in repository, chat, or public logs.
 - **The application is not deployed or reachable by the founder yet.** The private OCI Run Command deployment mechanism is merged, but protected OCI environments/secrets/variables, secured state bucket, reviewed Terraform apply, private host, PostgreSQL/PostGIS, verified persistent volumes, image publish/deploy, and secure access remain blockers. Code/CI verification does not substitute for deployment.
 
