@@ -10,6 +10,7 @@ import uuid
 import psycopg
 from database.journal import append
 from database.eligibility import check_registered_completion
+from database.manifest_binding import manifest_binding_schema_available
 
 class RegisteredCompletionTests(unittest.TestCase):
     def setUp(self):
@@ -40,6 +41,8 @@ class RegisteredCompletionTests(unittest.TestCase):
             self.check(dict(self.fixture.data, front=b'tampered'))
 
     def test_registered_root_context_binding_tamper_fails_closed(self):
+        if not manifest_binding_schema_available(self.fixture.conn):
+            self.skipTest('requires authority migration 0029')
         f = self.fixture
         self.assertEqual(f.register(), 'REGISTERED')
         with psycopg.connect(f.admin_url, autocommit=True) as admin:
