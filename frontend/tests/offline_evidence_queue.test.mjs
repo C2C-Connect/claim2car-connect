@@ -186,7 +186,7 @@ await test("legacy_plaintext_with_bad_digest_is_not_uploaded_or_migrated", async
   assert.equal(store.records[0].encryptionAlgorithm,undefined);
   assert.equal(store.records[0].bytes instanceof Uint8Array,true);
 });
-\nawait test("missing_indexeddb_fails_closed", async () => {
+await test("missing_indexeddb_fails_closed", async () => {
   assert.throws(() => createIndexedDbEvidenceStore(null), /INDEXEDDB_UNAVAILABLE/);
 });
 
