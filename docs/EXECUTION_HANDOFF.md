@@ -1,6 +1,6 @@
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
-- **Main HEAD:** `beb72950081201e891a7a3e66f42addd13c9f528`.
+- **Main HEAD:** `785bef6242c768b91bfa7ecde0dc17f7a8e009d4` (PR #172 docs merge).
 - **PR #171 — Canonical offline evidence queue encryption:** merged by squash. Tested PR head `086cf77d71da42342c3ec1c3dd348085014e15f3`.
 - **Exact-head CI:** **13/13 workflow types green**. Full suite: **1,035 passed, 31 warnings, 208 subtests passed**. Offline queue unit tests **11/11** and actual Chromium/IndexedDB verification passed. Database authority, legacy DB, FastAPI, restricted runtime, integrated runtime including OCI ARM64 build, capture, VIN, intake, and controlled-demo checks passed.
 - The canonical root workbench now encrypts originals before IndexedDB storage using HKDF-derived AES-GCM keys and authenticated metadata (AAD). Plaintext and prior-format queue records are integrity-checked and migrated before upload; wrong token, digest mismatch, and metadata tampering fail closed. Stable IDs, FIFO retry, and purge behavior are preserved. The sign-in field clears after successful authentication.
