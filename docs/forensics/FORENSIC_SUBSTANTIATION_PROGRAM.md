@@ -1,4 +1,14 @@
 # Claim2Car Forensic Substantiation Program
+## Latest verified implementation checkpoint — PR #180 merged (2026-11-23)
+
+PR #180 merged to main (`35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`). Exact PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`: **13/13 workflows green**; full suite **1,050 passed, 31 warnings, 219 subtests passed**. PostgreSQL authority acceptance on isolated synthetic environment: 386 counted tests, DB-01–DB-14 14/14 PASS, overall DB acceptance ACCEPTED. This is not forensic M1 acceptance or field qualification.
+
+Migration 0028 now stores SHA-256 event/genesis commitments, transactionally backfills existing rows without rewriting payloads, fails on sequence gaps, verifies the full stored chain before append, validates direct insert continuity and rejects update/delete. Python/SQL parity and migration/adversarial tests passed.
+
+**M1 incomplete:** server readback verifier integration; chain-tip/sequence/hash-version/capture-context binding in manifest root; registered-original/artifact binding; independent verifier; restart/restore/concurrency/fork and external checkpoint acceptance. External anchor is separate from the in-DB chain.
+
+**Next code task:** server-owned persisted-chain readback verification, seal/root chain-tip/context binding, artifact provenance binding, then adversarial/recovery/reproducibility tests. Keep real participants, field qualification, dispatch and payments gated.
+
 
 **Owner directive / focus reset:** 2026-11-23  
 **Status:** ACTIVE ENGINEERING PRIORITY — forensic substantiation over adjacent product expansion  
