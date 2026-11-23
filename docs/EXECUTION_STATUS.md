@@ -78,9 +78,9 @@ Configure the protected OCI environments/state bucket, run reviewed plan/apply, 
 - Main after PR #156: `607a257ac36cc95a224c3f101d46a5884646c40a`.
 - **No deployment/field acceptance:** there is no user-accessible staging URL, live OCI compute, verified PostgreSQL/PostGIS host, durable evidence volume, backup/restore rehearsal, or physical-device qualification. Guarded OCI plan/apply and image-publish workflows exist, but protected environment secrets cannot be inspected or dispatched from this session. Live payments/dispatch remain disabled.
 
-## Current next task — M1 readback and seal binding (after PR #180)
+## Current next task — M1 manifest-root chain-tip binding (after PR #182)
 
-From current main, integrate server-owned persisted-chain readback verification; bind manifest roots to verified chain tip, sequence/hash version and capture context; bind registered original/artifacts; then add independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. M1 remains incomplete. See docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md.
+From current main, implement migration 0029 to bind manifest roots/seals to verified chain tip, sequence/hash version and deterministic capture context; recompute/validate chain at registration; verify root binding in readback/completion/receipt consumers; then bind registered originals/artifacts and add independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. M1 remains incomplete. See authoritative thread handoff and complete forensic specification.
 
 ## Verified checkpoint — PR #153 merged (2026-11-22)
 
