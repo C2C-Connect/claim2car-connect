@@ -2,11 +2,16 @@
 
 ## Active engineering handoff — forensic substantiation (updated 2026-11-23)
 
-PR #180 merged to main (`35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`); exact tested head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, 13/13 workflows green. Full suite: 1,050 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 386 counted tests and DB-01–DB-14 14/14 PASS; not forensic M1 acceptance.
+## Latest verified checkpoint — PR #182 merged (2026-11-23)
 
-Migration 0028 persists SHA-256 event-chain hashes, transactional backfill, append-time verification and immutable event guards. SQL/Python parity and integration/migration/adversarial tests passed. M1 remains incomplete: server-owned readback verifier, manifest chain-tip/context binding, artifact provenance, independent verifier and external checkpoint/recovery/fork testing remain. No deployment, field qualification, participant evidence, payment or dispatch.
+PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested PR head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows green**. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests; DB-01–DB-14 14/14 PASS and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
 
-**Next code task:** server-owned readback verification from PostgreSQL; bind sealed root to verified chain tip, sequence/version and capture context; bind original artifacts; add independent/recovery/adversarial tests. Read the current thread handoff and forensic program; proceed in code.
+Migration 0028 persists SHA-256 event hashes and fail-closed backfill. PR #182 adds server-owned persisted-chain readback from PostgreSQL, invalid-chain rejection before journal replay/locked consumers, explicit legacy-unhashed status and partial-schema failure. SQL/Python parity, readback, tamper, tenant and migration tests passed.
+
+**M1 incomplete:** sealed manifest roots do not bind verified chain tip, sequence, hash version and context; original-artifact binding, independent verifier agreement, recovery/concurrency/fork tests and external checkpoint remain. No staging, field qualification, participant evidence, payment or dispatch.
+
+**Next code task:** migration 0029 for chain-tip/context binding in manifest roots and registration; then bind original artifacts and implement independent/recovery/adversarial verification. No planning loop.
+
 
 ## Core Engine Implementation Guide & Subsystem Engineering Manual
 
