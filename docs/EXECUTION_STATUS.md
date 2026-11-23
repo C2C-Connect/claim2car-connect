@@ -1,15 +1,14 @@
 # Active focus — forensic substantiation (2026-11-23)
 
-## Latest verified checkpoint — PR #180 merged (2026-11-23)
+## Latest verified checkpoint — PR #182 merged (2026-11-23)
 
-PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, **13/13 workflows passed**. Full suite: **1,050 passed, 31 warnings, 219 subtests**. Isolated synthetic PostgreSQL acceptance: **386/386 counted tests**, DB-01–DB-14 **14/14 PASS**, diagnostics successful and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
+PR #182 merged to main as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested PR head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows passed**. Full suite: **1,054 passed, 31 warnings, 219 subtests**. Isolated synthetic PostgreSQL acceptance: **390/390 counted tests**, DB-01–DB-14 **14/14 PASS**, 14 gate passes awarded, diagnostics successful and overall database acceptance ACCEPTED. This is not forensic M1 acceptance or field qualification.
 
-Migration 0028 implements persistent SHA-256 event/genesis hashes, transactional backfill, append-time full-chain recomputation, direct-insert validation and update/delete immutability. Python/SQL parity, backfill rollback, tamper and database tests passed.
+Migration 0028 persists SHA-256 event hashes and backfills transactionally. PR #182 adds server-owned persisted readback that recomputes the chain from PostgreSQL rows; `load_journal` and locked consumers fail closed on invalid chain; legacy unhashed schemas are explicitly `LEGACY_UNHASHED`; partial hash schemas fail closed. Tamper, tenant, legacy and locked-consumer tests passed.
 
-**M1 remains incomplete:** server-owned readback verification; manifest-root chain-tip/sequence/version/context binding; registered-original/artifact binding; independent verifier agreement; restart/restore/concurrency/fork and external checkpoint. No deployment, field qualification, participant evidence, payment or dispatch.
+**M1 still incomplete:** sealed manifest roots do not yet bind chain tip/sequence/hash version/context; registered original/artifact binding; independent verifier; restart/restore/concurrency/fork and external checkpoint. No deployment, field qualification, participant evidence, payment or dispatch.
 
-**Next code target:** server-owned PostgreSQL readback recomputation and chain-tip/context binding; then registered-original/artifact provenance and independent/adversarial/recovery tests. Continue in code, not planning.
-
+**Next code target:** migration 0029 for seal/root chain-tip and context binding; server recomputes and validates chain at registration; root/readback/completion/receipt consumers verify binding. Then artifact provenance, independent/recovery/adversarial tests.
 
 ## Historical checkpoint before PR #180 (superseded)
 
@@ -24,7 +23,7 @@ Migration 0028 implements persistent SHA-256 event/genesis hashes, transactional
 
 The owner has explicitly directed undivided focus on the ability to substantiate every meaningful forensic claim. The ordered implementation methodology and acceptance gates are in **`docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`**. This is now the primary engineering focus; avoid adjacent feature expansion.
 
-**Current implementation milestone:** M1 persisted event-chain hashing is merged; integrate independent server-owned readback verification and chain-tip-bound manifests. The current `backend/app/anchor/ledger.py` is process-memory based and is not the durable forensic ledger required by FAOS. Trace existing PostgreSQL migrations/authority, sealed manifests, registered original evidence, event/audit systems, verifier, integrity scoring, and dispatch/payment callers. Implement a persistent, tenant-scoped, append-only event/anchor model with canonical serialization, stable IDs, idempotency, server times, chain recomputation, checkpoint semantics, manifest/artifact/session binding, restart/concurrency recovery, and fail-closed verification. Do not create parallel persistence systems. Integrity status is not dispatch/payment authorization.
+**Current implementation milestone:** M1 persistent hashes and server-owned readback are merged; implement chain-tip/context binding in sealed manifest roots. The current `backend/app/anchor/ledger.py` is process-memory based and is not the durable forensic ledger required by FAOS. Trace existing PostgreSQL migrations/authority, sealed manifests, registered original evidence, event/audit systems, verifier, integrity scoring, and dispatch/payment callers. Implement a persistent, tenant-scoped, append-only event/anchor model with canonical serialization, stable IDs, idempotency, server times, chain recomputation, checkpoint semantics, manifest/artifact/session binding, restart/concurrency recovery, and fail-closed verification. Do not create parallel persistence systems. Integrity status is not dispatch/payment authorization.
 
 **Program:** M0 schemas/contracts → M1 provenance → M2 registered original/artifact binding → M3 VIN/configuration source verification → M4 camera calibration/alignment/coordinate frame → M5 damage localization + one calibrated measurement → M6 source-backed parts/OEM assessment → M7 deterministic versioned report → M8 held-out/blind validation and qualification. Start with synthetic known-answer data. Target first vertical slice: one controlled vehicle, one component, one bounded damage region, one validated measurement, one evidence-linked finding, one reproducible report.
 
