@@ -81,9 +81,7 @@ Configure the protected OCI environments/state bucket, run reviewed plan/apply, 
 
 ## Current next task — M1 readback and seal binding (after PR #180)
 
-From current main, integrate server-owned persisted-chain readback verification; bind manifest roots to verified chain tip, sequence/hash version and capture context; bind registered original/artifacts; then independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. M1 remains incomplete.
-
-
+From current main, integrate server-owned persisted-chain readback verification; bind manifest roots to verified chain tip, sequence/hash version and capture context; bind registered original/artifacts; then add independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. M1 remains incomplete. See docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md.
 
 ## Verified checkpoint — PR #153 merged (2026-11-22)
 
