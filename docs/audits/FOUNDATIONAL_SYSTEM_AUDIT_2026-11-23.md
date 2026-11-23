@@ -174,6 +174,14 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 **Remediation:** Evaluate and explicitly approve v2 as the default for new sessions, preserve v1 compatibility for existing sessions, and move any supplemental personal-document capture to a separately consented optional flow with purpose, access, retention, and redaction controls. Add tests that default new sessions to the approved protocol and never silently reinterpret existing sessions.
 
+
+### AUD-022 — Collision lifecycle/outbox foundation lacks full transitions and relay consumers (P1)
+**Evidence:** `database/collision_lifecycle.py` currently provides collision root creation, claim/vehicle linking, and tenant-scoped reads/listing. Migration 0020 includes a persistent collision event/outbox table and transactional event append, but repository inspection found no deployed relay/consumer worker for that persistent outbox. The separate `app/outbox.py` implementation uses injectable dictionary storage and is explicitly a semantics/test abstraction, not the PostgreSQL runtime relay.
+
+**Impact:** Durable identity and event/outbox rows do not yet provide complete operational lifecycle state transitions, external delivery, consumer idempotency, retry/dead-letter, or reconciliation. Events may remain queued without an operational delivery path.
+
+**Remediation:** Implement authoritative lifecycle state transitions and a persistent outbox relay/consumer contract with locking/lease, idempotent delivery, bounded retry/dead-letter, observability, replay/reconciliation, and restart/tenant-isolation tests. External dispatch remains disabled until the trust and release gates pass.
+
 ## Initial priority order for corrective work
 
 1. **AUD-001 + AUD-002:** Canonical root offline queue encryption and frontend discrepancy—verify actual served path; resolve legacy plaintext records safely; regression tests.
@@ -209,6 +217,7 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-019 | CONFIRMED / deployment config unverified | Server originals are filesystem plaintext at application layer; at-rest volume/snapshot encryption not yet accepted |
 | AUD-020 | CONFIRMED | Financial journal is process-local and sandbox webhook receipts are not full ledger posting/reconciliation |
 | AUD-021 | CONFIRMED | Default v1 requires license/insurance docs; newer v2 has structural evidence and no mandatory document slot |
+| AUD-022 | CONFIRMED | Collision lifecycle has root/link/read operations; persistent outbox has no relay consumer; app outbox is in-memory abstraction |
 
 ## Change log
 
