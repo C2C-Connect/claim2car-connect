@@ -2,6 +2,7 @@ import unittest
 import uuid
 
 import psycopg
+from psycopg.conninfo import make_conninfo
 
 from app.domain_events import DomainEvent
 from database.event_hash_chain import event_hash, genesis_hash
@@ -20,7 +21,7 @@ class EventHashChainIntegration(unittest.TestCase):
         self.session="chain-integration-"+uuid.uuid4().hex
         self.conn=self.fixture.connections[0]
         self.admin=self.fixture.seed
-        self.admin_url=psycopg.conninfo.make_conninfo(self.fixture.admin.info.dsn,dbname=self.fixture.db)
+        self.admin_url=make_conninfo(self.fixture.admin.info.dsn,dbname=self.fixture.db)
         self.admin.execute("INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)",(self.tenant,self.session))
         self.event=DomainEvent(
             self.session,"chain-event-1",1,"SESSION_CREATED","synthetic-test",
