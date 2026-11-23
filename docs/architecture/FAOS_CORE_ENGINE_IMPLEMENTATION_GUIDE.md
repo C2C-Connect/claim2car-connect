@@ -1,13 +1,12 @@
 # Claim2Car Connect™ Forensic Operating System (FAOS)
 
-## Active engineering handoff: forensic substantiation (2026-11-23)
+## Active engineering handoff — forensic substantiation (updated 2026-11-23)
 
-The owner has narrowed active work to substantiating claims, starting M1 persistent provenance. Read docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md for current implementation status and ordered gates. Initial PR #176 Python hash/verifier code is only a draft slice; SQL persistence, manifest chain-tip binding, DB adversarial testing and independent verification remain. This manual’s target capabilities, thresholds, equations, models, examples and vendor references are requirements/hypotheses—not evidence of implementation or validation. Do not claim forensic certification, accuracy, causation, trusted timestamping or independent notarization. Dispatch and payments remain gated.
+PR #180 merged to main (`35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`); exact tested head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, 13/13 workflows green. Full suite: 1,050 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 386 counted tests and DB-01–DB-14 14/14 PASS; not forensic M1 acceptance.
 
+Migration 0028 persists SHA-256 event-chain hashes, transactional backfill, append-time verification and immutable event guards. SQL/Python parity and integration/migration/adversarial tests passed. M1 remains incomplete: server-owned readback verifier, manifest chain-tip/context binding, artifact provenance, independent verifier and external checkpoint/recovery/fork testing remain. No deployment, field qualification, participant evidence, payment or dispatch.
 
-## Active engineering handoff: forensic substantiation (2026-11-23)
-
-The owner has narrowed active work to substantiating claims, starting M1 persistent provenance. Read docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md for current implementation status and ordered gates. Initial PR #176 Python hash/verifier code is only a draft slice; SQL persistence, manifest chain-tip binding, DB adversarial testing and independent verification remain. This manual’s target capabilities, thresholds, equations, models, examples and vendor references are requirements/hypotheses—not evidence of implementation or validation. Do not claim forensic certification, accuracy, causation, trusted timestamping or independent notarization. Dispatch and payments remain gated.
+**Next code task:** server-owned readback verification from PostgreSQL; bind sealed root to verified chain tip, sequence/version and capture context; bind original artifacts; add independent/recovery/adversarial tests. Read the current thread handoff and forensic program; proceed in code.
 
 ## Core Engine Implementation Guide & Subsystem Engineering Manual
 
