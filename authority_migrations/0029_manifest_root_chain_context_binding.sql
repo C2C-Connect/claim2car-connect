@@ -36,6 +36,14 @@ BEGIN
    previous:=computed; expected:=expected+1;
   END LOOP;
   IF expected-1 IS DISTINCT FROM v_seq OR previous IS DISTINCT FROM v_hash THEN RAISE EXCEPTION 'MANIFEST_BINDING_SEAL_PREFIX_INVALID'; END IF;
+  -- Also validate events appended after sealing; the seal commitment remains
+  -- anchored to its prefix, but registration/readback must reject a broken tail.
+  FOR e IN SELECT * FROM faos.events WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id AND sequence>v_seq ORDER BY sequence LOOP
+   IF e.sequence IS DISTINCT FROM expected OR e.hash_version IS DISTINCT FROM 'event-hash-v1' OR e.previous_hash IS DISTINCT FROM previous THEN RAISE EXCEPTION 'MANIFEST_BINDING_CHAIN_TAIL_INVALID'; END IF;
+   computed:=faos.event_chain_entry_hash(e.tenant_id,e.session_id,e.event_id,e.sequence,e.kind,e.actor,e.occurred_at,e.reason,e.payload_json,e.schema_version,previous);
+   IF computed IS DISTINCT FROM e.entry_hash THEN RAISE EXCEPTION 'MANIFEST_BINDING_CHAIN_TAIL_INVALID'; END IF;
+   previous:=computed; expected:=expected+1;
+  END LOOP;
   context_hash:=faos.manifest_context_binding_hash(root_row.tenant_id,root_row.session_id,protocol,v_seq,v_hash);
   UPDATE faos.manifest_roots SET seal_sequence=v_seq,seal_chain_hash=v_hash,context_binding_hash=context_hash,binding_version='manifest-context-v1'
    WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id AND seal_event_id=root_row.seal_event_id;
@@ -75,7 +83,15 @@ BEGIN
  SELECT kind,payload_json::jsonb INTO seal_kind,seal_payload FROM faos.events WHERE tenant_id=p_tenant AND session_id=p_session AND event_id=p_seal AND sequence=root_row.seal_sequence;
  IF NOT FOUND OR seal_kind IS DISTINCT FROM 'MANIFEST_SEALED' OR seal_payload->>'manifest_digest' IS DISTINCT FROM root_row.manifest_digest OR seal_payload->>'shot_list_version' IS DISTINCT FROM root_row.shot_list_version THEN RETURN false; END IF;
  context_hash:=faos.manifest_context_binding_hash(p_tenant,p_session,protocol,root_row.seal_sequence,root_row.seal_chain_hash);
- RETURN context_hash IS NOT DISTINCT FROM root_row.context_binding_hash;
+ IF context_hash IS DISTINCT FROM root_row.context_binding_hash THEN RETURN false; END IF;
+ expected:=root_row.seal_sequence+1; previous:=root_row.seal_chain_hash;
+ FOR e IN SELECT * FROM faos.events WHERE tenant_id=p_tenant AND session_id=p_session AND sequence>root_row.seal_sequence ORDER BY sequence LOOP
+  IF e.sequence IS DISTINCT FROM expected OR e.hash_version IS DISTINCT FROM 'event-hash-v1' OR e.previous_hash IS DISTINCT FROM previous THEN RETURN false; END IF;
+  computed:=faos.event_chain_entry_hash(e.tenant_id,e.session_id,e.event_id,e.sequence,e.kind,e.actor,e.occurred_at,e.reason,e.payload_json,e.schema_version,previous);
+  IF computed IS DISTINCT FROM e.entry_hash THEN RETURN false; END IF;
+  previous:=computed; expected:=expected+1;
+ END LOOP;
+ RETURN true;
 END $verify$;
 
 CREATE OR REPLACE FUNCTION faos.register_manifest_root(p_tenant uuid,p_session text,p_seal text,p_digest text,p_version text)
@@ -100,6 +116,12 @@ BEGIN
   previous:=computed; expected:=expected+1;
  END LOOP;
  IF expected-1 IS DISTINCT FROM v_seq OR previous IS DISTINCT FROM v_hash THEN RAISE EXCEPTION 'MANIFEST_BINDING_SEAL_PREFIX_INVALID'; END IF;
+ FOR e IN SELECT * FROM faos.events WHERE tenant_id=p_tenant AND session_id=p_session AND sequence>v_seq ORDER BY sequence LOOP
+  IF e.sequence IS DISTINCT FROM expected OR e.hash_version IS DISTINCT FROM 'event-hash-v1' OR e.previous_hash IS DISTINCT FROM previous THEN RAISE EXCEPTION 'MANIFEST_BINDING_CHAIN_TAIL_INVALID'; END IF;
+  computed:=faos.event_chain_entry_hash(e.tenant_id,e.session_id,e.event_id,e.sequence,e.kind,e.actor,e.occurred_at,e.reason,e.payload_json,e.schema_version,previous);
+  IF computed IS DISTINCT FROM e.entry_hash THEN RAISE EXCEPTION 'MANIFEST_BINDING_CHAIN_TAIL_INVALID'; END IF;
+  previous:=computed; expected:=expected+1;
+ END LOOP;
  binding:=faos.manifest_context_binding_hash(p_tenant,p_session,protocol,v_seq,v_hash);
  SELECT * INTO old FROM faos.manifest_roots WHERE tenant_id=p_tenant AND session_id=p_session AND seal_event_id=p_seal;
  IF FOUND THEN
