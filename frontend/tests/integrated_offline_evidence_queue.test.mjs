@@ -10,7 +10,7 @@ const canonicalHtml=await readFile(new URL("../../app/web/index.html",import.met
 assert.ok(canonicalAppSource.includes("keyMaterial:token"));
 assert.ok(canonicalQueueSource.includes("subtle.encrypt"));
 assert.ok(canonicalQueueSource.includes("subtle.decrypt"));
-assert.ok(canonicalQueueSource.includes("legacy plaintext queue"));
+assert.ok(canonicalQueueSource.includes("prior plaintext queue"));
 assert.ok(canonicalQueueSource.includes("updateRecord"));
 assert.ok(canonicalHtml.includes("AES-GCM encrypted in IndexedDB"));
 
