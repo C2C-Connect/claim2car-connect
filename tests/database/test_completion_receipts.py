@@ -90,6 +90,18 @@ class CompletionReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '^MANIFEST_ROOT_BINDING_INVALID$'):
             inspect_completion_receipt(f.conn, f.tenant, f.session, self.request)
 
+    def test_receipt_write_rejects_root_binding_tamper(self):
+        f=self.fixture
+        with psycopg.connect(f.admin_url,autocommit=True) as admin:
+            admin.execute(
+                "UPDATE faos.manifest_roots SET context_binding_hash=%s WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s",
+                ('0'*64,f.tenant,f.session,f.seal),
+            )
+        with self.assertRaises(psycopg.errors.RaiseException) as caught:
+            self.record()
+        self.assertEqual(caught.exception.diag.message_primary,'MANIFEST_ROOT_BINDING_INVALID')
+        self.assertEqual(self.receipts(),[])
+
     def test_wrong_sequence_rejected_without_receipt(self):
         values = self.values()
         self.assert_rejected(values[:-1] + (values[-1]+1,), 'COMPLETION_SEQUENCE_CHANGED')
