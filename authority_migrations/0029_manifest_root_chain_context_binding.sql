@@ -19,13 +19,14 @@ ALTER TABLE faos.manifest_roots DISABLE ROW LEVEL SECURITY;
 -- Validate and backfill existing roots from exact persisted chain prefix.
 DO $backfill$
 DECLARE root_row record; e faos.events%ROWTYPE; previous text; expected bigint; computed text;
- protocol text; v_seq bigint; v_hash text; context_hash text;
+ protocol text; v_seq bigint; v_hash text; context_hash text; v_kind text; v_payload jsonb;
 BEGIN
  FOR root_row IN SELECT * FROM faos.manifest_roots ORDER BY tenant_id,session_id,seal_event_id LOOP
   SELECT capture_protocol_version INTO protocol FROM faos.sessions WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id;
   IF protocol IS NULL THEN RAISE EXCEPTION 'MANIFEST_BINDING_SESSION_MISSING'; END IF;
-  SELECT sequence,entry_hash INTO v_seq,v_hash FROM faos.events WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id AND event_id=root_row.seal_event_id;
+  SELECT kind,payload_json::jsonb,sequence,entry_hash INTO v_kind,v_payload,v_seq,v_hash FROM faos.events WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id AND event_id=root_row.seal_event_id;
   IF v_seq IS NULL THEN RAISE EXCEPTION 'MANIFEST_BINDING_SEAL_MISSING'; END IF;
+  IF v_kind IS DISTINCT FROM 'MANIFEST_SEALED' OR v_payload->>'manifest_digest' IS DISTINCT FROM root_row.manifest_digest OR v_payload->>'shot_list_version' IS DISTINCT FROM root_row.shot_list_version THEN RAISE EXCEPTION 'MANIFEST_BINDING_SEAL_PAYLOAD_MISMATCH'; END IF;
   previous:=faos.event_chain_genesis_hash(root_row.tenant_id,root_row.session_id); expected:=1;
   FOR e IN SELECT * FROM faos.events WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id AND sequence<=v_seq ORDER BY sequence LOOP
    IF e.sequence IS DISTINCT FROM expected OR e.hash_version IS DISTINCT FROM 'event-hash-v1' OR e.previous_hash IS DISTINCT FROM previous THEN RAISE EXCEPTION 'MANIFEST_BINDING_CHAIN_INVALID'; END IF;
@@ -56,7 +57,7 @@ ALTER TABLE faos.manifest_roots ADD CONSTRAINT manifest_root_binding_version_sup
 
 CREATE FUNCTION faos.verify_manifest_root_binding(p_tenant uuid,p_session text,p_seal text)
 RETURNS boolean LANGUAGE plpgsql STABLE SET search_path=pg_catalog,faos,public,pg_temp AS $verify$
-DECLARE root_row faos.manifest_roots%ROWTYPE; protocol text; e faos.events%ROWTYPE; previous text; expected bigint; computed text; context_hash text;
+DECLARE root_row faos.manifest_roots%ROWTYPE; protocol text; e faos.events%ROWTYPE; previous text; expected bigint; computed text; context_hash text; seal_kind text; seal_payload jsonb;
 BEGIN
  SELECT * INTO root_row FROM faos.manifest_roots WHERE tenant_id=p_tenant AND session_id=p_session AND seal_event_id=p_seal;
  IF NOT FOUND OR root_row.binding_version IS DISTINCT FROM 'manifest-context-v1' THEN RETURN false; END IF;
@@ -70,6 +71,8 @@ BEGIN
   previous:=computed; expected:=expected+1;
  END LOOP;
  IF expected-1 IS DISTINCT FROM root_row.seal_sequence OR previous IS DISTINCT FROM root_row.seal_chain_hash THEN RETURN false; END IF;
+ SELECT kind,payload_json::jsonb INTO seal_kind,seal_payload FROM faos.events WHERE tenant_id=p_tenant AND session_id=p_session AND event_id=p_seal AND sequence=root_row.seal_sequence;
+ IF NOT FOUND OR seal_kind IS DISTINCT FROM 'MANIFEST_SEALED' OR seal_payload->>'manifest_digest' IS DISTINCT FROM root_row.manifest_digest OR seal_payload->>'shot_list_version' IS DISTINCT FROM root_row.shot_list_version THEN RETURN false; END IF;
  context_hash:=faos.manifest_context_binding_hash(p_tenant,p_session,protocol,root_row.seal_sequence,root_row.seal_chain_hash);
  RETURN context_hash IS NOT DISTINCT FROM root_row.context_binding_hash;
 END $verify$;
