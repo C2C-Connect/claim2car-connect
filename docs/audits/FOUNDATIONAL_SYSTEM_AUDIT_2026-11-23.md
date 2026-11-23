@@ -1,8 +1,8 @@
+## Owner-directed focus reset — substantiating forensic claims (2026-11-23)
 
 ## Latest implementation checkpoint — M1 persistent forensic provenance (2026-11-23)
 
 PR #176 is draft/open on feat/persistent-forensic-provenance-m1, head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404. Exact-head CI 13/13 workflows succeeded, including Full test suite, authority cutover and legacy database. The code slice adds Python versioned deterministic genesis/event commitments and a full-chain verifier with known-answer/unit tests; this is **not persistent implementation**. Verified source gaps remain: faos.events has no hashes; readback sequence-replays but does not recompute; manifest root lacks chain-tip/context commitments; SQL/Python payload canonicalization parity unresolved; process-memory ledger and caller-supplied roots remain in public verification. SQL migration/backfill, SQL parity, persistent append, server-owned verification, manifest binding and DB adversarial/restart/concurrency/tenant tests remain. Keep PR draft and dispatch disabled. Detailed trace/next steps in docs/THREAD_HANDOFF_2026-11-23.md.
-## Owner-directed focus reset — substantiating forensic claims (2026-11-23)
 
 The next work is deliberately narrowed to the forensic substantiation vertical slice. See **`docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`** for the implementation sequence and measurable acceptance gates. The audit's highest trust gap is not a cosmetic feature: the current `backend/app/anchor/ledger.py` is a process-memory singleton, not durable independent provenance; it does not recompute/verify the complete prior-entry chain on verification. Related audit findings AUD-017/018 concern persistent event hash-chain and sealed manifest/capture-context commitments.
 
