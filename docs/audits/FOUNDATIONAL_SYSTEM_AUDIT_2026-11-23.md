@@ -1,3 +1,13 @@
+## Owner-directed focus reset — substantiating forensic claims (2026-11-23)
+
+The next work is deliberately narrowed to the forensic substantiation vertical slice. See **`docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`** for the implementation sequence and measurable acceptance gates. The audit's highest trust gap is not a cosmetic feature: the current `backend/app/anchor/ledger.py` is a process-memory singleton, not durable independent provenance; it does not recompute/verify the complete prior-entry chain on verification. Related audit findings AUD-017/018 concern persistent event hash-chain and sealed manifest/capture-context commitments.
+
+**First implementation PR (M1):** trace existing PostgreSQL authority, event/migration models, registered originals, seal/manifest, integrity verification, API callers, and dispatch/payment boundaries; map reuse versus gaps; design canonical event and checkpoint contracts; implement persistent tenant-scoped append-only event/anchor records, full-chain recomputation, manifest/artifact/session binding, fail-closed structured verification, restart/idempotency/concurrency/tamper/missing/reorder/fork/tenant tests, and independent verifier agreement. Do not create parallel databases/ledgers. Forensic integrity status must never alone authorize dispatch/payment.
+
+**Following milestones:** evidence binding → VIN/configuration source substantiation → camera calibration/alignment and versioned vehicle coordinate frame → damage localization and one calibrated measurement with uncertainty → source-backed parts/OEM technical assessment → deterministic versioned report → blind/held-out validation. Synthetic known-answer fixtures first. No unsupported metric precision, causation, hidden-damage, forensic-certification, or field-accuracy claims.
+
+---
+
 # Claim2Car Connect — Foundational System Audit
 
 **Audit started:** 2026-11-23  
@@ -239,4 +249,4 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 ## Change log
 
-- 2026-11-23: Initial source-level inspection recorded 24 findings. PR #171 remediated AUD-001/AUD-016 (canonical offline queue encryption and authenticated metadata) and corrected AUD-003 (README claim). Exact-head 13/13 CI passed; audit remains in progress for the remaining findings.
+- 2026-11-23: Initial source-level inspection recorded 24 findings. PR #171 remediated AUD-001/AUD-016 (canonical offline queue encryption and authenticated metadata) and corrected AUD-003 (README claim). Exact-head 13/13 CI passed. Owner reset focus to forensic substantiation; detailed program and acceptance gates recorded in `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`. Next code target M1 is persistent provenance and independently recomputed full-chain verification; audit remains in progress.
