@@ -93,6 +93,18 @@ class MigrationControlsIntegration(unittest.TestCase):
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
+    def test_event_chain_migration_restores_forced_rls(self):
+        plan=self.authority_plan()
+        apply(self.conn,plan)
+        flags=self.admin_db.execute(
+            "SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='faos.events'::regclass"
+        ).fetchone()
+        self.assertEqual(flags,(True,True))
+        columns=self.admin_db.execute(
+            "SELECT column_name,is_nullable FROM information_schema.columns WHERE table_schema='faos' AND table_name='events' AND column_name IN ('previous_hash','entry_hash','hash_version') ORDER BY column_name"
+        ).fetchall()
+        self.assertEqual(columns,[('entry_hash','NO'),('hash_version','NO'),('previous_hash','NO')])
+
     def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
         plan = self.authority_plan()
         protocol_index = next(i for i, item in enumerate(plan)
@@ -367,6 +379,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0027_capture_protocol_16_v2.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0028_persistent_event_hash_chain.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
