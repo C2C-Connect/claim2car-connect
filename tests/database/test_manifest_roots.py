@@ -22,11 +22,10 @@ class ManifestRootTests(unittest.TestCase):
         self.values = (self.tenant, self.session, self.seal, self.digest, self.version)
         self.admin_url = os.getenv('MIGRATION_TEST_ADMIN_URL', 'postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test')
         dbname = conninfo_to_dict(self.admin_url).get('dbname','claim2car_test')
-        self.authority_schema = 'tenant_login_bindings' in [
-            row[0] for row in psycopg.connect(self.admin_url).execute(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema='faos' AND table_name='tenant_login_bindings'"
-            ).fetchall()
-        ]
+        with psycopg.connect(self.admin_url) as schema_conn:
+            self.authority_schema = schema_conn.execute(
+                "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='faos' AND table_name='tenant_login_bindings')"
+            ).fetchone()[0]
         with psycopg.connect(self.admin_url,autocommit=True) as admin:
             admin.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',(self.tenant,'synthetic root fixture'))
             has_protocol_column=admin.execute("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='sessions' AND column_name='capture_protocol_version')").fetchone()[0]
@@ -79,7 +78,10 @@ class ManifestRootTests(unittest.TestCase):
 
     def register(self,values=None,context=True):
         if self.authority_schema:
-            with tenant_transaction(self.fixture_conn,self.tenant):
+            if context:
+                with tenant_transaction(self.fixture_conn,self.tenant):
+                    return self.fixture_conn.execute(REGISTER,values or self.values).fetchone()[0]
+            with self.fixture_conn.transaction():
                 return self.fixture_conn.execute(REGISTER,values or self.values).fetchone()[0]
         with psycopg.connect(self.admin_url,autocommit=True) as conn:
             with conn.transaction():
