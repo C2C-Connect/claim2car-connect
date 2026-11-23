@@ -164,6 +164,7 @@ await test("legacy_plaintext_queue_record_migrates_to_encryption_before_upload",
   const uploaded=[];
   const result=await queue.syncSession({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",keyMaterial,
     upload:async record=>{uploaded.push(new TextDecoder().decode(record.bytes));return {ok:true};}});
+  assert.equal(result.error,null);
   assert.equal(result.uploaded,1);
   assert.deepEqual(uploaded,["legacy-original"]);
   const stored=store.records[0];
