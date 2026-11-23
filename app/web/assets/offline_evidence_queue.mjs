@@ -177,6 +177,13 @@ function toHex(buffer) {
 }
 
 const encoder = new TextEncoder();
+function recordAad(record) {
+  return encoder.encode(JSON.stringify({
+    tenantId:record.tenantId,actorId:record.actorId,sessionId:record.sessionId,slot:record.slot,
+    artifactId:record.artifactId,requestId:record.requestId,sha256:record.sha256,
+    byteLength:record.byteLength,mimeType:record.mimeType,queuedAt:record.queuedAt,
+  }));
+}
 async function deriveStorageKey(keyMaterial, salt, cryptoProvider) {
   const imported = await cryptoProvider.subtle.importKey("raw", encoder.encode(keyMaterial), "HKDF", false, ["deriveKey"]);
   return cryptoProvider.subtle.deriveKey({
@@ -216,16 +223,17 @@ export function createOfflineEvidenceQueue({
     const digest = toHex(await cryptoProvider.subtle.digest("SHA-256", original));
     const salt = cryptoProvider.getRandomValues(new Uint8Array(16));
     const iv = cryptoProvider.getRandomValues(new Uint8Array(12));
-    const key = await deriveStorageKey(keyMaterial, salt, cryptoProvider);
-    const encrypted = new Uint8Array(await cryptoProvider.subtle.encrypt({name:"AES-GCM",iv},key,original));
     const record = {
       sessionId,tenantId,actorId,slot,
       artifactId:makeUuid(),requestId:makeUuid(),sha256:digest,
       byteLength:original.byteLength,
       mimeType:typeof file.type==="string"?file.type:"application/octet-stream",
-      encryptionAlgorithm:"AES-GCM",salt,iv,
-      queuedAt:now(),uploaded:false,bytes:encrypted,
+      encryptionAlgorithm:"AES-GCM-HKDF-SHA256-v2",salt,iv,
+      queuedAt:now(),uploaded:false,
     };
+    const key = await deriveStorageKey(keyMaterial, salt, cryptoProvider);
+    const encrypted = new Uint8Array(await cryptoProvider.subtle.encrypt({name:"AES-GCM",iv,additionalData:recordAad(record)},key,original));
+    record.bytes=encrypted;
     return store.enqueue(record);
   }
 
@@ -248,12 +256,25 @@ export function createOfflineEvidenceQueue({
       for (let record of records) {
         try {
           let original;
-          if (record.encryptionAlgorithm==="AES-GCM" && record.iv && record.salt) {
+          if (record.encryptionAlgorithm==="AES-GCM-HKDF-SHA256-v2" && record.iv && record.salt) {
+            const key=await deriveStorageKey(keyMaterial,record.salt,cryptoProvider);
+            try { original=new Uint8Array(await cryptoProvider.subtle.decrypt({name:"AES-GCM",iv:record.iv,additionalData:recordAad(record)},key,record.bytes)); }
+            catch { return {uploaded,blockedAtQueueId:record.queueId,error:"EVIDENCE_DECRYPTION_FAILED"}; }
+            if(original.byteLength!==record.byteLength||toHex(await cryptoProvider.subtle.digest("SHA-256",original))!==record.sha256)
+              return {uploaded,blockedAtQueueId:record.queueId,error:"LOCAL_ORIGINAL_INTEGRITY_FAILED"};
+          } else if (record.encryptionAlgorithm==="AES-GCM" && record.iv && record.salt) {
+            // Upgrade ciphertext from the prior format, which did not bind metadata as AAD.
             const key=await deriveStorageKey(keyMaterial,record.salt,cryptoProvider);
             try { original=new Uint8Array(await cryptoProvider.subtle.decrypt({name:"AES-GCM",iv:record.iv},key,record.bytes)); }
             catch { return {uploaded,blockedAtQueueId:record.queueId,error:"EVIDENCE_DECRYPTION_FAILED"}; }
             if(original.byteLength!==record.byteLength||toHex(await cryptoProvider.subtle.digest("SHA-256",original))!==record.sha256)
               return {uploaded,blockedAtQueueId:record.queueId,error:"LOCAL_ORIGINAL_INTEGRITY_FAILED"};
+            const salt=cryptoProvider.getRandomValues(new Uint8Array(16)),iv=cryptoProvider.getRandomValues(new Uint8Array(12));
+            const migrated={...record,encryptionAlgorithm:"AES-GCM-HKDF-SHA256-v2",salt,iv};
+            const newKey=await deriveStorageKey(keyMaterial,salt,cryptoProvider);
+            migrated.bytes=new Uint8Array(await cryptoProvider.subtle.encrypt({name:"AES-GCM",iv,additionalData:recordAad(migrated)},newKey,original));
+            await store.updateRecord(record.queueId,migrated);
+            record=migrated;
           } else {
             // One-time migration for records written by the prior plaintext queue.
             if(!(record.bytes instanceof Uint8Array)||record.bytes.byteLength!==record.byteLength)
@@ -262,9 +283,9 @@ export function createOfflineEvidenceQueue({
             if(!record.sha256||toHex(await cryptoProvider.subtle.digest("SHA-256",original))!==record.sha256)
               return {uploaded,blockedAtQueueId:record.queueId,error:"LOCAL_ORIGINAL_INTEGRITY_FAILED"};
             const salt=cryptoProvider.getRandomValues(new Uint8Array(16)),iv=cryptoProvider.getRandomValues(new Uint8Array(12));
+            const migrated={...record,encryptionAlgorithm:"AES-GCM-HKDF-SHA256-v2",salt,iv};
             const key=await deriveStorageKey(keyMaterial,salt,cryptoProvider);
-            const encrypted=new Uint8Array(await cryptoProvider.subtle.encrypt({name:"AES-GCM",iv},key,original));
-            const migrated={...record,encryptionAlgorithm:"AES-GCM",salt,iv,bytes:encrypted};
+            migrated.bytes=new Uint8Array(await cryptoProvider.subtle.encrypt({name:"AES-GCM",iv,additionalData:recordAad(migrated)},key,original));
             await store.updateRecord(record.queueId,migrated);
             record=migrated;
           }
