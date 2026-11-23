@@ -1,10 +1,10 @@
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
-- **Main HEAD:** `beb72950081201e891a7a3e66f42addd13c9f528`.
+- **Main HEAD:** `785bef6242c768b91bfa7ecde0dc17f7a8e009d4` (PR #172 docs merge).
 - **PR #171** canonical offline evidence queue encryption merged; tested head `086cf77d71da42342c3ec1c3dd348085014e15f3`.
 - **Exact-head CI:** **13/13 workflows passed**; full suite **1,035 passed, 31 warnings, 208 subtests**; offline queue unit tests **11/11**; Chromium IndexedDB verification passed.
 - Canonical root queue now uses HKDF/AES-GCM with authenticated metadata, migrates legacy plaintext and previous ciphertext formats before upload, and fails closed on wrong-token, digest, or metadata-tamper errors. Credential input is cleared after successful sign-in. This remains controlled-test only; no real participant data.
-- **System audit:** 24 findings. AUD-001/AUD-016 and AUD-003 are remediated. Audit findings/priority ledger in `docs/audits/FOUNDATIONAL_SYSTEM_AUDIT_2026-11-23.md`; docs handoff PR is being prepared. Next code priority: persistent event hash-chain + sealed provenance and server-derived integrity authorization.
+- **System audit:** 24 findings. AUD-001/AUD-016 and AUD-003 are remediated. Audit findings/priority ledger in `docs/audits/FOUNDATIONAL_SYSTEM_AUDIT_2026-11-23.md`; audit/handoff documentation PR #172 is merged. Next code priority: persistent event hash-chain + sealed provenance and server-derived integrity authorization.
 - **Not deployed:** no OCI integrated staging URL, field/device acceptance, real participants, live payments, or dispatch. Protected OCI configuration, state bucket, ingress tightening, correct PostgreSQL/PostGIS authority, host/evidence volume and credentials remain blockers.
 
 ## Latest verified checkpoint — 2026-11-22 (PR #165 merged)
