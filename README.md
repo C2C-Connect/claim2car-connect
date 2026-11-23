@@ -2,11 +2,11 @@
 
 ## Latest authoritative handoff — forensic substantiation (2026-11-23)
 
-**Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). PR #180 merged as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, **13/13 workflows green**. Full suite: 1,050 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 386 counted tests and DB-01–DB-14 14/14 PASS. This is database acceptance, not forensic M1 acceptance.
+**Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows green**. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests and DB-01–DB-14 14/14 PASS. This is database acceptance, not forensic M1 acceptance.
 
-**Current M1 code:** migration 0028 stores SHA-256 event-chain hashes; backfills transactionally; append verifies persisted chain; triggers validate direct inserts and prevent event update/delete. SQL/Python parity, backfill-gap rollback, tamper and database tests passed. M1 remains incomplete: server readback verification, seal/root chain-tip/context binding, registered-original/artifact binding, independent verifier and external checkpoint remain. No deployment, field qualification, participant evidence, payment or dispatch.
+**Current M1 code:** migration 0028 persists SHA-256 hashes; server-owned readback recomputes the chain from PostgreSQL; invalid authority-schema chains fail closed before replay/locked consumers; legacy unhashed status is explicit and partial hash schemas fail closed. M1 remains incomplete: migration 0029 chain-tip/context binding, registered-original/artifact binding, independent verifier, recovery/adversarial/fork tests and external checkpoint remain. No deployment/field qualification/participant evidence/payment/dispatch.
 
-**Next implementation:** server-owned readback verifier, chain-tip-bound seal/context, registered-original binding, independent/adversarial/restart/restore/concurrency/fork tests. Continue in code, not planning.
+**Next implementation:** migration 0029 manifest-root chain-tip/context binding, verified registration and consumers, artifact provenance, independent/recovery/adversarial tests. Continue in code, not planning.
 
 ## Active engineering focus — forensic substantiation
 
