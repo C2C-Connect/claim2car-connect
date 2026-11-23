@@ -1,4 +1,4 @@
-"""Protected synthetic registry tests; fixture endorsement is not real-world authenticity."""
+"""Protected synthetic registry tests; fixture-role writes are not real-world authenticity."""
 import os
 import unittest
 from dataclasses import replace
