@@ -1,5 +1,8 @@
 # OCI Integrated Staging Runbook
 
+**Priority note (2026-11-23):** This runbook remains the technical reference for a later staging phase. Current engineering focus is forensic substantiation M1–M8; OCI deployment is not the active next task. No deployment or operational acceptance is claimed. See [current handoff](../THREAD_HANDOFF_2026-11-23.md).
+
+
 **Target:** Oracle Cloud Infrastructure, region `us-chicago-1`  
 **Status:** selected target; infrastructure deployment not yet completed  
 **Data scope:** synthetic staging only

@@ -4,6 +4,8 @@
 
 **Status: IN PROGRESS / NOT ACCEPTED.** PR #176 (feat/persistent-forensic-provenance-m1, head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404) has an initial Python deterministic hash contract, full-chain verifier and known-answer/unit tests. Exact-head CI 13/13 successful, but automated workflow success does not satisfy the M1 gate. SQL migration/backfill/parity, persistence, server verifier, chain-tip-bound immutable seal, artifact binding, tenant/RLS, append-only and adversarial tests, restart/concurrency/idempotency, and independent verifier agreement are not yet complete. Keep draft/unmerged. See docs/THREAD_HANDOFF_2026-11-23.md for source reconnaissance, vectors and acceptance details. No external notarization, field qualification, forensic certification, or dispatch/payment authorization is implied.
 
+**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The only active next task is M1 persistent provenance/full-chain verification on PR #176; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
+
 
 ## Active forensic substantiation gate — M1 (2026-11-23)
 
@@ -22,7 +24,8 @@
 - **PR #165 — FAOS 16-v2 capture contract:** merged. Tested PR head: `766c0bc99e319e830c626c1fa8d7cacdf1822e9d`. All required workflows passed; full suite: **1026 passed, 31 warnings, 208 subtests passed**. This increment adds migration `0027_capture_protocol_16_v2.sql`, a versioned contract/registry, server API support, browser selection/resume, manifest binding, damage-localization exclusion for non-exterior slots, and compatibility tests.
 - **Protocol status:** `claims2car-16-v2` is selectable for controlled testing. `claims2car-16-v1` remains the default; legacy `claims2car-12-v1` remains supported. V2's current 16 positions are eight exterior views, four accessible structural corners, two cabin/restraint views, instrument-cluster telemetry, and physical VIN identity. The manual's second telemetry frame remains an explicit alignment gap; do not silently relabel or alter this immutable version. Field qualification is not complete.
 - Browser image quality remains advisory only; it never rejects or changes original evidence. Thresholds are not field calibrated.
-- **Next implementation target:** enforce the FAOS forensic integrity contract. Audit found that current `C_hash` can remain nonzero with incomplete/duplicate chains, the backend score uses a weighted geometric mean rather than the manual's weighted sum, and internal dispatch has no strict integrity authorization and falls back to a session ID when photo hashes are absent. Implement fail-closed chain collapse, formula alignment, and dispatch authorization tests before enabling dispatch.
+- **Next implementation target:** M1 persistent provenance on PR #176. Implement SQL/Python hash parity, migration/backfill, server-side append/full-chain verification, chain-tip-bound immutable manifest seals, artifact binding, and adversarial DB tests. Keep dispatch/payment disabled. See docs/THREAD_HANDOFF_2026-11-23.md.
+
 - **Deployment:** OCI staging is still NOT deployed/accepted. Owner-controlled protected-environment/OCI configuration and workflow dispatch remain external blockers; do not request secrets in chat. Continue all code/test work.
 - **Thread continuity:** read README, this handoff, status, FAOS manual, and acceptance matrix; inspect live main/PR/check/deployment state; resume the next executable task above without replanning.
 ## Verified checkpoint — PR #150 merged (2026-11-21)
@@ -59,8 +62,7 @@
 
 **Main after merge:** `05ddb8349785c6d91ea2fb26457f3d7488b7b72c`.
 
-**Next milestone remains OCI deployment:** protected environment setup, remote-state bootstrap, reviewed Terraform plan, guarded apply, actual private runtime deployment, and live acceptance. None of these are yet verified as deployed.
-
+**Historical/deferred milestone — OCI deployment:** retained as a future staging task. Not the current focus; staging remains unaccepted.
 
 ## Verified checkpoint — PR #136 merged (2026-11-21)
 
@@ -72,8 +74,7 @@
 
 **Main after merge:** `063d1ec61f36b11e2abeecb9791185ebf1a53f9d`.
 
-**Next execution milestone:** execute the protected OCI state bootstrap, inspect the plan, and provision private staging. The OCI environment and credentials remain external configuration; deployment has not been verified. Avoid posting any secrets in chat.
-
+**Deferred staging milestone:** private OCI deployment and live acceptance remain future tasks after the forensic substantiation program, unless required as a blocker.
 
 ## Verified checkpoint — PR #134 merged (2026-11-21)
 
@@ -84,8 +85,7 @@
 
 **Main after merge:** `8a07d922ef9c091696bd1fc664e9eb377001cbbd`.
 
-**Next execution priority remains real OCI staging:** credentials/protected environment/state-bucket access must be available to execute the guarded state bootstrap, plan, and apply. No OCI integrated deployment has been verified. Do not claim staging readiness; continue independent implementation/tooling while this access gap remains.
-
+**Deferred staging priority:** infrastructure remains unverified and should not displace the current forensic M1 work.
 
 ## Previous verified checkpoint (post-PR #132 merge; superseded by PR #134 checkpoint above)
 
@@ -96,13 +96,11 @@
 - **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
 - **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
-## Next executable task (no founder choice required)
+## Current next task — M1 persistent provenance (2026-11-23)
 
-1. Continue the audit-led corrective sequence: establish a persistent cryptographic capture-event chain and a versioned sealed manifest that binds the chain tip, actor/time, consent, quality, exceptions, and original hashes. Trace integrity inputs to server-derived evidence and keep dispatch disabled.
-2. Implement precise consent-withdrawal/deletion receipts with durable retry/pending state; verify originals encryption at rest, snapshots, and backups.
-3. Remove synthetic triage defaults or isolate them behind explicit controlled-demo mode; attach provenance and uncertainty to ACV/jurisdiction outputs. Resolve the privacy-sensitive default capture protocol.
-4. Continue identity, durable financial lifecycle, collision state/outbox relay work.
-5. In parallel, revalidate OCI public ingress, retire/confirm unused MySQL resource, configure protected staging environments and private PostgreSQL/PostGIS, then deploy and qualify only through approved gates.
+Continue PR #176 only after syncing it with current main. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 remains draft until all M1 criteria pass.
+
+Deferred work remains: consent/deletion hardening, source-backed triage, financial/outbox lifecycle, staging and deployment are tracked in their respective acceptance/runbooks; do not jump ahead of M1.
 
 See [Execution Handoff](../EXECUTION_HANDOFF.md), [Execution Status Snapshot](../EXECUTION_STATUS.md), and the [system audit](../audits/FOUNDATIONAL_SYSTEM_AUDIT_2026-11-23.md).
 
@@ -316,47 +314,7 @@ The former Railway configuration was a restricted synthetic containment service,
 - FastAPI foundation, restricted intake container, offline capture, frontend VIN/transport, controlled-test PostgreSQL, synthetic demonstration, historical Railway-hosted restricted smoke, and PR #29 checks: passed.
 - Historical Railway restricted staging verification passed — run [42755641253](https://github.com/C2C-Connect/claim2car-connect/actions/runs/42755387517). The actual deploy job was skipped; this is not deployment of the integrated Claim2Car application.
 
-**Next implementation slice:** reconcile the 12-versus-16 capture-slot contract; establish the incident intake data contract and consent/disclosure scope; replace static owner actor credentials with the approved owner authentication/invitation path; then deploy the integrated app to restricted staging and validate with approved test participants before any production release.
-
-
-## Structured incident intake and supplemental owner consent — 2026-11-10
-
-**Implementation:** PR #29 candidate branch, migrations `0014_claim_case_incident_intake.sql` and `0015_incident_event_kinds.sql`; synthetic PostgreSQL integration coverage added and verified.
-
-**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** full repository suite passed; database authority migration/cutover and tenant-isolation diagnostics passed, including direct-table-read denial and actor-filtered read verification; API health, controlled intake PostgreSQL, integrated-container smoke, frontend, VIN, CodeQL, and historical Railway-hosted restricted smoke checks passed. The historical Railway deploy job remained skipped. These are CI/synthetic results, not field acceptance or a live deployment.
-
-- Added a separate owner consent event with disclosure version `incident-intake-v1` and scope `incident_details`. It is distinct from the existing `disclosure-v1` capture/evidence consent.
-- Added a tenant-scoped, RLS-forced `faos.claim_case_incident_intake` table. The first version collects only incident timestamp, category, city, two-letter state/territory code, and ZIP code.
-- Explicitly excluded street address/GPS, free-text narrative, claimant contact information, date of birth, policy number, and payment information.
-- Incident details are stored outside the append-only event journal so the structured row can be deleted on supplemental withdrawal or withdrawal of the underlying capture consent. The journal records consent and request references, not the incident fields.
-- Owner identity must be the already-bound owner actor for the persistent claim case. Operator credentials cannot submit owner consent or incident details.
-- API exposure is gated by `C2C_INCIDENT_INTAKE_ENABLED=true`; the default is disabled. The disclosure contract is marked `draft_pending_legal_review`. No real participant data use is authorized by this code increment.
-- This is a first structured intake slice, not the complete incident/claimant/policy intake contract. Owner access still relies on a server-provisioned owner actor credential; end-user authentication, identity proofing, and claimant invitation remain outstanding.
-
-
-## Actor-scoped incident detail read path — 2026-11-10
-
-- Migration `0016_claim_case_incident_read_boundary.sql` revokes direct `SELECT` on incident details from the shared application database role.
-- The application reads incident details through a restricted database function that filters by the server-resolved actor ID against the case creator or bound owner. The API additionally enforces the actor role and case-creator/owner rules before invoking it.
-- Added owner and case-creating-operator read paths; other same-tenant operators and reviewers are denied. Reviewer access is not included in this supplemental disclosure scope.
-- The owner-facing disclosure now states who can view these details and that they are not automatically sent to insurers, repair shops, or dealerships.
-- The operator shell can load the details after the owner separately consents. Withdrawal removes the row, so the read path no longer returns it.
-- The database authority diagnostic now verifies that the shared application role cannot directly select this table and must use the actor-filtered read function.
-
-**Verification at candidate `10b2f7b5ba26393a0d67cf4579fc890cf9bd416a`:** the complete database authority/cutover workflow and full repository suite passed (**693 passed, 23 warnings, 192 subtests**), including the owner/creator readback and denial-to-other-operator integration test. API health, integrated-container smoke, controlled PostgreSQL intake, VIN, frontend, CodeQL, and historical Railway-hosted restricted verification also passed; the actual historical Railway deploy job remained skipped.
-
-**Remaining boundary:** owner authentication is still based on a provisioned actor credential; this does not establish the real person's identity. The feature remains disabled by default and the disclosure remains pending legal review.
-
-
-## Canonical offline queue hardening — PR #171 merged (2026-11-23)
-
-- Canonical integrated root workbench stores original bytes encrypted before IndexedDB persistence using HKDF-derived AES-GCM keys with random salt/IV.
-- AAD authenticates tenant, actor, session, capture slot, artifact/request IDs, digest, byte length, MIME type, queue timestamp, and encryption version.
-- Legacy plaintext and prior AES-GCM-without-AAD queue records are digest-checked and migrated in place before upload; corrupted legacy items remain blocked.
-- Wrong token or metadata tampering causes decryption failure and no upload. Stable IDs, FIFO fail-stop retry, uploaded-payload removal, and tenant/session purge are preserved.
-- Sign-in token field is cleared after successful authentication. Key remains transient; local recovery requires re-entering the same credential.
-- Exact-head CI: 13/13 workflows green; full suite 1,035 passed, 31 warnings, 208 subtests; unit queue tests 11/11; Chromium/IndexedDB browser verification passed.
-- **Limit:** encryption is defense-in-depth, not WORM/secure-device storage; no physical-device, Safari/iPad, quota/eviction, or field qualification. No real evidence is authorized.
+**Historical slice plan (superseded):** capture-contract and intake work from this earlier checkpoint has since been implemented/changed; use the current acceptance matrix and handoff for live state.
 
 ## Browser-persistent original evidence queue — 2026-11-10
 
@@ -409,8 +367,7 @@ The former Railway configuration was a restricted synthetic containment service,
 
 **Boundary:** the successful database workflow uses isolated/disposable PostgreSQL test databases and synthetic records. It does not establish production database migration safety against unknown live historical rows, durable cloud storage, backup/restore, production deployment, Safari/iPad qualification, field validation, or legal admissibility. Hashes and canonical journal serialization establish consistency and replayability, not the truth of a claim or capture provenance.
 
-**Next P0 slice:** exercise the complete authenticated HTTP path against the full authority schema and durable artifact store, including process restart, manifest seal/readback, independent reviewer retrieval, cross-tenant denial, consent withdrawal, and tampered-byte rejection. Keep deployment disabled until that integrated path and the persistent storage/recovery controls have evidence.
-
+**Historical P0 task (superseded):** earlier intake HTTP integration work; current status and priorities are recorded in the active handoff.
 
 ## Capture protocol version binding — 2026-11-11
 

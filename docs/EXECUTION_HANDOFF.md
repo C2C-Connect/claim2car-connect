@@ -4,6 +4,8 @@
 
 See [complete thread handoff](THREAD_HANDOFF_2026-11-23.md). Current focus is M1 persistent forensic provenance on PR #176; initial Python hash-chain slice is in draft and exact-head CI was 13/13 successful. M1 is **not complete**: SQL persistence/parity/backfill, manifest chain-tip binding, server verifier, adversarial DB/restart/concurrency/tenant tests and independent verifier agreement remain. The full M0–M8 sequence and trust rules are in docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Do not merge PR #176 yet. Staging remains undeployed but is not the immediate focus. Check exact current GitHub state before resume.
 
+**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The only active next task is M1 persistent provenance/full-chain verification on PR #176; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
+
 
 **Founder directive:** put undivided engineering focus on substantiating what Claim2Car claims to know. Evidence integrity is the foundation, but forensic quality requires provenance, identity, capture geometry, calibrated measurements, damage observations, source-backed parts/repair analysis, uncertainty, reproducible reasoning, and defensible reports. No product breadth drift while this vertical slice is incomplete.
 
@@ -34,7 +36,8 @@ See [complete thread handoff](THREAD_HANDOFF_2026-11-23.md). Current focus is M1
 - **PR #165 — FAOS 16-v2 capture contract:** merged. Tested PR head: `766c0bc99e319e830c626c1fa8d7cacdf1822e9d`. All required workflows passed; full suite: **1026 passed, 31 warnings, 208 subtests passed**. This increment adds migration `0027_capture_protocol_16_v2.sql`, a versioned contract/registry, server API support, browser selection/resume, manifest binding, damage-localization exclusion for non-exterior slots, and compatibility tests.
 - **Protocol status:** `claims2car-16-v2` is selectable for controlled testing. `claims2car-16-v1` remains the default; legacy `claims2car-12-v1` remains supported. V2's current 16 positions are eight exterior views, four accessible structural corners, two cabin/restraint views, instrument-cluster telemetry, and physical VIN identity. The manual's second telemetry frame remains an explicit alignment gap; do not silently relabel or alter this immutable version. Field qualification is not complete.
 - Browser image quality remains advisory only; it never rejects or changes original evidence. Thresholds are not field calibrated.
-- **Next implementation target:** enforce the FAOS forensic integrity contract. Audit found that current `C_hash` can remain nonzero with incomplete/duplicate chains, the backend score uses a weighted geometric mean rather than the manual's weighted sum, and internal dispatch has no strict integrity authorization and falls back to a session ID when photo hashes are absent. Implement fail-closed chain collapse, formula alignment, and dispatch authorization tests before enabling dispatch.
+- **Current implementation target:** M1 persistent forensic provenance on PR #176, per the current handoff. The previous integrity-score/dispatch hardening target is historical; dispatch remains disabled and will be revisited only under the separate authorization gate.
+
 - **Deployment:** OCI staging is still NOT deployed/accepted. Owner-controlled protected-environment/OCI configuration and workflow dispatch remain external blockers; do not request secrets in chat. Continue all code/test work.
 - **Thread continuity:** read README, this handoff, status, FAOS manual, and acceptance matrix; inspect live main/PR/check/deployment state; resume the next executable task above without replanning.
 ## Latest verified state — 2026-11-22 (PR #158, #155, #152 merged)
@@ -52,7 +55,7 @@ See [complete thread handoff](THREAD_HANDOFF_2026-11-23.md). Current focus is M1
 
 The concept is finalized. Stop producing high-level plans, placeholders, mock product data, or status-only work. Work directly on functional product increments. Use synthetic fixtures only inside tests/controlled demos and never present them as live cases. Continue with autonomous code changes, branches, commits, PRs, CI diagnosis/fixes, verified merges, and deployment where tools/credentials permit. Batch intermediate commits to avoid workflow spam. Do not bypass gates or claim a deployment/test passed without evidence.
 
-**Next concrete task:** complete protected OCI staging prerequisites in GitHub Settings/OCI (configure both `oci-staging` and `oci-staging-apply` environments, required secrets/variables, Vault OCIR pull-secret, and secured state bucket); run state bootstrap and non-destructive plan; review and apply only through the protected gate; identify/mount dedicated PostgreSQL and evidence volumes safely; provision PostgreSQL/PostGIS; publish the immutable ARM64 image; invoke the private Run Command deploy workflow; and verify authenticated capture/review, tenant isolation, restart persistence, and backup/restore. The current connector cannot dispatch manual workflows or inspect protected environment settings. If that access barrier remains, provide the founder the exact UI action to perform and continue executable code/test work.
+**Deferred staging task (historical; not the current engineering priority):** the OCI setup/apply/deploy sequence remains documented below as a future operational task. No staging is deployed or accepted. Do not divert from M1–M8 forensic substantiation to perform this sequence unless a required dependency or owner-approved priority change makes it necessary.
 
 ## Verified checkpoint — PR #153 merged (2026-11-22)
 
@@ -62,7 +65,7 @@ The concept is finalized. Stop producing high-level plans, placeholders, mock pr
 - This is a product-entry UX increment in the canonical integrated frontend. **It is still not deployed.** No public URL, live OCI staging, owner/operator credentials, field acceptance, or real participant-data use is established by this merge.
 - Main after merge: `76d5c6795de283be8967978239f2f5b5e59f700f`.
 
-**Next product blocker:** provision the protected OCI GitHub environments/secrets and state bucket, run the reviewed guarded infrastructure apply, set up identity-verified persistent volumes and PostgreSQL/PostGIS, generate synthetic staging actor credentials on-host, publish the immutable integrated ARM64 image, and deploy through the private host path. The founder cannot see or use the app until a deployment and secure access path exist.
+**Deferred product/deployment blocker:** OCI protected environments, state bucket, private host, PostgreSQL/PostGIS, evidence storage, immutable image publication, secure access and live journey acceptance remain unresolved. These are recorded for the staging phase, but are not the active task while forensic M1–M8 are being executed.
 
 ## Verified checkpoint — PR #150 merged (2026-11-21)
 
@@ -98,8 +101,7 @@ The concept is finalized. Stop producing high-level plans, placeholders, mock pr
 
 **Main after merge:** `05ddb8349785c6d91ea2fb26457f3d7488b7b72c`.
 
-**Next milestone remains OCI deployment:** protected environment setup, remote-state bootstrap, reviewed Terraform plan, guarded apply, actual private runtime deployment, and live acceptance. None of these are yet verified as deployed.
-
+**Historical/deferred milestone — OCI deployment:** the infrastructure setup and private deployment checklist remains valid for later staging work; not the current focus. No deployment is verified.
 
 ## Verified checkpoint — PR #136 merged (2026-11-21)
 
@@ -111,8 +113,7 @@ The concept is finalized. Stop producing high-level plans, placeholders, mock pr
 
 **Main after merge:** `063d1ec61f36b11e2abeecb9791185ebf1a53f9d`.
 
-**Next execution milestone:** execute the protected OCI state bootstrap, inspect the plan, and provision private staging. The OCI environment and credentials remain external configuration; deployment has not been verified. Avoid posting any secrets in chat.
-
+**Deferred staging milestone:** guarded OCI state bootstrap, reviewed plan/apply, PostgreSQL/PostGIS, durable evidence volume, immutable deployment and operational acceptance remain future work, subject to access and authorization.
 
 ## Verified checkpoint — PR #134 merged (2026-11-21)
 
@@ -123,12 +124,7 @@ The concept is finalized. Stop producing high-level plans, placeholders, mock pr
 
 **Main after merge:** `8a07d922ef9c091696bd1fc664e9eb377001cbbd`.
 
-**Next execution priority remains real OCI staging:** credentials/protected environment/state-bucket access must be available to execute the guarded state bootstrap, plan, and apply. No OCI integrated deployment has been verified. Do not claim staging readiness; continue independent implementation/tooling while this access gap remains.
-
-
-**Last updated:** 2026-11-21  
-**Canonical repository:** `C2C-Connect/claim2car-connect`  
-**Purpose:** preserve the founder's direction, exact operating expectations, and execution checkpoint across new chat threads.
+**Deferred staging priority:** OCI staging remains undeployed; continue the forensic M1–M8 program first.
 
 ## The goal—non-negotiable
 
@@ -199,12 +195,11 @@ For each increment:
 - **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
 - **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
-## Next executable task (no founder choice required)
+## Current next task — M1 persistent provenance (2026-11-23)
 
-1. Inspect live OCI infrastructure state and GitHub environment configuration for authorized credentials/state/access; do not print or expose secrets.
-2. Run the guarded Terraform plan, resolve drift/configuration, and execute apply only through the protected staging workflow after confirming costs and permissions are within authorization.
-3. Provision/verify Postgres/PostGIS and durable evidence storage, bootstrap tenant authority, deploy the immutable image, and test health, restart persistence, capture/evidence retrieval/integrity, tenant isolation, backup/restore and the integrated journey.
-4. If credentials or access are missing, ask only for the exact prerequisite and keep implementing/testable deployment tooling.
+Continue PR #176 only after syncing it with current main. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 remains draft until all M1 criteria pass.
+
+
 
 ## Thread-resume instructions
 

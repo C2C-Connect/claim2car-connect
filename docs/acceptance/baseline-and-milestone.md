@@ -1,3 +1,5 @@
+**HISTORICAL BASELINE (2026-10-28):** This proposed baseline and early M1 controlled-demonstration milestone are retained for historical context only. It is not the current acceptance or execution plan. The owner’s current mandate is the forensic substantiation M0–M8 program, with M1 persistent provenance active; see [current handoff](../THREAD_HANDOFF_2026-11-23.md) and [acceptance matrix](ACCEPTANCE_MATRIX.md).
+
 # Claim2Car Connect — Baseline Record, Gate Dependencies, and Work Ledger
 
 **Document ID:** C2C-BASE-001

@@ -1,5 +1,8 @@
 # Claim2Car Persistent Staging and Rollout Go/No-Go
 
+**Priority note (2026-11-23):** This release checklist remains a future staging/release gate. Current focus is forensic substantiation M1–M8, not deployment. Passing CI or this checklist alone does not establish field qualification or forensic certification. See [current handoff](../THREAD_HANDOFF_2026-11-23.md).
+
+
 **Scope:** integrated persistent staging first; supervised field pilot and commercial production are separate later decisions. This checklist operationalizes the nine release gates in the CTO Master Execution Plan. It does not award acceptance automatically.
 
 ## Candidate and integration strategy
