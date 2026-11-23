@@ -8,6 +8,8 @@
 - Exact next task: complete M1 under the acceptance criteria in docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Keep PR draft/unmerged.
 - This active focus supersedes previous “next task OCI staging” status. OCI staging remains unverified/undeployed, no accessible URL, Postgres/PostGIS/evidence volume/backup-restore/secure access still blockers.
 
+**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The only active next task is M1 persistent provenance/full-chain verification on PR #176; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
+
 
 The owner has explicitly directed undivided focus on the ability to substantiate every meaningful forensic claim. The ordered implementation methodology and acceptance gates are in **`docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`**. This is now the primary engineering focus; avoid adjacent feature expansion.
 
@@ -47,9 +49,13 @@ No unsupported metric precision, causation, hidden damage, forensic certificatio
 - **Not deployed/operationally accepted:** no public/user-accessible staging URL, live OCI host, PostgreSQL/PostGIS, verified persistent evidence volume, backup/restore rehearsal, or field qualification. OCI environment secrets/variables and state bucket require owner configuration; protected manual workflows cannot be dispatched from this connector.
 - Synthetic-only testing; no real participant data, live payments, or dispatch.
 
-## Next executable task — protected OCI staging provisioning
+**Deferred staging task (historical; not the current engineering priority):** the OCI setup/apply/deploy sequence remains documented below as a future operational task. No staging is deployed or accepted. Do not divert from M1–M8 forensic substantiation to perform this sequence unless a required dependency or owner-approved priority change makes it necessary.
 
-Configure GitHub environments `oci-staging` and `oci-staging-apply` separately (secrets/variables do not inherit), the OCI state bucket/namespace, OCIR configuration and Vault OCIR pull-secret. Run state bootstrap and non-destructive plan, review resource counts/cost, then apply only the saved non-destructive plan through required approval. Audit the existing private-subnet security lists, identify/mount the exact PostgreSQL/evidence volume OCIDs, run host preflight, provision PostGIS, publish the immutable ARM64 image, deploy privately, then verify authenticated capture/review, tenant isolation, restart persistence and restore. Manual workflow dispatch is unavailable through this connector; if the founder must click, give precise UI steps and do not request credentials in chat.
+## Deferred staging checklist (retained for later)
+
+Configure the protected OCI environments/state bucket, run reviewed plan/apply, provision private Postgres/PostGIS and evidence storage, deploy immutable image, and verify capture/review, tenant isolation, restart persistence and restore. Do not claim deployment. This is not the active task.
+
+
 
 ## Verified product checkpoint — PR #154 and #156 merged (2026-11-22)
 
@@ -109,8 +115,7 @@ Run the guarded OCI infrastructure plan from GitHub Actions, review state and co
 
 **Main after merge:** `05ddb8349785c6d91ea2fb26457f3d7488b7b72c`.
 
-**Next milestone remains OCI deployment:** protected environment setup, remote-state bootstrap, reviewed Terraform plan, guarded apply, actual private runtime deployment, and live acceptance. None of these are yet verified as deployed.
-
+**Historical/deferred milestone — OCI deployment:** this remains a staging checklist only; no deployment is accepted and it is not the active priority.
 
 ## Verified checkpoint — PR #136 merged (2026-11-21)
 
@@ -122,8 +127,7 @@ Run the guarded OCI infrastructure plan from GitHub Actions, review state and co
 
 **Main after merge:** `063d1ec61f36b11e2abeecb9791185ebf1a53f9d`.
 
-**Next execution milestone:** execute the protected OCI state bootstrap, inspect the plan, and provision private staging. The OCI environment and credentials remain external configuration; deployment has not been verified. Avoid posting any secrets in chat.
-
+**Deferred staging milestone:** guarded OCI bootstrap/plan/apply, Postgres/PostGIS, durable evidence storage, image publish/deploy and live operational acceptance remain future work after the forensic substantiation focus.
 
 ## Verified checkpoint — PR #134 merged (2026-11-21)
 
@@ -134,11 +138,7 @@ Run the guarded OCI infrastructure plan from GitHub Actions, review state and co
 
 **Main after merge:** `8a07d922ef9c091696bd1fc664e9eb377001cbbd`.
 
-**Next execution priority remains real OCI staging:** credentials/protected environment/state-bucket access must be available to execute the guarded state bootstrap, plan, and apply. No OCI integrated deployment has been verified. Do not claim staging readiness; continue independent implementation/tooling while this access gap remains.
-
-
-**Updated:** 2026-11-21
-**Canonical repo:** `C2C-Connect/claim2car-connect`
+**Deferred staging priority:** staging is still not deployed; resume its prerequisite work only after the current forensic program or if a concrete dependency makes it necessary.
 
 ## Previous verified checkpoint (post-PR #132 merge; superseded by PR #134 checkpoint above)
 
@@ -149,16 +149,16 @@ Run the guarded OCI infrastructure plan from GitHub Actions, review state and co
 - **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
 - **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
-## Next executable task (no founder choice required)
+## Current next task — M1 persistent provenance (2026-11-23)
 
-1. Inspect live OCI infrastructure state and GitHub environment configuration for authorized credentials/state/access; do not print or expose secrets.
-2. Run the guarded Terraform plan, resolve drift/configuration, and execute apply only through the protected staging workflow after confirming costs and permissions are within authorization.
-3. Provision/verify Postgres/PostGIS and durable evidence storage, bootstrap tenant authority, deploy the immutable image, and test health, restart persistence, capture/evidence retrieval/integrity, tenant isolation, backup/restore and the integrated journey.
-4. If credentials or access are missing, ask only for the exact prerequisite and keep implementing/testable deployment tooling.
+Continue PR #176 only after syncing it with current main. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 remains draft until all M1 criteria pass.
+
+
 
 ## Start-of-thread checklist
 
-Read this file, `docs/EXECUTION_HANDOFF.md`, `docs/CTO_MASTER_EXECUTION_PLAN.md`, and README; then inspect live main, OCI credentials/configuration, and current deployment workflow. Resume the staging implementation directly—do not re-plan.
+Read docs/THREAD_HANDOFF_2026-11-23.md and the forensic program first. Query GitHub live for main, PR #176, exact-head CI and deployment status; then continue M1 without re-planning. OCI is deferred.
+
 
 
 ## FAOS core-engine premise and thread-resume continuity (owner directive — 2026-11-22)
