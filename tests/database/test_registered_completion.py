@@ -44,10 +44,10 @@ class RegisteredCompletionTests(unittest.TestCase):
         self.assertEqual(f.register(), 'REGISTERED')
         with psycopg.connect(f.admin_url, autocommit=True) as admin:
             admin.execute(
-                "UPDATE faos.manifest_roots SET seal_chain_hash=%s WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s",
+                "UPDATE faos.manifest_roots SET context_binding_hash=%s WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s",
                 ('0' * 64, f.tenant, f.session, f.seal),
             )
-        with self.assertRaisesRegex(ValueError, '^MANIFEST_ROOT_BINDING_INVALID$'):
+        with self.assertRaisesRegex(ValueError, '^MANIFEST_ROOT_CONTEXT_HASH_MISMATCH$'):
             self.check()
 
     def test_registered_root_does_not_override_revoked_consent(self):
