@@ -65,7 +65,7 @@ function makeQueue(store, ids = ["artifact-1", "request-1", "artifact-2", "reque
   });
 }
 
-await test("queue_persists_original_bytes_and_server_digest", async () => {
+await test("canonical_queue_encrypts_originals_and_requires_same_token", async () => {
   const store = makeStore();
   const queue = makeQueue(store);
   const item = await queue.queueFile({ sessionId: "session-a", tenantId: "tenant-a", actorId: "actor-a", slot: "front", file: makeFile("original-image"), keyMaterial });
