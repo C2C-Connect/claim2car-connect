@@ -2,13 +2,17 @@
 
 ## Latest authoritative handoff — forensic substantiation (2026-11-23)
 
-**Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). It records current branch/PR/checkpoint, M1 reconnaissance, code contract and test vector, exact CI state, implementation constraints, release boundaries, and new-chat resume steps. This supersedes stale “next task = OCI staging” directives: staging remains undeployed, but the active engineering priority is M1 persistent provenance.
+**Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). PR #180 merged as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, **13/13 workflows green**. Full suite: 1,050 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 386 counted tests and DB-01–DB-14 14/14 PASS. This is database acceptance, not forensic M1 acceptance.
+
+**Current M1 code:** migration 0028 stores SHA-256 event-chain hashes; backfills transactionally; append verifies persisted chain; triggers validate direct inserts and prevent event update/delete. SQL/Python parity, backfill-gap rollback, tamper and database tests passed. M1 remains incomplete: server readback verification, seal/root chain-tip/context binding, registered-original/artifact binding, independent verifier and external checkpoint remain. No deployment, field qualification, participant evidence, payment or dispatch.
+
+**Next implementation:** server-owned readback verifier, chain-tip-bound seal/context, registered-original binding, independent/adversarial/restart/restore/concurrency/fork tests. Continue in code, not planning.
 
 ## Active engineering focus — forensic substantiation
 
 The owner has directed undivided focus on substantiating what Claim2Car claims to know: durable provenance, evidence-to-observation traceability, vehicle identity/configuration, camera calibration/alignment, geometric measurement with uncertainty, damage localization, source-backed parts/repair assessment, and reproducible forensic reports. Do not pivot to adjacent features until the initial forensic vertical slice is implemented and validated.
 
-**Program and handoff:** [Forensic Substantiation Program](docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md). First code milestone is persistent PostgreSQL provenance and independently recomputed full-chain/manifest/artifact verification (M1); inspect/reuse existing database authority and systems. Then artifact binding, VIN, camera geometry, one damage region/measurement, source-backed technical assessment, report, and held-out validation. Synthetic known-answer data first.
+**Program and handoff:** [Forensic Substantiation Program](docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md). The M1 persistent hash-chain increment is merged; the next code milestone is server-owned persisted-chain verification and seal/context binding, then registered-original/artifact verification. Then artifact binding, VIN, camera geometry, one damage region/measurement, source-backed technical assessment, report, and held-out validation. Synthetic known-answer data first.
 
 A hash or hash chain does not establish capture authenticity, identity, causation, damage classification, calibrated measurement, or independent notarization. Reports must distinguish observation, measurement, inference, causation, hidden damage, and repair advice; expose sources, methods, uncertainty and limitations. No unsupported precision or claims of forensic certification. No real participant evidence, live payments, dispatch, or public/accepted staging before independent release gates.
 
