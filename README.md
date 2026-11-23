@@ -2,7 +2,7 @@
 
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
-- **Main HEAD:** `785bef6242c768b91bfa7ecde0dc17f7a8e009d4` (PR #172 docs merge).
+- **Main branch:** `main` (verify the live head on resume). **Last verified code merge:** PR #171 at `beb72950081201e891a7a3e66f42addd13c9f528`; audit/handoff docs PRs #172 and #173 are merged.
 - **PR #171:** canonical root offline evidence queue encryption and authenticated metadata merged. Exact tested head `086cf77d71da42342c3ec1c3dd348085014e15f3`.
 - **Exact-head CI:** **13/13 workflows green**; full suite **1,035 passed, 31 warnings, 208 subtests passed**; queue unit tests **11/11**; Chromium/IndexedDB verification passed.
 - The canonical root queue encrypts originals before IndexedDB persistence using HKDF-derived AES-GCM keys and authenticated metadata. Legacy plaintext and prior ciphertext formats are integrity-checked and migrated before upload; wrong token, digest mismatch, and metadata tampering fail closed.
