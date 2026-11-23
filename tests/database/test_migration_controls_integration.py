@@ -74,7 +74,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0027_capture_protocol_16_v2.sql')
+        self.assertEqual(plan[-1].name,'0028_persistent_event_hash_chain.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -89,9 +89,45 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql','0021_collision_claim_link.sql','0022_collision_vehicle_capture_link.sql','0023_consented_vehicle_profile.sql','0024_audited_capture_exceptions_pause_resume.sql','0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql','0027_capture_protocol_16_v2.sql'))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql','0021_collision_claim_link.sql','0022_collision_vehicle_capture_link.sql','0023_consented_vehicle_profile.sql','0024_audited_capture_exceptions_pause_resume.sql','0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql','0027_capture_protocol_16_v2.sql','0028_persistent_event_hash_chain.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
+
+    def test_event_chain_backfill_gap_rolls_back_migration(self):
+        plan=self.authority_plan()
+        apply(self.conn,plan[:-1])
+        tenant=str(uuid.uuid4())
+        session='chain-gap-'+uuid.uuid4().hex
+        payload='{"synthetic":true}'
+        self.admin_db.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',(tenant,'synthetic chain-gap fixture'))
+        self.admin_db.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',(tenant,session))
+        for sequence,event_id in ((1,'gap-event-1'),(3,'gap-event-3')):
+            self.admin_db.execute(
+                'INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (tenant,session,event_id,sequence,'SESSION_CREATED','synthetic-test',
+                 f'2026-01-01T00:00:0{sequence}Z','sequence-gap fixture',payload,'0.1'),
+            )
+        before=self.history()
+        with self.assertRaises(psycopg.errors.RaiseException) as raised:
+            apply(self.conn,plan)
+        self.assertTrue(raised.exception.diag.message_primary.startswith('EVENT_CHAIN_BACKFILL_SEQUENCE_GAP'))
+        self.assertEqual(self.history(),before,'FAILED_CHAIN_BACKFILL_ADVANCED_MIGRATION_LEDGER')
+        self.assertFalse(self.admin_db.execute(
+            "SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='events' AND column_name='entry_hash')"
+        ).fetchone()[0],'FAILED_CHAIN_BACKFILL_LEFT_PARTIAL_DDL')
+
+    def test_event_chain_migration_restores_forced_rls(self):
+        plan=self.authority_plan()
+        apply(self.conn,plan)
+        flags=self.admin_db.execute(
+            "SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='faos.events'::regclass"
+        ).fetchone()
+        self.assertEqual(flags,(True,True))
+        self.assertTrue(self.admin_db.execute("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='pgcrypto')").fetchone()[0])
+        columns=self.admin_db.execute(
+            "SELECT column_name,is_nullable FROM information_schema.columns WHERE table_schema='faos' AND table_name='events' AND column_name IN ('previous_hash','entry_hash','hash_version') ORDER BY column_name"
+        ).fetchall()
+        self.assertEqual(columns,[('entry_hash','NO'),('hash_version','NO'),('previous_hash','NO')])
 
     def test_capture_protocol_migration_preserves_legacy_and_defaults_new_sessions(self):
         plan = self.authority_plan()
@@ -329,6 +365,19 @@ class MigrationControlsIntegration(unittest.TestCase):
             (tenant, session),
         ).fetchone()
         self.assertEqual(after, before, 'MIGRATION_REWROTE_HISTORICAL_EVENT_BYTES')
+        hashes = self.admin_db.execute(
+            'SELECT previous_hash,entry_hash,hash_version FROM faos.events WHERE tenant_id=%s AND session_id=%s',
+            (tenant,session),
+        ).fetchone()
+        genesis = self.admin_db.execute(
+            'SELECT faos.event_chain_genesis_hash(%s::uuid,%s)',(tenant,session),
+        ).fetchone()[0]
+        expected = self.admin_db.execute(
+            'SELECT faos.event_chain_entry_hash(%s::uuid,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+            (tenant,session,'preserved-event',1,'SESSION_CREATED','synthetic-test',
+             '2026-01-01T00:00:00Z','preserve exact bytes',payload,'0.1',genesis),
+        ).fetchone()[0]
+        self.assertEqual(hashes,(genesis,expected,'event-hash-v1'),'BACKFILL_HASH_MISMATCH')
 
     def test_noncanonical_historical_event_blocks_parity_migration_without_rewrite(self):
         plan = self.authority_plan()
@@ -367,6 +416,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0027_capture_protocol_16_v2.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0028_persistent_event_hash_chain.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)

@@ -23,6 +23,12 @@ REQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','fro
 
 REQUIRED += ['frontend/tests/vpic_transport.test.mjs']
 REQUIRED += [
+    'database/event_hash_chain.py',
+    'tests/database/test_event_hash_chain_unit.py',
+    'tests/database/test_event_hash_chain_integration.py',
+    'authority_migrations/0028_persistent_event_hash_chain.sql',
+]
+REQUIRED += [
     'authority_migrations/0022_collision_vehicle_capture_link.sql',
     'authority_migrations/0023_consented_vehicle_profile.sql',
     'authority_migrations/0024_audited_capture_exceptions_pause_resume.sql',

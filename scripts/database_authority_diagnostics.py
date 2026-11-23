@@ -38,7 +38,8 @@ def validate_authority_migration_inventory(inventory):
            'AUTHORITY_MIGRATION_ORDER_INVALID')
     expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql') < names.index('0026_square_sandbox_webhook_reconciliation.sql') < names.index('0027_capture_protocol_16_v2.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names[-1]=='0027_capture_protocol_16_v2.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0027')
+    expect(names.index('0027_capture_protocol_16_v2.sql') < names.index('0028_persistent_event_hash_chain.sql'),'AUTHORITY_MIGRATION_ORDER_INVALID')
+    expect(names[-1]=='0028_persistent_event_hash_chain.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0028')
 
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
@@ -88,7 +89,7 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.location_brands VALUES (%s,%s,%s)',(tenant,ids['location'],ids['brand']))
             sequence = admin.execute('SELECT max(sequence)+1 FROM faos.events WHERE tenant_id=%s AND session_id=%s',(tenant,session)).fetchone()[0]
             payload = json.dumps({'schema_version':'0.1','manifest_digest':digest,'shot_list_version':'claims2car-12-v1'},sort_keys=True,separators=(',',':'))
-            admin.execute('INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,session,seal,sequence,'MANIFEST_SEALED','synthetic-matrix','2026-01-01T00:00:00Z','storage isolation fixture only',payload,'0.1'))
+            admin.execute('INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,session,seal,sequence,'MANIFEST_SEALED','synthetic-matrix','2026-01-01T00:00:00Z','storage isolation fixture only',payload,'0.1'))
             admin.execute('INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) VALUES (%s,%s,%s,%s,%s)',(tenant,session,seal,digest,'claims2car-12-v1'))
             admin.execute('INSERT INTO faos.completion_receipts(tenant_id,session_id,request_id,seal_event_id,event_sequence) VALUES (%s,%s,%s,%s,%s)',(tenant,session,ids['request'],seal,sequence))
             ledger_id='matrix-ledger-'+uuid.uuid4().hex
@@ -233,7 +234,13 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('DELETE FROM faos.financial_ledger_entries WHERE tenant_id=%s AND entry_id LIKE %s',(tenant,'matrix-ledger-%'))
             for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','location_brands'):
                 admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
-            admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(tenant,session,seal))
+            # This is a disposable synthetic diagnostics database. Temporarily
+            # disable the append-only guard solely to remove this fixture row.
+            admin.execute('ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation')
+            try:
+                admin.execute('DELETE FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(tenant,session,seal))
+            finally:
+                admin.execute('ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation')
         for brand in ('brand','extra_brand'):
             admin.execute('DELETE FROM faos.brands WHERE brand_id=%s',(ids[brand],))
 
@@ -339,8 +346,12 @@ def run(report):
             for conn in connections:
                 conn.close()
             for tenant in tenants:
-                for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
-                    admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
+                admin.execute('ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation')
+                try:
+                    for table in ('claim_case_incident_intake','claim_cases','completion_receipts','manifest_roots','events','sessions','location_brands','dealer_locations','dealer_groups','memberships','users','tenant_login_bindings','organizations'):
+                        admin.execute(sql.SQL('DELETE FROM faos.{} WHERE tenant_id=%s').format(sql.Identifier(table)),(tenant,))
+                finally:
+                    admin.execute('ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation')
             for role in roles:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
     report['diagnostics_successful'] = len(report['checks'])==14 and all(row['status']=='PASS' for row in report['checks'])

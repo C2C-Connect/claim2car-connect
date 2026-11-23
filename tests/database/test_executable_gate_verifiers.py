@@ -1,4 +1,4 @@
-"""Unit tests for 14-gate acceptance, 27 migrations, and 16-v1 root binding."""
+"""Unit tests for 14-gate acceptance, 28 migrations, and 16-v1 root binding."""
 import unittest
 
 from verify_gates import (
@@ -35,7 +35,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(results[-1]["id"], "DB-14")
         self.assertEqual(results[-1]["status"], "NOT AWARDED")
 
-    def test_authority_migration_inventory_requires_all_twenty_seven_ordered_files(self):
+    def test_authority_migration_inventory_requires_all_twenty_eight_ordered_files(self):
         names = [
             '0001_tenant_registry.sql',
             '0002_event_journal.sql',
@@ -64,6 +64,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             '0025_square_sandbox_payment_intents.sql',
             '0026_square_sandbox_webhook_reconciliation.sql',
             '0027_capture_protocol_16_v2.sql',
+            '0028_persistent_event_hash_chain.sql',
         ]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_added_migration_detected',
@@ -83,7 +84,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             'diagnostics_successful': True,
             'checks': [],
             'database': ['claim2car_test', 'PostgreSQL synthetic'],
-            'extensions': [('plpgsql', '1.0'), ('postgis', '3.4')],
+            'extensions': [('plpgsql', '1.0'), ('postgis', '3.4'), ('pgcrypto', '1.3')],
             'migration_inventory': inventory,
             'environment': {'connections': {
                 'admin': {'user': 'postgres', 'host': '127.0.0.1', 'port': '55432', 'dbname': 'claim2car_test'},
@@ -95,7 +96,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(verify_db_01(context)['status'], 'PASS')
         self.assertEqual(verify_db_02(context)['status'], 'PASS')
 
-    def test_db14_requires_complete_27_migration_same_run_evidence(self):
+    def test_db14_requires_complete_28_migration_same_run_evidence(self):
         selectors = (
             "test_counted_runner.CountedRunnerTests.test_passing_case_is_recorded",
             "test_evidence_finalizer.EvidenceFinalizerTests.test_success_verifies_checksums",
@@ -113,7 +114,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             "tested_checkout_commit": "checkout",
             "migration_inventory": [
                 (f"{number:04d}_migration.sql", "0" * 64)
-                for number in range(1, 28)
+                for number in range(1, 29)
             ],
         }
         context = {
