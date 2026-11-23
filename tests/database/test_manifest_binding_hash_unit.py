@@ -20,6 +20,11 @@ class ManifestContextBindingHashTests(unittest.TestCase):
         self.assertNotEqual(base,manifest_context_binding_hash('12345678-1234-5678-1234-567812345678','session','protocol',6,'b'*64))
         self.assertNotEqual(base,manifest_context_binding_hash('12345678-1234-5678-1234-567812345678','session','protocol',5,'c'*64))
 
+    def test_session_and_protocol_context_are_committed(self):
+        base = manifest_context_binding_hash('12345678-1234-5678-1234-567812345678','session-a','protocol-a',5,'b'*64)
+        self.assertNotEqual(base,manifest_context_binding_hash('12345678-1234-5678-1234-567812345678','session-b','protocol-a',5,'b'*64))
+        self.assertNotEqual(base,manifest_context_binding_hash('12345678-1234-5678-1234-567812345678','session-a','protocol-b',5,'b'*64))
+
     def test_uuid_case_canonicalizes_to_same_binding(self):
         lower = '12345678-1234-5678-1234-567812345678'
         upper = lower.upper()
