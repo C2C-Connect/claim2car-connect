@@ -160,7 +160,7 @@ await test("legacy_plaintext_queue_record_migrates_to_encryption_before_upload",
   const bytes=new TextEncoder().encode("legacy-original");
   const legacy=await store.enqueue({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",slot:"front",
     artifactId:"legacy-artifact-id",requestId:"legacy-request-id",sha256:"",byteLength:bytes.byteLength,queuedAt:"2026-11-10T00:00:00.000Z",uploaded:false,bytes});
-  legacy.sha256=Array.from(await webcrypto.subtle.digest("SHA-256",bytes),b=>b.toString(16).padStart(2,"0")).join("");
+  legacy.sha256=Array.from(new Uint8Array(await webcrypto.subtle.digest("SHA-256",bytes)),b=>b.toString(16).padStart(2,"0")).join("");
   const uploaded=[];
   const result=await queue.syncSession({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",keyMaterial,
     upload:async record=>{uploaded.push(new TextDecoder().decode(record.bytes));return {ok:true};}});
