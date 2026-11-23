@@ -11,6 +11,7 @@ import psycopg
 from database.eligibility import check_registered_completion
 from database.journal import append
 from database.receipts import inspect_completion_receipt
+from database.manifest_binding import manifest_binding_schema_available
 
 class ReceiptInspectionTests(unittest.TestCase):
     def setUp(self):
@@ -37,7 +38,8 @@ class ReceiptInspectionTests(unittest.TestCase):
         self.assertTrue(result.authority_session)
         self.assertIsNotNone(result.recorded_at.utcoffset())
         self.assertTrue(result.snapshot_matches_current_history)
-        self.assertEqual(result.binding_status,'LEGACY_UNBOUND')
+        expected_binding = 'VERIFIED' if manifest_binding_schema_available(f.conn) else 'LEGACY_UNBOUND'
+        self.assertEqual(result.binding_status,expected_binding)
         self.assertEqual(result.current_event_sequence, len(f.events))
         self.assertIsNone(f.conn.execute('SELECT faos.tenant_id()').fetchone()[0])
 
