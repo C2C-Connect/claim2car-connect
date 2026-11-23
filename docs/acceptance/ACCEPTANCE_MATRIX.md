@@ -8,7 +8,7 @@ Migration 0028 persists SHA-256 event hashes and fail-closed backfill. PR #182 a
 
 **Next code task:** migration 0029 for chain-tip/context binding in manifest roots and registration; then bind original artifacts and implement independent/recovery/adversarial verification. No planning loop.
 
-## Latest verified checkpoint — PR #180 merged (2026-11-23)
+## Historical checkpoint — PR #180 merged (superseded by PR #182)
 
 PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`. Exact PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`: **13/13 workflows green**. Full repository: **1,050 passed, 31 warnings, 219 subtests passed**. Isolated synthetic PostgreSQL authority acceptance: **386/386 counted tests**, DB-01–DB-14 **14/14 PASS**, diagnostics successful, database overall ACCEPTED. This does not equal forensic M1 acceptance or field qualification.
 
@@ -24,7 +24,7 @@ Migration 0028 adds persistent SHA-256 genesis/event hashes, fail-closed transac
 
 **Historical status at that checkpoint:** PR #176 contained only the initial Python hash/verifier slice. PR #180 superseded and closed it; see the current verified checkpoint above. No external notarization, field qualification, forensic certification, or dispatch/payment authorization is implied.
 
-**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The active next task is M1 server readback and chain-tip/context binding from merged PR #180; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
+**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The active next task is migration 0029 manifest-root chain-tip/context binding after merged PR #182; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
 
 
 ## Historical M1 checkpoint before PR #180 (superseded)
