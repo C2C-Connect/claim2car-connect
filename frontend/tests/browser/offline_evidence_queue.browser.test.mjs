@@ -79,7 +79,7 @@ try {
   assert.equal(await page.evaluate(() => window.c2cQueueHarness.purge()), 3);
   assert.equal((await page.evaluate(() => window.c2cQueueHarness.status())).total, 0);
   assert.equal((await page.evaluate(() => window.c2cQueueHarness.status("browser-test-other-actor"))).total, 0);
-  // Integrated frontend queue: actual IndexedDB, encrypted originals, token recovery, and retry.
+  // Separate prototype queue: verify compatibility but do not confuse it with the canonical root queue.
   await page.waitForFunction(() => Boolean(window.c2cIntegratedQueueHarness));
   await page.evaluate(() => window.c2cIntegratedQueueHarness.reset());
   const integratedIds=await page.evaluate(() => window.c2cIntegratedQueueHarness.seed());
