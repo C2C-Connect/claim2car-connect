@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.domain_events import DomainEvent, EventJournal
-from database.event_hash_chain import HASH_VERSION, verify_event_chain
+from database.event_hash_chain import verify_event_chain
 from database.journal import tenant_transaction
 
 HASH_COLUMNS = ("previous_hash", "entry_hash", "hash_version")
@@ -39,13 +39,13 @@ def _validate_session(session_id):
         raise ValueError("INVALID_SESSION")
 
 
-def _hash_columns_available(conn):
+def _hash_column_count(conn):
     found = conn.execute(
         "SELECT count(*) FROM information_schema.columns "
         "WHERE table_schema='faos' AND table_name='events' AND column_name=ANY(%s)",
         (list(HASH_COLUMNS),),
     ).fetchone()[0]
-    return found == len(HASH_COLUMNS)
+    return found
 
 
 def _read_journal_readback(conn, tenant, session_id):
@@ -57,7 +57,8 @@ def _read_journal_readback(conn, tenant, session_id):
     if session is None:
         raise ValueError("SESSION_NOT_FOUND_OR_NOT_VISIBLE")
 
-    if not _hash_columns_available(conn):
+    hash_column_count = _hash_column_count(conn)
+    if hash_column_count == 0:
         legacy_rows = conn.execute(
             "SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,"
             "payload_json,schema_version FROM faos.events "
@@ -77,6 +78,8 @@ def _read_journal_readback(conn, tenant, session_id):
         journal.chain_verification = report
         journal.integrity_status = "LEGACY_UNHASHED"
         return PersistedJournalReadback(tenant, session_id, report, journal)
+    if hash_column_count != len(HASH_COLUMNS):
+        raise ValueError("HASH_SCHEMA_INCOMPLETE")
 
     rows = conn.execute(
         "SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,"
