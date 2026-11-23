@@ -399,3 +399,8 @@ See `docs/release/CAPTURE_PROTOCOL_VERSIONING.md` for the immutable-session rule
 The founder has expressly authorized autonomous sequential implementation, test/fix, verified merges, staging deployment, and end-to-end validation to materialize the product. The handoff is recorded in `docs/EXECUTION_HANDOFF.md`; it is the continuity source for new chat threads. Planning, scaffolding, mock/demo output, and documentation do not count as product completion.
 
 Checkpoint: PR #119 sandbox checkout-intent persistence merged at `c7befe0aa8366b109818310ae488809cc695e58c`; its exact tested head `dd21e35484a90dcced1990eccbf674e9cad5c342` had 18 successful workflow runs. PR #120 webhook reconciliation was closed unmerged/superseded; latest branch head `3b7ab26c7aca151ded5b2fd41c09573f618f4b68` had no reported workflow runs and is not accepted. OCI deployment remains unexecuted. See the handoff for next tasks and exact boundaries.
+
+
+## Canonical forensic requirements source
+
+The complete owner-directed forensic substantiation specification is [COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md](../forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md) (relative path may be adjusted for document location). Use it as the detailed requirement and acceptance baseline; it is not implementation evidence. Keep the active focus on M1 PR #176 until accepted.
