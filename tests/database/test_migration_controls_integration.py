@@ -90,6 +90,7 @@ class MigrationControlsIntegration(unittest.TestCase):
             'test_registered_completion.RegisteredCompletionTests.test_registered_root_context_binding_tamper_fails_closed',
             'test_completion_receipts.CompletionReceiptTests.test_receipt_inspection_fails_closed_on_root_binding_tamper',
             'test_completion_receipts.CompletionReceiptTests.test_receipt_write_rejects_root_binding_tamper',
+            'test_receipt_inspection.ReceiptInspectionTests.test_metadata_matches_committed_snapshot',
         )
         env = os.environ.copy()
         admin_base = os.getenv('MIGRATION_TEST_ADMIN_URL','postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test')
