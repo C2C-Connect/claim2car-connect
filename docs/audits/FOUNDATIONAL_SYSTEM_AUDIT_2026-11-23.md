@@ -141,7 +141,7 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 | Finding | Status | Evidence / next action |
 |---|---|---|
-| AUD-001 | CONFIRMED / remediation not yet implemented | Canonical root IndexedDB queue stores plaintext; implement encrypted storage + actual-root tests |
+| AUD-001 | CONFIRMED / remediation in PR #171 (pending exact-head CI) | Canonical root IndexedDB queue stores plaintext; PR #171 adds encryption, legacy plaintext migration, wrong-token tests, and canonical browser coverage |
 | AUD-002 | CONFIRMED | Root and prototype differ; decide canonicalization and eliminate drift |
 | AUD-003 | CONFIRMED | README claim mismatches root queue |
 | AUD-004 | CONFIRMED limitation | Offline readiness requires server revalidation; define and test safe offline model |
