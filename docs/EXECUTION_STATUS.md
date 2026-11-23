@@ -1,10 +1,11 @@
-## Verified checkpoint — 2026-11-23 (PR #168 merged)
+## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
-- **Main HEAD:** `44a40af41ef4f20366ac66227f431a900ba0cd83`.
-- **PR #168:** merged. It completes the triage API integrity contract: explicit GPS-spoof/hash-tamper inputs; returned chain score/diagnostics and failure reasons; health metadata aligned to the weighted-sum strict-chain implementation. Dispatch remains disabled.
-- **Exact tested PR head:** `21b79a49f43177341a86c28aaa55b68832ef75d7`. All 13 distinct required workflow types passed. Full suite: **1,035 passed, 31 warnings, 208 subtests passed**. Database authority, legacy DB, FastAPI, restricted runtime, integrated runtime including ARM64 build, capture, VIN, IndexedDB, intake, and controlled-demo checks passed.
-- **Current release boundary:** no OCI integrated staging deployment, no user-accessible URL, no real participant data/field acceptance, and no live payments or dispatch.
-- **Next blocking execution:** owner-controlled GitHub protected environment setup and OCI staging credentials/configuration. Configure `oci-staging` and `oci-staging-apply` separately, provision the versioned private state bucket, run read-only ingress audit, execute the guarded plan, review costs/changes, then apply the saved plan through its approval gate. The connector cannot inspect protected secrets or dispatch manual workflows; do not request secrets in chat. Continue executable engineering that does not depend on these credentials.
+- **Main HEAD:** `beb72950081201e891a7a3e66f42addd13c9f528`.
+- **PR #171** canonical offline evidence queue encryption merged; tested head `086cf77d71da42342c3ec1c3dd348085014e15f3`.
+- **Exact-head CI:** **13/13 workflows passed**; full suite **1,035 passed, 31 warnings, 208 subtests**; offline queue unit tests **11/11**; Chromium IndexedDB verification passed.
+- Canonical root queue now uses HKDF/AES-GCM with authenticated metadata, migrates legacy plaintext and previous ciphertext formats before upload, and fails closed on wrong-token, digest, or metadata-tamper errors. Credential input is cleared after successful sign-in. This remains controlled-test only; no real participant data.
+- **System audit:** 24 findings. AUD-001/AUD-016 and AUD-003 are remediated. Audit findings/priority ledger in `docs/audits/FOUNDATIONAL_SYSTEM_AUDIT_2026-11-23.md`; docs handoff PR is being prepared. Next code priority: persistent event hash-chain + sealed provenance and server-derived integrity authorization.
+- **Not deployed:** no OCI integrated staging URL, field/device acceptance, real participants, live payments, or dispatch. Protected OCI configuration, state bucket, ingress tightening, correct PostgreSQL/PostGIS authority, host/evidence volume and credentials remain blockers.
 
 ## Latest verified checkpoint — 2026-11-22 (PR #165 merged)
 

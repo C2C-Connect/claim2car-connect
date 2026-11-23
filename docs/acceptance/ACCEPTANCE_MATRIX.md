@@ -1,10 +1,11 @@
-## Verified checkpoint — 2026-11-23 (PR #168 merged)
+## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
-- **Main HEAD:** `44a40af41ef4f20366ac66227f431a900ba0cd83`.
-- **PR #168:** merged. It completes the triage API integrity contract: explicit GPS-spoof/hash-tamper inputs; returned chain score/diagnostics and failure reasons; health metadata aligned to the weighted-sum strict-chain implementation. Dispatch remains disabled.
-- **Exact tested PR head:** `21b79a49f43177341a86c28aaa55b68832ef75d7`. All 13 distinct required workflow types passed. Full suite: **1,035 passed, 31 warnings, 208 subtests passed**. Database authority, legacy DB, FastAPI, restricted runtime, integrated runtime including ARM64 build, capture, VIN, IndexedDB, intake, and controlled-demo checks passed.
-- **Current release boundary:** no OCI integrated staging deployment, no user-accessible URL, no real participant data/field acceptance, and no live payments or dispatch.
-- **Next blocking execution:** owner-controlled GitHub protected environment setup and OCI staging credentials/configuration. Configure `oci-staging` and `oci-staging-apply` separately, provision the versioned private state bucket, run read-only ingress audit, execute the guarded plan, review costs/changes, then apply the saved plan through its approval gate. The connector cannot inspect protected secrets or dispatch manual workflows; do not request secrets in chat. Continue executable engineering that does not depend on these credentials.
+- **Main HEAD:** `beb72950081201e891a7a3e66f42addd13c9f528`.
+- **PR #171 — canonical offline queue encryption and metadata authentication:** merged. Exact tested head `086cf77d71da42342c3ec1c3dd348085014e15f3`.
+- **Exact-head CI:** 13/13 workflows passed. Full suite **1,035 passed, 31 warnings, 208 subtests**; offline queue unit tests **11/11**; Chromium/IndexedDB verification passed; integrated runtime/OCI ARM64 build passed.
+- Canonical root queue uses HKDF/AES-GCM, authenticated metadata, legacy plaintext and prior ciphertext migration, wrong-token/tamper fail-closed behavior, stable retry identifiers, and purge tests.
+- **Acceptance scope:** implementation and automated tests verified; not field-qualified, not WORM, not secure-device storage. Real participant evidence remains prohibited until staging and release gates.
+- **System audit:** 24 findings; AUD-001/AUD-016 and AUD-003 remediated. The remaining priority is persistent event-chain and full manifest provenance (AUD-006/017/018), consent/deletion and server encryption (AUD-008/019), source-backed triage/valuation and capture protocol privacy (AUD-013/009/021), then identity, financial, collision/outbox, and staging infrastructure. Audit ledger is linked in the handoff.
 
 ## Latest verified checkpoint — 2026-11-22 (PR #165 merged)
 
@@ -88,12 +89,13 @@
 
 ## Next executable task (no founder choice required)
 
-1. Inspect live OCI infrastructure state and GitHub environment configuration for authorized credentials/state/access; do not print or expose secrets.
-2. Run the guarded Terraform plan, resolve drift/configuration, and execute apply only through the protected staging workflow after confirming costs and permissions are within authorization.
-3. Provision/verify Postgres/PostGIS and durable evidence storage, bootstrap tenant authority, deploy the immutable image, and test health, restart persistence, capture/evidence retrieval/integrity, tenant isolation, backup/restore and the integrated journey.
-4. If credentials or access are missing, ask only for the exact prerequisite and keep implementing/testable deployment tooling.
+1. Continue the audit-led corrective sequence: establish a persistent cryptographic capture-event chain and a versioned sealed manifest that binds the chain tip, actor/time, consent, quality, exceptions, and original hashes. Trace integrity inputs to server-derived evidence and keep dispatch disabled.
+2. Implement precise consent-withdrawal/deletion receipts with durable retry/pending state; verify originals encryption at rest, snapshots, and backups.
+3. Remove synthetic triage defaults or isolate them behind explicit controlled-demo mode; attach provenance and uncertainty to ACV/jurisdiction outputs. Resolve the privacy-sensitive default capture protocol.
+4. Continue identity, durable financial lifecycle, collision state/outbox relay work.
+5. In parallel, revalidate OCI public ingress, retire/confirm unused MySQL resource, configure protected staging environments and private PostgreSQL/PostGIS, then deploy and qualify only through approved gates.
 
-See [Execution Handoff](../EXECUTION_HANDOFF.md) and [Execution Status Snapshot](../EXECUTION_STATUS.md).
+See [Execution Handoff](../EXECUTION_HANDOFF.md), [Execution Status Snapshot](../EXECUTION_STATUS.md), and the [system audit](../audits/FOUNDATIONAL_SYSTEM_AUDIT_2026-11-23.md).
 
 ---
 
@@ -337,6 +339,16 @@ The former Railway configuration was a restricted synthetic containment service,
 **Remaining boundary:** owner authentication is still based on a provisioned actor credential; this does not establish the real person's identity. The feature remains disabled by default and the disclosure remains pending legal review.
 
 
+## Canonical offline queue hardening — PR #171 merged (2026-11-23)
+
+- Canonical integrated root workbench stores original bytes encrypted before IndexedDB persistence using HKDF-derived AES-GCM keys with random salt/IV.
+- AAD authenticates tenant, actor, session, capture slot, artifact/request IDs, digest, byte length, MIME type, queue timestamp, and encryption version.
+- Legacy plaintext and prior AES-GCM-without-AAD queue records are digest-checked and migrated in place before upload; corrupted legacy items remain blocked.
+- Wrong token or metadata tampering causes decryption failure and no upload. Stable IDs, FIFO fail-stop retry, uploaded-payload removal, and tenant/session purge are preserved.
+- Sign-in token field is cleared after successful authentication. Key remains transient; local recovery requires re-entering the same credential.
+- Exact-head CI: 13/13 workflows green; full suite 1,035 passed, 31 warnings, 208 subtests; unit queue tests 11/11; Chromium/IndexedDB browser verification passed.
+- **Limit:** encryption is defense-in-depth, not WORM/secure-device storage; no physical-device, Safari/iPad, quota/eviction, or field qualification. No real evidence is authorized.
+
 ## Browser-persistent original evidence queue — 2026-11-10
 
 **Candidate revision:** `0ebe7337b74c5fe82ba7b2e39cc1c08aedbf7737` (current code and verification revision; subsequent commits update documentation only).
@@ -361,7 +373,7 @@ The former Railway configuration was a restricted synthetic containment service,
 **Important limits — not field acceptance:**
 - Pure queue-logic assertions also use an injected in-memory store. The separate Chromium run exercises the real IndexedDB adapter, but uses synthetic bytes and a mocked upload callback; it does not exercise the integrated app-to-API upload path.
 - Safari/iPad storage behavior, browser eviction, physical-device restart recovery, quota exhaustion, and real-world roadside connectivity interruption have not been field-tested.
-- IndexedDB is not an encrypted vault, WORM store, or production durability guarantee. This feature remains a controlled-test aid and is not authorized for real participant evidence.
+- The canonical root queue now encrypts originals using AES-GCM with authenticated metadata and token-derived keys; it is still not a secure-device vault, WORM store, or production durability guarantee. Browser eviction/quota, Safari/iPad, and physical-device recovery remain unqualified. This feature remains a controlled-test aid and is not authorized for real participant evidence.
 - The last verified readiness result is held in page memory, not a signed offline consent permit. After a page restart while offline, new evidence cannot be queued until the server can revalidate readiness. If consent is withdrawn elsewhere while the operator device remains offline, already queued local bytes cannot be remotely erased until that device reconnects.
 - No claim is made that this completes the offline-first field-capture requirement. Native/device-qualified storage, explicit local retention controls, integrated app-to-API browser tests, and iPad field validation remain open.
 
