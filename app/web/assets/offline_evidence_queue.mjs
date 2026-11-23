@@ -179,7 +179,7 @@ function toHex(buffer) {
 const encoder = new TextEncoder();
 function recordAad(record) {
   return encoder.encode(JSON.stringify({
-    tenantId:record.tenantId,actorId:record.actorId,sessionId:record.sessionId,slot:record.slot,
+    encryptionAlgorithm:record.encryptionAlgorithm,tenantId:record.tenantId,actorId:record.actorId,sessionId:record.sessionId,slot:record.slot,
     artifactId:record.artifactId,requestId:record.requestId,sha256:record.sha256,
     byteLength:record.byteLength,mimeType:record.mimeType,queuedAt:record.queuedAt,
   }));
