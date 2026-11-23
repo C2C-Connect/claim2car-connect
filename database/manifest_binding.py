@@ -52,16 +52,20 @@ def verify_registered_manifest_binding(conn, tenant, session_id, seal_event_id):
     rows = conn.execute(
         "SELECT session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,"
         "schema_version,previous_hash,entry_hash,hash_version FROM faos.events "
-        "WHERE tenant_id=%s AND session_id=%s AND sequence<=%s ORDER BY sequence",
-        (tenant, session_id, root[2]),
+        "WHERE tenant_id=%s AND session_id=%s ORDER BY sequence",
+        (tenant, session_id),
     ).fetchall()
     columns = ("session_id","event_id","sequence","kind","actor","occurred_at","reason",
                "payload_json","schema_version","previous_hash","entry_hash","hash_version")
     records = [dict(zip(columns, row)) for row in rows]
-    chain = verify_event_chain(tenant, session_id, records)
+    full_chain = verify_event_chain(tenant, session_id, records)
+    if not full_chain.get("valid"):
+        raise ValueError("MANIFEST_ROOT_EVENT_CHAIN_INVALID")
+    prefix_records = [record for record in records if record["sequence"] <= root[2]]
+    chain = verify_event_chain(tenant, session_id, prefix_records)
     if not chain.get("valid") or chain.get("event_count") != root[2]:
         raise ValueError("MANIFEST_ROOT_CHAIN_PREFIX_INVALID")
-    seal = records[-1] if records else None
+    seal = prefix_records[-1] if prefix_records else None
     if seal is None or seal["event_id"] != seal_event_id or seal["kind"] != "MANIFEST_SEALED":
         raise ValueError("MANIFEST_ROOT_SEAL_SEQUENCE_MISMATCH")
     try:
@@ -87,5 +91,6 @@ def verify_registered_manifest_binding(conn, tenant, session_id, seal_event_id):
         "seal_sequence": root[2],
         "seal_chain_hash": root[3],
         "context_binding_hash": root[4],
+        "verified_event_count": full_chain["event_count"],
         "python_sql_agreement": True,
     }
