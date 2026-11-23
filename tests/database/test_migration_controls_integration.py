@@ -10,6 +10,8 @@ import psycopg
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
 from database.migrate import apply, LOCK_KEY, run_migrations
+from database.journal import tenant_transaction
+from database.manifest_binding import verify_registered_manifest_binding
 from database.migration_plan import Migration, discover, discover_authority
 
 class MigrationControlsIntegration(unittest.TestCase):
@@ -126,7 +128,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                 self.assertEqual(fixture.register(),'REGISTERED')
                 self.assertEqual(run_migrations(),('0029_manifest_root_chain_context_binding.sql',))
                 with patch.dict(os.environ,env):
-                    with __import__('database.journal',fromlist=['tenant_transaction']).tenant_transaction(fixture.conn,fixture.tenant):
+                    with tenant_transaction(fixture.conn,fixture.tenant):
                         row=fixture.conn.execute(
                             'SELECT seal_sequence,seal_chain_hash,context_binding_hash,binding_version,'
                             'faos.verify_manifest_root_binding(tenant_id,session_id,seal_event_id) '
@@ -135,7 +137,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                         ).fetchone()
                         self.assertTrue(row[4])
                         self.assertEqual(row[3],'manifest-context-v1')
-                        self.assertTrue(__import__('database.manifest_binding',fromlist=['verify_registered_manifest_binding']).verify_registered_manifest_binding(
+                        self.assertTrue(verify_registered_manifest_binding(
                             fixture.conn,fixture.tenant,fixture.session,fixture.seal)['valid'])
                 rls=self.admin_db.execute(
                     "SELECT c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
