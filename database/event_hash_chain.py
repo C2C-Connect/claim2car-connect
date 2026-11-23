@@ -73,15 +73,15 @@ def event_hash(tenant_id: str, event: DomainEvent, previous_hash: str) -> str:
 def _row_event(row: Mapping) -> DomainEvent:
     try:
         return DomainEvent(
-        session_id=row["session_id"],
-        event_id=row["event_id"],
-        sequence=row["sequence"],
-        kind=row["kind"],
-        actor=row["actor"],
-        occurred_at=row["occurred_at"],
-        reason=row["reason"],
-        payload_json=row["payload_json"],
-        schema_version=row["schema_version"],
+            session_id=row["session_id"],
+            event_id=row["event_id"],
+            sequence=row["sequence"],
+            kind=row["kind"],
+            actor=row["actor"],
+            occurred_at=row["occurred_at"],
+            reason=row["reason"],
+            payload_json=row["payload_json"],
+            schema_version=row["schema_version"],
         )
     except KeyError:
         raise ValueError("MISSING_CONTEXT") from None
@@ -120,6 +120,7 @@ def verify_event_chain(tenant_id: str, session_id: str, rows: Iterable[Mapping])
                 return {"valid": False, "reason": "EVENT_HASH_MISMATCH", "failed_sequence": expected_sequence}
             previous = computed
         except (KeyError, TypeError, ValueError) as error:
-            return {"valid": False, "reason": str(error) or "INVALID_EVENT_RECORD", "failed_sequence": expected_sequence}
+            reason = "MISSING_CONTEXT" if isinstance(error, KeyError) else str(error) or "INVALID_EVENT_RECORD"
+            return {"valid": False, "reason": reason, "failed_sequence": expected_sequence}
     return {"valid": True, "reason": "CHAIN_VALID", "tenant_id": tenant, "session_id": session_id,
             "event_count": len(records), "chain_head": previous, "genesis_hash": genesis_hash(tenant, session_id)}
