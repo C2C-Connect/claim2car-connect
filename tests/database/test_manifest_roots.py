@@ -95,6 +95,16 @@ class ManifestRootTests(unittest.TestCase):
         with tenant_transaction(self.conn,tenant):
             return self.conn.execute('SELECT seal_event_id,manifest_digest,shot_list_version FROM faos.manifest_roots ORDER BY seal_event_id').fetchall()
 
+    def test_authority_fixture_roles_are_bound_to_tenant(self):
+        if not self.authority_schema:
+            self.skipTest('requires tenant login binding migration')
+        with tenant_transaction(self.conn,self.tenant):
+            app_tenant=self.conn.execute('SELECT faos.tenant_id()::text').fetchone()[0]
+        with tenant_transaction(self.fixture_conn,self.tenant):
+            fixture_tenant=self.fixture_conn.execute('SELECT faos.tenant_id()::text').fetchone()[0]
+        self.assertEqual(app_tenant,self.tenant)
+        self.assertEqual(fixture_tenant,self.tenant)
+
     def test_fixture_registration_and_exact_retry(self):
         self.assertEqual(self.register(),'REGISTERED')
         self.assertEqual(self.register(),'DUPLICATE')
