@@ -65,6 +65,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             '0026_square_sandbox_webhook_reconciliation.sql',
             '0027_capture_protocol_16_v2.sql',
             '0028_persistent_event_hash_chain.sql',
+            '0029_manifest_root_chain_context_binding.sql',
         ]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_added_migration_detected',
