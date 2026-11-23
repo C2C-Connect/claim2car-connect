@@ -34,6 +34,7 @@ def validate_authority_migration_inventory(inventory):
     expect('0022_collision_vehicle_capture_link.sql' in names,'COLLISION_VEHICLE_CAPTURE_LINK_MIGRATION_REQUIRED')
     expect('0023_consented_vehicle_profile.sql' in names,'CONSENTED_VEHICLE_PROFILE_MIGRATION_REQUIRED')
     expect('0024_audited_capture_exceptions_pause_resume.sql' in names,'AUDITED_CAPTURE_EXCEPTIONS_MIGRATION_REQUIRED')
+    expect('0029_manifest_root_chain_context_binding.sql' in names,'MANIFEST_ROOT_CHAIN_CONTEXT_BINDING_MIGRATION_REQUIRED')
     expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql') < names.index('0020_collision_lifecycle_record.sql') < names.index('0021_collision_claim_link.sql') < names.index('0022_collision_vehicle_capture_link.sql') < names.index('0023_consented_vehicle_profile.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
     expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql') < names.index('0026_square_sandbox_webhook_reconciliation.sql') < names.index('0027_capture_protocol_16_v2.sql'),
