@@ -92,9 +92,9 @@ try {
   assert.deepEqual(integratedStatus.records.map(record=>record.queueId),integratedIds);
   assert.equal(integratedStatus.records.every(record=>record.encryptionAlgorithm==="AES-GCM"),true);
   assert.equal(integratedStatus.records.every(record=>!("bytes" in record)),true);
-  const wrongKey=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false,"wrong-operator-token-material-0123456789ABCDEFGHIJKLMN"));
-  assert.equal(wrongKey.result.uploaded,0);
-  assert.equal(wrongKey.result.error,"EVIDENCE_DECRYPTION_FAILED");
+  const integratedWrongKey=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false,"wrong-operator-token-material-0123456789ABCDEFGHIJKLMN"));
+  assert.equal(integratedWrongKey.result.uploaded,0);
+  assert.equal(integratedWrongKey.result.error,"EVIDENCE_DECRYPTION_FAILED");
   assert.equal((await page.evaluate(() => window.c2cIntegratedQueueHarness.status())).pending,2);
   const integratedFailed=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(true));
   assert.equal(integratedFailed.result.uploaded,0);
