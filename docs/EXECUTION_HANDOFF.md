@@ -1,3 +1,17 @@
+# Current mission focus — forensic substantiation (2026-11-23)
+
+**Founder directive:** put undivided engineering focus on substantiating what Claim2Car claims to know. Evidence integrity is the foundation, but forensic quality requires provenance, identity, capture geometry, calibrated measurements, damage observations, source-backed parts/repair analysis, uncertainty, reproducible reasoning, and defensible reports. No product breadth drift while this vertical slice is incomplete.
+
+**Program/acceptance gates:** `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md` is the current mission and method contract. Read it first on resume. The initial vertical slice is one controlled vehicle/component/damage region/validated measurement/evidence-linked finding/reproducible report.
+
+**Next code target (M1):** replace the in-memory anchor ledger with durable PostgreSQL provenance/event anchoring and independently verifiable full-chain/manifest/artifact verification. Inspect existing migrations, PostgreSQL authority, event/seal/manifest, integrity API, verifier, and callers; reuse existing components rather than create a competing ledger. Fail closed on incomplete/altered/orphaned/reordered/forked provenance. Tenant isolation, restart recovery, idempotency, concurrency and tamper tests. Keep forensic integrity separate from dispatch/payment authorization. Establish contract and tests, then implement a narrow verified PR.
+
+**Focus sequence:** M0 claim/observation/measurement/finding contracts as needed → M1 persistent provenance → M2 artifact provenance → M3 VIN/configuration source substantiation → M4 camera calibration/alignment/coordinate frame → M5 damage localization and one calibrated measurement → M6 source-backed parts/OEM technical assessment → M7 report generator → M8 blind validation/qualification. Synthetic data first; controlled non-participant vehicle validation later. No unsupported precision or causation assertions.
+
+**Release boundary:** no real participant evidence, live payment, dispatch, forensic certification, field accuracy claim, or public/accepted staging until specific gates are implemented and validated. CI passing is not field validation.
+
+---
+
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
 - **Main branch:** `main` (verify the live head on resume). **Last verified code merge:** PR #171 at `beb72950081201e891a7a3e66f42addd13c9f528`; audit/handoff docs PRs #172 and #173 are merged.
