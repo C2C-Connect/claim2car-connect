@@ -100,6 +100,7 @@ class MigrationControlsIntegration(unittest.TestCase):
         admin_base = os.getenv('MIGRATION_TEST_ADMIN_URL','postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test')
         app_base = os.getenv('APP_DATABASE_URL','postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
         env.update({
+            'PYTHONPATH': str(Path(__file__).resolve().parents[2]) + os.pathsep + env.get('PYTHONPATH',''),
             'MIGRATION_DATABASE_URL': self.url,
             'MIGRATION_TEST_ADMIN_URL': make_conninfo(admin_base,dbname=self.db),
             'APP_DATABASE_URL': make_conninfo(app_base,dbname=self.db),
