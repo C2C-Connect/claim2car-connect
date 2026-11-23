@@ -239,14 +239,13 @@ Passing G6 is not forensic quality. M0–M8 order/dependencies are defined in `d
 
 ## 14. Current implementation state — truth snapshot (must be checked live)
 
-- Canonical repository: `C2C-Connect/claim2car-connect`; legacy `claim2car-faos-v1` is superseded historical reference.
-- Documentation PR #175 merged (commit `cf985ee92ed6624467bc8dbeaea9e25ff9e207fa`) established program and focus.
-- PR #177 merged: synchronized README, CTO execution plan, execution handoff/status, this thread handoff, acceptance matrix, core engine manual, product premise and foundational audit. Merge/check status should be verified against GitHub before relying on a snapshot.
-- PR #176 is the active draft implementation: `feat/persistent-forensic-provenance-m1`, head last recorded `36fdd083ebbbe1268e6e2f51d40dfe60b9523404`. Initial Python event/genesis commitment and verifier/known-answer tests only. Last recorded exact-head CI 13/13 successful; check current state live.
-- M1 is **not accepted or merged**: SQL migration/backfill/parity, persisted hashes, append enforcement, complete server verification, manifest chain-tip binding, DB adversarial/restart/concurrency/tenant tests and independent verifier agreement remain.
-- External trust checkpoint/signature/notarization is separate. No forensic certification, field accuracy, collision causation, deployment/accepted staging, live payment or dispatch is claimed.
-- OCI staging remains undeployed/unverified and is not the current next engineering task; M1 is.
+- PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`; 13/13 workflows green.
+- Full suite: 1,050 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL authority acceptance: 386 counted tests; DB-01–DB-14 14/14 PASS and database overall ACCEPTED. This is not forensic M1 acceptance.
+- Migration 0028 implements persistent SHA-256 previous/entry hashes and version on `faos.events`, deterministic fail-closed backfill, append-time full-chain recomputation, direct-insert guard, and update/delete immutability. SQL/Python parity and migration/tamper tests passed.
+- **M1 incomplete:** readback verifier not integrated; manifest roots/seals not chain-tip/context-bound; registered original/artifact binding and independent verifier agreement incomplete; no external checkpoint. No field qualification, forensic certification, staging deployment, live payment or dispatch.
+- Next: server-owned PostgreSQL readback verification; bind seal/root to chain tip, sequence, version and capture context; bind originals/artifacts; independent/adversarial/restart/restore/concurrency/fork verification. See current thread handoff.
 
 ## 15. New-chat handoff
 
-On resume, read `docs/THREAD_HANDOFF_2026-11-23.md`, this specification, `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`, `docs/EXECUTION_HANDOFF.md`, `docs/EXECUTION_STATUS.md`, `docs/acceptance/ACCEPTANCE_MATRIX.md`, the foundational audit, product premise and core-engine manual. Check main and PR #176 live. Continue implementing M1 from SQL migration/backfill/parity onward; do not re-plan, widen scope, claim acceptance, or merge before the gate. After each verified increment synchronize handoff/status/acceptance references and report commit, exact tests/checks and limitations.
+On resume, read `docs/THREAD_HANDOFF_2026-11-23.md`, this specification, `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`, `docs/EXECUTION_HANDOFF.md`, `docs/EXECUTION_STATUS.md`, `docs/acceptance/ACCEPTANCE_MATRIX.md`, the foundational audit, product premise and core-engine manual. Check main live. Continue M1 from the next code target: server-owned readback recomputation, manifest-root chain-tip/context binding, registered original/artifact binding and independent/recovery/adversarial verification. Do not re-plan, widen scope, or claim M1 complete. After each verified increment synchronize handoff/status/acceptance references and report commit, exact tests/checks and limitations.
+

@@ -1,17 +1,28 @@
 # Current mission focus — forensic substantiation (2026-11-23)
 
-## Authoritative latest checkpoint (2026-11-23; supersedes older deployment-only next-task entries)
+## Latest verified checkpoint — PR #180 merged (2026-11-23)
 
-See [complete thread handoff](THREAD_HANDOFF_2026-11-23.md). Current focus is M1 persistent forensic provenance on PR #176; initial Python hash-chain slice is in draft and exact-head CI was 13/13 successful. M1 is **not complete**: SQL persistence/parity/backfill, manifest chain-tip binding, server verifier, adversarial DB/restart/concurrency/tenant tests and independent verifier agreement remain. The full M0–M8 sequence and trust rules are in docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Do not merge PR #176 yet. Staging remains undeployed but is not the immediate focus. Check exact current GitHub state before resume.
+PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, **13/13 workflows passed**. Full suite: **1,050 passed, 31 warnings, 219 subtests**. Isolated synthetic PostgreSQL acceptance: **386/386 counted tests**, DB-01–DB-14 **14/14 PASS**, diagnostics successful and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
 
-**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The only active next task is M1 persistent provenance/full-chain verification on PR #176; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
+Migration 0028 implements persistent SHA-256 event/genesis hashes, transactional backfill, append-time full-chain recomputation, direct-insert validation and update/delete immutability. Python/SQL parity, backfill rollback, tamper and database tests passed.
+
+**M1 remains incomplete:** server-owned readback verification; manifest-root chain-tip/sequence/version/context binding; registered-original/artifact binding; independent verifier agreement; restart/restore/concurrency/fork and external checkpoint. No deployment, field qualification, participant evidence, payment or dispatch.
+
+**Next code target:** server-owned PostgreSQL readback recomputation and chain-tip/context binding; then registered-original/artifact provenance and independent/adversarial/recovery tests. Continue in code, not planning.
+
+
+## Historical checkpoint before PR #180 (superseded)
+
+This checkpoint described the initial PR #176 Python-only slice before merged PR #180. It is historical and superseded by the latest checkpoint above. PR #176 is closed; continue from main.
+
+**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The active next task is M1 server-owned readback and chain-tip/context binding from current main; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
 
 
 **Founder directive:** put undivided engineering focus on substantiating what Claim2Car claims to know. Evidence integrity is the foundation, but forensic quality requires provenance, identity, capture geometry, calibrated measurements, damage observations, source-backed parts/repair analysis, uncertainty, reproducible reasoning, and defensible reports. No product breadth drift while this vertical slice is incomplete.
 
 **Program/acceptance gates:** `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md` is the current mission and method contract. Read it first on resume. The initial vertical slice is one controlled vehicle/component/damage region/validated measurement/evidence-linked finding/reproducible report.
 
-**Next code target (M1):** replace the in-memory anchor ledger with durable PostgreSQL provenance/event anchoring and independently verifiable full-chain/manifest/artifact verification. Inspect existing migrations, PostgreSQL authority, event/seal/manifest, integrity API, verifier, and callers; reuse existing components rather than create a competing ledger. Fail closed on incomplete/altered/orphaned/reordered/forked provenance. Tenant isolation, restart recovery, idempotency, concurrency and tamper tests. Keep forensic integrity separate from dispatch/payment authorization. Establish contract and tests, then implement a narrow verified PR.
+**Next code target (M1):** integrate server-owned persisted-chain readback verification and bind manifest roots to the verified chain tip/context; then registered-original/artifact binding and independent/recovery/adversarial verification. Inspect existing migrations, PostgreSQL authority, event/seal/manifest, integrity API, verifier, and callers; reuse existing components rather than create a competing ledger. Fail closed on incomplete/altered/orphaned/reordered/forked provenance. Tenant isolation, restart recovery, idempotency, concurrency and tamper tests. Keep forensic integrity separate from dispatch/payment authorization. Establish contract and tests, then implement a narrow verified PR.
 
 **Focus sequence:** M0 claim/observation/measurement/finding contracts as needed → M1 persistent provenance → M2 artifact provenance → M3 VIN/configuration source substantiation → M4 camera calibration/alignment/coordinate frame → M5 damage localization and one calibrated measurement → M6 source-backed parts/OEM technical assessment → M7 report generator → M8 blind validation/qualification. Synthetic data first; controlled non-participant vehicle validation later. No unsupported precision or causation assertions.
 
@@ -36,7 +47,7 @@ See [complete thread handoff](THREAD_HANDOFF_2026-11-23.md). Current focus is M1
 - **PR #165 — FAOS 16-v2 capture contract:** merged. Tested PR head: `766c0bc99e319e830c626c1fa8d7cacdf1822e9d`. All required workflows passed; full suite: **1026 passed, 31 warnings, 208 subtests passed**. This increment adds migration `0027_capture_protocol_16_v2.sql`, a versioned contract/registry, server API support, browser selection/resume, manifest binding, damage-localization exclusion for non-exterior slots, and compatibility tests.
 - **Protocol status:** `claims2car-16-v2` is selectable for controlled testing. `claims2car-16-v1` remains the default; legacy `claims2car-12-v1` remains supported. V2's current 16 positions are eight exterior views, four accessible structural corners, two cabin/restraint views, instrument-cluster telemetry, and physical VIN identity. The manual's second telemetry frame remains an explicit alignment gap; do not silently relabel or alter this immutable version. Field qualification is not complete.
 - Browser image quality remains advisory only; it never rejects or changes original evidence. Thresholds are not field calibrated.
-- **Current implementation target:** M1 persistent forensic provenance on PR #176, per the current handoff. The previous integrity-score/dispatch hardening target is historical; dispatch remains disabled and will be revisited only under the separate authorization gate.
+- **Current implementation target:** M1 server-owned readback verification and manifest chain-tip/context binding from current main, per the handoff. The previous integrity-score/dispatch hardening target is historical; dispatch remains disabled and will be revisited only under the separate authorization gate.
 
 - **Deployment:** OCI staging is still NOT deployed/accepted. Owner-controlled protected-environment/OCI configuration and workflow dispatch remain external blockers; do not request secrets in chat. Continue all code/test work.
 - **Thread continuity:** read README, this handoff, status, FAOS manual, and acceptance matrix; inspect live main/PR/check/deployment state; resume the next executable task above without replanning.
@@ -195,9 +206,9 @@ For each increment:
 - **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
 - **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
-## Current next task — M1 persistent provenance (2026-11-23)
+## Current next task — M1 readback and seal binding (after PR #180)
 
-Continue PR #176 only after syncing it with current main. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 remains draft until all M1 criteria pass.
+Continue from current main. Implement server-owned readback verification; bind manifest seal/root to verified chain tip, sequence/version and capture context; bind registered original/artifacts; then independent verifier, restart/restore, concurrency and adversarial tests. Keep dispatch/payment disabled. M1 remains incomplete; do not claim acceptance.
 
 
 

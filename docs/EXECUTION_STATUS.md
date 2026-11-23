@@ -1,19 +1,30 @@
 # Active focus — forensic substantiation (2026-11-23)
 
-## Current verified checkpoint (2026-11-23 — PR #176 M1 draft)
+## Latest verified checkpoint — PR #180 merged (2026-11-23)
+
+PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, **13/13 workflows passed**. Full suite: **1,050 passed, 31 warnings, 219 subtests**. Isolated synthetic PostgreSQL acceptance: **386/386 counted tests**, DB-01–DB-14 **14/14 PASS**, diagnostics successful and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
+
+Migration 0028 implements persistent SHA-256 event/genesis hashes, transactional backfill, append-time full-chain recomputation, direct-insert validation and update/delete immutability. Python/SQL parity, backfill rollback, tamper and database tests passed.
+
+**M1 remains incomplete:** server-owned readback verification; manifest-root chain-tip/sequence/version/context binding; registered-original/artifact binding; independent verifier agreement; restart/restore/concurrency/fork and external checkpoint. No deployment, field qualification, participant evidence, payment or dispatch.
+
+**Next code target:** server-owned PostgreSQL readback recomputation and chain-tip/context binding; then registered-original/artifact provenance and independent/adversarial/recovery tests. Continue in code, not planning.
+
+
+## Historical checkpoint before PR #180 (superseded)
 
 - PR #175 documentation program merged to main: cf985ee92ed6624467bc8dbeaea9e25ff9e207fa.
-- PR #176 draft/open: feat/persistent-forensic-provenance-m1, last verified head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404; **13/13 workflows green on this exact head** (including full suite, database authority, legacy database). No full-suite count captured for this run.
-- Implemented initial Python versioned deterministic event/genesis hash and independent chain verifier + known-answer/unit tests only. No SQL migration/backfill, persistence, SQL parity, manifest tip binding, API verifier replacement, external checkpoint, DB adversarial/restart/concurrency integration, deployment or field qualification.
-- Exact next task: complete M1 under the acceptance criteria in docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Keep PR draft/unmerged.
+- PR #176's initial Python hash/verifier slice was superseded and closed by merged PR #180; its branch is stale and should not be resumed.
+- This historical checkpoint described Python-only hashes before SQL migration 0028. Current merged code includes persistence, parity, backfill, append verification and immutable event guards; remaining M1 work is stated in the latest checkpoint above.
+- Next task is the remaining M1 readback, manifest-root and artifact-binding code gates from the current handoff.
 - This active focus supersedes previous “next task OCI staging” status. OCI staging remains unverified/undeployed, no accessible URL, Postgres/PostGIS/evidence volume/backup-restore/secure access still blockers.
 
-**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The only active next task is M1 persistent provenance/full-chain verification on PR #176; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
+**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The active task is M1 server-owned readback and chain-tip/context binding from current main; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
 
 
 The owner has explicitly directed undivided focus on the ability to substantiate every meaningful forensic claim. The ordered implementation methodology and acceptance gates are in **`docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`**. This is now the primary engineering focus; avoid adjacent feature expansion.
 
-**First implementation milestone:** M1 persistent provenance and independent full-chain verification. The current `backend/app/anchor/ledger.py` is process-memory based and is not the durable forensic ledger required by FAOS. Trace existing PostgreSQL migrations/authority, sealed manifests, registered original evidence, event/audit systems, verifier, integrity scoring, and dispatch/payment callers. Implement a persistent, tenant-scoped, append-only event/anchor model with canonical serialization, stable IDs, idempotency, server times, chain recomputation, checkpoint semantics, manifest/artifact/session binding, restart/concurrency recovery, and fail-closed verification. Do not create parallel persistence systems. Integrity status is not dispatch/payment authorization.
+**Current implementation milestone:** M1 persisted event-chain hashing is merged; integrate independent server-owned readback verification and chain-tip-bound manifests. The current `backend/app/anchor/ledger.py` is process-memory based and is not the durable forensic ledger required by FAOS. Trace existing PostgreSQL migrations/authority, sealed manifests, registered original evidence, event/audit systems, verifier, integrity scoring, and dispatch/payment callers. Implement a persistent, tenant-scoped, append-only event/anchor model with canonical serialization, stable IDs, idempotency, server times, chain recomputation, checkpoint semantics, manifest/artifact/session binding, restart/concurrency recovery, and fail-closed verification. Do not create parallel persistence systems. Integrity status is not dispatch/payment authorization.
 
 **Program:** M0 schemas/contracts → M1 provenance → M2 registered original/artifact binding → M3 VIN/configuration source verification → M4 camera calibration/alignment/coordinate frame → M5 damage localization + one calibrated measurement → M6 source-backed parts/OEM assessment → M7 deterministic versioned report → M8 held-out/blind validation and qualification. Start with synthetic known-answer data. Target first vertical slice: one controlled vehicle, one component, one bounded damage region, one validated measurement, one evidence-linked finding, one reproducible report.
 
@@ -68,11 +79,9 @@ Configure the protected OCI environments/state bucket, run reviewed plan/apply, 
 - Main after PR #156: `607a257ac36cc95a224c3f101d46a5884646c40a`.
 - **No deployment/field acceptance:** there is no user-accessible staging URL, live OCI compute, verified PostgreSQL/PostGIS host, durable evidence volume, backup/restore rehearsal, or physical-device qualification. Guarded OCI plan/apply and image-publish workflows exist, but protected environment secrets cannot be inspected or dispatched from this session. Live payments/dispatch remain disabled.
 
-## Current next task — M1 persistent provenance (2026-11-23)
+## Current next task — M1 readback and seal binding (after PR #180)
 
-Sync the M1 branch with current main before further commits. Then implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend append_event to compute/verify hashes under its session lock; server-side full-chain verification; immutable manifest seals bound to chain tip, capture context, consent/quality/exceptions and registered originals; server-derived verification; and tenant/RLS, append-only, migration/rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled and PR #176 draft until M1 acceptance. See docs/THREAD_HANDOFF_2026-11-23.md.
-
-
+From current main, integrate server-owned persisted-chain readback verification; bind manifest roots to verified chain tip, sequence/hash version and capture context; bind registered original/artifacts; then add independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. M1 remains incomplete. See docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md.
 
 ## Verified checkpoint — PR #153 merged (2026-11-22)
 
@@ -151,15 +160,15 @@ Sync the M1 branch with current main before further commits. Then implement SQL/
 - **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
 - **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
-## Current next task — M1 persistent provenance (2026-11-23)
+## Current next task — M1 readback and seal binding (after PR #180)
 
-Continue PR #176 only after syncing it with current main. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 remains draft until all M1 criteria pass.
+Continue from current main. Integrate server-owned persisted-chain readback verification; bind manifest roots to verified chain tip, sequence/hash version and capture context; bind registered original/artifacts; then add independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. M1 remains incomplete; see the authoritative thread handoff.
 
 
 
 ## Start-of-thread checklist
 
-Read docs/THREAD_HANDOFF_2026-11-23.md and the forensic program first. Query GitHub live for main, PR #176, exact-head CI and deployment status; then continue M1 without re-planning. OCI is deferred.
+Read docs/THREAD_HANDOFF_2026-11-23.md and the forensic program first. Query GitHub live for main, active PRs, exact-head CI and deployment status; continue the remaining M1 code gates without re-planning. OCI is deferred.
 
 
 
