@@ -1,5 +1,9 @@
 # Claim2Car Connect / FAOS — San Antonio pilot
 
+## Latest authoritative handoff — forensic substantiation (2026-11-23)
+
+**Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). It records current branch/PR/checkpoint, M1 reconnaissance, code contract and test vector, exact CI state, implementation constraints, release boundaries, and new-chat resume steps. This supersedes stale “next task = OCI staging” directives: staging remains undeployed, but the active engineering priority is M1 persistent provenance.
+
 ## Active engineering focus — forensic substantiation
 
 The owner has directed undivided focus on substantiating what Claim2Car claims to know: durable provenance, evidence-to-observation traceability, vehicle identity/configuration, camera calibration/alignment, geometric measurement with uncertainty, damage localization, source-backed parts/repair assessment, and reproducible forensic reports. Do not pivot to adjacent features until the initial forensic vertical slice is implemented and validated.
