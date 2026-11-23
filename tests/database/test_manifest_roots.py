@@ -32,7 +32,7 @@ class ManifestRootTests(unittest.TestCase):
         if has_protocol_column:
             with psycopg.connect(self.admin_url, autocommit=True) as fixture_conn:
                 with fixture_conn.transaction():
-                    fixture_conn.execute('SET LOCAL ROLE faos_fixture')
+                    fixture_conn.execute('SET LOCAL ROLE faos_writer')
                     fixture_conn.execute("SELECT set_config('faos.tenant_id',%s,true)",(self.tenant,))
                     for event in self.events:
                         args=(self.tenant,event.session_id,event.event_id,event.sequence,event.kind,event.actor,event.occurred_at,event.reason,event.payload_json,event.schema_version)
