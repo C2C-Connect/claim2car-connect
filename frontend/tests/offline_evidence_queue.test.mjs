@@ -166,7 +166,7 @@ await test("aad_metadata_tampering_fails_closed_before_upload", async () => {
   assert.equal(attempted,false);
   assert.equal(store.records[0].queueId,queued.queueId);
 });
-await test("prior_aes_gcm_queue_record_upgrades_to_aad_format_before_upload", async () => {
+await test("prior_v1_ciphertext_is_verified_and_upgraded_before_upload", async () => {
   const store=makeStore(),queue=makeQueue(store);
   const bytes=new TextEncoder().encode("prior-encrypted-original");
   const digest=Array.from(new Uint8Array(await webcrypto.subtle.digest("SHA-256",bytes)),b=>b.toString(16).padStart(2,"0")).join("");
