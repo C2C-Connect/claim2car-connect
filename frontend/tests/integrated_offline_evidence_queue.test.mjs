@@ -8,6 +8,7 @@ const canonicalAppSource=await readFile(new URL("../../app/web/assets/app.js",im
 const canonicalQueueSource=await readFile(new URL("../../app/web/assets/offline_evidence_queue.mjs",import.meta.url),"utf8");
 const canonicalHtml=await readFile(new URL("../../app/web/index.html",import.meta.url),"utf8");
 assert.ok(canonicalAppSource.includes("keyMaterial:token"));
+assert.ok(canonicalAppSource.includes('$("access-token").value = "";'));
 assert.ok(canonicalQueueSource.includes("subtle.encrypt"));
 assert.ok(canonicalQueueSource.includes("subtle.decrypt"));
 assert.ok(canonicalQueueSource.includes("prior plaintext queue"));
