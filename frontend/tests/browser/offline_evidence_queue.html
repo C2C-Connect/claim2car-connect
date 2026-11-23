@@ -77,6 +77,11 @@
         const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),b=>b.toString(16).padStart(2,"0")).join("");
         return queueStore.enqueue({sessionId,tenantId,actorId,slot:"legacy",artifactId:"legacy-artifact",requestId:"legacy-request",sha256:digest,byteLength:bytes.byteLength,queuedAt:new Date().toISOString(),uploaded:false,bytes});
       },
+      async tamperSlot(queueId,slot){
+        const records=await queueStore.list(sessionId,{tenantId,actorId,includeBytes:true});
+        const record=records.find(item=>item.queueId===queueId);if(!record)throw new Error("NOT_FOUND");
+        await queueStore.updateRecord(queueId,{...record,slot});return true;
+      },
       async raw(){return queueStore.list(sessionId,{tenantId,actorId,includeBytes:true});},
       async purge() {
         return queue.deleteSession(sessionId,{tenantId});
