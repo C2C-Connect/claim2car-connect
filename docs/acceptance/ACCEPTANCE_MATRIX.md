@@ -1,3 +1,7 @@
+
+## Active forensic substantiation gate — M1 (2026-11-23)
+
+**Status: IN PROGRESS / NOT ACCEPTED.** PR #176 (feat/persistent-forensic-provenance-m1, head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404) has an initial Python deterministic hash contract, full-chain verifier and known-answer/unit tests. Exact-head CI 13/13 successful, but automated workflow success does not satisfy the M1 gate. SQL migration/backfill/parity, persistence, server verifier, chain-tip-bound immutable seal, artifact binding, tenant/RLS, append-only and adversarial tests, restart/concurrency/idempotency, and independent verifier agreement are not yet complete. Keep draft/unmerged. See docs/THREAD_HANDOFF_2026-11-23.md for source reconnaissance, vectors and acceptance details. No external notarization, field qualification, forensic certification, or dispatch/payment authorization is implied.
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
 - **Main branch:** `main` (verify the live head on resume). **Last verified code merge:** PR #171 at `beb72950081201e891a7a3e66f42addd13c9f528`; audit/handoff docs PRs #172 and #173 are merged.
