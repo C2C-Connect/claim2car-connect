@@ -239,13 +239,15 @@ Passing G6 is not forensic quality. M0–M8 order/dependencies are defined in `d
 
 ## 14. Current implementation state — truth snapshot (must be checked live)
 
-- PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`; 13/13 workflows green.
-- Full suite: 1,050 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL authority acceptance: 386 counted tests; DB-01–DB-14 14/14 PASS and database overall ACCEPTED. This is not forensic M1 acceptance.
-- Migration 0028 implements persistent SHA-256 previous/entry hashes and version on `faos.events`, deterministic fail-closed backfill, append-time full-chain recomputation, direct-insert guard, and update/delete immutability. SQL/Python parity and migration/tamper tests passed.
-- **M1 incomplete:** readback verifier not integrated; manifest roots/seals not chain-tip/context-bound; registered original/artifact binding and independent verifier agreement incomplete; no external checkpoint. No field qualification, forensic certification, staging deployment, live payment or dispatch.
-- Next: server-owned PostgreSQL readback verification; bind seal/root to chain tip, sequence, version and capture context; bind originals/artifacts; independent/adversarial/restart/restore/concurrency/fork verification. See current thread handoff.
+PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested head `668785ea465b807932e63fdb6a555ed419099b6b`; 13/13 workflows green. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests, DB-01–DB-14 14/14 PASS and database overall ACCEPTED. This is not forensic M1 acceptance.
+
+Migration 0028 persists SHA-256 event-chain hashes. PR #182 integrates server-owned PostgreSQL readback recomputation; invalid chains fail closed before replay/locked consumers; legacy unhashed status is explicit; partial hash schema fails closed. Tamper, tenant and migration tests passed.
+
+**M1 incomplete:** manifest-root chain-tip/sequence/version/context binding; registered original/artifact binding; independent verifier; recovery/concurrency/fork and external checkpoint. No field qualification, forensic certification, staging deployment, participant evidence, live payment or dispatch.
+
+- Next: migration 0029 for seal/root chain-tip/context binding, server-side registration verification, original-artifact binding, independent/recovery/adversarial tests. See current thread handoff.
 
 ## 15. New-chat handoff
 
-On resume, read `docs/THREAD_HANDOFF_2026-11-23.md`, this specification, `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`, `docs/EXECUTION_HANDOFF.md`, `docs/EXECUTION_STATUS.md`, `docs/acceptance/ACCEPTANCE_MATRIX.md`, the foundational audit, product premise and core-engine manual. Check main live. Continue M1 from the next code target: server-owned readback recomputation, manifest-root chain-tip/context binding, registered original/artifact binding and independent/recovery/adversarial verification. Do not re-plan, widen scope, or claim M1 complete. After each verified increment synchronize handoff/status/acceptance references and report commit, exact tests/checks and limitations.
+On resume, read `docs/THREAD_HANDOFF_2026-11-23.md`, this specification, `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`, `docs/EXECUTION_HANDOFF.md`, `docs/EXECUTION_STATUS.md`, `docs/acceptance/ACCEPTANCE_MATRIX.md`, the foundational audit, product premise and core-engine manual. Check main live. Continue M1 at migration 0029: bind manifest roots to verified chain tip and capture context, then registered original/artifact binding and independent/recovery/adversarial tests. Do not re-plan or claim M1 complete. Synchronize handoff/status/acceptance after each verified increment.
 
