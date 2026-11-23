@@ -29,8 +29,17 @@ class ManifestRootTests(unittest.TestCase):
                 admin.execute('INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)', (self.tenant, self.session, self.version))
             else:
                 admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)', (self.tenant, self.session))
-        for event in self.events:
-            self.assertEqual(append(self.conn, self.tenant, event), 'ACCEPTED')
+        if has_protocol_column:
+            with psycopg.connect(self.admin_url, autocommit=True) as fixture_conn:
+                with fixture_conn.transaction():
+                    fixture_conn.execute('SET LOCAL ROLE faos_fixture')
+                    fixture_conn.execute("SELECT set_config('faos.tenant_id',%s,true)",(self.tenant,))
+                    for event in self.events:
+                        args=(self.tenant,event.session_id,event.event_id,event.sequence,event.kind,event.actor,event.occurred_at,event.reason,event.payload_json,event.schema_version)
+                        self.assertEqual(fixture_conn.execute('SELECT faos.append_event(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',args).fetchone()[0],'ACCEPTED')
+        else:
+            for event in self.events:
+                self.assertEqual(append(self.conn, self.tenant, event), 'ACCEPTED')
 
     def register(self, values=None, context=True):
         with psycopg.connect(self.admin_url, autocommit=True) as conn:
