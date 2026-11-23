@@ -104,7 +104,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         diagnostics = {
             'diagnostics_successful': True,
             'database': ['claim2car_test', 'PostgreSQL 16 synthetic test instance'],
-            'extensions': [['plpgsql', '1.0'], ['postgis', '3.4.3']],
+            'extensions': [['plpgsql', '1.0'], ['postgis', '3.4.3'], ['pgcrypto', '1.3']],
             'migration_inventory': self.inventory(names),
             'environment': {'classification': 'synthetic_isolated', 'connections': connections},
         }
