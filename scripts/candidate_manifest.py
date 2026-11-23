@@ -21,7 +21,13 @@ REQUIRED += ['frontend/src/modules/capture/vpic.mjs','frontend/src/modules/captu
 REQUIRED += ['frontend/src/modules/capture/vpic_transport.mjs','frontend/tests/vpic_transport.test.mjs','.github/workflows/vpic-live-lookup.yml']
 REQUIRED += ['frontend/app/vehicle-lab.html','frontend/app/vehicle-lab.css','frontend/app/vehicle-lab.mjs','frontend/app/app.mjs','frontend/app/index.html']
 
-REQUIRED += ['frontend/tests/vpic_transport.test.mjs']\nREQUIRED += [\n    'database/event_hash_chain.py',\n    'tests/database/test_event_hash_chain_unit.py',\n    'tests/database/test_event_hash_chain_integration.py',\n    'authority_migrations/0028_persistent_event_hash_chain.sql',\n]
+REQUIRED += ['frontend/tests/vpic_transport.test.mjs']
+REQUIRED += [
+    'database/event_hash_chain.py',
+    'tests/database/test_event_hash_chain_unit.py',
+    'tests/database/test_event_hash_chain_integration.py',
+    'authority_migrations/0028_persistent_event_hash_chain.sql',
+]
 REQUIRED += [
     'authority_migrations/0022_collision_vehicle_capture_link.sql',
     'authority_migrations/0023_consented_vehicle_profile.sql',
