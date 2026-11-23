@@ -87,7 +87,7 @@ class CompletionReceiptTests(unittest.TestCase):
                 ('0' * 64, f.tenant, f.session, f.seal),
             )
         from database.receipts import inspect_completion_receipt
-        with self.assertRaisesRegex(ValueError, '^MANIFEST_ROOT_BINDING_INVALID$'):
+        with self.assertRaisesRegex(ValueError, '^MANIFEST_ROOT_CONTEXT_HASH_MISMATCH$'):
             inspect_completion_receipt(f.conn, f.tenant, f.session, self.request)
 
     def test_receipt_write_rejects_root_binding_tamper(self):
