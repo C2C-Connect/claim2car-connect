@@ -59,6 +59,7 @@ async function connect() {
   if (!token) { $("sign-in-error").textContent = "An access token is required."; return; }
   try {
     identity = await api("/api/v1/identity");
+    $("access-token").value = "";
     await loadCaptureProtocols();
     $("sign-in").hidden = true;
     $("workspace").hidden = false;
