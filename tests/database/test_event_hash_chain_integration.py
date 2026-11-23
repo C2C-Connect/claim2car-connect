@@ -74,7 +74,7 @@ class EventHashChainIntegration(unittest.TestCase):
     def test_direct_insert_is_guarded_and_auto_hashed_for_privileged_fixture_role(self):
         with psycopg.connect(self.admin_url,autocommit=True) as admin:
             admin.execute("INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) VALUES (%s,%s,%s,1,%s,%s,%s,%s,%s,%s)",
-                (self.tenant,self.session,"admin-fixture-event","SESSION_CREATED","synthetic-admin",
+                (self.tenant,self.session,"admin-fixture-event",1,"SESSION_CREATED","synthetic-admin",
                  "2026-11-23T12:35:00Z","privileged fixture","{\"synthetic\":true}","0.1"))
             row=admin.execute("SELECT previous_hash,entry_hash,hash_version FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s",
                 (self.tenant,self.session,"admin-fixture-event")).fetchone()
