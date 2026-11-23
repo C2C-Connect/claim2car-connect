@@ -100,6 +100,7 @@ class MigrationControlsIntegration(unittest.TestCase):
             "SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='faos.events'::regclass"
         ).fetchone()
         self.assertEqual(flags,(True,True))
+        self.assertTrue(self.admin_db.execute("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='pgcrypto')").fetchone()[0])
         columns=self.admin_db.execute(
             "SELECT column_name,is_nullable FROM information_schema.columns WHERE table_schema='faos' AND table_name='events' AND column_name IN ('previous_hash','entry_hash','hash_version') ORDER BY column_name"
         ).fetchall()
