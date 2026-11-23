@@ -162,7 +162,7 @@ From current main, integrate server-owned persisted-chain readback verification;
 
 ## Current next task — M1 readback and seal binding (after PR #180)
 
-Continue PR #176 only after syncing it with current main. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 remains draft until all M1 criteria pass.
+Continue from current main. Integrate server-owned persisted-chain readback verification; bind manifest roots to verified chain tip, sequence/hash version and capture context; bind registered original/artifacts; then add independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. M1 remains incomplete; see the authoritative thread handoff.
 
 
 
