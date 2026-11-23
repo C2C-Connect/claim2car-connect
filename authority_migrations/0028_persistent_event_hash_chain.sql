@@ -86,6 +86,7 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,faos,public,pg_temp
 AS $guard$
 DECLARE last_sequence bigint; last_hash text; expected_previous text; expected_entry text;
+        verify_row faos.events%ROWTYPE; verify_previous text; verify_expected bigint; verify_hash text;
 BEGIN
  IF TG_OP <> 'INSERT' THEN
    RAISE EXCEPTION 'EVENT_HISTORY_IMMUTABLE';
@@ -99,6 +100,18 @@ BEGIN
  END IF;
  PERFORM 1 FROM faos.sessions WHERE tenant_id=NEW.tenant_id AND session_id=NEW.session_id FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'SESSION_NOT_FOUND'; END IF;
+ verify_previous := faos.event_chain_genesis_hash(NEW.tenant_id,NEW.session_id);
+ verify_expected := 1;
+ FOR verify_row IN SELECT * FROM faos.events WHERE tenant_id=NEW.tenant_id AND session_id=NEW.session_id ORDER BY sequence LOOP
+   IF verify_row.sequence IS DISTINCT FROM verify_expected OR verify_row.hash_version IS DISTINCT FROM 'event-hash-v1' OR verify_row.previous_hash IS DISTINCT FROM verify_previous THEN
+     RAISE EXCEPTION 'EVENT_CHAIN_INVALID';
+   END IF;
+   verify_hash := faos.event_chain_entry_hash(verify_row.tenant_id,verify_row.session_id,verify_row.event_id,
+     verify_row.sequence,verify_row.kind,verify_row.actor,verify_row.occurred_at,verify_row.reason,
+     verify_row.payload_json,verify_row.schema_version,verify_previous);
+   IF verify_hash IS DISTINCT FROM verify_row.entry_hash THEN RAISE EXCEPTION 'EVENT_CHAIN_INVALID'; END IF;
+   verify_previous := verify_hash; verify_expected := verify_expected+1;
+ END LOOP;
  SELECT sequence,entry_hash INTO last_sequence,last_hash
  FROM faos.events WHERE tenant_id=NEW.tenant_id AND session_id=NEW.session_id
  ORDER BY sequence DESC LIMIT 1;
