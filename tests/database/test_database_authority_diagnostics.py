@@ -23,6 +23,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0026_square_sandbox_webhook_reconciliation.sql',
             '0027_capture_protocol_16_v2.sql',
             '0028_persistent_event_hash_chain.sql',
+            '0029_manifest_root_chain_context_binding.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
@@ -80,7 +81,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             'claim_case_retry_without_update_lock.sql', 'claim_case_capture_session.sql',
             'claim_case_incident_intake.sql', 'incident_event_kinds.sql',
             'claim_case_incident_read_boundary.sql', 'event_contract_parity.sql',
-            'capture_protocol_session_binding.sql', 'manifest_root_protocol_binding.sql', 'collision_lifecycle_record.sql', 'collision_claim_link.sql', 'collision_vehicle_capture_link.sql', 'consented_vehicle_profile.sql', 'audited_capture_exceptions_pause_resume.sql', 'square_sandbox_payment_intents.sql', 'square_sandbox_webhook_reconciliation.sql', 'capture_protocol_16_v2.sql', 'persistent_event_hash_chain.sql',
+            'capture_protocol_session_binding.sql', 'manifest_root_protocol_binding.sql', 'collision_lifecycle_record.sql', 'collision_claim_link.sql', 'collision_vehicle_capture_link.sql', 'consented_vehicle_profile.sql', 'audited_capture_exceptions_pause_resume.sql', 'square_sandbox_payment_intents.sql', 'square_sandbox_webhook_reconciliation.sql', 'capture_protocol_16_v2.sql', 'persistent_event_hash_chain.sql', 'manifest_root_chain_context_binding.sql',
         ), start=1)]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_unchanged_candidate_compares',
@@ -135,7 +136,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0025_square_sandbox_payment_intents.sql',
             '0026_square_sandbox_webhook_reconciliation.sql',
             '0027_capture_protocol_16_v2.sql',
-            '0028_persistent_event_hash_chain.sql',
+            '0028_persistent_event_hash_chain.sql', '0029_manifest_root_chain_context_binding.sql',
         ]
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
@@ -159,8 +160,8 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_rejects_unreviewed_migration_after_0028(self):
-        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0028'):
+    def test_rejects_unreviewed_migration_after_0029(self):
+        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0029'):
             validate_authority_migration_inventory(self.inventory([
                 '0017_event_contract_parity.sql',
                 '0018_capture_protocol_session_binding.sql',
