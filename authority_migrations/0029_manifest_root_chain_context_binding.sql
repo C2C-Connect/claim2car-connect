@@ -11,6 +11,11 @@ ALTER TABLE faos.manifest_roots ADD COLUMN seal_chain_hash text;
 ALTER TABLE faos.manifest_roots ADD COLUMN context_binding_hash text;
 ALTER TABLE faos.manifest_roots ADD COLUMN binding_version text;
 
+-- Migration-only cross-tenant backfill, transactionally restore forced RLS.
+ALTER TABLE faos.events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE faos.sessions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE faos.manifest_roots DISABLE ROW LEVEL SECURITY;
+
 -- Validate and backfill existing roots from exact persisted chain prefix.
 DO $backfill$
 DECLARE root_row record; e faos.events%ROWTYPE; previous text; expected bigint; computed text;
@@ -34,6 +39,12 @@ BEGIN
    WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id AND seal_event_id=root_row.seal_event_id;
  END LOOP;
 END $backfill$;
+ALTER TABLE faos.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE faos.events FORCE ROW LEVEL SECURITY;
+ALTER TABLE faos.sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE faos.sessions FORCE ROW LEVEL SECURITY;
+ALTER TABLE faos.manifest_roots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE faos.manifest_roots FORCE ROW LEVEL SECURITY;
 ALTER TABLE faos.manifest_roots ALTER COLUMN seal_sequence SET NOT NULL;
 ALTER TABLE faos.manifest_roots ALTER COLUMN seal_chain_hash SET NOT NULL;
 ALTER TABLE faos.manifest_roots ALTER COLUMN context_binding_hash SET NOT NULL;
@@ -95,6 +106,28 @@ BEGIN
  VALUES(p_tenant,p_session,p_seal,p_digest,p_version,v_seq,v_hash,binding,'manifest-context-v1');
  RETURN 'REGISTERED';
 END $register$;
+
+CREATE OR REPLACE FUNCTION faos.record_completion_receipt(p_tenant uuid,p_session text,p_request uuid,p_seal text,p_sequence bigint)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,faos,public,pg_temp
+AS $receipt$
+DECLARE last_sequence bigint; last_seal text; old faos.completion_receipts%ROWTYPE;
+BEGIN
+ IF faos.tenant_id() IS NULL OR p_tenant IS DISTINCT FROM faos.tenant_id() THEN RAISE EXCEPTION 'TENANT_CONTEXT_MISMATCH'; END IF;
+ PERFORM faos.lock_session_for_completion(p_tenant,p_session);
+ SELECT COALESCE(MAX(sequence),0) INTO last_sequence FROM faos.events WHERE tenant_id=p_tenant AND session_id=p_session;
+ IF p_sequence IS DISTINCT FROM last_sequence THEN RAISE EXCEPTION 'COMPLETION_SEQUENCE_CHANGED'; END IF;
+ SELECT event_id INTO last_seal FROM faos.events WHERE tenant_id=p_tenant AND session_id=p_session AND kind='MANIFEST_SEALED' ORDER BY sequence DESC LIMIT 1;
+ IF last_seal IS NULL OR p_seal IS DISTINCT FROM last_seal THEN RAISE EXCEPTION 'SEAL_SNAPSHOT_CHANGED'; END IF;
+ IF NOT faos.verify_manifest_root_binding(p_tenant,p_session,p_seal) THEN RAISE EXCEPTION 'MANIFEST_ROOT_BINDING_INVALID'; END IF;
+ SELECT * INTO old FROM faos.completion_receipts WHERE tenant_id=p_tenant AND session_id=p_session AND request_id=p_request;
+ IF FOUND THEN
+  IF ROW(old.seal_event_id,old.event_sequence) IS DISTINCT FROM ROW(p_seal,p_sequence) THEN RAISE EXCEPTION 'RECEIPT_CONFLICT'; END IF;
+  RETURN 'DUPLICATE';
+ END IF;
+ INSERT INTO faos.completion_receipts(tenant_id,session_id,request_id,seal_event_id,event_sequence)
+ VALUES(p_tenant,p_session,p_request,p_seal,p_sequence);
+ RETURN 'RECORDED';
+END $receipt$;
 
 REVOKE ALL ON FUNCTION faos.manifest_context_binding_hash(uuid,text,text,bigint,text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION faos.verify_manifest_root_binding(uuid,text,text) FROM PUBLIC;
