@@ -16,6 +16,7 @@ from app.domain_events import DomainEvent
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 GENESIS_DOMAIN = "FAOS_EVENT_CHAIN_GENESIS_V1"
 ENTRY_DOMAIN = "FAOS_EVENT_HASH_V1"
+HASH_VERSION = "event-hash-v1"
 
 
 def _hex_text(value: str) -> str:
@@ -104,6 +105,8 @@ def verify_event_chain(tenant_id: str, session_id: str, rows: Iterable[Mapping])
                 return {"valid": False, "reason": "SESSION_BINDING_MISMATCH", "failed_sequence": expected_sequence}
             if row["sequence"] != expected_sequence:
                 return {"valid": False, "reason": "EVENT_SEQUENCE_GAP_OR_REORDER", "failed_sequence": expected_sequence}
+            if row.get("hash_version") != HASH_VERSION:
+                return {"valid": False, "reason": "UNSUPPORTED_EVENT_HASH_VERSION", "failed_sequence": expected_sequence}
             if row["previous_hash"] != previous:
                 return {"valid": False, "reason": "PREVIOUS_HASH_MISMATCH", "failed_sequence": expected_sequence}
             if not _HASH_RE.fullmatch(row["entry_hash"]):
