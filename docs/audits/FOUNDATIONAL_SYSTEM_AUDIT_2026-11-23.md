@@ -127,6 +127,14 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 **Remediation:** Label the capability clearly, preserve limitations and uncertainty, validate against representative imagery, persist versioned observations only when intended, and keep model outputs from consequential decisions absent validation and human review.
 
+
+### AUD-016 — Encrypted offline records do not authenticate capture metadata as AES-GCM associated data (P1)
+**Evidence:** The encrypted queue binds ciphertext integrity through AES-GCM but currently decrypts using only the IV/key, without authenticated additional data derived from the record's session, tenant, actor, slot, artifact/request IDs, digest, and byte length. Those metadata fields are stored separately in IndexedDB.
+
+**Impact:** Local metadata changes may not be detected by cryptographic decryption. Although the server enforces its own session/slot/consent contract and verifies original-byte hashes, altered queue metadata could cause a locally encrypted original to be presented under a different capture slot or context.
+
+**Remediation:** Bind a canonical, versioned metadata tuple as AES-GCM additional authenticated data (AAD); migrate existing ciphertext to the new format before upload; reject metadata changes; test tampering of slot, session, actor/tenant, artifact/request IDs, digest, and length. Keep server-side provenance authoritative.
+
 ## Initial priority order for corrective work
 
 1. **AUD-001 + AUD-002:** Canonical root offline queue encryption and frontend discrepancy—verify actual served path; resolve legacy plaintext records safely; regression tests.
@@ -156,6 +164,7 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-013 | CONFIRMED | Triage API has default synthetic values that can yield a result from a session ID alone |
 | AUD-014 | CONFIRMED limitation | Anchor ledger is process-local; no persistent/external anchor established |
 | AUD-015 | CONFIRMED limitation | Photo baseline is heuristic and result is not persisted |
+| AUD-016 | CONFIRMED / corrective design identified | Offline ciphertext lacks AES-GCM AAD binding for record metadata; bind metadata in the next encrypted-queue iteration |
 
 ## Change log
 
