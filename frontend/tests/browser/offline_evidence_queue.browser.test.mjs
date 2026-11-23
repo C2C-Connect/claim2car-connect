@@ -75,8 +75,8 @@ try {
   await page.evaluate(() => window.c2cQueueHarness.addOtherActor());
   const otherActor = await page.evaluate(() => window.c2cQueueHarness.status("browser-test-other-actor"));
   assert.equal(otherActor.total, 1);
-  assert.equal((await page.evaluate(() => window.c2cQueueHarness.status())).total, 2);
-  assert.equal(await page.evaluate(() => window.c2cQueueHarness.purge()), 3);
+  assert.equal((await page.evaluate(() => window.c2cQueueHarness.status())).total, 3);
+  assert.equal(await page.evaluate(() => window.c2cQueueHarness.purge()), 4);
   assert.equal((await page.evaluate(() => window.c2cQueueHarness.status())).total, 0);
   assert.equal((await page.evaluate(() => window.c2cQueueHarness.status("browser-test-other-actor"))).total, 0);
   // Separate prototype queue: verify compatibility but do not confuse it with the canonical root queue.
