@@ -4,6 +4,11 @@
 
 Owner-directed focus is now forensic substantiation—not adjacent expansion. The first target is M1 persistent provenance and independently recomputed event-chain/manifest/artifact verification. PR #176 is a draft Python-only initial slice; 13/13 exact-head CI checks succeeded, but SQL persistence/parity, migration/backfill, server verifier, manifest chain-tip binding, tenant/adversarial/restart/concurrency tests and independent verifier agreement remain. See docs/THREAD_HANDOFF_2026-11-23.md and the forensic program for exact gaps and resume steps. This product premise does not authorize claims that target mechanics are implemented, field-validated, independently notarized, or certified.
 
+
+## Current implementation focus / handoff (2026-11-23)
+
+Owner-directed focus is now forensic substantiation—not adjacent expansion. The first target is M1 persistent provenance and independently recomputed event-chain/manifest/artifact verification. PR #176 is a draft Python-only initial slice; 13/13 exact-head CI checks succeeded, but SQL persistence/parity, migration/backfill, server verifier, manifest chain-tip binding, tenant/adversarial/restart/concurrency tests and independent verifier agreement remain. See docs/THREAD_HANDOFF_2026-11-23.md and the forensic program for exact gaps and resume steps. This product premise does not authorize claims that target mechanics are implemented, field-validated, independently notarized, or certified.
+
 **Status:** Owner-aligned governing product premise and architecture direction  
 **Applies to:** Product strategy, domain modeling, architecture, implementation, AI/automation, reporting, acceptance, and future agent handoffs  
 **Canonical repository:** `C2C-Connect/claim2car-connect`
