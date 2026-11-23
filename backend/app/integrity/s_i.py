@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 from config import forensic_constants as C
 
@@ -31,6 +31,7 @@ class IntegrityResult:
     c_chain: float = 1.0
     c_chain_geometric: float = 1.0
     chain_failure_reason: Optional[str] = None
+    integrity_failure_reasons: List[str] = None
 
 
 def _fraction(value: float, name: str) -> float:
@@ -126,4 +127,5 @@ def compute_s_i(inputs: IntegrityInputs) -> IntegrityResult:
         c_chain=round(c_chain_effective, 4),
         c_chain_geometric=round(c_chain_geometric, 4),
         chain_failure_reason=chain_failure or ("MASTER_HASH_INVALID" if not inputs.master_hash_valid else None),
+        integrity_failure_reasons=[reason for reason in (chain_failure, "MASTER_HASH_INVALID" if not inputs.master_hash_valid else None, "GPS_SPOOF_SUSPECTED" if inputs.gps_spoof_suspected else None) if reason],
     )
