@@ -89,7 +89,7 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.location_brands VALUES (%s,%s,%s)',(tenant,ids['location'],ids['brand']))
             sequence = admin.execute('SELECT max(sequence)+1 FROM faos.events WHERE tenant_id=%s AND session_id=%s',(tenant,session)).fetchone()[0]
             payload = json.dumps({'schema_version':'0.1','manifest_digest':digest,'shot_list_version':'claims2car-12-v1'},sort_keys=True,separators=(',',':'))
-            admin.execute('INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,session,seal,sequence,'MANIFEST_SEALED','synthetic-matrix','2026-01-01T00:00:00Z','storage isolation fixture only',payload,'0.1'))
+            admin.execute('INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,session,seal,sequence,'MANIFEST_SEALED','synthetic-matrix','2026-01-01T00:00:00Z','storage isolation fixture only',payload,'0.1'))
             admin.execute('INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) VALUES (%s,%s,%s,%s,%s)',(tenant,session,seal,digest,'claims2car-12-v1'))
             admin.execute('INSERT INTO faos.completion_receipts(tenant_id,session_id,request_id,seal_event_id,event_sequence) VALUES (%s,%s,%s,%s,%s)',(tenant,session,ids['request'],seal,sequence))
             ledger_id='matrix-ledger-'+uuid.uuid4().hex
