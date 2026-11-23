@@ -155,7 +155,7 @@ await test("consent_withdrawal_purges_local_originals", async () => {
 });
 
 
-await test("authenticated_metadata_tampering_fails_decryption", async () => {
+await test("aad_metadata_tampering_fails_closed_before_upload", async () => {
   const store=makeStore(),queue=makeQueue(store);
   const queued=await queue.queueFile({sessionId:"session-tamper",tenantId:"tenant-a",actorId:"actor-a",slot:"front",file:makeFile("protected-original"),keyMaterial});
   store.records[0].slot="rear";
