@@ -1,3 +1,15 @@
+# Active focus — forensic substantiation (2026-11-23)
+
+The owner has explicitly directed undivided focus on the ability to substantiate every meaningful forensic claim. The ordered implementation methodology and acceptance gates are in **`docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`**. This is now the primary engineering focus; avoid adjacent feature expansion.
+
+**First implementation milestone:** M1 persistent provenance and independent full-chain verification. The current `backend/app/anchor/ledger.py` is process-memory based and is not the durable forensic ledger required by FAOS. Trace existing PostgreSQL migrations/authority, sealed manifests, registered original evidence, event/audit systems, verifier, integrity scoring, and dispatch/payment callers. Implement a persistent, tenant-scoped, append-only event/anchor model with canonical serialization, stable IDs, idempotency, server times, chain recomputation, checkpoint semantics, manifest/artifact/session binding, restart/concurrency recovery, and fail-closed verification. Do not create parallel persistence systems. Integrity status is not dispatch/payment authorization.
+
+**Program:** M0 schemas/contracts → M1 provenance → M2 registered original/artifact binding → M3 VIN/configuration source verification → M4 camera calibration/alignment/coordinate frame → M5 damage localization + one calibrated measurement → M6 source-backed parts/OEM assessment → M7 deterministic versioned report → M8 held-out/blind validation and qualification. Start with synthetic known-answer data. Target first vertical slice: one controlled vehicle, one component, one bounded damage region, one validated measurement, one evidence-linked finding, one reproducible report.
+
+No unsupported metric precision, causation, hidden damage, forensic certification, or field accuracy claims. No real participant evidence, live payments, dispatch, or public/accepted staging without their independent gates.
+
+---
+
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
 - **Main branch:** `main` (verify the live head on resume). **Last verified code merge:** PR #171 at `beb72950081201e891a7a3e66f42addd13c9f528`; audit/handoff docs PRs #172 and #173 are merged.
