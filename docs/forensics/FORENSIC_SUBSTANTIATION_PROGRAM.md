@@ -1,18 +1,13 @@
 # Claim2Car Forensic Substantiation Program
-## Latest verified implementation checkpoint — PR #180 merged (2026-11-23)
+## Latest verified implementation checkpoint — PR #182 merged (2026-11-23)
 
-PR #180 merged to main (`35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`). Exact PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`: **13/13 workflows green**; full suite **1,050 passed, 31 warnings, 219 subtests passed**. PostgreSQL authority acceptance on isolated synthetic environment: 386 counted tests, DB-01–DB-14 14/14 PASS, overall DB acceptance ACCEPTED. This is not forensic M1 acceptance or field qualification.
+PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows green**. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests, DB-01–DB-14 14/14 PASS and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
 
-Migration 0028 now stores SHA-256 event/genesis commitments, transactionally backfills existing rows without rewriting payloads, fails on sequence gaps, verifies the full stored chain before append, validates direct insert continuity and rejects update/delete. Python/SQL parity and migration/adversarial tests passed.
+Migration 0028 persists SHA-256 event hashes and fail-closed backfill. PR #182 adds server-owned persisted-chain readback from PostgreSQL; invalid chains fail closed before replay/locked consumers; legacy unhashed status is explicit; partial schema fails closed. Tamper, tenant, legacy and locked-consumer tests passed.
 
-**M1 incomplete:** server readback verifier integration; chain-tip/sequence/hash-version/capture-context binding in manifest root; registered-original/artifact binding; independent verifier; restart/restore/concurrency/fork and external checkpoint acceptance. External anchor is separate from the in-DB chain.
+**M1 incomplete:** sealed manifest roots do not bind verified chain tip, sequence, hash version and context; registered original/artifact binding, independent verifier agreement, recovery/concurrency/fork tests and external checkpoint remain. No staging, field qualification, participant evidence, payment or dispatch.
 
-**Next code task:** server-owned persisted-chain readback verification, seal/root chain-tip/context binding, artifact provenance binding, then adversarial/recovery/reproducibility tests. Keep real participants, field qualification, dispatch and payments gated.
-
-
-**Owner directive / focus reset:** 2026-11-23  
-**Status:** ACTIVE ENGINEERING PRIORITY — forensic substantiation over adjacent product expansion  
-**Current verified code checkpoint:** PR #171 merged; offline queue encryption verified by exact-head CI. This document is the focus/handoff contract for the next implementation stream, not evidence that the planned mechanics already exist.
+**Next code task:** migration 0029 for manifest-root chain-tip/context binding and verified registration/consumers; then artifact provenance and independent/recovery/adversarial tests. No planning loop.
 
 ## Mission
 

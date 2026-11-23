@@ -1,4 +1,14 @@
-## Latest verified checkpoint — PR #180 merged (2026-11-23)
+## Latest verified checkpoint — PR #182 merged (2026-11-23)
+
+PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested PR head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows green**. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests; DB-01–DB-14 14/14 PASS and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
+
+Migration 0028 persists SHA-256 event hashes and fail-closed backfill. PR #182 adds server-owned persisted-chain readback from PostgreSQL, invalid-chain rejection before journal replay/locked consumers, explicit legacy-unhashed status and partial-schema failure. SQL/Python parity, readback, tamper, tenant and migration tests passed.
+
+**M1 incomplete:** sealed manifest roots do not bind verified chain tip, sequence, hash version and context; original-artifact binding, independent verifier agreement, recovery/concurrency/fork tests and external checkpoint remain. No staging, field qualification, participant evidence, payment or dispatch.
+
+**Next code task:** migration 0029 for chain-tip/context binding in manifest roots and registration; then bind original artifacts and implement independent/recovery/adversarial verification. No planning loop.
+
+## Historical checkpoint — PR #180 merged (superseded by PR #182)
 
 PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`. Exact PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`: **13/13 workflows green**. Full repository: **1,050 passed, 31 warnings, 219 subtests passed**. Isolated synthetic PostgreSQL authority acceptance: **386/386 counted tests**, DB-01–DB-14 **14/14 PASS**, diagnostics successful, database overall ACCEPTED. This does not equal forensic M1 acceptance or field qualification.
 
@@ -14,7 +24,7 @@ Migration 0028 adds persistent SHA-256 genesis/event hashes, fail-closed transac
 
 **Historical status at that checkpoint:** PR #176 contained only the initial Python hash/verifier slice. PR #180 superseded and closed it; see the current verified checkpoint above. No external notarization, field qualification, forensic certification, or dispatch/payment authorization is implied.
 
-**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The active next task is M1 server readback and chain-tip/context binding from merged PR #180; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
+**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The active next task is migration 0029 manifest-root chain-tip/context binding after merged PR #182; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
 
 
 ## Historical M1 checkpoint before PR #180 (superseded)
@@ -106,7 +116,7 @@ Migration 0028 adds persistent SHA-256 genesis/event hashes, fail-closed transac
 - **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
 - **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
-## Current next task — M1 readback and seal binding (after PR #180)
+## Current next task — M1 manifest-root chain-tip binding (after PR #182)
 
 From current main, implement server-owned persisted-chain readback verification; bind manifest seal/root to chain tip, sequence/hash version and capture context; bind registered originals/artifacts; then add independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. See the current thread handoff and complete forensic specification.
 
