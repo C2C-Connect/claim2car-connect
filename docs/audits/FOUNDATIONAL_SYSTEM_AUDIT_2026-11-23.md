@@ -2,7 +2,7 @@
 
 **Audit started:** 2026-11-23  
 **Status:** IN PROGRESS — initial repository inspection, not a certification or exhaustive audit  
-**Audit baseline:** `main` at `44a40af41ef4f20366ac66227f431a900ba0cd83` (PR #168 merged). **Current checkpoint:** PR #171 code merge at `beb72950081201e891a7a3e66f42addd13c9f528`; PR #172 audit/handoff docs merged at `785bef6242c768b91bfa7ecde0dc17f7a8e009d4`.  
+**Audit baseline:** `main` at `44a40af41ef4f20366ac66227f431a900ba0cd83` (PR #168 merged). **Current checkpoint:** PR #171 code merge at `beb72950081201e891a7a3e66f42addd13c9f528`; audit/handoff docs PRs #172 and #173 merged. Verify live `main` head on resume.  
 **Purpose:** Inspect existing mechanics against the product/FAOS requirements, identify verified gaps and risks, and convert the highest-priority findings into tested corrective changes. This document is an engineering work ledger; it is not a security certification, forensic validation, legal opinion, or field acceptance.
 
 ## Method
