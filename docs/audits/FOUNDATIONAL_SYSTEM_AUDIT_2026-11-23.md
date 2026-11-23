@@ -259,3 +259,4 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 ## Change log
 
 - 2026-11-23: Initial source-level inspection recorded 24 findings. PR #171 remediated AUD-001/AUD-016 (canonical offline queue encryption and authenticated metadata) and corrected AUD-003 (README claim). Exact-head 13/13 CI passed. Owner reset focus to forensic substantiation; detailed program and acceptance gates recorded in `docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`. Next code target M1 is persistent provenance and independently recomputed full-chain verification; audit remains in progress.
+\n\n## Canonical detailed requirement baseline\n\nThe complete forensic substantiation specification is [complete forensic substantiation specification](docs/forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md). Audit gaps and verified status must be assessed against it; aspirational capabilities are not implementation evidence.\n
