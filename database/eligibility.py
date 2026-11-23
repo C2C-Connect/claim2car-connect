@@ -1,6 +1,7 @@
 """Registry-backed synthetic decisions; fixture authority is not production sealing."""
 from app.synthetic_evidence import reconstruct, check_completion
 from database.readback import locked_journal
+from database.manifest_binding import verify_registered_manifest_binding
 
 
 def _check_registered_journal(conn, tenant, session_id, journal, supplied_bytes):
@@ -17,6 +18,7 @@ def _check_registered_journal(conn, tenant, session_id, journal, supplied_bytes)
         raise ValueError('MANIFEST_ROOT_NOT_REGISTERED')
     if root != (state.seal.manifest_digest, state.seal.shot_list_version):
         raise ValueError('REGISTERED_ROOT_MISMATCH')
+    verify_registered_manifest_binding(conn, tenant, session_id, state.seal.event_id)
     decision = check_completion(session_id, journal.events, supplied_bytes, root[0])
     return decision, state.seal
 
