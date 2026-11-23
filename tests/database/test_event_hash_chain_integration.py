@@ -83,6 +83,21 @@ class EventHashChainIntegration(unittest.TestCase):
             self.assertEqual(row[1],event_hash(self.tenant,DomainEvent(self.session,"admin-fixture-event",1,"SESSION_CREATED","synthetic-admin",
                 "2026-11-23T12:35:00Z","privileged fixture",'{"synthetic":true}'),row[0]))
 
+    def test_append_rejects_existing_row_tampering_even_after_trigger_bypass(self):
+        self.assertEqual(self.append(self.event),"ACCEPTED")
+        with psycopg.connect(self.admin_url,autocommit=True) as admin:
+            admin.execute("ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation")
+            try:
+                admin.execute("UPDATE faos.events SET payload_json='{\"synthetic\":false}' WHERE tenant_id=%s AND session_id=%s",
+                    (self.tenant,self.session))
+            finally:
+                admin.execute("ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation")
+        next_event=DomainEvent(self.session,"chain-event-2",2,"CONSENT_RECORDED","synthetic-test",
+            "2026-11-23T12:35:00Z","append after tamper",'{"consent":true}')
+        with self.assertRaises(psycopg.errors.RaiseException) as raised:
+            self.append(next_event)
+        self.assertEqual(raised.exception.diag.message_primary,"EVENT_HASH_MISMATCH")
+
     def test_mutation_rejected_by_trigger(self):
         self.assertEqual(self.append(self.event),"ACCEPTED")
         with psycopg.connect(self.admin_url,autocommit=True) as admin:
