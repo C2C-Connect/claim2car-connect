@@ -59,6 +59,7 @@ async function connect() {
   if (!token) { $("sign-in-error").textContent = "An access token is required."; return; }
   try {
     identity = await api("/api/v1/identity");
+    $("access-token").value = "";
     await loadCaptureProtocols();
     $("sign-in").hidden = true;
     $("workspace").hidden = false;
@@ -395,6 +396,7 @@ async function syncPendingUploads(sessionId) {
     sessionId,
     tenantId:identity.tenant_id,
     actorId:identity.actor_id,
+    keyMaterial:token,
     upload: async (record) => {
       await api(`/api/v1/capture-sessions/${encodeURIComponent(sessionId)}/artifacts`, {
         method:"POST",
@@ -453,7 +455,7 @@ async function upload(slot, file, status) {
     if (!readiness?.capture_allowed) {
       throw new Error("OWNER_CONSENT_AND_VALID_VEHICLE_REFERENCE_REQUIRED_BEFORE_LOCAL_CAPTURE");
     }
-    const queued = await evidenceQueue.queueFile({sessionId:id,tenantId:identity.tenant_id,actorId:identity.actor_id,slot,file});
+    const queued = await evidenceQueue.queueFile({sessionId:id,tenantId:identity.tenant_id,actorId:identity.actor_id,slot,file,keyMaterial:token});
     status.textContent = `Saved on this device · queued #${queued.queueId} · waiting to sync`;
     await refreshCaptureQueueStatus(id);
     await syncPendingUploads(id);

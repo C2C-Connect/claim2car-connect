@@ -4,6 +4,22 @@ import { webcrypto } from "node:crypto";
 import { createOfflineEvidenceQueue } from "../app/offline_evidence_queue.mjs";
 
 const appSource=await readFile(new URL("../app/app.mjs",import.meta.url),"utf8");
+const canonicalAppSource=await readFile(new URL("../../app/web/assets/app.js",import.meta.url),"utf8");
+const canonicalQueueSource=await readFile(new URL("../../app/web/assets/offline_evidence_queue.mjs",import.meta.url),"utf8");
+const canonicalHtml=await readFile(new URL("../../app/web/index.html",import.meta.url),"utf8");
+assert.ok(canonicalAppSource.includes("keyMaterial:token"));
+assert.ok(canonicalAppSource.includes('$("access-token").value = "";'));
+assert.ok(canonicalQueueSource.includes("subtle.encrypt"));
+assert.ok(canonicalQueueSource.includes("subtle.decrypt"));
+assert.ok(canonicalQueueSource.includes("additionalData:recordAad"));
+assert.ok(canonicalQueueSource.includes("function recordAad"));
+assert.ok(canonicalQueueSource.includes("prior plaintext queue"));
+assert.ok(canonicalQueueSource.includes("updateRecord"));
+assert.ok(canonicalQueueSource.includes("One-time migration for records written by the prior plaintext queue"));
+assert.ok(canonicalAppSource.includes("evidenceQueue.syncSession"));
+assert.ok(canonicalAppSource.includes("keyMaterial:token"));
+assert.ok(canonicalHtml.includes("AES-GCM encrypted in IndexedDB"));
+
 const queueSource=await readFile(new URL("../app/offline_evidence_queue.mjs",import.meta.url),"utf8");
 const appHtml=await readFile(new URL("../app/index.html",import.meta.url),"utf8");
 assert.ok(appSource.includes("createOfflineEvidenceQueue"));
