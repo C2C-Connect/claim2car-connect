@@ -68,9 +68,11 @@ Configure the protected OCI environments/state bucket, run reviewed plan/apply, 
 - Main after PR #156: `607a257ac36cc95a224c3f101d46a5884646c40a`.
 - **No deployment/field acceptance:** there is no user-accessible staging URL, live OCI compute, verified PostgreSQL/PostGIS host, durable evidence volume, backup/restore rehearsal, or physical-device qualification. Guarded OCI plan/apply and image-publish workflows exist, but protected environment secrets cannot be inspected or dispatched from this session. Live payments/dispatch remain disabled.
 
-## Next executable task
+## Current next task — M1 persistent provenance (2026-11-23)
 
-Run the guarded OCI infrastructure plan from GitHub Actions, review state and cost, then apply only through the protected environment after verifying credentials and approvals. Provision/verify Postgres/PostGIS and durable evidence storage, publish the immutable ARM64 integrated image, deploy privately, and test authenticated case capture, evidence retrieval/integrity, tenant isolation, restart persistence, and backup/restore. If a required protected secret/access path is absent, identify the exact prerequisite; continue product implementation meanwhile.
+Sync the M1 branch with current main before further commits. Then implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend append_event to compute/verify hashes under its session lock; server-side full-chain verification; immutable manifest seals bound to chain tip, capture context, consent/quality/exceptions and registered originals; server-derived verification; and tenant/RLS, append-only, migration/rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled and PR #176 draft until M1 acceptance. See docs/THREAD_HANDOFF_2026-11-23.md.
+
+
 
 ## Verified checkpoint — PR #153 merged (2026-11-22)
 
