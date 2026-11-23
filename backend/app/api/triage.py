@@ -162,6 +162,7 @@ def adjudicate(body: AdjudicateRequest) -> Dict[str, Any]:
             "c_chain_geometric": result.integrity.c_chain_geometric,
             "c_meta": result.integrity.c_meta,
             "chain_failure_reason": result.integrity.chain_failure_reason,
+            "integrity_failure_reasons": result.integrity.integrity_failure_reasons or [],
             "tier": result.integrity.tier,
             "all_or_nothing_collapse": result.integrity.all_or_nothing_collapse,
         },
