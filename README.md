@@ -1,5 +1,14 @@
 # Claim2Car Connect / FAOS - San Antonio pilot
 
+## Verified checkpoint — 2026-11-23 (PR #168 merged)
+
+- **Main HEAD:** `44a40af41ef4f20366ac66227f431a900ba0cd83`.
+- **PR #168:** merged. It completes the triage API integrity contract: explicit GPS-spoof/hash-tamper inputs; returned chain score/diagnostics and failure reasons; health metadata aligned to the weighted-sum strict-chain implementation. Dispatch remains disabled.
+- **Exact tested PR head:** `21b79a49f43177341a86c28aaa55b68832ef75d7`. All 13 distinct required workflow types passed. Full suite: **1,035 passed, 31 warnings, 208 subtests passed**. Database authority, legacy DB, FastAPI, restricted runtime, integrated runtime including ARM64 build, capture, VIN, IndexedDB, intake, and controlled-demo checks passed.
+- **Current release boundary:** no OCI integrated staging deployment, no user-accessible URL, no real participant data/field acceptance, and no live payments or dispatch.
+- **Next blocking execution:** owner-controlled GitHub protected environment setup and OCI staging credentials/configuration. Configure `oci-staging` and `oci-staging-apply` separately, provision the versioned private state bucket, run read-only ingress audit, execute the guarded plan, review costs/changes, then apply the saved plan through its approval gate. The connector cannot inspect protected secrets or dispatch manual workflows; do not request secrets in chat. Continue executable engineering that does not depend on these credentials.
+
+
 ## Governing product premise
 
 Claim2Car is an end-to-end post-accident intelligence and resolution platform. It establishes, documents, explains, and coordinates the truth that can responsibly be established about a collision—from authenticated intake and preserved evidence through vehicle and damage assessment, explainable findings, authorized reporting, driver next steps, and auditable event resolution. The broader objective is to responsibly coordinate the post-accident economy around a trustworthy incident record. Accuracy, provenance, uncertainty disclosure, consent, and accountability are foundational product requirements—not optional enhancements.

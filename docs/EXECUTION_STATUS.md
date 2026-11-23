@@ -1,3 +1,11 @@
+## Verified checkpoint — 2026-11-23 (PR #168 merged)
+
+- **Main HEAD:** `44a40af41ef4f20366ac66227f431a900ba0cd83`.
+- **PR #168:** merged. It completes the triage API integrity contract: explicit GPS-spoof/hash-tamper inputs; returned chain score/diagnostics and failure reasons; health metadata aligned to the weighted-sum strict-chain implementation. Dispatch remains disabled.
+- **Exact tested PR head:** `21b79a49f43177341a86c28aaa55b68832ef75d7`. All 13 distinct required workflow types passed. Full suite: **1,035 passed, 31 warnings, 208 subtests passed**. Database authority, legacy DB, FastAPI, restricted runtime, integrated runtime including ARM64 build, capture, VIN, IndexedDB, intake, and controlled-demo checks passed.
+- **Current release boundary:** no OCI integrated staging deployment, no user-accessible URL, no real participant data/field acceptance, and no live payments or dispatch.
+- **Next blocking execution:** owner-controlled GitHub protected environment setup and OCI staging credentials/configuration. Configure `oci-staging` and `oci-staging-apply` separately, provision the versioned private state bucket, run read-only ingress audit, execute the guarded plan, review costs/changes, then apply the saved plan through its approval gate. The connector cannot inspect protected secrets or dispatch manual workflows; do not request secrets in chat. Continue executable engineering that does not depend on these credentials.
+
 ## Latest verified checkpoint — 2026-11-22 (PR #165 merged)
 
 - **Main HEAD:** `1f18668b2d9f1cc4e19b49e16c1e66c1313fc116` (PR #165 squash merge).
