@@ -5,6 +5,7 @@ import unittest
 import uuid
 import psycopg
 from database.journal import append, tenant_transaction
+from database.manifest_binding import manifest_binding_schema_available
 
 RECORD = 'SELECT faos.record_completion_receipt(%s::uuid,%s::text,%s::uuid,%s::text,%s::bigint)'
 
@@ -79,6 +80,8 @@ class CompletionReceiptTests(unittest.TestCase):
                 self.assertEqual(self.receipts(), expected)
 
     def test_receipt_inspection_fails_closed_on_root_binding_tamper(self):
+        if not manifest_binding_schema_available(self.fixture.conn):
+            self.skipTest('requires authority migration 0029')
         f = self.fixture
         self.assertEqual(self.record(), 'RECORDED')
         with psycopg.connect(f.admin_url, autocommit=True) as admin:
@@ -91,6 +94,8 @@ class CompletionReceiptTests(unittest.TestCase):
             inspect_completion_receipt(f.conn, f.tenant, f.session, self.request)
 
     def test_receipt_write_rejects_root_binding_tamper(self):
+        if not manifest_binding_schema_available(self.fixture.conn):
+            self.skipTest('requires authority migration 0029')
         f=self.fixture
         with psycopg.connect(f.admin_url,autocommit=True) as admin:
             admin.execute(
