@@ -139,6 +139,9 @@ class MigrationControlsIntegration(unittest.TestCase):
                             (fixture.tenant,fixture.session,fixture.seal),
                         ).fetchone()
                         self.assertTrue(row[4])
+                        self.assertEqual(row[0],len(fixture.events))
+                        seal_hash=fixture.conn.execute('SELECT entry_hash FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(fixture.tenant,fixture.session,fixture.seal)).fetchone()[0]
+                        self.assertEqual(row[1],seal_hash)
                         self.assertEqual(row[3],'manifest-context-v1')
                         self.assertTrue(verify_registered_manifest_binding(
                             fixture.conn,fixture.tenant,fixture.session,fixture.seal)['valid'])
