@@ -28,7 +28,7 @@ def row(event, previous_hash, entry_hash):
         "session_id": event.session_id, "event_id": event.event_id, "sequence": event.sequence,
         "kind": event.kind, "actor": event.actor, "occurred_at": event.occurred_at,
         "reason": event.reason, "payload_json": event.payload_json, "schema_version": event.schema_version,
-        "previous_hash": previous_hash, "entry_hash": entry_hash,
+        "previous_hash": previous_hash, "entry_hash": entry_hash, "hash_version": "event-hash-v1",
     }
 
 
