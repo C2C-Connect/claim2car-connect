@@ -184,13 +184,14 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 ## Initial priority order for corrective work
 
-1. **AUD-001 + AUD-002:** Canonical root offline queue encryption and frontend discrepancy—verify actual served path; resolve legacy plaintext records safely; regression tests.
-2. **AUD-006 + AUD-017 + AUD-018:** End-to-end integrity provenance, persistent event hash-chain, full sealed-package provenance, and consequential authorization boundary.
-3. **AUD-004 + AUD-008:** Offline authorization, withdrawal, deletion, retention, and recovery semantics.
-4. **AUD-007:** Credential lifecycle, owner identity assurance, and revocation.
-5. **AUD-009:** Provenance/uncertainty and jurisdiction-rule maintenance.
-6. **AUD-010 + AUD-011:** Financial/collision lifecycle completeness and idempotent event/outbox behavior.
-7. **AUD-012:** Deployment, backup/restore, operational readiness, and field qualification.
+1. **AUD-001 + AUD-002 + AUD-016:** Canonical offline evidence encryption, authenticated metadata, legacy migration, and frontend drift—PR #171 is implementing this slice.
+2. **AUD-006 + AUD-017 + AUD-018:** Integrity provenance, persistent event hash-chain, and complete sealed-package provenance; these are foundational trust mechanics.
+3. **AUD-008 + AUD-019:** Consent withdrawal/deletion receipts and verified server-side originals encryption/backup coverage.
+4. **AUD-013 + AUD-009 + AUD-021:** Eliminate synthetic triage defaults, establish ACV/jurisdiction provenance, and resolve privacy-sensitive capture-protocol defaults.
+5. **AUD-007:** Owner identity assurance, credential rotation/revocation, and recovery.
+6. **AUD-010 + AUD-020:** Durable financial obligations, postings, reconciliation, refunds/disputes, and sandbox-to-release controls.
+7. **AUD-011 + AUD-022:** Complete collision lifecycle transitions and operational persistent outbox relay/consumer.
+8. **AUD-012:** Private staging deployment, backup/restore, monitoring, incident response, and field qualification.
 
 ## Audit status tracking
 
