@@ -20,17 +20,18 @@ def test_adjudication_api_reports_incomplete_chain_collapse():
     assert integrity["s_i"] == 0.0
     assert integrity["all_or_nothing_collapse"] is True
     assert integrity["chain_failure_reason"] == "CHAIN_COVERAGE_INCOMPLETE"
+    assert "CHAIN_COVERAGE_INCOMPLETE" in integrity["integrity_failure_reasons"]
     assert abs(integrity["c_chain_geometric"] - (0.99 ** 0.5)) < 1e-4
 
 
 def test_api_accepts_and_applies_tamper_and_spoof_signals():
     for field, reason in (
         ("hash_tamper_suspected", "HASH_TAMPER_SUSPECTED"),
-        ("gps_spoof_suspected", "HASH_TAMPER_SUSPECTED"),
+        ("gps_spoof_suspected", "GPS_SPOOF_SUSPECTED"),
     ):
         body = AdjudicateRequest(session_id=f"api-integrity-{field}", **{field: True})
         response = adjudicate(body)
         integrity = response["integrity"]
         assert integrity["s_i"] == 0.0
         assert integrity["all_or_nothing_collapse"] is True
-        assert integrity["chain_failure_reason"] == reason
+        assert reason in integrity["integrity_failure_reasons"]
