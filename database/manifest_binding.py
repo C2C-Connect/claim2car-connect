@@ -1,6 +1,7 @@
 """Independent Python and PostgreSQL verification of a registered seal binding."""
 import hashlib
 import hmac
+import json
 import re
 from uuid import UUID
 
@@ -63,6 +64,12 @@ def verify_registered_manifest_binding(conn, tenant, session_id, seal_event_id):
     seal = records[-1] if records else None
     if seal is None or seal["event_id"] != seal_event_id or seal["kind"] != "MANIFEST_SEALED":
         raise ValueError("MANIFEST_ROOT_SEAL_SEQUENCE_MISMATCH")
+    try:
+        seal_payload = json.loads(seal["payload_json"])
+    except (TypeError, ValueError):
+        raise ValueError("MANIFEST_ROOT_SEAL_PAYLOAD_INVALID") from None
+    if seal_payload.get("manifest_digest") != root[0] or seal_payload.get("shot_list_version") != root[1]:
+        raise ValueError("MANIFEST_ROOT_SEAL_PAYLOAD_MISMATCH")
     if not hmac.compare_digest(chain["chain_head"], root[3]):
         raise ValueError("MANIFEST_ROOT_CHAIN_HASH_MISMATCH")
     expected_context = manifest_context_binding_hash(tenant, session_id, protocol[0], root[2], root[3])
