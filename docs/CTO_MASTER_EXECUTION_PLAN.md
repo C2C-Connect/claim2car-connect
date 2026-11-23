@@ -2,12 +2,11 @@
 
 ## Updated execution priority — forensic substantiation (2026-11-23)
 
-This document’s older broad slices/deployment sequence are subordinate to the current owner-directed focus in docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md and docs/THREAD_HANDOFF_2026-11-23.md. Execute M1 persistent provenance first (PR #176 draft initial Python hash/verifier slice; exact-head CI 13/13 green, but not accepted), then M2 artifact binding, M3 VIN/configuration source substantiation, M4 camera geometry/calibration, M5 one validated damage measurement, M6 source-backed technical assessment, M7 reproducible report, M8 held-out qualification. Staging remains undeployed but is not the active next task. Do not merge M1 until its full acceptance criteria pass.
+PR #180 merged as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`; exact tested head `539cde24a5ed390b26a97e6cfd206f334a48ff6`, 13/13 workflows green. Full suite 1,050 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance 386/386 counted DB tests and DB-01–DB-14 14/14 PASS; this is not forensic M1 acceptance.
 
+Migration 0028 now persists SHA-256 event-chain hashes, fail-closed backfill, append verification and immutable event guards. SQL/Python parity and migration/adversarial tests passed. M1 remains incomplete: server readback verification, chain-tip/context binding in sealed manifest roots, artifact binding, independent verifier and external checkpoint/recovery/fork tests remain.
 
-## Updated execution priority — forensic substantiation (2026-11-23)
-
-This document’s older broad slices/deployment sequence are subordinate to the current owner-directed focus in docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md and docs/THREAD_HANDOFF_2026-11-23.md. Execute M1 persistent provenance first (PR #176 draft initial Python hash/verifier slice; exact-head CI 13/13 green, but not accepted), then M2 artifact binding, M3 VIN/configuration source substantiation, M4 camera geometry/calibration, M5 one validated damage measurement, M6 source-backed technical assessment, M7 reproducible report, M8 held-out qualification. Staging remains undeployed but is not the active next task. Do not merge M1 until its full acceptance criteria pass.
+**Next executable target:** integrate server-owned readback verifier, bind seal/root to verified chain tip/sequence/hash version/capture context, bind original artifacts, and test independent/adversarial/restart/restore/concurrency/fork verification. Continue code from main. No staging or field deployment until separately gated.
 
 **Document ID:** C2C-CTO-EXEC-001  
 **Version:** 1.0  
