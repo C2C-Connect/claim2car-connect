@@ -1,15 +1,25 @@
+## Latest verified checkpoint — PR #180 merged (2026-11-23)
+
+PR #180 merged to main as `35f7339564cf8f8d15d9eb4e28e14cb13b1c3fef`. Exact PR head `539cde24a5ed390b26a97e6cfd206f334a48ff6`: **13/13 workflows green**. Full repository: **1,050 passed, 31 warnings, 219 subtests passed**. Isolated synthetic PostgreSQL authority acceptance: **386/386 counted tests**, DB-01–DB-14 **14/14 PASS**, diagnostics successful, database overall ACCEPTED. This does not equal forensic M1 acceptance or field qualification.
+
+Migration 0028 adds persistent SHA-256 genesis/event hashes, fail-closed transactional backfill, append-time full-chain recomputation, direct-insert validation and event update/delete immutability. SQL/Python parity, backfill, tamper and migration tests are green.
+
+**M1 remains incomplete:** server readback verifier integration; sealed-manifest/root chain-tip, sequence, version and capture-context binding; registered original/artifact binding; independent verifier agreement; recovery/concurrency/fork and external checkpoint. No deployment/field qualification/real participant data/live payments/dispatch.
+
+**Next code target:** server-owned PostgreSQL readback recomputation and chain-tip/context binding; then artifact provenance and independent/adversarial/recovery tests. Continue implementation without re-planning.
+
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
-## Active forensic substantiation gate — M1 (2026-11-23)
+## Historical M1 checkpoint before PR #180 (superseded)
 
-**Status: IN PROGRESS / NOT ACCEPTED.** PR #176 (feat/persistent-forensic-provenance-m1, head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404) has an initial Python deterministic hash contract, full-chain verifier and known-answer/unit tests. Exact-head CI 13/13 successful, but automated workflow success does not satisfy the M1 gate. SQL migration/backfill/parity, persistence, server verifier, chain-tip-bound immutable seal, artifact binding, tenant/RLS, append-only and adversarial tests, restart/concurrency/idempotency, and independent verifier agreement are not yet complete. Keep draft/unmerged. See docs/THREAD_HANDOFF_2026-11-23.md for source reconnaissance, vectors and acceptance details. No external notarization, field qualification, forensic certification, or dispatch/payment authorization is implied.
+**Historical status at that checkpoint:** PR #176 contained only the initial Python hash/verifier slice. PR #180 superseded and closed it; see the current verified checkpoint above. No external notarization, field qualification, forensic certification, or dispatch/payment authorization is implied.
 
-**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The only active next task is M1 persistent provenance/full-chain verification on PR #176; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
+**Chronology warning:** the dated checkpoints below are retained as historical records. Their old “next task/next milestone” text is not actionable if it conflicts with the current forensic M1 checkpoint above. The active next task is M1 server readback and chain-tip/context binding from merged PR #180; see docs/THREAD_HANDOFF_2026-11-23.md. OCI staging and other roadmap work are deferred unless a concrete blocker requires them.
 
 
-## Active forensic substantiation gate — M1 (2026-11-23)
+## Historical M1 checkpoint before PR #180 (superseded)
 
-**Status: IN PROGRESS / NOT ACCEPTED.** PR #176 (feat/persistent-forensic-provenance-m1, head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404) has an initial Python deterministic hash contract, full-chain verifier and known-answer/unit tests. Exact-head CI 13/13 successful, but automated workflow success does not satisfy the M1 gate. SQL migration/backfill/parity, persistence, server verifier, chain-tip-bound immutable seal, artifact binding, tenant/RLS, append-only and adversarial tests, restart/concurrency/idempotency, and independent verifier agreement are not yet complete. Keep draft/unmerged. See docs/THREAD_HANDOFF_2026-11-23.md for source reconnaissance, vectors and acceptance details. No external notarization, field qualification, forensic certification, or dispatch/payment authorization is implied.
+**Historical status at that checkpoint:** PR #176 contained only the initial Python hash/verifier slice. PR #180 superseded and closed it; see the current verified checkpoint above. No external notarization, field qualification, forensic certification, or dispatch/payment authorization is implied.
 
 - **Main branch:** `main` (verify the live head on resume). **Last verified code merge:** PR #171 at `beb72950081201e891a7a3e66f42addd13c9f528`; audit/handoff docs PRs #172 and #173 are merged.
 - **PR #171 — canonical offline queue encryption and metadata authentication:** merged. Exact tested head `086cf77d71da42342c3ec1c3dd348085014e15f3`.
@@ -24,7 +34,7 @@
 - **PR #165 — FAOS 16-v2 capture contract:** merged. Tested PR head: `766c0bc99e319e830c626c1fa8d7cacdf1822e9d`. All required workflows passed; full suite: **1026 passed, 31 warnings, 208 subtests passed**. This increment adds migration `0027_capture_protocol_16_v2.sql`, a versioned contract/registry, server API support, browser selection/resume, manifest binding, damage-localization exclusion for non-exterior slots, and compatibility tests.
 - **Protocol status:** `claims2car-16-v2` is selectable for controlled testing. `claims2car-16-v1` remains the default; legacy `claims2car-12-v1` remains supported. V2's current 16 positions are eight exterior views, four accessible structural corners, two cabin/restraint views, instrument-cluster telemetry, and physical VIN identity. The manual's second telemetry frame remains an explicit alignment gap; do not silently relabel or alter this immutable version. Field qualification is not complete.
 - Browser image quality remains advisory only; it never rejects or changes original evidence. Thresholds are not field calibrated.
-- **Next implementation target:** M1 persistent provenance on PR #176. Implement SQL/Python hash parity, migration/backfill, server-side append/full-chain verification, chain-tip-bound immutable manifest seals, artifact binding, and adversarial DB tests. Keep dispatch/payment disabled. See docs/THREAD_HANDOFF_2026-11-23.md.
+- **Next implementation target:** M1 persistent hash-chain increment merged in PR #180; remaining M1 gates are listed above. Implement SQL/Python hash parity, migration/backfill, server-side append/full-chain verification, chain-tip-bound immutable manifest seals, artifact binding, and adversarial DB tests. Keep dispatch/payment disabled. See docs/THREAD_HANDOFF_2026-11-23.md.
 
 - **Deployment:** OCI staging is still NOT deployed/accepted. Owner-controlled protected-environment/OCI configuration and workflow dispatch remain external blockers; do not request secrets in chat. Continue all code/test work.
 - **Thread continuity:** read README, this handoff, status, FAOS manual, and acceptance matrix; inspect live main/PR/check/deployment state; resume the next executable task above without replanning.
@@ -98,7 +108,7 @@
 
 ## Current next task — M1 persistent provenance (2026-11-23)
 
-Continue PR #176 only after syncing it with current main. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 remains draft until all M1 criteria pass.
+Continue from current main after merged PR #180. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 is closed as superseded; create the next implementation PR from current main.
 
 Deferred work remains: consent/deletion hardening, source-backed triage, financial/outbox lifecycle, staging and deployment are tracked in their respective acceptance/runbooks; do not jump ahead of M1.
 
