@@ -30,6 +30,7 @@ class ManifestRootTests(unittest.TestCase):
             else:
                 admin.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)', (self.tenant, self.session))
         if has_protocol_column:
+            # Authority schema uses the privileged writer only for synthetic test events.
             with psycopg.connect(self.admin_url, autocommit=True) as fixture_conn:
                 with fixture_conn.transaction():
                     fixture_conn.execute('SET LOCAL ROLE faos_writer')
