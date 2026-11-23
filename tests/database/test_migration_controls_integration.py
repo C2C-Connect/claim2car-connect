@@ -2,6 +2,8 @@
 from dataclasses import replace
 import hashlib
 import os
+import subprocess
+import sys
 from pathlib import Path
 import unittest
 from unittest.mock import patch
