@@ -1,19 +1,13 @@
-## Current verified checkpoint (2026-11-23 — PR #176 M1 draft)
-
-## Current verified checkpoint (2026-11-23 — PR #176 M1 draft)
-
-- PR #175 documentation program merged to main: cf985ee92ed6624467bc8dbeaea9e25ff9e207fa.
-- PR #176 draft/open: feat/persistent-forensic-provenance-m1, last verified head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404; **13/13 workflows green on this exact head** (including full suite, database authority, legacy database). No full-suite count captured for this run.
-- Implemented initial Python versioned deterministic event/genesis hash and independent chain verifier + known-answer/unit tests only. No SQL migration/backfill, persistence, SQL parity, manifest tip binding, API verifier replacement, external checkpoint, DB adversarial/restart/concurrency integration, deployment or field qualification.
-- Exact next task: complete M1 under the acceptance criteria in docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Keep PR draft/unmerged.
-- This active focus supersedes previous “next task OCI staging” status. OCI staging remains unverified/undeployed, no accessible URL, Postgres/PostGIS/evidence volume/backup-restore/secure access still blockers.
-
-- PR #175 documentation program merged to main: cf985ee92ed6624467bc8dbeaea9e25ff9e207fa.
-- PR #176 draft/open: feat/persistent-forensic-provenance-m1, last verified head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404; **13/13 workflows green on this exact head** (including full suite, database authority, legacy database). No full-suite count captured for this run.
-- Implemented initial Python versioned deterministic event/genesis hash and independent chain verifier + known-answer/unit tests only. No SQL migration/backfill, persistence, SQL parity, manifest tip binding, API verifier replacement, external checkpoint, DB adversarial/restart/concurrency integration, deployment or field qualification.
-- Exact next task: complete M1 under the acceptance criteria in docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Keep PR draft/unmerged.
-- This active focus supersedes previous “next task OCI staging” status. OCI staging remains unverified/undeployed, no accessible URL, Postgres/PostGIS/evidence volume/backup-restore/secure access still blockers.
 # Active focus — forensic substantiation (2026-11-23)
+
+## Current verified checkpoint (2026-11-23 — PR #176 M1 draft)
+
+- PR #175 documentation program merged to main: cf985ee92ed6624467bc8dbeaea9e25ff9e207fa.
+- PR #176 draft/open: feat/persistent-forensic-provenance-m1, last verified head 36fdd083ebbbe1268e6e2f51d40dfe60b9523404; **13/13 workflows green on this exact head** (including full suite, database authority, legacy database). No full-suite count captured for this run.
+- Implemented initial Python versioned deterministic event/genesis hash and independent chain verifier + known-answer/unit tests only. No SQL migration/backfill, persistence, SQL parity, manifest tip binding, API verifier replacement, external checkpoint, DB adversarial/restart/concurrency integration, deployment or field qualification.
+- Exact next task: complete M1 under the acceptance criteria in docs/THREAD_HANDOFF_2026-11-23.md and docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md. Keep PR draft/unmerged.
+- This active focus supersedes previous “next task OCI staging” status. OCI staging remains unverified/undeployed, no accessible URL, Postgres/PostGIS/evidence volume/backup-restore/secure access still blockers.
+
 
 The owner has explicitly directed undivided focus on the ability to substantiate every meaningful forensic claim. The ordered implementation methodology and acceptance gates are in **`docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md`**. This is now the primary engineering focus; avoid adjacent feature expansion.
 
