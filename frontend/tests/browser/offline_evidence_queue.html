@@ -20,7 +20,9 @@
     const sessionId = "browser-test-session";
     const tenantId = "browser-test-tenant";
     const actorId = "browser-test-actor";
+    const keyMaterial = "browser-test-operator-token-material-0123456789ABCDEF";
     const store = createIndexedDbEvidenceStore();
+    const queueStore = store;
     const queue = createOfflineEvidenceQueue({store});
 
     window.c2cQueueHarness = Object.freeze({
@@ -35,11 +37,11 @@
       },
       async seed() {
         const first = await queue.queueFile({
-          sessionId, tenantId, actorId, slot:"front",
+          sessionId, tenantId, actorId, slot:"front",keyMaterial,
           file:new File(["synthetic-original-front"],"front.jpg",{type:"image/jpeg"}),
         });
         const second = await queue.queueFile({
-          sessionId, tenantId, actorId, slot:"rear",
+          sessionId, tenantId, actorId, slot:"rear",keyMaterial,
           file:new File(["synthetic-original-rear"],"rear.jpg",{type:"image/jpeg"}),
         });
         return [first.queueId,second.queueId];
@@ -47,10 +49,10 @@
       async status(forActor = actorId, forTenant = tenantId) {
         return queue.status(sessionId,{tenantId:forTenant,actorId:forActor});
       },
-      async sync(failFirst = false) {
+      async sync(failFirst = false, token = keyMaterial) {
         const attempted = [];
         const result = await queue.syncSession({
-          sessionId,tenantId,actorId,
+          sessionId,tenantId,actorId,keyMaterial:token,
           upload:async (record) => {
             attempted.push({
               queueId:record.queueId,
@@ -66,10 +68,11 @@
       },
       async addOtherActor() {
         return queue.queueFile({
-          sessionId,tenantId,actorId:"browser-test-other-actor",slot:"front",
+          sessionId,tenantId,actorId:"browser-test-other-actor",slot:"front",keyMaterial,
           file:new File(["other-actor-original"],"other.jpg",{type:"image/jpeg"}),
         });
       },
+      async raw(){return queueStore.list(sessionId,{tenantId,actorId,includeBytes:true});},
       async purge() {
         return queue.deleteSession(sessionId,{tenantId});
       },
