@@ -176,9 +176,6 @@ function toHex(buffer) {
   return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function toHex(buffer) {
-  return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
 const encoder = new TextEncoder();
 async function deriveStorageKey(keyMaterial, salt, cryptoProvider) {
   const imported = await cryptoProvider.subtle.importKey("raw", encoder.encode(keyMaterial), "HKDF", false, ["deriveKey"]);
