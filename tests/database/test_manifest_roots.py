@@ -105,7 +105,7 @@ class ManifestRootTests(unittest.TestCase):
             event_id='post-seal-event',
             sequence=len(self.events) + 1,
             kind='REVIEW_RECORDED',
-            payload_json='{"artifact_ids":[],"disposition":"NOTE_ONLY","schema_version":"0.1"}',
+            payload_json='{"artifact_ids":["front"],"disposition":"NOTE_ONLY","schema_version":"0.1"}',
         )
         self.assertEqual(append(self.conn, self.tenant, post_seal), 'ACCEPTED')
         self.assertEqual(self.register(), 'REGISTERED')
@@ -114,7 +114,7 @@ class ManifestRootTests(unittest.TestCase):
             try:
                 admin.execute(
                     "UPDATE faos.events SET payload_json=%s WHERE tenant_id=%s AND session_id=%s AND event_id=%s",
-                    ('{"artifact_ids":[],"disposition":"HUMAN_QC_REQUIRED","schema_version":"0.1"}',
+                    ('{"artifact_ids":["front"],"disposition":"HUMAN_QC_REQUIRED","schema_version":"0.1"}',
                      self.tenant, self.session, post_seal.event_id),
                 )
             finally:
