@@ -29,7 +29,7 @@ try {
   assert.equal("bytes" in restored.records[0], false);
   const raw = await page.evaluate(() => window.c2cQueueHarness.raw());
   assert.equal(raw.every(record => record.bytes instanceof Uint8Array && record.bytes.byteLength === record.byteLength + 16), true);
-  assert.equal(new TextDecoder().decode(raw[0].bytes), "synthetic-original-front");
+  assert.notEqual(new TextDecoder().decode(raw[0].bytes), "synthetic-original-front");
   const wrongKey = await page.evaluate(() => window.c2cQueueHarness.sync(false,"wrong-browser-operator-token-material-0123456789ABCDEF"));
   assert.equal(wrongKey.result.error, "EVIDENCE_DECRYPTION_FAILED");
   assert.equal(wrongKey.attempted.length, 0);
