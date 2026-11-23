@@ -25,7 +25,7 @@ try {
   assert.equal(restored.total, 2);
   assert.equal(restored.pending, 2);
   assert.deepEqual(restored.records.map((record) => record.queueId), queueIds);
-  assert.equal(restored.records.every(record => record.encryptionAlgorithm === "AES-GCM"), true);
+  assert.equal(restored.records.every(record => record.encryptionAlgorithm === "AES-GCM-HKDF-SHA256-v2"), true);
   assert.equal("bytes" in restored.records[0], false);
   const raw = await page.evaluate(() => window.c2cQueueHarness.raw());
   assert.equal(raw.every(record => record.bytes instanceof Uint8Array && record.bytes.byteLength === record.byteLength + 16), true);
@@ -34,6 +34,11 @@ try {
   assert.equal(wrongKey.result.error, "EVIDENCE_DECRYPTION_FAILED");
   assert.equal(wrongKey.attempted.length, 0);
   assert.equal((await page.evaluate(() => window.c2cQueueHarness.status())).pending, 2);
+  await page.evaluate(() => window.c2cQueueHarness.tamperSlot(queueIds[0],"tampered-slot"));
+  const metadataTamper=await page.evaluate(() => window.c2cQueueHarness.sync(false));
+  assert.equal(metadataTamper.result.error,"EVIDENCE_DECRYPTION_FAILED");
+  assert.equal(metadataTamper.attempted.length,0);
+  await page.evaluate(() => window.c2cQueueHarness.tamperSlot(queueIds[0],"front"));
 
   // A failed first upload must halt FIFO processing without deleting either original.
   const failed = await page.evaluate(() => window.c2cQueueHarness.sync(true));
@@ -63,7 +68,7 @@ try {
   assert.equal(migrated.attempted[0].queueId,legacy.queueId);
   const migrationStatus=await page.evaluate(() => window.c2cQueueHarness.status());
   assert.equal(migrationStatus.uploaded,3);
-  assert.equal(migrationStatus.records.find(record=>record.queueId===legacy.queueId).encryptionAlgorithm,"AES-GCM");
+  assert.equal(migrationStatus.records.find(record=>record.queueId===legacy.queueId).encryptionAlgorithm,"AES-GCM-HKDF-SHA256-v2");
   assert.equal("bytes" in migrationStatus.records.find(record=>record.queueId===legacy.queueId),false);
 
   // Same session in another actor scope is isolated; tenant/session purge clears both.
