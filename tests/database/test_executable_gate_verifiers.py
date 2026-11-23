@@ -97,7 +97,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
         self.assertEqual(verify_db_01(context)['status'], 'PASS')
         self.assertEqual(verify_db_02(context)['status'], 'PASS')
 
-    def test_db14_requires_complete_28_migration_same_run_evidence(self):
+    def test_db14_requires_complete_29_migration_same_run_evidence(self):
         selectors = (
             "test_counted_runner.CountedRunnerTests.test_passing_case_is_recorded",
             "test_evidence_finalizer.EvidenceFinalizerTests.test_success_verifies_checksums",
@@ -115,7 +115,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             "tested_checkout_commit": "checkout",
             "migration_inventory": [
                 (f"{number:04d}_migration.sql", "0" * 64)
-                for number in range(1, 29)
+                for number in range(1, 30)
             ],
         }
         context = {
