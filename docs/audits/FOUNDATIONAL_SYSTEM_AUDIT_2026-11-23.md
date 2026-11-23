@@ -166,6 +166,14 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 **Remediation:** Establish PostgreSQL as the financial authority; implement transactionally idempotent obligations, postings, verified payment event linkage, reconciliation, refunds/reversals/disputes, actor/tenant authorization, and restart/recovery tests. Keep real-money transactions behind a separate approved release gate.
 
+
+### AUD-021 — Default capture contract requires supplemental personal documents and does not default to the FAOS v2 views (P1)
+**Evidence:** `app/capture_protocols.py` defines `claims2car-16-v1` as the default. Its required 16th slot is `15_license_and_insurance_docs`. The implemented `claims2car-16-v2` instead includes four structural corner views, front/rear cabin restraint views, instrument-cluster telemetry, and vehicle identity; it removes the mandatory license/insurance-document slot. The canonical app and protocol registry still default to v1.
+
+**Impact:** New sessions may request sensitive license/insurance documents as mandatory capture, while the newer FAOS protocol has a more collision-relevant evidence set and less document collection. This can increase roadside friction and privacy exposure, and create version divergence.
+
+**Remediation:** Evaluate and explicitly approve v2 as the default for new sessions, preserve v1 compatibility for existing sessions, and move any supplemental personal-document capture to a separately consented optional flow with purpose, access, retention, and redaction controls. Add tests that default new sessions to the approved protocol and never silently reinterpret existing sessions.
+
 ## Initial priority order for corrective work
 
 1. **AUD-001 + AUD-002:** Canonical root offline queue encryption and frontend discrepancy—verify actual served path; resolve legacy plaintext records safely; regression tests.
@@ -200,6 +208,7 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-018 | CONFIRMED | Sealed v0.1 manifest does not commit to event-chain tip or full capture context |
 | AUD-019 | CONFIRMED / deployment config unverified | Server originals are filesystem plaintext at application layer; at-rest volume/snapshot encryption not yet accepted |
 | AUD-020 | CONFIRMED | Financial journal is process-local and sandbox webhook receipts are not full ledger posting/reconciliation |
+| AUD-021 | CONFIRMED | Default v1 requires license/insurance docs; newer v2 has structural evidence and no mandatory document slot |
 
 ## Change log
 
