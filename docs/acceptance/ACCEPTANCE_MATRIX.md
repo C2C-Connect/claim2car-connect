@@ -106,9 +106,9 @@ Migration 0028 adds persistent SHA-256 genesis/event hashes, fail-closed transac
 - **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
 - **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
-## Current next task — M1 persistent provenance (2026-11-23)
+## Current next task — M1 readback and seal binding (after PR #180)
 
-Continue from current main after merged PR #180. Implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend the existing append function to compute/verify hashes under its session lock; implement server-side full-chain verification; bind immutable manifest seals to chain tip, capture context, consent/quality/exceptions and registered originals; replace client-supplied-root verification; add tenant/RLS, append-only, migration, rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled. Exact acceptance criteria are in docs/THREAD_HANDOFF_2026-11-23.md. PR #176 is closed as superseded; create the next implementation PR from current main.
+From current main, implement server-owned persisted-chain readback verification; bind manifest seal/root to chain tip, sequence/hash version and capture context; bind registered originals/artifacts; then add independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. See the current thread handoff and complete forensic specification.
 
 Deferred work remains: consent/deletion hardening, source-backed triage, financial/outbox lifecycle, staging and deployment are tracked in their respective acceptance/runbooks; do not jump ahead of M1.
 
@@ -413,4 +413,4 @@ Checkpoint: PR #119 sandbox checkout-intent persistence merged at `c7befe0aa8366
 
 ## Canonical forensic requirements source
 
-The complete owner-directed forensic substantiation specification is [COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md](../forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md) (relative path may be adjusted for document location). Use it as the detailed requirement and acceptance baseline; it is not implementation evidence. Keep the active focus on M1 PR #176 until accepted.
+The complete owner-directed forensic substantiation specification is [COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md](../forensics/COMPLETE_FORENSIC_SUBSTANTIATION_SPEC.md) (relative path may be adjusted for document location). Use it as the detailed requirement and acceptance baseline; it is not implementation evidence. Continue M1 from current main: server-owned readback verification, manifest chain-tip/context binding, registered-original/artifact binding and independent/recovery/adversarial tests.
