@@ -11,7 +11,10 @@ _HEX_256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 def manifest_context_binding_hash(tenant, session_id, protocol, sequence, chain_hash):
-    tenant = str(UUID(str(tenant)))
+    try:
+        tenant = str(UUID(str(tenant)))
+    except (ValueError, TypeError, AttributeError):
+        raise ValueError('INVALID_TENANT_ID') from None
     if not all(isinstance(value, str) and value for value in (session_id, protocol)):
         raise ValueError("INVALID_MANIFEST_CONTEXT")
     if not isinstance(sequence, int) or sequence < 1 or not isinstance(chain_hash, str) or not _HEX_256.fullmatch(chain_hash):
@@ -32,7 +35,10 @@ def verify_registered_manifest_binding(conn, tenant, session_id, seal_event_id):
 
     Caller must hold tenant context and the session serialization lock.
     """
-    tenant = str(UUID(str(tenant)))
+    try:
+        tenant = str(UUID(str(tenant)))
+    except (ValueError, TypeError, AttributeError):
+        raise ValueError('INVALID_TENANT_ID') from None
     root = conn.execute(
         "SELECT manifest_digest,shot_list_version,seal_sequence,seal_chain_hash,"
         "context_binding_hash,binding_version FROM faos.manifest_roots "
