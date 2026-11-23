@@ -81,7 +81,7 @@ Configure the protected OCI environments/state bucket, run reviewed plan/apply, 
 
 ## Current next task — M1 readback and seal binding (after PR #180)
 
-Sync the M1 branch with current main before further commits. Then implement SQL/Python hash parity and migration/backfill against the existing PostgreSQL event authority; extend append_event to compute/verify hashes under its session lock; server-side full-chain verification; immutable manifest seals bound to chain tip, capture context, consent/quality/exceptions and registered originals; server-derived verification; and tenant/RLS, append-only, migration/rollback, restart, concurrency, idempotency, tamper, missing/reorder/fork and independent-verifier tests. Keep dispatch/payment disabled and PR #176 draft until M1 acceptance. See docs/THREAD_HANDOFF_2026-11-23.md.
+From current main, integrate server-owned persisted-chain readback verification; bind manifest roots to verified chain tip, sequence/hash version and capture context; bind registered original/artifacts; then independent verifier, restart/restore, concurrency, tamper, missing/reorder/fork tests. Keep dispatch/payment disabled. M1 remains incomplete.
 
 
 
@@ -170,7 +170,7 @@ Continue PR #176 only after syncing it with current main. Implement SQL/Python h
 
 ## Start-of-thread checklist
 
-Read docs/THREAD_HANDOFF_2026-11-23.md and the forensic program first. Query GitHub live for main, PR #176, exact-head CI and deployment status; then continue M1 without re-planning. OCI is deferred.
+Read docs/THREAD_HANDOFF_2026-11-23.md and the forensic program first. Query GitHub live for main, active PRs, exact-head CI and deployment status; continue the remaining M1 code gates without re-planning. OCI is deferred.
 
 
 
