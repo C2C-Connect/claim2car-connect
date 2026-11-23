@@ -40,6 +40,9 @@ ALTER TABLE faos.events ADD COLUMN hash_version text;
 
 -- Deterministic backfill in session sequence order; any gap or malformed
 -- historical row aborts the whole migration and leaves history untouched.
+-- The migrator owns this table; temporarily disabling RLS is transaction-scoped
+-- and the policies/forced-RLS mode are restored before the migration commits.
+ALTER TABLE faos.events DISABLE ROW LEVEL SECURITY;
 DO $backfill$
 DECLARE r record; current_tenant uuid; current_session text;
         previous text; expected bigint; computed text;
@@ -69,6 +72,8 @@ $backfill$;
 ALTER TABLE faos.events ALTER COLUMN previous_hash SET NOT NULL;
 ALTER TABLE faos.events ALTER COLUMN entry_hash SET NOT NULL;
 ALTER TABLE faos.events ALTER COLUMN hash_version SET NOT NULL;
+ALTER TABLE faos.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE faos.events FORCE ROW LEVEL SECURITY;
 ALTER TABLE faos.events ADD CONSTRAINT events_previous_hash_format
  CHECK(previous_hash ~ '^[0-9a-f]{64}$');
 ALTER TABLE faos.events ADD CONSTRAINT events_entry_hash_format
@@ -85,7 +90,11 @@ BEGIN
  IF TG_OP <> 'INSERT' THEN
    RAISE EXCEPTION 'EVENT_HISTORY_IMMUTABLE';
  END IF;
- IF faos.tenant_id() IS NULL OR NEW.tenant_id IS DISTINCT FROM faos.tenant_id() THEN
+ IF faos.tenant_id() IS NOT NULL AND NEW.tenant_id IS DISTINCT FROM faos.tenant_id() THEN
+   RAISE EXCEPTION 'TENANT_CONTEXT_MISMATCH';
+ ELSIF faos.tenant_id() IS NULL AND NOT EXISTS (
+   SELECT 1 FROM pg_catalog.pg_roles WHERE rolname=session_user AND (rolsuper OR rolbypassrls)
+ ) THEN
    RAISE EXCEPTION 'TENANT_CONTEXT_MISMATCH';
  END IF;
  PERFORM 1 FROM faos.sessions WHERE tenant_id=NEW.tenant_id AND session_id=NEW.session_id FOR UPDATE;
