@@ -24,6 +24,7 @@ BEGIN
  FOR root_row IN SELECT * FROM faos.manifest_roots ORDER BY tenant_id,session_id,seal_event_id LOOP
   SELECT capture_protocol_version INTO protocol FROM faos.sessions WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id;
   IF protocol IS NULL THEN RAISE EXCEPTION 'MANIFEST_BINDING_SESSION_MISSING'; END IF;
+  IF protocol IS DISTINCT FROM root_row.shot_list_version THEN RAISE EXCEPTION 'MANIFEST_BINDING_PROTOCOL_MISMATCH'; END IF;
   SELECT kind,payload_json::jsonb,sequence,entry_hash INTO v_kind,v_payload,v_seq,v_hash FROM faos.events WHERE tenant_id=root_row.tenant_id AND session_id=root_row.session_id AND event_id=root_row.seal_event_id;
   IF v_seq IS NULL THEN RAISE EXCEPTION 'MANIFEST_BINDING_SEAL_MISSING'; END IF;
   IF v_kind IS DISTINCT FROM 'MANIFEST_SEALED' OR v_payload->>'manifest_digest' IS DISTINCT FROM root_row.manifest_digest OR v_payload->>'shot_list_version' IS DISTINCT FROM root_row.shot_list_version THEN RAISE EXCEPTION 'MANIFEST_BINDING_SEAL_PAYLOAD_MISMATCH'; END IF;
