@@ -1,5 +1,5 @@
 """Regression coverage for fail-closed integrity API inputs and diagnostics."""
-from app.api.triage import AdjudicateRequest, adjudicate, triage_health
+from backend.app.api.triage import AdjudicateRequest, adjudicate, triage_health
 
 
 def test_health_names_the_integrity_contract_implemented_by_s_i():
