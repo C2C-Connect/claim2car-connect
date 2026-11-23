@@ -93,6 +93,29 @@ class MigrationControlsIntegration(unittest.TestCase):
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
+    def test_event_chain_backfill_gap_rolls_back_migration(self):
+        plan=self.authority_plan()
+        apply(self.conn,plan[:-1])
+        tenant=str(uuid.uuid4())
+        session='chain-gap-'+uuid.uuid4().hex
+        payload='{"synthetic":true}'
+        self.admin_db.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',(tenant,'synthetic chain-gap fixture'))
+        self.admin_db.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)',(tenant,session))
+        for sequence,event_id in ((1,'gap-event-1'),(3,'gap-event-3')):
+            self.admin_db.execute(
+                'INSERT INTO faos.events VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (tenant,session,event_id,sequence,'SESSION_CREATED','synthetic-test',
+                 f'2026-01-01T00:00:0{sequence}Z','sequence-gap fixture',payload,'0.1'),
+            )
+        before=self.history()
+        with self.assertRaises(psycopg.errors.RaiseException) as raised:
+            apply(self.conn,plan)
+        self.assertTrue(raised.exception.diag.message_primary.startswith('EVENT_CHAIN_BACKFILL_SEQUENCE_GAP'))
+        self.assertEqual(self.history(),before,'FAILED_CHAIN_BACKFILL_ADVANCED_MIGRATION_LEDGER')
+        self.assertFalse(self.admin_db.execute(
+            "SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='faos' AND table_name='events' AND column_name='entry_hash')"
+        ).fetchone()[0],'FAILED_CHAIN_BACKFILL_LEFT_PARTIAL_DDL')
+
     def test_event_chain_migration_restores_forced_rls(self):
         plan=self.authority_plan()
         apply(self.conn,plan)
