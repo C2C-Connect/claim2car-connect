@@ -72,7 +72,7 @@ await test("canonical_queue_encrypts_originals_and_requires_same_token", async (
   assert.equal(item.uploaded, false);
   assert.equal(item.byteLength, 14);
   assert.equal(item.bytes instanceof Uint8Array, true);
-  assert.equal(item.encryptionAlgorithm,"AES-GCM");
+  assert.equal(item.encryptionAlgorithm,"AES-GCM-HKDF-SHA256-v2");
   assert.notEqual(new TextDecoder().decode(item.bytes),"original-image");
   assert.equal(item.bytes.byteLength,item.byteLength+16);
   assert.equal(item.sha256, "27f0c6997c0fc4780eb0d9a0e8a1f5f02418196494e213a91911b54bea2816cb");
@@ -82,7 +82,7 @@ await test("canonical_queue_encrypts_originals_and_requires_same_token", async (
   assert.equal(wrongKey.uploaded,0);
   const status = await queue.status("session-a",{tenantId:"tenant-a",actorId:"actor-a"});
   assert.equal(status.pending, 1);
-  assert.equal(status.records[0].encryptionAlgorithm,"AES-GCM");
+  assert.equal(status.records[0].encryptionAlgorithm,"AES-GCM-HKDF-SHA256-v2");
   assert.equal("bytes" in status.records[0], false);
 });
 
@@ -155,7 +155,18 @@ await test("consent_withdrawal_purges_local_originals", async () => {
 });
 
 
-await test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_before_upload", async () => {
+await test("authenticated_metadata_tampering_fails_decryption", async () => {
+  const store=makeStore(),queue=makeQueue(store);
+  const queued=await queue.queueFile({sessionId:"session-tamper",tenantId:"tenant-a",actorId:"actor-a",slot:"front",file:makeFile("protected-original"),keyMaterial});
+  store.records[0].slot="rear";
+  let attempted=false;
+  const result=await queue.syncSession({sessionId:"session-tamper",tenantId:"tenant-a",actorId:"actor-a",keyMaterial,
+    upload:async()=>{attempted=true;return {ok:true};}});
+  assert.equal(result.error,"EVIDENCE_DECRYPTION_FAILED");
+  assert.equal(attempted,false);
+  assert.equal(store.records[0].queueId,queued.queueId);
+});
+\nawait test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_before_upload", async () => {
   const store=makeStore(),queue=makeQueue(store,["legacy-artifact","legacy-request"]);
   const bytes=new TextEncoder().encode("legacy-original");
   const legacy=await store.enqueue({sessionId:"session-legacy",tenantId:"tenant-a",actorId:"actor-a",slot:"front",
@@ -168,7 +179,7 @@ await test("legacy_plaintext_queue_record_is_integrity_checked_and_migrated_befo
   assert.equal(result.uploaded,1);
   assert.deepEqual(uploaded,["legacy-original"]);
   const stored=store.records[0];
-  assert.equal(stored.encryptionAlgorithm,"AES-GCM");
+  assert.equal(stored.encryptionAlgorithm,"AES-GCM-HKDF-SHA256-v2");
   assert.notEqual(new TextDecoder().decode(stored.bytes),"legacy-original");
   assert.equal(stored.uploaded,true);
   assert.equal("bytes" in stored,false);
