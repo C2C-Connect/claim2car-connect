@@ -135,10 +135,25 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 **Remediation:** Bind a canonical, versioned metadata tuple as AES-GCM additional authenticated data (AAD); migrate existing ciphertext to the new format before upload; reject metadata changes; test tampering of slot, session, actor/tenant, artifact/request IDs, digest, and length. Keep server-side provenance authoritative.
 
+
+### AUD-017 — Persistent capture event journal is sequential/append-only but not cryptographically hash-chained (P1)
+**Evidence:** Migration `0002_event_journal.sql` creates tenant-scoped events with a unique sequence and a security-definer `faos.append_event` function that enforces next-sequence ordering, duplicate idempotency, and insert-only permissions. Event rows do not store a previous-event hash or event hash. The separate `backend/app/anchor/ledger.py` hash-chain ledger is process-local and is not integrated with the persistent capture event journal.
+
+**Impact:** Database sequence and restricted mutation permissions provide consistency/access controls, but they do not independently make event history tamper-evident against privileged database modification. The persistent journal cannot currently be cryptographically recomputed as a chain.
+
+**Remediation:** Add versioned hash-chain fields and deterministic canonical event hashing, bind each event to the prior event hash, make the sealed manifest commit to the capture-event chain tip, and provide a verifier with mutation/reordering/truncation tests. Keep legacy event history explicitly versioned and do not claim retroactive chain protection.
+
+### AUD-018 — Sealed manifest does not bind full capture provenance (P1)
+**Evidence:** `app/evidence_manifest.py` manifest v0.1 digest binds schema version, session ID, shot-list version, artifact IDs, slots, and original SHA-256 values. The `MANIFEST_SEALED` event stores the digest and artifact IDs. It does not include the event-chain tip, capture actor/time/time-source, device/session metadata, consent event reference, quality-review results, or exception/resolution history.
+
+**Impact:** Original-byte integrity and slot completeness are verified, but the sealed package is not yet a complete cryptographic commitment to the broader forensic capture context required by the core manual.
+
+**Remediation:** Define a versioned provenance manifest that references and commits to the canonical event chain and capture metadata, consent/disclosure version, quality/review, exceptions, and original bytes. Preserve v0.1 compatibility, bind the new version, and independently verify it before any downstream consequential workflow.
+
 ## Initial priority order for corrective work
 
 1. **AUD-001 + AUD-002:** Canonical root offline queue encryption and frontend discrepancy—verify actual served path; resolve legacy plaintext records safely; regression tests.
-2. **AUD-006:** End-to-end integrity provenance and consequential authorization boundary.
+2. **AUD-006 + AUD-017 + AUD-018:** End-to-end integrity provenance, persistent event hash-chain, full sealed-package provenance, and consequential authorization boundary.
 3. **AUD-004 + AUD-008:** Offline authorization, withdrawal, deletion, retention, and recovery semantics.
 4. **AUD-007:** Credential lifecycle, owner identity assurance, and revocation.
 5. **AUD-009:** Provenance/uncertainty and jurisdiction-rule maintenance.
@@ -165,6 +180,8 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-014 | CONFIRMED limitation | Anchor ledger is process-local; no persistent/external anchor established |
 | AUD-015 | CONFIRMED limitation | Photo baseline is heuristic and result is not persisted |
 | AUD-016 | CONFIRMED / remediation in PR #171 (pending exact-head CI) | PR #171 binds canonical metadata as AES-GCM AAD and upgrades prior plaintext/v1 queue records before upload |
+| AUD-017 | CONFIRMED | Persistent events enforce sequence but have no cryptographic event hash chain |
+| AUD-018 | CONFIRMED | Sealed v0.1 manifest does not commit to event-chain tip or full capture context |
 
 ## Change log
 
