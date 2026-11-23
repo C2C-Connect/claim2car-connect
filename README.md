@@ -1,5 +1,13 @@
 # Claim2Car Connect / FAOS — San Antonio pilot
 
+## Active engineering focus — forensic substantiation
+
+The owner has directed undivided focus on substantiating what Claim2Car claims to know: durable provenance, evidence-to-observation traceability, vehicle identity/configuration, camera calibration/alignment, geometric measurement with uncertainty, damage localization, source-backed parts/repair assessment, and reproducible forensic reports. Do not pivot to adjacent features until the initial forensic vertical slice is implemented and validated.
+
+**Program and handoff:** [Forensic Substantiation Program](docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md). First code milestone is persistent PostgreSQL provenance and independently recomputed full-chain/manifest/artifact verification (M1); inspect/reuse existing database authority and systems. Then artifact binding, VIN, camera geometry, one damage region/measurement, source-backed technical assessment, report, and held-out validation. Synthetic known-answer data first.
+
+A hash or hash chain does not establish capture authenticity, identity, causation, damage classification, calibrated measurement, or independent notarization. Reports must distinguish observation, measurement, inference, causation, hidden damage, and repair advice; expose sources, methods, uncertainty and limitations. No unsupported precision or claims of forensic certification. No real participant evidence, live payments, dispatch, or public/accepted staging before independent release gates.
+
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
 - **Main branch:** `main` (verify the live head on resume). **Last verified code merge:** PR #171 at `beb72950081201e891a7a3e66f42addd13c9f528`; audit/handoff docs PRs #172 and #173 are merged.
