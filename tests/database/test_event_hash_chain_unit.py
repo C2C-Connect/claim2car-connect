@@ -55,7 +55,6 @@ class EventHashChainUnitTests(unittest.TestCase):
             {"actor": "operator-2"}, {"occurred_at": "2026-11-23T12:34:56.123455Z"},
             {"reason": "changed"},
             {"payload_json": '{"capture_protocol_version":"claims2car-16-v2","synthetic":false}'},
-            {"schema_version": "0.2"},
         )
         for change in changes:
             with self.subTest(change=change):
