@@ -114,7 +114,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         })
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
-    def test_db02_accepts_the_complete_27_migration_inventory(self):
+    def test_db02_accepts_the_complete_28_migration_inventory(self):
         names = [
             '0001_tenant_registry.sql', '0002_event_journal.sql',
             '0003_completion_lock.sql', '0004_manifest_roots.sql',
@@ -158,7 +158,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
         self.assertEqual(result['status'], 'PASS', result['failed_sql_checks'])
 
     def test_rejects_unreviewed_migration_after_0028(self):
-        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0027'):
+        with self.assertRaisesRegex(AssertionError, 'UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0028'):
             validate_authority_migration_inventory(self.inventory([
                 '0017_event_contract_parity.sql',
                 '0018_capture_protocol_session_binding.sql',
