@@ -150,6 +150,14 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 
 **Remediation:** Define a versioned provenance manifest that references and commits to the canonical event chain and capture metadata, consent/disclosure version, quality/review, exceptions, and original bytes. Preserve v0.1 compatibility, bind the new version, and independently verify it before any downstream consequential workflow.
 
+
+### AUD-019 — Server-side original evidence storage has no application-level encryption (P1)
+**Evidence:** `app/artifact_storage.py` validates and stores original bytes in tenant/session/artifact-scoped filesystem objects, uses restrictive file permissions and no-follow/atomic-write protections, and verifies hashes on retrieval. The inspected storage implementation writes the original byte payload directly; no application-level envelope encryption is performed. Underlying volume encryption and key management depend on deployment configuration and have not been verified in staging.
+
+**Impact:** Filesystem permissions and integrity checks do not protect confidentiality if storage media, snapshots, backups, or privileged host access are compromised. Unlinking is not secure erasure.
+
+**Remediation:** Establish and verify encrypted-at-rest storage for originals, including volume/snapshot/backup coverage, key custody/rotation, least-privilege access, restore testing, and documented retention. Consider envelope encryption with tenant/session-scoped keys if the deployment threat model requires protection beyond provider-managed disk encryption.
+
 ## Initial priority order for corrective work
 
 1. **AUD-001 + AUD-002:** Canonical root offline queue encryption and frontend discrepancy—verify actual served path; resolve legacy plaintext records safely; regression tests.
@@ -182,6 +190,7 @@ A separate `frontend/app` workbench contains an AES-GCM/HKDF queue implementatio
 | AUD-016 | CONFIRMED / remediation in PR #171 (pending exact-head CI) | PR #171 binds canonical metadata as AES-GCM AAD and upgrades prior plaintext/v1 queue records before upload |
 | AUD-017 | CONFIRMED | Persistent events enforce sequence but have no cryptographic event hash chain |
 | AUD-018 | CONFIRMED | Sealed v0.1 manifest does not commit to event-chain tip or full capture context |
+| AUD-019 | CONFIRMED / deployment config unverified | Server originals are filesystem plaintext at application layer; at-rest volume/snapshot encryption not yet accepted |
 
 ## Change log
 
