@@ -12,6 +12,9 @@ assert.ok(canonicalQueueSource.includes("subtle.encrypt"));
 assert.ok(canonicalQueueSource.includes("subtle.decrypt"));
 assert.ok(canonicalQueueSource.includes("prior plaintext queue"));
 assert.ok(canonicalQueueSource.includes("updateRecord"));
+assert.ok(canonicalQueueSource.includes("One-time migration for records written by the prior plaintext queue"));
+assert.ok(canonicalAppSource.includes("evidenceQueue.syncSession"));
+assert.ok(canonicalAppSource.includes("keyMaterial:token"));
 assert.ok(canonicalHtml.includes("AES-GCM encrypted in IndexedDB"));
 
 const queueSource=await readFile(new URL("../app/offline_evidence_queue.mjs",import.meta.url),"utf8");
