@@ -46,6 +46,7 @@ from app.vehicle_intelligence.vpic import VpicClient
 from backend.app.reports.damage_assessment import (
     CameraAngle, DamageAssessment, DamageEvidenceImage, DamageFinding,
     DamageReportError, RepairEstimateLine, render_damage_assessment_pdf,
+    build_damage_assessment_carrier_payload,
 )
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
@@ -747,6 +748,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                             "X-Report-Artifact-ID": metadata["report_artifact_id"],
                             "X-Report-SHA256": metadata["report_sha256"],
                             "X-Report-Revision": str(metadata["report_revision"]),
+                            "X-Report-JSON-Artifact-ID": metadata["report_json_artifact_id"],
+                            "X-Report-JSON-SHA256": metadata["report_json_sha256"],
                         },
                     )
 
@@ -784,6 +787,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                         original_bytes=original,
                         expected_sha256=metadata["sha256"],
                         registered_at=metadata.get("registered_at") or "NOT_RECORDED",
+                        storage_key=metadata["storage_key"],
                         camera_angle=camera_angle,
                     ))
 
@@ -822,14 +826,20 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                     prepared_at=review["reviewed_at"],
                     manifest_digest=details["manifest_digest"],
                     seal_event_id=details["seal_event_id"],
+                    capture_protocol_version=details["capture_protocol_version"],
                 )
                 pdf_bytes = render_damage_assessment_pdf(assessment)
                 report_sha256 = sha256(pdf_bytes).hexdigest()
+                carrier_payload = build_damage_assessment_carrier_payload(assessment)
+                report_json_bytes = json.dumps(carrier_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+                report_json_sha256 = sha256(report_json_bytes).hexdigest()
                 stored = evidence.record_damage_assessment_report(
                     authorization, str(session_id),
                     request_id=str(body.request_id),
                     pdf_bytes=pdf_bytes,
                     report_sha256=report_sha256,
+                    report_json_bytes=report_json_bytes,
+                    report_json_sha256=report_json_sha256,
                     report_revision=assessment.report_revision,
                     finding_ids=[item.finding_id for item in findings],
                     estimate_total_cents=sum(item.amount_cents for item in estimate_lines),
@@ -843,6 +853,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                         "X-Report-Artifact-ID": stored["report_artifact_id"],
                         "X-Report-SHA256": report_sha256,
                         "X-Report-Revision": str(assessment.report_revision),
+                        "X-Report-JSON-Artifact-ID": stored["report_json_artifact_id"],
+                        "X-Report-JSON-SHA256": stored["report_json_sha256"],
                     },
                 )
             except HTTPException:
@@ -901,6 +913,34 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 _fail(409, "DAMAGE_REPORT_ARTIFACT_INTEGRITY_FAILURE")
             except Exception:
                 _fail(500, "DAMAGE_ASSESSMENT_REPORT_DOWNLOAD_FAILED")
+
+
+        @api.get('/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}/json')
+        def download_damage_assessment_report_json(session_id: UUID, report_artifact_id: UUID, authorization: str = Depends(authorize)):
+            try:
+                result = evidence.retrieve_damage_assessment_report(authorization, str(session_id), str(report_artifact_id))
+                metadata = result["metadata"]
+                return Response(content=result["json_bytes"], media_type="application/json", headers={
+                    **NO_STORE_HEADERS,
+                    "X-Report-JSON-Artifact-ID": metadata["report_json_artifact_id"],
+                    "X-Report-JSON-SHA256": metadata["report_json_sha256"],
+                })
+            except HTTPException:
+                raise
+            except AuthenticationError:
+                _fail(401, "UNAUTHORIZED")
+            except CaptureAuthorizationError:
+                _fail(403, "REVIEWER_IDENTITY_REQUIRED")
+            except CaptureSessionNotFound:
+                _fail(404, "DAMAGE_REPORT_NOT_FOUND")
+            except CaptureSessionConflict as error:
+                _fail(409, str(error))
+            except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
+                _fail(503, "CAPTURE_STORAGE_UNAVAILABLE")
+            except (ArtifactIntegrityError, ArtifactNotFound):
+                _fail(409, "DAMAGE_REPORT_ARTIFACT_INTEGRITY_FAILURE")
+            except Exception:
+                _fail(500, "DAMAGE_ASSESSMENT_REPORT_JSON_DOWNLOAD_FAILED")
 
 
         @api.get('/v1/review-collisions/{collision_id}')

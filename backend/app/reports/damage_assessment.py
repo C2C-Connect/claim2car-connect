@@ -64,11 +64,18 @@ class DamageEvidenceImage:
     original_bytes: bytes
     expected_sha256: str
     registered_at: str
+    storage_key: str
     camera_angle: CameraAngle = CameraAngle()
+
+    @property
+    def slot_id(self):
+        return self.capture_slot
 
     def __post_init__(self):
         if not self.artifact_id.strip() or not self.capture_slot.strip():
             raise DamageReportError("EVIDENCE_ID_AND_CAPTURE_SLOT_REQUIRED")
+        if not isinstance(self.storage_key, str) or not self.storage_key.strip():
+            raise DamageReportError("IMMUTABLE_SOURCE_STORAGE_KEY_REQUIRED")
         if not _SHA256_RE.fullmatch(self.expected_sha256):
             raise DamageReportError("INVALID_EVIDENCE_SHA256")
         if not isinstance(self.original_bytes, bytes) or not self.original_bytes or len(self.original_bytes) > _MAX_IMAGE_BYTES:
@@ -165,12 +172,15 @@ class DamageAssessment:
     prepared_at: str = ""
     manifest_digest: str = ""
     seal_event_id: str = ""
+    capture_protocol_version: str = ""
 
     def __post_init__(self):
         if not self.session_id.strip() or not self.vehicle_description.strip() or self.report_revision < 1:
             raise DamageReportError("INVALID_DAMAGE_ASSESSMENT_IDENTITY")
         if self.currency != "USD":
             raise DamageReportError("UNSUPPORTED_ESTIMATE_CURRENCY")
+        if not isinstance(self.capture_protocol_version, str) or not self.capture_protocol_version.strip():
+            raise DamageReportError("CAPTURE_PROTOCOL_VERSION_REQUIRED")
         if self.manifest_digest and not _SHA256_RE.fullmatch(self.manifest_digest):
             raise DamageReportError("INVALID_SEALED_MANIFEST_DIGEST")
         if self.seal_event_id and not self.seal_event_id.strip():
@@ -194,6 +204,71 @@ class DamageAssessment:
         for line in self.estimate_lines:
             if line.related_finding_id and line.related_finding_id not in finding_ids:
                 raise DamageReportError("ESTIMATE_LINE_FINDING_REFERENCE_NOT_FOUND")
+
+
+DAMAGE_BOX_DISCLOSURE = (
+    "A bounding box is a suspect-region identifier only. It is not a measured dimension, "
+    "calibrated geometry, or a structural-severity claim."
+)
+
+
+def build_damage_assessment_carrier_payload(assessment: DamageAssessment) -> dict:
+    """Build the durable JSON carrier payload linked to the report event."""
+    image_by_id = {image.artifact_id: image for image in assessment.evidence_images}
+    evidence_images = [{
+        "artifact_id": image.artifact_id, "slot_id": image.slot_id,
+        "storage_key": image.storage_key, "sha256": image.expected_sha256,
+        "registered_at": image.registered_at,
+        "camera_angle": {"yaw_degrees": image.camera_angle.yaw_degrees,
+                         "pitch_degrees": image.camera_angle.pitch_degrees,
+                         "roll_degrees": image.camera_angle.roll_degrees,
+                         "source": image.camera_angle.source},
+    } for image in assessment.evidence_images]
+    findings = []
+    for finding in assessment.findings:
+        image = image_by_id[finding.evidence_artifact_id]
+        x0, y0, x1, y1 = finding.bbox_normalized
+        findings.append({
+            "finding_id": finding.finding_id, "component": finding.component,
+            "vehicle_location": finding.vehicle_location, "damage_type": finding.damage_type,
+            "observation": finding.observation, "status": finding.status,
+            "slot_id": image.slot_id,
+            "bbox_normalized": {"x_min": x0, "y_min": y0, "x_max": x1, "y_max": y1},
+            "camera_angle": {"yaw_degrees": image.camera_angle.yaw_degrees,
+                             "pitch_degrees": image.camera_angle.pitch_degrees,
+                             "roll_degrees": image.camera_angle.roll_degrees,
+                             "source": image.camera_angle.source},
+            "reviewer_attribution": {"actor_id": finding.reviewer_actor_id,
+                                     "reviewed_at": finding.reviewed_at},
+            "source_image": {"artifact_id": image.artifact_id,
+                             "storage_key": image.storage_key,
+                             "sha256": image.expected_sha256},
+            "bbox_disclosure": DAMAGE_BOX_DISCLOSURE,
+            "limitations": finding.limitations,
+        })
+    return {
+        "schema_version": "damage-assessment-carrier-v1",
+        "session_id": assessment.session_id,
+        "capture_protocol_version": assessment.capture_protocol_version,
+        "vehicle_description": assessment.vehicle_description,
+        "report_revision": assessment.report_revision,
+        "manifest_digest": assessment.manifest_digest,
+        "seal_event_id": assessment.seal_event_id,
+        "evidence_images": evidence_images, "findings": findings,
+        "estimate_lines": [{
+            "line_id": line.line_id, "category": line.category,
+            "description": line.description, "quantity": str(line.quantity),
+            "unit": line.unit, "unit_price_cents": line.unit_price_cents,
+            "amount_cents": line.amount_cents, "source_name": line.source_name,
+            "source_reference": line.source_reference, "effective_date": line.effective_date,
+            "related_finding_id": line.related_finding_id,
+        } for line in assessment.estimate_lines],
+        "estimate_total_cents": sum(line.amount_cents for line in assessment.estimate_lines),
+        "currency": assessment.currency,
+        "disclosures": [DAMAGE_BOX_DISCLOSURE,
+            "Image-space boxes do not establish physical dimensions, structural severity, hidden damage, causation, repairability, or roadworthiness.",
+            "Camera-angle values are shown only with their declared provenance; unknown values remain unknown."],
+    }
 
 
 def _money(cents: int) -> str:
@@ -272,9 +347,9 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
     story = [
         Paragraph("Claim2Car — Vehicle Damage Assessment", styles["C2CTitle"]),
         Spacer(1, 8),
-        Paragraph(f"<b>Session:</b> {_safe(assessment.session_id)}<br/><b>Vehicle:</b> {_safe(assessment.vehicle_description)}<br/><b>Revision:</b> {assessment.report_revision}<br/><b>Prepared against review:</b> {_safe(assessment.prepared_at or 'Not recorded')}<br/><b>Seal event:</b> {_safe(assessment.seal_event_id or 'Not supplied')}<br/><b>Sealed manifest SHA-256:</b> {_safe(assessment.manifest_digest or 'Not supplied')}", styles["BodyText"]),
+        Paragraph(f"<b>Session:</b> {_safe(assessment.session_id)}<br/><b>Vehicle:</b> {_safe(assessment.vehicle_description)}<br/><b>Revision:</b> {assessment.report_revision}<br/><b>Capture protocol:</b> {_safe(assessment.capture_protocol_version)}<br/><b>Prepared against review:</b> {_safe(assessment.prepared_at or 'Not recorded')}<br/><b>Seal event:</b> {_safe(assessment.seal_event_id or 'Not supplied')}<br/><b>Sealed manifest SHA-256:</b> {_safe(assessment.manifest_digest or 'Not supplied')}", styles["BodyText"]),
         Spacer(1, 10),
-        Paragraph("<b>Scope:</b> This report describes supplied evidence, reviewer-attributed findings and source-attributed estimate inputs. It does not establish hidden damage, causation, structural integrity or roadworthiness unless separately supported. Camera-angle source labels and estimate references are presented as supplied; EXIF values are untrusted device metadata and GPS fields are deliberately omitted. This renderer does not independently authenticate metadata origin or infer camera pose from EXIF orientation.", styles["C2CSmall"]),
+        Paragraph("<b>Scope:</b> This report describes supplied evidence, reviewer-attributed findings and source-attributed estimate inputs. It does not establish hidden damage, causation, structural integrity or roadworthiness unless separately supported. Camera-angle source labels and estimate references are presented as supplied; EXIF values are untrusted device metadata and GPS fields are deliberately omitted. This renderer does not independently authenticate metadata origin or infer camera pose from EXIF orientation. A bounding box is a suspect-region identifier only; it is not a measured dimension, calibrated geometry, or a structural-severity claim.", styles["C2CSmall"]),
         Paragraph("Damage findings", styles["C2CHeading"]),
     ]
     image_by_id = {image.artifact_id: image for image in assessment.evidence_images}
@@ -290,8 +365,9 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
         story.append(Paragraph(f"<b>{_safe(finding.finding_id)} — {_safe(finding.component)}</b> | {_safe(finding.status)}", styles["Heading3"]))
         rows = [
             ["Vehicle location", finding.vehicle_location, "Damage type", finding.damage_type],
-            ["Capture slot", evidence.capture_slot, "Capture angle", angle_text],
+            ["Slot ID", evidence.slot_id, "Capture angle", angle_text],
             ["Original artifact", evidence.artifact_id, "SHA-256", evidence.expected_sha256],
+            ["Immutable source storage key", evidence.storage_key, "Capture protocol", assessment.capture_protocol_version],
             ["Image dimensions", f"{width} × {height} px", "Bounding box", f"normalized ({x0:.4f}, {y0:.4f})–({x1:.4f}, {y1:.4f})"],
             ["Pixel bounds", f"x={pixel_box[0]}–{pixel_box[2]}, y={pixel_box[1]}–{pixel_box[3]}", "Artifact registered at", evidence.registered_at],
             ["EXIF camera (unverified)", f"{exif['make']} {exif['model']}", "EXIF timestamp (unverified)", exif["datetime_original"] if exif["datetime_original"] != "Not recorded" else exif["datetime"]],
@@ -309,7 +385,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
             ("LEFTPADDING", (0,0), (-1,-1), 4),
             ("RIGHTPADDING", (0,0), (-1,-1), 4),
         ]))
-        story.extend([table, Spacer(1, 5), Paragraph(f"<b>Observation:</b> {_safe(finding.observation)}", styles["BodyText"])])
+        story.extend([table, Spacer(1, 5), Paragraph(f"<b>Observation:</b> {_safe(finding.observation)}", styles["BodyText"]), Paragraph(f"<b>Bounding-box disclosure:</b> {_safe(DAMAGE_BOX_DISCLOSURE)}", styles["C2CSmall"])])
         if finding.reviewer_actor_id:
             story.append(Paragraph(f"<b>Reviewer:</b> {_safe(finding.reviewer_actor_id)} at {_safe(finding.reviewed_at)}", styles["C2CSmall"]))
         if finding.limitations:
@@ -370,6 +446,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
     doc.addPageTemplates([PageTemplate(id="evidence", frames=[frame], onPage=page_footer)])
     def invariant_canvas(*args, **kwargs):
         kwargs["invariant"] = 1
+        kwargs["pageCompression"] = 0
         return Canvas(*args, **kwargs)
 
     doc.build(story, canvasmaker=invariant_canvas)
