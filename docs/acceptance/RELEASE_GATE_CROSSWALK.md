@@ -34,7 +34,7 @@ PR #186 must not merge before PR #185 is accepted, merged, and PR #186 is rebase
 | Workflow | Run | Result at snapshot | Evidence |
 |---|---:|---|---|
 | Full test suite | #1125 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012107 |
-| Database authority cutover | #1196 | Success; artifact retained, artifact contents not yet independently inspected | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012240 |
+| Database authority cutover | #1196 | Success; inspected artifact awards DB-01–DB-14 14/14 PASS | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012240 |
 | Legacy database component | #1240 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012125 |
 | FastAPI foundation | #1182 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012063 |
 | Integrated runtime container smoke | #671 | Success after targeted rerun | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012031 |
