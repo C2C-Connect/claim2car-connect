@@ -435,7 +435,7 @@ class CaptureSessionIntegration(unittest.TestCase):
             tampered_payload = json.dumps({
                 'accepted': False,
                 'owner_actor_id': 'claim-owner-0',
-                'disclosure_version': 'capture-owner-consent-v1',
+                'disclosure_version': 'disclosure-v1',
                 'scope': 'capture_review',
                 'request_id': str(owner_request),
             }, sort_keys=True, separators=(',', ':'))
