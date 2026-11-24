@@ -1,5 +1,20 @@
 # Claim2Car — authoritative thread handoff / current engineering state
 
+## 0. Current checkpoint — 2026-11-24
+
+- **PR #184 merged:** `55f69790df123a4602196c3c474e143808c4b87e`; exact tested head `95692eaf30f76ca9ab8b7c0cf71c4bcf9fac5d68`; 13/13 workflows passed. Full suite 1,064 passed, 7 skipped, 31 warnings, 218 subtests. Authority suite 407/407 counted tests; DB-01–DB-14 14/14 PASS; 340 tenant-isolation assertions.
+- **M1 database chain/context binding is merged.** Do not repeat migration 0029 or describe M1 as wholly complete: the live capture service still needed to register the root at seal time.
+- **Active PR #185:** [runtime manifest registration](https://github.com/C2C-Connect/claim2car-connect/pull/185), branch `cto/m1-runtime-manifest-registration`, current head `18b617facf9a3772a4d6d568acac315b0327be6f`. Migration 0030 adds a narrow SECURITY DEFINER app path; the live seal transaction registers and verifies the root; review consumers fail closed without a valid root; exact 12-v1/16-v1/16-v2 slot sets are checked. The first CI run found an owner-transfer schema privilege error and stale 29-migration test fixtures. The migration now grants schema CREATE only for ownership transfer and immediately revokes it; fixtures and gate inventory were updated. Corrected-head CI is pending.
+- **Merge gate:** all 13 workflows green and DB-01–DB-14 accepted on the exact latest head. PR #185 is not merged.
+- **Next after PR #185:** M2 original-artifact provenance and metadata; then observation/finding persistence, calibrated geometry/measurement, source-backed technical assessment, and deterministic report generation. The legacy in-memory four-tier PDF service is not an acceptable production report pipeline.
+- **Release boundary:** no deployment, external notarization, trusted timestamp, field accuracy qualification, participant evidence, live payment or dispatch is claimed.
+
+**Active branch:** `cto/m1-runtime-manifest-registration`
+**Active PR:** #185
+**Canonical base:** `main`
+
+---
+
 ## 0. Latest verified checkpoint — persisted readback verification merged (2026-11-23)
 
 - **Main merge:** PR #182 squash-merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`. PR #180 is the previous merged increment; PR #176 was superseded and closed.
