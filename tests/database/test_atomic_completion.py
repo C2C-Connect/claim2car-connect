@@ -114,7 +114,7 @@ with psycopg.connect(os.environ['RECOVERY_DATABASE_URL'], autocommit=True) as co
 print(json.dumps(rows))
 """
         env = os.environ.copy()
-        env['RECOVERY_DATABASE_URL'] = os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
+        env['RECOVERY_DATABASE_URL'] = f.app_url if f.authority_schema else os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
         result = subprocess.run([sys.executable, '-c', child], input=json.dumps({'tenant':self.f.tenant,'session':self.f.session}),
                                 cwd=Path(__file__).resolve().parents[2], env=env, text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
