@@ -109,8 +109,8 @@ Every row explicitly lists its database dependencies, additional evidence not su
 
 | Component | Level | Current-head SHA | Workflow evidence | Gates satisfied | Gates remaining | Blockers |
 |---|---|---|---|---|---|---|
-| Runtime manifest registration (PR #185) | Implemented | `0431dbaf6e1a3bb3348f6d94c094e893543e513c` | Full suite #1125, DB authority #1196, FastAPI #1182 passed; integrated smoke #671 rerun in progress | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Independent inspection of authority artifact; completed integrated smoke rerun; prove restart, idempotency, independent verification, tamper rejection and audit at exact current head |
-| Evidence-linked damage reports (PR #186) | Implemented | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | Eleven of thirteen listed workflow runs completed successfully; two are in progress at snapshot | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Complete all exact-head workflows; durable report registry; restart retrieval; immutable original-byte reference; per-box source linkage and disclosure; PDF/JSON parity; tamper audit; rebase after PR #185 |
+| Runtime manifest registration (PR #185) | Implemented | `0431dbaf6e1a3bb3348f6d94c094e893543e513c` | Full suite #1125, DB authority #1196, FastAPI #1182 passed; integrated smoke #671 rerun in progress | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Inspect authority artifact; complete integrated smoke rerun; confirm exact-head test assertions for idempotency, independent verification, restart survival, tamper rejection and durable audit |
+| Evidence-linked damage reports (PR #186) | Implemented | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | Full suite #1129 passed; 11/13 workflows passed; DB authority #1200 and integrated smoke #675 remain in progress | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Complete the two in-progress workflows; inspect retained artifacts; rebase and rerun after PR #185. Update stale PR description to reflect durable journal-backed report registry and restart/tamper tests |
 | Persistent integrated staging | Designed | No deployed revision | No deployment run proving persistent staging | None | GATE-04, GATE-05 and all dependent gates | No approved cost ceiling and no completed provisioning/deployment evidence |
 | Physical-device qualification | Designed | No qualified device revision | No physical-device run | None | GATE-06 | Physical iPad Pro 11-inch M5 qualification evidence absent |
 | Square sandbox reconciliation | Implemented status not established by this registry | No current-head SHA/run established | No complete current-head sandbox evidence located | None | GATE-01, GATE-07 | Success/duplicate/failure/UNKNOWN/reversal/reconciliation evidence and signed governance terms absent |
@@ -133,7 +133,7 @@ Current candidate: SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. The DB author
 
 ### PR #186 — evidence-linked damage assessment reports
 
-**Implementation evidence discovered in the live PR branch:** `database/capture_evidence.py` implements `record_damage_assessment_report` and `retrieve_damage_assessment_report`. The write path stores PDF and JSON carrier bytes in the durable artifact store and appends a `DAMAGE_ASSESSMENT_REPORT_GENERATED` event to the PostgreSQL journal with both immutable storage keys, SHA-256 digests, manifest digest, seal event, protocol version, report revision, request digest, findings and review-event binding. The read path reconstructs report metadata from the persisted journal and fetches both objects by key with expected-digest verification. The PR description's statement that report versions remain process-memory-only is therefore stale relative to the current branch implementation and integration tests.
+**Implementation evidence discovered in the live PR branch:** `database/capture_evidence.py` implements `record_damage_assessment_report` and `retrieve_damage_assessment_report`. The write path stores PDF and JSON carrier bytes in the durable artifact store and appends a `DAMAGE_ASSESSMENT_REPORT_GENERATED` event to the PostgreSQL journal with both immutable storage keys, SHA-256 digests, manifest digest, seal event, protocol version, report revision, request digest, findings and review-event binding. The read path reconstructs report metadata from the persisted journal and fetches both objects by key with expected-digest verification. The PR description's statement that report versions remain process-memory-only is therefore stale relative to the current branch implementation and integration tests; the PR description should be reconciled before final review.
 
 The current integration test also:
 - asserts the PDF does not embed the original source byte sequence, while carrying the original image storage key and digest;
@@ -154,20 +154,20 @@ Before it can be considered Verified or merged, current-head evidence must prove
 4. Report versions and metadata are held in a durable registry; a fresh process can retrieve the report and verify its digest. In-memory-only versioning is not acceptable.
 5. Tampering with a persisted report fails closed and writes a durable audit event.
 
-Current candidate: SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. The latest commit adds HTTP assertions for source storage key, SHA-256, reviewer timestamp, disclosure text, and durable tamper audit. The PR description still states that report versions are stored in process memory; that is a merge blocker until replaced with a durable report registry and tested across restart.
+Current candidate: SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. The latest commit adds HTTP assertions for source storage key, SHA-256, reviewer timestamp, disclosure text, and durable tamper audit. The PR description still states that report versions are stored in process memory; this is a documentation discrepancy, not a code blocker if the durable implementation and restart evidence remain present on the final rebased head.
 
 ## 7. Live-source discrepancies requiring explicit reconciliation
 
-The owner directive's canonical capture identifiers are `12-v1` and `16-v1`. The live code on the PR #185 branch sets `DEFAULT_CAPTURE_PROTOCOL = claims2car-16-v1`, lists `claims2car-16-v2` as a separate FAOS protocol, and lists `claims2car-12-v1` as the legacy protocol. The repository's versioning document records the 16-v1 view list as owner-approved on 2026-11-11 and enabled. The additional 16-v2 protocol is not named in the current owner decision and must remain a distinct version, never an alias or reinterpretation of 16-v1.
+The owner directive's canonical capture identifiers are `12-v1` and `16-v1`. The live code on the PR #185 branch sets `DEFAULT_CAPTURE_PROTOCOL = claims2car-16-v1`, keeps `claims2car-12-v1` as a supported legacy protocol, and also exposes `claims2car-16-v2` as a separate FAOS protocol. The repository's versioning document records the exact 16-v1 view list as owner-approved on 2026-11-11 and enabled. The 16-v2 protocol is not named in the current owner decision and is therefore a separate, non-default protocol whose semantics must not be merged into 16-v1.
 
-Until the actual contracts, migrations, API validators, frontend selector, session-creation defaults, and report/reviewer consumers are reconciled against the owner's canonical `12-v1` / `16-v1` decision:
-- do not enable or silently rename any protocol;
-- do not reinterpret existing sessions;
-- persist and display the exact protocol identifier stored at session creation;
-- treat any `16-v2` session as a distinct immutable protocol, not as `16-v1`;
-- report the discrepancy in every acceptance decision that depends on capture protocol.
+Required handling:
+- preserve `claims2car-16-v1` and `claims2car-12-v1` as distinct immutable contracts;
+- preserve any existing `claims2car-16-v2` sessions as their own immutable protocol; never relabel them as 16-v1;
+- persist and display the exact protocol identifier stored at session creation in every report, reviewer view and carrier payload;
+- do not make 16-v2 the default or silently change protocol enablement;
+- record this additional version as a live-source discrepancy in any gate depending on capture protocol.
 
-The owner directive supersedes stale repository prose where it conflicts, while the live code remains the source of truth for what is actually implemented. This registry does not rewrite historical protocol records or certify compatibility.
+The owner directive governs the canonical 12-v1 / 16-v1 target; the live repository is the source of truth for the additional 16-v2 implementation. This registry does not rewrite historical protocol records or certify compatibility.
 
 ## 8. Owner and environment approvals
 
