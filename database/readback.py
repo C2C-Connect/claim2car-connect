@@ -118,7 +118,9 @@ def locked_verified_journal_in_transaction(conn, tenant, session_id):
     """Return a fully verified journal inside an existing tenant transaction.
 
     Use this from services that already run under CaptureSessionStore._authorized.
-    It checks the live database tenant binding, takes the session serialization
+    It requires the current transaction's tenant binding and refuses legacy
+    unhashed schemas; callers must map its ValueError to a fail-closed domain
+    conflict. It checks the live database tenant binding, takes the session serialization
     lock, recomputes every persisted event hash from PostgreSQL rows, and refuses
     legacy-unhashed or invalid histories. It deliberately does not open a nested
     tenant_transaction.
