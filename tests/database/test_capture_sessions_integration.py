@@ -170,6 +170,7 @@ class CaptureSessionIntegration(unittest.TestCase):
                 request_payload_sha256=request_digest,
             )
             self.assertEqual(report["manifest_digest"], sealed["manifest_digest"])
+            self.assertEqual(report["seal_event_id"], root[0])
             self.assertEqual(report["report_revision"], 1)
             self.assertFalse(report["replayed"])
             retry = service.record_damage_assessment_report(
