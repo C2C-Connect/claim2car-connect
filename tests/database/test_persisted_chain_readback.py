@@ -5,10 +5,11 @@ from unittest.mock import patch
 import psycopg
 
 from app.domain_events import DomainEvent
-from database.journal import append
+from database.journal import append, tenant_transaction
 from database.readback import (
     load_journal,
     locked_journal,
+    locked_verified_journal_in_transaction,
     read_persisted_journal,
     verify_persisted_event_chain,
 )
@@ -58,8 +59,8 @@ class PersistedChainReadbackIntegration(unittest.TestCase):
         self.admin.execute("ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation")
         try:
             self.admin.execute(
-                "UPDATE faos.events SET payload_json='{\"synthetic\":false}' WHERE tenant_id=%s AND session_id=%s",
-                (self.tenant,self.session),
+                "UPDATE faos.events SET payload_json=%s WHERE tenant_id=%s AND session_id=%s",
+                ('{"synthetic":false}',self.tenant,self.session),
             )
         finally:
             self.admin.execute("ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation")
@@ -90,6 +91,40 @@ class PersistedChainReadbackIntegration(unittest.TestCase):
         self.assertEqual(append(self.conn,self.tenant,self.event),"ACCEPTED")
         with self.assertRaisesRegex(ValueError,"^SESSION_NOT_FOUND_OR_NOT_VISIBLE$"):
             read_persisted_journal(self.other_conn,self.other_tenant,self.session)
+
+
+    def test_locked_verified_readback_uses_existing_tenant_transaction(self):
+        self.assertEqual(append(self.conn,self.tenant,self.event),"ACCEPTED")
+        with tenant_transaction(self.conn,self.tenant):
+            journal=locked_verified_journal_in_transaction(self.conn,self.tenant,self.session)
+            self.assertEqual(journal.events,(self.event,))
+            self.assertEqual(journal.integrity_status,"CHAIN_VERIFIED")
+
+    def test_locked_verified_readback_fails_closed_on_tampered_chain(self):
+        self.assertEqual(append(self.conn,self.tenant,self.event),"ACCEPTED")
+        self.admin.execute("ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation")
+        try:
+            self.admin.execute(
+                "UPDATE faos.events SET payload_json='{\\"synthetic\\":false}' WHERE tenant_id=%s AND session_id=%s",
+                (self.tenant,self.session),
+            )
+        finally:
+            self.admin.execute("ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation")
+        with tenant_transaction(self.conn,self.tenant):
+            with self.assertRaisesRegex(ValueError,"^EVENT_CHAIN_INVALID:EVENT_HASH_MISMATCH$"):
+                locked_verified_journal_in_transaction(self.conn,self.tenant,self.session)
+
+    def test_locked_verified_readback_rejects_missing_tenant_transaction(self):
+        self.assertEqual(append(self.conn,self.tenant,self.event),"ACCEPTED")
+        with self.assertRaisesRegex(ValueError,"^TENANT_CONTEXT_MISMATCH$"):
+            locked_verified_journal_in_transaction(self.conn,self.tenant,self.session)
+
+    def test_locked_verified_readback_rejects_legacy_unhashed_schema(self):
+        self.assertEqual(append(self.conn,self.tenant,self.event),"ACCEPTED")
+        with patch("database.readback._hash_column_count",return_value=0):
+            with tenant_transaction(self.conn,self.tenant):
+                with self.assertRaisesRegex(ValueError,"^EVENT_CHAIN_INVALID:HASH_COLUMNS_NOT_PRESENT$"):
+                    locked_verified_journal_in_transaction(self.conn,self.tenant,self.session)
 
 
 if __name__ == "__main__":
