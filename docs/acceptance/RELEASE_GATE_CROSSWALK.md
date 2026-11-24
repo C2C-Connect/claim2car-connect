@@ -73,7 +73,16 @@ The authority artifact identifies tested checkout `40a9e5298b2e6eb484177319552ff
 
 The DB authority artifact is retained as artifact ID `14972002960`, SHA-256 `8b8e387915e000cd9c431409dc8de719c736030263632a4b15e00a185e632670`: https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282825/artifacts/14972002960. Its metadata records candidate SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`, tested checkout `63ba944f0809212e968199b6afd8ab5dfac086f5`, migration `0031_damage_assessment_report_event.sql`, 409/409 counted DB tests with zero skips, and 14/14 executable DB gate results. It likewise reports DB-level `overall_acceptance: ACCEPTED`, which is not owner certification of the full release. The candidate SHA and merge-ref tested checkout are both recorded; they are not interchangeable.
 
-**Skip accounting:** the full-suite jobs for both PRs each report seven skipped tests. The database authority jobs separately report zero skipped tests. Because the owner PR rules require zero skipped tests, the seven full-suite skips remain a merge-readiness blocker until each is either executed in its required environment without being silently skipped or explicitly resolved under an owner-approved rule.
+**Skip accounting:** the full-suite jobs for both PRs each report seven skips because the general suite runs against the explicit legacy schema baseline through migration 0007. The seven cases are:
+- `CompletionReceiptTests.test_receipt_inspection_fails_closed_on_root_binding_tamper`
+- `CompletionReceiptTests.test_receipt_write_rejects_root_binding_tamper`
+- `ManifestRootTests.test_authority_fixture_roles_are_bound_to_tenant`
+- `ManifestRootTests.test_privileged_context_binding_tamper_fails_verification`
+- `ManifestRootTests.test_registered_binding_rejects_tampered_chain_tail`
+- `ManifestRootTests.test_registered_root_contains_and_verifies_seal_chain_binding`
+- `RegisteredCompletionTests.test_registered_root_context_binding_tamper_fails_closed`
+
+These are schema-specific N/A skips in the legacy-baseline run, not missing coverage: all seven are executed and PASS in the separate post-cutover authority lane. That lane reports 408/408 counted tests, zero skips for PR #185, and 409/409 counted tests, zero skips for PR #186. Nevertheless, the general full-suite jobs still report seven skipped cases. The owner's literal PR rule says zero skipped tests; therefore do not silently waive this discrepancy. Keep the components at Implemented until the owner-approved interpretation is recorded or the workflow matrix is changed to report these cases without skipping while preserving the legacy-baseline checks.
 ## 3. Database gate registry — DB-01 through DB-14
 
 **Required environment:** isolated synthetic PostgreSQL 16 with PostGIS 3.4 and required extensions; separately identified admin, migrator, and restricted application roles; full ordered migration inventory; no production credentials or participant data.  
