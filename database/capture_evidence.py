@@ -23,6 +23,7 @@ from app.artifact_storage import (
 from app.evidence_manifest import ManifestEntry, build_manifest
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
 from app.vin_guard import validate_vin
+from database.readback import locked_verified_journal_in_transaction
 from database.capture_sessions import (
     CaptureAuthorizationError,
     CaptureSessionConflict,
@@ -72,18 +73,19 @@ class CaptureEvidenceService:
         session = self.sessions._read(conn, actor, session_id)
         if creator_required and session.created_by != actor.actor_id:
             raise CaptureAuthorizationError("CAPTURE_AUTHORITY_DENIED")
-        conn.execute("SELECT faos.lock_session_for_completion(%s::uuid,%s::text)", (actor.tenant_id, session_id))
-        rows = conn.execute(
-            "SELECT sequence,kind,actor,payload_json,event_id FROM faos.events "
-            "WHERE tenant_id=%s AND session_id=%s ORDER BY sequence",
-            (actor.tenant_id, session_id),
-        ).fetchall()
-        if not rows or len(rows) > 1000 or any(row[0] != i + 1 for i, row in enumerate(rows)):
+        try:
+            journal = locked_verified_journal_in_transaction(conn, actor.tenant_id, session_id)
+        except ValueError as error:
+            raise CaptureSessionConflict("CAPTURE_HISTORY_CHAIN_INVALID") from error
+        events = journal.events
+        if not events or len(events) > 1000:
             raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_HISTORY")
         try:
-            return session, [(r[1], r[2], json.loads(r[3]), r[4]) for r in rows]
+            history = [(event.kind, event.actor, json.loads(event.payload_json), event.event_id)
+                       for event in events]
         except (ValueError, TypeError):
             raise CaptureSessionConflict("INVALID_CAPTURE_HISTORY") from None
+        return session, history
 
     @staticmethod
     def _append(conn, actor, session_id, history, *, event_id, kind, reason, payload):
