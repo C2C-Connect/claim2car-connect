@@ -8,6 +8,8 @@ import base64
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -452,6 +454,69 @@ class CaptureHttpIntegration(unittest.TestCase):
                         self.assertEqual(fresh_pdf.content, report.content)
                         self.assertEqual(fresh_json.status_code, 200, fresh_json.text)
                         self.assertEqual(fresh_json.content, report_json_download.content)
+
+                    # A separate interpreter must retrieve both persisted report
+                    # carriers using only the durable PostgreSQL registry and store.
+                    report_process_environment = {
+                        **os.environ,
+                        "C2C_TEST_DSNS": json.dumps(self.db.dsns),
+                        "C2C_TEST_TENANT_ID": self.db.f.tenants[0],
+                        "C2C_TEST_REVIEWER_ROLE": self.db.f.roles[0],
+                        "C2C_TEST_REVIEWER_TOKEN": self.db.reviewer_token,
+                        "C2C_TEST_SESSION_ID": session_id,
+                        "C2C_TEST_REPORT_ID": report_artifact_id,
+                        "C2C_TEST_REPORT_SHA256": report_sha,
+                        "C2C_TEST_REPORT_JSON_SHA256": report_json_sha,
+                    }
+                    report_process_script = r'''
+import hashlib, json, os, time, uuid
+from fastapi.testclient import TestClient
+from app.capture_api import CaptureRuntime, create_capture_app
+from app.identity import ActorBinding, Credential, CredentialResolver
+from app.main import Settings
+from database.capture_sessions import CaptureSessionStore
+from database.claim_cases import ClaimCaseStore
+
+token = os.environ["C2C_TEST_REVIEWER_TOKEN"]
+tenant_id = uuid.UUID(os.environ["C2C_TEST_TENANT_ID"])
+credential = Credential(
+    hashlib.sha256(token.encode()).hexdigest(),
+    ActorBinding("claim-reviewer-0", tenant_id, os.environ["C2C_TEST_REVIEWER_ROLE"], "reviewer"),
+    int(time.time()) + 3600,
+)
+resolver = CredentialResolver([credential])
+store = CaptureSessionStore(resolver, json.loads(os.environ["C2C_TEST_DSNS"]))
+runtime = CaptureRuntime(resolver, store, Settings(), ClaimCaseStore(store))
+session_id = os.environ["C2C_TEST_SESSION_ID"]
+report_id = os.environ["C2C_TEST_REPORT_ID"]
+with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
+    headers = {"Authorization": "Bearer " + token}
+    pdf = client.get(f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_id}", headers=headers)
+    carrier = client.get(f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_id}/json", headers=headers)
+    assert pdf.status_code == 200, pdf.text
+    assert carrier.status_code == 200, carrier.text
+    assert hashlib.sha256(pdf.content).hexdigest() == os.environ["C2C_TEST_REPORT_SHA256"]
+    assert hashlib.sha256(carrier.content).hexdigest() == os.environ["C2C_TEST_REPORT_JSON_SHA256"]
+    print(json.dumps({"pdf_sha256": hashlib.sha256(pdf.content).hexdigest(),
+                      "json_sha256": hashlib.sha256(carrier.content).hexdigest(),
+                      "process_restarted": True}, sort_keys=True))
+'''
+                    report_process_result = subprocess.run(
+                        [sys.executable, "-c", report_process_script],
+                        env=report_process_environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        check=False,
+                    )
+                    self.assertEqual(
+                        report_process_result.returncode, 0,
+                        report_process_result.stdout + "\n" + report_process_result.stderr,
+                    )
+                    report_process_payload = json.loads(report_process_result.stdout.strip().splitlines()[-1])
+                    self.assertTrue(report_process_payload["process_restarted"])
+                    self.assertEqual(report_process_payload["pdf_sha256"], report_sha)
+                    self.assertEqual(report_process_payload["json_sha256"], report_json_sha)
 
                     collision_evidence = restarted.get(
                         f"/v1/review-collisions/{collision_id}",
