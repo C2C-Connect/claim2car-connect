@@ -98,8 +98,10 @@ BEGIN
 END
 $capture_register$;
 
+GRANT CREATE ON SCHEMA faos TO faos_writer;
 ALTER FUNCTION faos.register_manifest_root_from_capture(uuid,text,text,text,text,text,uuid)
  OWNER TO faos_writer;
+REVOKE CREATE ON SCHEMA faos FROM faos_writer;
 REVOKE ALL ON FUNCTION faos.register_manifest_root_from_capture(uuid,text,text,text,text,text,uuid)
  FROM PUBLIC,faos_fixture;
 GRANT EXECUTE ON FUNCTION faos.register_manifest_root_from_capture(uuid,text,text,text,text,text,uuid)
