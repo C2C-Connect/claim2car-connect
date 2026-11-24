@@ -8,6 +8,8 @@ import base64
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -287,6 +289,79 @@ class CaptureHttpIntegration(unittest.TestCase):
                         "SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)",
                         (self.db.f.tenants[0], session_id, seal_id),
                     ).fetchone()[0])
+
+                    # Start a separate Python process immediately after sealing.
+                    # It must reconstruct the HTTP reviewer path using only the
+                    # persisted PostgreSQL journal and durable original-byte store.
+                    process_artifact_id, process_original = next(iter(originals.items()))
+                    process_environment = {
+                        **os.environ,
+                        "C2C_TEST_DSNS": json.dumps(self.db.dsns),
+                        "C2C_TEST_TENANT_ID": self.db.f.tenants[0],
+                        "C2C_TEST_REVIEWER_ROLE": self.db.f.roles[0],
+                        "C2C_TEST_REVIEWER_TOKEN": self.db.reviewer_token,
+                        "C2C_TEST_SESSION_ID": session_id,
+                        "C2C_TEST_ARTIFACT_ID": process_artifact_id,
+                        "C2C_TEST_ORIGINAL_B64": base64.b64encode(process_original).decode("ascii"),
+                        "C2C_TEST_EXPECTED_MANIFEST": manifest_digest,
+                    }
+                    process_script = r'''
+import base64, hashlib, json, os, time, uuid
+from fastapi.testclient import TestClient
+from app.capture_api import CaptureRuntime, create_capture_app
+from app.identity import ActorBinding, Credential, CredentialResolver
+from app.main import Settings
+from database.capture_sessions import CaptureSessionStore
+from database.claim_cases import ClaimCaseStore
+
+token = os.environ["C2C_TEST_REVIEWER_TOKEN"]
+tenant_id = uuid.UUID(os.environ["C2C_TEST_TENANT_ID"])
+role = os.environ["C2C_TEST_REVIEWER_ROLE"]
+credential = Credential(
+    hashlib.sha256(token.encode()).hexdigest(),
+    ActorBinding("claim-reviewer-0", tenant_id, role, "reviewer"),
+    int(time.time()) + 3600,
+)
+resolver = CredentialResolver([credential])
+store = CaptureSessionStore(resolver, json.loads(os.environ["C2C_TEST_DSNS"]))
+runtime = CaptureRuntime(resolver, store, Settings(), ClaimCaseStore(store))
+session_id = os.environ["C2C_TEST_SESSION_ID"]
+artifact_id = os.environ["C2C_TEST_ARTIFACT_ID"]
+expected_bytes = base64.b64decode(os.environ["C2C_TEST_ORIGINAL_B64"])
+with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
+    headers = {"Authorization": "Bearer " + token}
+    details = client.get(f"/v1/review-sessions/{session_id}", headers=headers)
+    assert details.status_code == 200, details.text
+    assert details.json()["manifest_digest"] == os.environ["C2C_TEST_EXPECTED_MANIFEST"]
+    original = client.get(f"/v1/review-sessions/{session_id}/artifacts/{artifact_id}", headers=headers)
+    assert original.status_code == 200, original.text
+    assert original.content == expected_bytes
+    print(json.dumps({
+        "manifest_digest": details.json()["manifest_digest"],
+        "artifact_sha256": hashlib.sha256(original.content).hexdigest(),
+        "artifact_id": artifact_id,
+        "process_restarted": True,
+    }, sort_keys=True))
+'''
+                    process_result = subprocess.run(
+                        [sys.executable, "-c", process_script],
+                        env=process_environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        check=False,
+                    )
+                    self.assertEqual(
+                        process_result.returncode, 0,
+                        process_result.stdout + "\n" + process_result.stderr,
+                    )
+                    process_result_payload = json.loads(process_result.stdout.strip().splitlines()[-1])
+                    self.assertTrue(process_result_payload["process_restarted"])
+                    self.assertEqual(process_result_payload["manifest_digest"], manifest_digest)
+                    self.assertEqual(
+                        process_result_payload["artifact_sha256"],
+                        hashlib.sha256(process_original).hexdigest(),
+                    )
 
                     cross_tenant = client.get(
                         f"/v1/review-sessions/{session_id}",
