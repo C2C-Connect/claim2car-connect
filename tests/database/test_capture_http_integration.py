@@ -493,10 +493,18 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                         "x_min": 0.2, "y_min": 0.2, "x_max": 0.7, "y_max": 0.7,
                     })
                     self.assertEqual(carrier_finding["reviewer_attribution"]["actor_id"], "claim-reviewer-0")
+                    self.assertTrue(carrier_finding["reviewer_attribution"]["reviewed_at"])
                     self.assertEqual(carrier_finding["source_image"]["artifact_id"], first_artifact_id)
                     self.assertEqual(
                         carrier_finding["source_image"]["storage_key"],
                         f"{self.db.f.tenants[0]}/{session_id}/{first_artifact_id}.original",
+                    )
+                    self.assertEqual(carrier_finding["source_image"]["sha256"], hashlib.sha256(first_bytes).hexdigest())
+                    self.assertIn(b"A bounding box is a suspect-region identifier only", report.content)
+                    self.assertIn(carrier_finding["source_image"]["storage_key"].encode("utf-8"), report.content)
+                    self.assertEqual(
+                        carrier_finding["bbox_disclosure"],
+                        "A bounding box is a suspect-region identifier only. It is not a measured dimension, calibrated geometry, or a structural-severity claim.",
                     )
                     self.assertEqual(carrier_finding["camera_angle"]["yaw_degrees"], 25)
                     self.assertEqual(report_json_download.headers["x-report-json-artifact-id"], report_json_artifact_id)
@@ -589,6 +597,27 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                     self.assertEqual(report_process_payload["pdf_sha256"], report_sha)
                     self.assertEqual(report_process_payload["json_sha256"], report_json_sha)
 
+                    # A corrupted persisted PDF must fail closed and leave a durable audit event.
+                    report_path.write_bytes(b"tampered synthetic report bytes")
+                    tampered_report = restarted.get(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(tampered_report.status_code, 409, tampered_report.text)
+                    self.assertEqual(
+                        tampered_report.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"},
+                    )
+                    report_integrity_audit = self.db.f.seed.execute(
+                        "SELECT payload_json FROM faos.events "
+                        "WHERE tenant_id=%s AND session_id=%s AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED' "
+                        "AND payload_json::jsonb->>'artifact_id'=%s",
+                        (self.db.f.tenants[0], session_id, report_artifact_id),
+                    ).fetchall()
+                    self.assertEqual(len(report_integrity_audit), 1, "DAMAGE_REPORT_TAMPER_AUDIT_NOT_DURABLE")
+                    self.assertEqual(
+                        json.loads(report_integrity_audit[0][0])["failure_code"], "ARTIFACT_HASH_MISMATCH",
+                    )
+
                     collision_evidence = restarted.get(
                         f"/v1/review-collisions/{collision_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
@@ -657,14 +686,13 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                     self.assertEqual(tampered.status_code, 409)
                     self.assertEqual(tampered.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"})
                     integrity_audit = self.db.f.seed.execute(
-                        "SELECT kind,payload_json FROM faos.events "
-                        "WHERE tenant_id=%s AND session_id=%s "
-                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED'",
-                        (self.db.f.tenants[0], session_id),
+                        "SELECT payload_json FROM faos.events "
+                        "WHERE tenant_id=%s AND session_id=%s AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED' "
+                        "AND payload_json::jsonb->>'artifact_id'=%s",
+                        (self.db.f.tenants[0], session_id, first_artifact_id),
                     ).fetchall()
                     self.assertEqual(len(integrity_audit), 1, "INTEGRITY_FAILURE_AUDIT_NOT_DURABLE")
-                    audit_payload = json.loads(integrity_audit[0][1])
-                    self.assertEqual(integrity_audit[0][0], "ARTIFACT_INTEGRITY_FAILURE_RECORDED")
+                    audit_payload = json.loads(integrity_audit[0][0])
                     self.assertEqual(audit_payload["artifact_id"], first_artifact_id)
                     self.assertEqual(audit_payload["expected_sha256"], hashlib.sha256(first_bytes).hexdigest())
                     self.assertEqual(audit_payload["failure_code"], "ARTIFACT_HASH_MISMATCH")
@@ -676,8 +704,9 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                     self.assertEqual(tampered_retry.status_code, 409)
                     repeated_audit_count = self.db.f.seed.execute(
                         "SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s "
-                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED'",
-                        (self.db.f.tenants[0], session_id),
+                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED' "
+                        "AND payload_json::jsonb->>'artifact_id'=%s",
+                        (self.db.f.tenants[0], session_id, first_artifact_id),
                     ).fetchone()[0]
                     self.assertEqual(repeated_audit_count, 1, "INTEGRITY_FAILURE_AUDIT_NOT_IDEMPOTENT")
 
