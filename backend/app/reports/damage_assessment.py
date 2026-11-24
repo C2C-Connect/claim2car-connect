@@ -15,7 +15,7 @@ from io import BytesIO
 import re
 from typing import Sequence
 
-from PIL import Image, ImageDraw, UnidentifiedImageError
+from PIL import ExifTags, Image, ImageDraw, UnidentifiedImageError
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
@@ -211,6 +211,33 @@ def _display_image(raw: bytes) -> bytes:
     return out.getvalue()
 
 
+def _capture_metadata(raw: bytes) -> dict[str, str]:
+    """Extract a small, explicitly untrusted EXIF subset; omit GPS/location."""
+    try:
+        with Image.open(BytesIO(raw)) as image:
+            exif = image.getexif()
+            tags = {ExifTags.TAGS.get(key, str(key)): value for key, value in exif.items()}
+        def value(name: str) -> str:
+            item = tags.get(name)
+            if item is None:
+                return "Not recorded"
+            if isinstance(item, bytes):
+                return item.decode("utf-8", "replace")[:120]
+            return str(item)[:120]
+        return {
+            "make": value("Make"), "model": value("Model"),
+            "datetime_original": value("DateTimeOriginal"), "datetime": value("DateTime"),
+            "focal_length": value("FocalLength"), "exposure_time": value("ExposureTime"),
+            "f_number": value("FNumber"), "iso": value("ISOSpeedRatings"),
+            "orientation": value("Orientation"),
+        }
+    except (UnidentifiedImageError, OSError, ValueError, TypeError):
+        return {key: "Not recorded" for key in (
+            "make", "model", "datetime_original", "datetime", "focal_length",
+            "exposure_time", "f_number", "iso", "orientation",
+        )}
+
+
 def _annotated_image(evidence: DamageEvidenceImage, findings: Sequence[DamageFinding]) -> bytes:
     image = Image.open(BytesIO(evidence.original_bytes)).convert("RGB")
     draw = ImageDraw.Draw(image)
@@ -241,7 +268,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
         Spacer(1, 8),
         Paragraph(f"<b>Session:</b> {_safe(assessment.session_id)}<br/><b>Vehicle:</b> {_safe(assessment.vehicle_description)}<br/><b>Revision:</b> {assessment.report_revision}<br/><b>Prepared against review:</b> {_safe(assessment.prepared_at or 'Not recorded')}<br/><b>Seal event:</b> {_safe(assessment.seal_event_id or 'Not supplied')}<br/><b>Sealed manifest SHA-256:</b> {_safe(assessment.manifest_digest or 'Not supplied')}", styles["BodyText"]),
         Spacer(1, 10),
-        Paragraph("<b>Scope:</b> This report describes supplied evidence, reviewer-attributed findings and source-attributed estimate inputs. It does not establish hidden damage, causation, structural integrity or roadworthiness unless separately supported. Camera-angle source labels and estimate references are presented as supplied; this renderer does not independently authenticate their origin.", styles["C2CSmall"]),
+        Paragraph("<b>Scope:</b> This report describes supplied evidence, reviewer-attributed findings and source-attributed estimate inputs. It does not establish hidden damage, causation, structural integrity or roadworthiness unless separately supported. Camera-angle source labels and estimate references are presented as supplied; EXIF values are untrusted device metadata and GPS fields are deliberately omitted. This renderer does not independently authenticate metadata origin or infer camera pose from EXIF orientation.", styles["C2CSmall"]),
         Paragraph("Damage findings", styles["C2CHeading"]),
     ]
     image_by_id = {image.artifact_id: image for image in assessment.evidence_images}
@@ -253,6 +280,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
         pixel_box = (round(x0 * width), round(y0 * height), round(x1 * width), round(y1 * height))
         angle = evidence.camera_angle
         angle_text = "Not recorded" if angle.source == "NOT_RECORDED" else f"Yaw {angle.yaw_degrees if angle.yaw_degrees is not None else '—'}°, pitch {angle.pitch_degrees if angle.pitch_degrees is not None else '—'}°, roll {angle.roll_degrees if angle.roll_degrees is not None else '—'}° ({angle.source})"
+        exif = _capture_metadata(evidence.original_bytes)
         story.append(Paragraph(f"<b>{_safe(finding.finding_id)} — {_safe(finding.component)}</b> | {_safe(finding.status)}", styles["Heading3"]))
         rows = [
             ["Vehicle location", finding.vehicle_location, "Damage type", finding.damage_type],
@@ -260,6 +288,9 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
             ["Original artifact", evidence.artifact_id, "SHA-256", evidence.expected_sha256],
             ["Image dimensions", f"{width} × {height} px", "Bounding box", f"normalized ({x0:.4f}, {y0:.4f})–({x1:.4f}, {y1:.4f})"],
             ["Pixel bounds", f"x={pixel_box[0]}–{pixel_box[2]}, y={pixel_box[1]}–{pixel_box[3]}", "Artifact registered at", evidence.registered_at],
+            ["EXIF camera (unverified)", f"{exif['make']} {exif['model']}", "EXIF timestamp (unverified)", exif["datetime_original"] if exif["datetime_original"] != "Not recorded" else exif["datetime"]],
+            ["Lens / focal length", exif["focal_length"], "Exposure / f-number", f"{exif['exposure_time']} / {exif['f_number']}"],
+            ["ISO / orientation", f"{exif['iso']} / {exif['orientation']}", "EXIF GPS", "Not extracted"],
         ]
         table = Table(rows, colWidths=[1.0*inch, 2.45*inch, 0.95*inch, 2.45*inch])
         table.setStyle(TableStyle([
