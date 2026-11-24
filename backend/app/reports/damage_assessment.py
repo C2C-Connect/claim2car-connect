@@ -7,6 +7,7 @@ estimate line items supplied by the assessment pipeline.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from xml.sax.saxutils import escape
 from hashlib import sha256
