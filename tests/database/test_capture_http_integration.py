@@ -311,6 +311,16 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(details.status_code, 200, details.text)
                     self.assertEqual(details.json()["manifest_digest"], manifest_digest)
                     self.assertEqual(len(details.json()["artifacts"]), len(CANONICAL_SLOTS))
+                    persisted_root = self.db.f.seed.execute(
+                        "SELECT seal_event_id FROM faos.manifest_roots "
+                        "WHERE tenant_id=%s AND session_id=%s",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()
+                    self.assertIsNotNone(persisted_root, "MANIFEST_ROOT_NOT_PERSISTED_AFTER_RESTART")
+                    self.assertTrue(self.db.f.seed.execute(
+                        "SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)",
+                        (self.db.f.tenants[0], session_id, persisted_root[0]),
+                    ).fetchone()[0], "FRESH_RUNTIME_MANIFEST_ROOT_VERIFICATION_FAILED")
 
                     collision_evidence = restarted.get(
                         f"/v1/review-collisions/{collision_id}",
@@ -379,7 +389,20 @@ class CaptureHttpIntegration(unittest.TestCase):
                         headers={"Authorization": self.db.reviewer_auth()},
                     )
                     self.assertEqual(tampered.status_code, 409)
-                    self.assertEqual(tampered.json(), {"detail": "EVIDENCE_ARTIFACT_CONFLICT"})
+                    self.assertEqual(tampered.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"})
+                    integrity_audit = self.db.f.seed.execute(
+                        "SELECT kind,payload_json FROM faos.events "
+                        "WHERE tenant_id=%s AND session_id=%s "
+                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED'",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchall()
+                    self.assertEqual(len(integrity_audit), 1, "INTEGRITY_FAILURE_AUDIT_NOT_DURABLE")
+                    audit_payload = json.loads(integrity_audit[0][1])
+                    self.assertEqual(integrity_audit[0][0], "ARTIFACT_INTEGRITY_FAILURE_RECORDED")
+                    self.assertEqual(audit_payload["artifact_id"], first_artifact_id)
+                    self.assertEqual(audit_payload["expected_sha256"], hashlib.sha256(first_bytes).hexdigest())
+                    self.assertEqual(audit_payload["failure_code"], "ARTIFACT_HASH_MISMATCH")
+                    self.assertTrue(audit_payload["idempotency_key"])
 
                     withdrawn = restarted.post(
                         f"/v1/capture-sessions/{session_id}/consent",

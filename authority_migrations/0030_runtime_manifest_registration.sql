@@ -1,3 +1,16 @@
+-- Durable journal event for server-detected original-byte integrity failures.
+ALTER TABLE faos.events DROP CONSTRAINT events_kind_check;
+ALTER TABLE faos.events ADD CONSTRAINT events_kind_check CHECK(kind IN (
+ 'SESSION_CREATED','CONSENT_RECORDED','VEHICLE_RECORDED',
+ 'ARTIFACT_REGISTERED','QUALITY_RECORDED','MANIFEST_SEALED',
+ 'REVIEW_RECORDED','SESSION_ABORTED',
+ 'INCIDENT_INTAKE_CONSENT_RECORDED','INCIDENT_INTAKE_RECORDED',
+ 'VEHICLE_DECODE_CONSENT_RECORDED','VEHICLE_PROFILE_DECODED',
+ 'CAPTURE_EXCEPTION_RECORDED','CAPTURE_EXCEPTION_RESOLVED',
+ 'CAPTURE_SESSION_PAUSED','CAPTURE_SESSION_RESUMED',
+ 'ARTIFACT_INTEGRITY_FAILURE_RECORDED'
+));
+
 -- Runtime registration path for the M1 seal-to-root binding.
 -- Applications may append a seal only through their authorized service; this
 -- function permits registration only for that exact current seal, actor,
