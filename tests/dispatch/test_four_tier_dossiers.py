@@ -112,7 +112,7 @@ class FourTierDossierTests(unittest.TestCase):
         evidence = DamageEvidenceImage(
             artifact_id="artifact-1", capture_slot="front_right_oblique",
             original_bytes=original, expected_sha256=sha256(original).hexdigest(),
-            captured_at="2026-11-08T18:00:00+00:00",
+            registered_at="2026-11-08T18:00:00+00:00",
             camera_angle=CameraAngle(yaw_degrees=30, pitch_degrees=0, roll_degrees=0, source="CAPTURE_METADATA"),
         )
         finding = DamageFinding(
@@ -156,7 +156,7 @@ class FourTierDossierTests(unittest.TestCase):
                 evidence_images=(DamageEvidenceImage(
                     artifact_id="not-in-manifest", capture_slot="front",
                     original_bytes=original, expected_sha256=sha256(original).hexdigest(),
-                    captured_at="2026-11-08T18:00:00+00:00",
+                    registered_at="2026-11-08T18:00:00+00:00",
                 ),),
             )
             self.service.generate_damage_assessment_report(
@@ -171,7 +171,7 @@ class FourTierDossierTests(unittest.TestCase):
         evidence = DamageEvidenceImage(
             artifact_id="artifact-1", capture_slot="front_right_oblique",
             original_bytes=original, expected_sha256=sha256(original).hexdigest(),
-            captured_at="2026-11-08T18:00:00+00:00",
+            registered_at="2026-11-08T18:00:00+00:00",
         )
         finding = DamageFinding(
             finding_id="D-002", component="Front fender", vehicle_location="Passenger front",
