@@ -153,6 +153,32 @@ class FourTierDossierTests(unittest.TestCase):
                 generated_by="forensic-report",
             )
 
+    def test_confirmed_damage_finding_must_match_bound_reviewer_identity(self):
+        image_buffer = BytesIO()
+        Image.new("RGB", (320, 240), "silver").save(image_buffer, format="JPEG")
+        original = image_buffer.getvalue()
+        evidence = DamageEvidenceImage(
+            artifact_id="artifact-1", capture_slot="front_right_oblique",
+            original_bytes=original, expected_sha256=sha256(original).hexdigest(),
+            captured_at="2026-11-08T18:00:00+00:00",
+        )
+        finding = DamageFinding(
+            finding_id="D-002", component="Front fender", vehicle_location="Passenger front",
+            damage_type="dent", observation="Visible deformation",
+            evidence_artifact_id="artifact-1", bbox_normalized=(.2,.2,.5,.5),
+            status="CONFIRMED_BY_REVIEWER", reviewer_actor_id="spoofed-reviewer",
+            reviewed_at="2026-11-08T18:01:00+00:00",
+        )
+        assessment = DamageAssessment(
+            session_id="session-1", vehicle_description="2022 Example Sedan",
+            report_revision=1, findings=(finding,), evidence_images=(evidence,),
+        )
+        with self.assertRaisesRegex(DossierGenerationError, "DAMAGE_REPORT_REVIEWER_IDENTITY_MISMATCH"):
+            self.service.generate_damage_assessment_report(
+                consent=self.consent, binding=self.binding, assessment=assessment,
+                generated_by="forensic-report",
+            )
+
     def test_consent_withdrawal_blocks_generation_and_revokes_versions(self):
         doc = self.service.generate_vehicle_owner_pdf(
             consent=self.consent, binding=self.binding, generated_by="dossier"
