@@ -66,7 +66,7 @@ def reject_mutation(conn,tenant,statement,parameters):
         expect(error.sqlstate=='42501','WRONG_AUTHORIZATION_SQLSTATE')
         return {'status':'PASS','sqlstate':'42501'}
 
-def verify(report,admin,connections,tenants,session):
+def verify(report,admin,connections,fixture_connections,tenants,session):
     matrix = {'id':'POSTCUTOVER-PER-TABLE-ISOLATION','status':'RUNNING','table_count':len(TABLES),'tenant_directions':2,
               'fixture_classification':'admin-provisioned storage-isolation fixtures; not evidence evaluation or accepted completion',
               'results':[]}
@@ -80,7 +80,7 @@ def verify(report,admin,connections,tenants,session):
         for brand in ('brand','extra_brand'):
             admin.execute('INSERT INTO faos.brands VALUES (%s,%s)',(ids[brand],'matrix-'+ids[brand]))
         shop_entries={}
-        for tenant in tenants:
+        for tenant_index,tenant in enumerate(tenants):
             admin.execute('INSERT INTO faos.claim_cases(tenant_id,claim_id,request_id,created_by,owner_actor_id) VALUES (%s,%s,%s,%s,%s)',(tenant,ids['claim'],ids['request'],'synthetic-matrix','synthetic-matrix'))
             admin.execute('INSERT INTO faos.claim_case_incident_intake(tenant_id,claim_id,owner_actor_id,request_id,incident_occurred_at,incident_type,incident_city,incident_region,incident_postal_code) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,ids['claim'],'synthetic-matrix',ids['request'],'2026-01-01T00:00:00Z','collision','San Antonio','TX','78201'))
             admin.execute('INSERT INTO faos.users VALUES (%s,%s,%s)',(tenant,ids['user'],'matrix-subject'))
@@ -90,8 +90,15 @@ def verify(report,admin,connections,tenants,session):
             admin.execute('INSERT INTO faos.location_brands VALUES (%s,%s,%s)',(tenant,ids['location'],ids['brand']))
             sequence = admin.execute('SELECT max(sequence)+1 FROM faos.events WHERE tenant_id=%s AND session_id=%s',(tenant,session)).fetchone()[0]
             payload = json.dumps({'schema_version':'0.1','manifest_digest':digest,'shot_list_version':'claims2car-12-v1'},sort_keys=True,separators=(',',':'))
-            admin.execute('INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(tenant,session,seal,sequence,'MANIFEST_SEALED','synthetic-matrix','2026-01-01T00:00:00Z','storage isolation fixture only',payload,'0.1'))
-            admin.execute('INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) VALUES (%s,%s,%s,%s,%s)',(tenant,session,seal,digest,'claims2car-12-v1'))
+            seal_event = DomainEvent(session,seal,sequence,'MANIFEST_SEALED','synthetic-matrix',
+                                     '2026-01-01T00:00:00Z','storage isolation fixture only',payload)
+            expect(append(connections[tenant_index],tenant,seal_event)=='ACCEPTED','SYNTHETIC_SEAL_APPEND_FAILED')
+            with tenant_transaction(fixture_connections[tenant_index],tenant):
+                registration = fixture_connections[tenant_index].execute(
+                    'SELECT faos.register_manifest_root(%s::uuid,%s::text,%s::text,%s::text,%s::text)',
+                    (tenant,session,seal,digest,'claims2car-12-v1'),
+                ).fetchone()[0]
+            expect(registration in ('REGISTERED','DUPLICATE'),'SYNTHETIC_MANIFEST_ROOT_REGISTRATION_FAILED')
             admin.execute('INSERT INTO faos.completion_receipts(tenant_id,session_id,request_id,seal_event_id,event_sequence) VALUES (%s,%s,%s,%s,%s)',(tenant,session,ids['request'],seal,sequence))
             ledger_id='matrix-ledger-'+uuid.uuid4().hex
             admin.execute('INSERT INTO faos.financial_ledger_entries(tenant_id,entry_id,sequence,idempotency_key,session_id,entry_kind,fee_type,partner_org_id,acceptance_id,amount_cents,currency,actor_id,occurred_at,reason,previous_hash,entry_hash) VALUES (%s,%s,1,%s,%s,%s,%s,%s,%s,37500,%s,%s,%s,%s,%s,%s)',
@@ -263,6 +270,7 @@ def run(report):
     tenants = [str(uuid.uuid4()),str(uuid.uuid4())]
     roles = []
     connections = []
+    fixture_connections = []
     session = 'cutover-'+uuid.uuid4().hex
     with psycopg.connect(admin_url,autocommit=True,connect_timeout=5) as admin:
         report['migration_inventory'] = admin.execute('SELECT name,sha256 FROM public.faos_migration_history ORDER BY ordinal').fetchall()
@@ -286,6 +294,13 @@ def run(report):
                 expect(conn.execute('SELECT session_user,current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone()==(role,role,False,False),'RESTRICTED_BOUND_ROLE_REQUIRED')
                 conn.execute("SET statement_timeout='8s'")
                 conn.execute("SET lock_timeout='5s'")
+                fixture_role,fixture_password = 'cutover_fixture_'+uuid.uuid4().hex,uuid.uuid4().hex
+                admin.execute(sql.SQL('CREATE ROLE {} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD {}').format(sql.Identifier(fixture_role),sql.Literal(fixture_password)))
+                roles.append(fixture_role)
+                admin.execute(sql.SQL('GRANT faos_fixture,faos_writer TO {}').format(sql.Identifier(fixture_role)))
+                expect(admin.execute('INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id) SELECT oid,rolname,%s FROM pg_roles WHERE rolname=%s',(tenant,fixture_role)).rowcount==1,'FIXTURE_BINDING_NOT_CREATED')
+                fixture_conn = psycopg.connect(make_conninfo(admin_url,user=fixture_role,password=fixture_password),autocommit=True,connect_timeout=5)
+                fixture_connections.append(fixture_conn)
             event = DomainEvent(session,'event-1',1,'SESSION_CREATED','synthetic-test','2026-01-01T00:00:00Z','post-cutover diagnostic','{}')
             for conn,tenant in zip(connections,tenants):
                 expect(append(conn,tenant,event)=='ACCEPTED','VALID_APPEND_FAILED')
@@ -338,13 +353,13 @@ def run(report):
             expect(append(connections[0],tenants[0],positive)=='DUPLICATE','COMPACT_RETRY_FAILED')
             expect(load_journal(connections[0],tenants[0],session).events==(event,unicode_event,positive),'COMPACT_READBACK_FAILED')
             report['checks'].append({'id':'COMPACT-JSON-POSITIVE-CONTROL','status':'PASS'})
-            verify(report,admin,connections,tenants,session)
+            verify(report,admin,connections,fixture_connections,tenants,session)
             expect(admin.execute('UPDATE faos.tenant_login_bindings SET enabled=false WHERE role_name=%s',(roles[0],)).rowcount==1,'REVOCATION_FAILED')
             denied(connections[0],tenants[0],event)
             expect(load_journal(connections[1],tenants[1],session).events==(event,),'OTHER_TENANT_DISRUPTED')
             report['checks'].append({'id':'BINDING-REVOCATION-NEXT-TRANSACTION','status':'PASS'})
         finally:
-            for conn in connections:
+            for conn in connections + fixture_connections:
                 conn.close()
             for tenant in tenants:
                 admin.execute('ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation')
