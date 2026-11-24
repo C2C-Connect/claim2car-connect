@@ -833,10 +833,10 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("UNRESOLVED_CAPTURE_EXCEPTIONS")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            for kind, _who, old, old_id in history:
+            for kind, seal_actor, old, old_id in history:
                 if old_id == event_id:
                     if kind == "MANIFEST_SEALED" and type(old) is dict:
-                        self._register_manifest_root(conn, actor, session_id, event_id, request_id, old)
+                        self._register_manifest_root(conn, actor, session_id, event_id, request_id, old, seal_actor=seal_actor)
                         return {"session_id": session_id, **old, "root_registered": True, "replayed": True}
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             last_capture_event = self._last_capture_event(history)
@@ -893,7 +893,7 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
             self._register_manifest_root(
                 conn, actor, session_id, last_capture_event[3],
-                seal["request_id"], seal,
+                seal["request_id"], seal, seal_actor=last_capture_event[1],
             )
             payload = {
                 "request_id": request_id,
