@@ -12,7 +12,10 @@ import tempfile
 import time
 import unittest
 import uuid
+from io import BytesIO
 from pathlib import Path
+
+from PIL import Image
 from unittest.mock import patch
 
 from test_capture_sessions_integration import CaptureSessionIntegration
@@ -225,7 +228,12 @@ class CaptureHttpIntegration(unittest.TestCase):
 
                     originals = {}
                     for slot in CANONICAL_SLOTS:
-                        raw = ("synthetic-http-original:" + slot).encode("ascii")
+                        if slot == CANONICAL_SLOTS[0]:
+                            image_buffer = BytesIO()
+                            Image.new("RGB", (320, 240), "silver").save(image_buffer, format="JPEG")
+                            raw = image_buffer.getvalue()
+                        else:
+                            raw = ("synthetic-http-original:" + slot).encode("ascii")
                         artifact_id = str(uuid.uuid4())
                         originals[artifact_id] = raw
                         uploaded = client.post(
@@ -293,6 +301,16 @@ class CaptureHttpIntegration(unittest.TestCase):
                         headers={"Authorization": f"Bearer {cross_tenant_reviewer_token}"},
                     )
                     self.assertEqual(cross_tenant.status_code, 404)
+                    reviewed = client.post(
+                        f"/v1/capture-sessions/{session_id}/review",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                        json={
+                            "request_id": str(uuid.uuid4()),
+                            "disposition": "NOTE_ONLY",
+                            "reason": "Synthetic report-generation test; no real claim decision.",
+                        },
+                    )
+                    self.assertEqual(reviewed.status_code, 200, reviewed.text)
 
                 # Rebuild runtime and database service objects, retaining only
                 # PostgreSQL rows and the provisioned evidence directory.
@@ -311,6 +329,70 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(details.status_code, 200, details.text)
                     self.assertEqual(details.json()["manifest_digest"], manifest_digest)
                     self.assertEqual(len(details.json()["artifacts"]), len(CANONICAL_SLOTS))
+                    self.assertEqual(details.json()["review"]["actor_id"], "claim-reviewer-0")
+                    first_artifact_id, first_bytes = next(iter(originals.items()))
+                    report_request_id = str(uuid.uuid4())
+                    report_request = {
+                        "request_id": report_request_id,
+                        "vehicle_description": "2003 Honda Accord (synthetic integration fixture)",
+                        "findings": [{
+                            "finding_id": "D-HTTP-001",
+                            "component": "Front bumper",
+                            "vehicle_location": "Front center",
+                            "damage_type": "surface deformation candidate",
+                            "observation": "Synthetic fixture region for report rendering.",
+                            "evidence_artifact_id": first_artifact_id,
+                            "bbox_normalized": [0.2, 0.2, 0.7, 0.7],
+                            "status": "CONFIRMED_BY_REVIEWER",
+                            "limitations": "Synthetic image; no real damage conclusion.",
+                        }],
+                        "estimate_lines": [{
+                            "line_id": "L-HTTP-001",
+                            "category": "BODY_LABOR",
+                            "description": "Synthetic body labor line",
+                            "quantity": "1.5",
+                            "unit": "hours",
+                            "unit_price_cents": 8000,
+                            "source_name": "Synthetic shop rate matrix",
+                            "source_reference": "TEST-RATE-001",
+                            "effective_date": "2026-11-24",
+                            "related_finding_id": "D-HTTP-001",
+                        }],
+                        "camera_angles": {
+                            first_artifact_id: {"yaw_degrees": 25, "pitch_degrees": -2, "roll_degrees": 0},
+                        },
+                    }
+                    report = restarted.post(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-report",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                        json=report_request,
+                    )
+                    self.assertEqual(report.status_code, 200, report.text)
+                    self.assertTrue(report.content.startswith(b"%PDF-"))
+                    self.assertEqual(report.headers["content-type"], "application/pdf")
+                    report_artifact_id = report.headers["x-report-artifact-id"]
+                    report_sha = report.headers["x-report-sha256"]
+                    self.assertEqual(hashlib.sha256(report.content).hexdigest(), report_sha)
+                    report_retry = restarted.post(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-report",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                        json=report_request,
+                    )
+                    self.assertEqual(report_retry.status_code, 200, report_retry.text)
+                    self.assertEqual(report_retry.content, report.content)
+                    altered_request = {**report_request, "vehicle_description": "Altered vehicle"}
+                    altered_retry = restarted.post(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-report",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                        json=altered_request,
+                    )
+                    self.assertEqual(altered_retry.status_code, 409)
+                    report_download = restarted.get(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(report_download.status_code, 200, report_download.text)
+                    self.assertEqual(report_download.content, report.content)
 
                     collision_evidence = restarted.get(
                         f"/v1/review-collisions/{collision_id}",
@@ -357,7 +439,6 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(profile_after_decode_withdrawal.json()["vehicles"][0]["vehicle_profile_status"], "REVOKED")
                     self.assertIsNone(profile_after_decode_withdrawal.json()["vehicles"][0]["vehicle_profile"])
 
-                    first_artifact_id, first_bytes = next(iter(originals.items()))
                     retrieved = restarted.get(
                         f"/v1/review-sessions/{session_id}/artifacts/{first_artifact_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
