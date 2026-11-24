@@ -1,7 +1,7 @@
 # Dispatch build containment
 
-Status: enforced in main; HTTP and direct builder containment verified.
-Current boundary: no dispatch packages may be built from caller-supplied adjudication dictionaries or photo-hash lists.
+Status: candidate implementation on `fix/unverified-triage-dispatch-containment-2026-11-24`; exact-head CI pending.
+Current boundary: triage adjudication and dispatch package construction are both disabled until trusted evidence context is integrated.
 
 ## Scope
 
@@ -17,11 +17,12 @@ No commercial rules, migrations, runtime packaging, real-data collection, extern
 
 ## Verification
 
-Two direct-handler unittest methods cover three provenance cases, builder/append non-invocation, fixed non-cacheable errors and disabled health reporting. These tests have not been executed in the authoring session. They are not live HTTP, PostgreSQL, browser, physical-device or deployment evidence.
+Candidate regression coverage includes HTTP 503 when forged integrity/ACV inputs are submitted, direct builder rejection even with a fabricated passing integrity dictionary and arbitrary 64-character photo hashes, plus existing dispatch-route non-invocation checks. Exact-head GitHub Actions results are required before merge. These tests are not live HTTP against a deployed service, physical-device or deployment evidence.
 
-Suggested focused command:
+Suggested focused commands:
 
-    python -m unittest discover -s tests/api -p test_dispatch_build_containment.py -v
+    pytest tests/api/test_triage_integrity_contract.py tests/api/test_dispatch_build_containment.py -q
+    pytest tests/test_dispatch.py -q
 
 Inspect actual CI results on the exact candidate commit before review or merge.
 
