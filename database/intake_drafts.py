@@ -7,6 +7,8 @@ import json
 import re
 from uuid import UUID
 
+from database.readback import locked_verified_journal_in_transaction
+
 class DraftConflict(ValueError):
     pass
 
