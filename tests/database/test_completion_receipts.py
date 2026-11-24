@@ -24,13 +24,14 @@ class CompletionReceiptTests(unittest.TestCase):
 
     def record(self, values=None, context=True):
         f = self.fixture
-        with psycopg.connect(f.admin_url, autocommit=True) as conn:
-            with conn.transaction():
-                conn.execute('SET LOCAL ROLE faos_writer')
-                self.assertEqual(conn.execute('SELECT current_user').fetchone()[0], 'faos_writer')
-                if context:
-                    conn.execute("SELECT set_config('faos.tenant_id',%s,true)", (f.tenant,))
-                return conn.execute(RECORD, values or self.values()).fetchone()[0]
+        # Use the fixture login whose session identity is explicitly bound to
+        # this tenant. SET ROLE on an administrative connection is not an
+        # equivalent identity and must not satisfy faos.tenant_id().
+        if context:
+            with tenant_transaction(f.fixture_conn, f.tenant):
+                return f.fixture_conn.execute(RECORD, values or self.values()).fetchone()[0]
+        with f.fixture_conn.transaction():
+            return f.fixture_conn.execute(RECORD, values or self.values()).fetchone()[0]
 
     def receipts(self, tenant=None):
         f = self.fixture
