@@ -163,12 +163,18 @@ class DamageAssessment:
     estimate_lines: tuple[RepairEstimateLine, ...] = ()
     currency: str = "USD"
     prepared_at: str = ""
+    manifest_digest: str = ""
+    seal_event_id: str = ""
 
     def __post_init__(self):
         if not self.session_id.strip() or not self.vehicle_description.strip() or self.report_revision < 1:
             raise DamageReportError("INVALID_DAMAGE_ASSESSMENT_IDENTITY")
         if self.currency != "USD":
             raise DamageReportError("UNSUPPORTED_ESTIMATE_CURRENCY")
+        if self.manifest_digest and not _SHA256_RE.fullmatch(self.manifest_digest):
+            raise DamageReportError("INVALID_SEALED_MANIFEST_DIGEST")
+        if self.seal_event_id and not self.seal_event_id.strip():
+            raise DamageReportError("INVALID_SEAL_EVENT_ID")
         image_ids = [item.artifact_id for item in self.evidence_images]
         if len(set(image_ids)) != len(image_ids):
             raise DamageReportError("DUPLICATE_EVIDENCE_IMAGE_ID")
@@ -229,7 +235,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
     story = [
         Paragraph("Claim2Car — Vehicle Damage Assessment", styles["C2CTitle"]),
         Spacer(1, 8),
-        Paragraph(f"<b>Session:</b> {_safe(assessment.session_id)}<br/><b>Vehicle:</b> {_safe(assessment.vehicle_description)}<br/><b>Revision:</b> {assessment.report_revision}<br/><b>Prepared:</b> {_safe(assessment.prepared_at or 'Not recorded')}", styles["BodyText"]),
+        Paragraph(f"<b>Session:</b> {_safe(assessment.session_id)}<br/><b>Vehicle:</b> {_safe(assessment.vehicle_description)}<br/><b>Revision:</b> {assessment.report_revision}<br/><b>Prepared against review:</b> {_safe(assessment.prepared_at or 'Not recorded')}<br/><b>Seal event:</b> {_safe(assessment.seal_event_id or 'Not supplied')}<br/><b>Sealed manifest SHA-256:</b> {_safe(assessment.manifest_digest or 'Not supplied')}", styles["BodyText"]),
         Spacer(1, 10),
         Paragraph("<b>Scope:</b> This report describes supplied evidence, reviewer-attributed findings and source-attributed estimate inputs. It does not establish hidden damage, causation, structural integrity or roadworthiness unless separately supported. Camera-angle source labels and estimate references are presented as supplied; this renderer does not independently authenticate their origin.", styles["C2CSmall"]),
         Paragraph("Damage findings", styles["C2CHeading"]),
