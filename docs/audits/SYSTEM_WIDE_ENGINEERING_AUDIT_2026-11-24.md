@@ -38,6 +38,20 @@ The internal adjudication request accepts `master_hash_valid`, `hash_tamper_susp
 
 **Required correction:** adjudication must consume a server-generated verification result bound to the session and exact sealed manifest. Caller-supplied integrity booleans/fractions must be rejected or treated as non-authoritative diagnostics. A chain failure must fail closed. Integrity status alone must never authorize payment or dispatch.
 
+#### AUD-2026-20 — Dispatch builder trusts caller-assembled integrity objects and photo hashes (P1; confirmed source, HTTP route contained)
+**Sources:** `backend/app/dispatch/dispatcher.py`; `backend/app/api/dispatch.py`; `tests/test_dispatch.py`.
+
+The HTTP `POST /api/v1/dispatch/build` route is correctly hard-disabled with HTTP 503 and does not call the builder. However, the directly callable `build_dispatch(adjudication, photo_hashes=...)` function remains enabled. Its authorization gate trusts a caller-provided dictionary containing `final_tier`, `final_fork`, and an `integrity` object with `s_i`, `tier`, `c_chain`, `c_hash`, and `all_or_nothing_collapse`. It also accepts caller-supplied 64-character photo hashes without retrieving originals or verifying them against a registered manifest. A fabricated dictionary can therefore satisfy the Python builder's integrity gate and generate role-specific packages plus a process-memory anchor if an internal caller invokes it. I found no production callsite for `build_dispatch` in the repository; current HTTP containment prevents the public route from reaching it.
+
+**Required correction:** keep the builder disabled at the function boundary until it accepts a server-owned, tenant-bound, manifest-verified evidence context that it cannot be forged from JSON/dict fields. The authorization object must be constructed only by the trusted evidence verifier; it must bind exact original artifact hashes, chain tip, manifest root, consent, review disposition, and recipient authorization. Tests must prove caller-created dictionaries and hash lists cannot create packages or ledger entries.
+
+#### AUD-2026-21 — Parts resolver uses a hardcoded seed catalog, not verified OEM/CAPA data (P1 for product claims; confirmed source)
+**Source:** `backend/app/catalog/parts_catalog.py`.
+
+The module states directly that it has no external OEM/CAPA APIs and uses admin-managed/CSV-seeded data. Its default catalog is a hardcoded `SEED_PARTS` list containing placeholder identifiers such as `OEM-HOOD-001`, fixed prices, fixed labor hours, and generic applicability by zone/damage class. This is useful for controlled algorithm tests but is not a verified vehicle-specific OEM parts catalog, source-backed supersession table, or current regional estimate. The resolver must not present these entries as verified OEM part numbers, current prices, or vehicle-specific repair procedures.
+
+**Required correction:** label seed records as synthetic/demo data in every output; require a versioned source record and vehicle applicability for verified parts/pricing; keep unsupported components unresolved instead of inventing a part match.
+
 #### AUD-2026-02 — Legacy in-memory anchor remains a misleading parallel verifier (P1/P2; confirmed source)
 **Source:** `backend/app/anchor/ledger.py`; `backend/app/api/dispatch.py`.
 
