@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 
 # These tests are deliberately authority-schema-only. The legacy comparison
-# workflow initializes migrations 0001-0007, so these eight tests are not
+# workflow initializes migrations 0001-0007, so these seven tests are not
 # executable in that schema. They remain mandatory in the full suite and the
 # post-cutover authority workflow; they are explicitly reported as N/A here.
 LEGACY_BASELINE_NOT_APPLICABLE = frozenset({

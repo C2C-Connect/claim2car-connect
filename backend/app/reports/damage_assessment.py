@@ -336,7 +336,7 @@ def _annotated_image(evidence: DamageEvidenceImage, findings: Sequence[DamageFin
 
 
 def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
-    """Render a report with original and annotated source images for each finding."""
+    """Render derived source previews and annotated derivatives; originals remain at immutable storage keys."""
     from reportlab.pdfgen.canvas import Canvas
 
     buffer = BytesIO()
