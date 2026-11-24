@@ -138,6 +138,13 @@ The 50-state/DC table is hardcoded with numeric thresholds and short notes; ther
 
 The analysis route constructs synthetic placeholder bytes from the session ID; it does not ingest vehicle photographs. Its health response identifies stub models and `vehicle_images_supported: false`; its response marks the decision simulated and not an appraisal. This is appropriately disclosed in the route, but these outputs must not be surfaced as actual damage detection, measurements, or appraisals. The triage route accepts caller-provided detections/depths and therefore is not an evidence-to-finding pipeline.
 
+#### AUD-2026-22 — Report generation trusts caller-asserted bindings and keeps versions in process memory (P1; confirmed source)
+**Source:** `backend/app/reports/forensic_pdf.py` (`build_dossier`, `FourTierDossierService`, `_verify_consent_and_review`, `_store_version`).
+
+The legacy seven-page `build_dossier(payload)` renders caller-provided `final_fork`, `final_tier`, integrity, valuation, physics, and detection fields without validating evidence references or a verified finding graph. The newer `FourTierDossierService` is more structured, but its `SourceEvidenceBinding` is a caller-constructed dataclass. `_verify_consent_and_review` checks that manifest digest, reviewer actor, and artifact-ID list are nonempty; it does not retrieve/verify those values from PostgreSQL or the evidence store. `_store_version` persists generated versions in the service instance's `self._versions` dictionary, so versions do not survive process restart and are not a durable, tenant-enforced report registry. The existing pages summarize artifact counts/IDs and selected values; they do not yet provide the required per-finding image annotations, bounding boxes/masks, view/angle, calibrated measurement method, uncertainty, and traceable observation-to-conclusion graph.
+
+**Required correction:** generate reports only from a server-issued verified evidence/review context; persist immutable document versions and revision lineage in PostgreSQL/object storage; bind each annotation to an original artifact and coordinates; bind every measurement to method/calibration/uncertainty; bind each conclusion to findings and alternatives; verify report bytes and source manifest on retrieval. Until then, treat generated dossiers as controlled-test templates, not defensible forensic reports.
+
 ### 6. Workflow & state machines
 
 #### AUD-2026-13 — Quality and seal are separate events; quality payload is advisory
