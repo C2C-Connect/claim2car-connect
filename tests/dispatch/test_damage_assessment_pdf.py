@@ -31,6 +31,7 @@ class DamageAssessmentPdfTests(unittest.TestCase):
             original_bytes=self.raw,
             expected_sha256=sha256(self.raw).hexdigest(),
             registered_at="2026-11-24T08:00:00-06:00",
+            storage_key="tenant-1/session-1/artifact-front-right-001.original",
             camera_angle=CameraAngle(yaw_degrees=35.0, pitch_degrees=-4.0, roll_degrees=0.5, source="CAPTURE_METADATA"),
         )
         self.finding = DamageFinding(
@@ -59,6 +60,7 @@ class DamageAssessmentPdfTests(unittest.TestCase):
             evidence_images=(self.image,),
             estimate_lines=(self.estimate,),
             prepared_at="2026-11-24T09:05:00-06:00",
+            capture_protocol_version="claims2car-16-v2",
         )
 
     def test_pdf_embeds_original_and_annotated_images_and_sourced_estimate(self):
@@ -66,6 +68,7 @@ class DamageAssessmentPdfTests(unittest.TestCase):
         self.assertTrue(pdf.startswith(b"%PDF-"))
         self.assertIn(b"/Subtype /Image", pdf)
         self.assertIn(b"Damage Assessment", pdf)
+        self.assertIn(b"A bounding box is a suspect-region identifier only", pdf)
         self.assertGreaterEqual(pdf.count(b"/Subtype /Image"), 2)
         self.assertEqual(self.estimate.amount_cents, 18750)
 
@@ -91,6 +94,7 @@ class DamageAssessmentPdfTests(unittest.TestCase):
                 artifact_id="tampered", capture_slot="front",
                 original_bytes=self.raw + b"x", expected_sha256=sha256(self.raw).hexdigest(),
                 registered_at="2026-11-24T08:00:00-06:00",
+                storage_key="tenant-1/session-1/tampered.original",
             )
 
     def test_finding_must_reference_an_attached_image(self):
@@ -103,6 +107,7 @@ class DamageAssessmentPdfTests(unittest.TestCase):
                     bbox_normalized=(.1,.1,.2,.2), status="PROVISIONAL",
                 ),),
                 evidence_images=(),
+                capture_protocol_version="claims2car-16-v2",
             )
 
     def test_confirmed_finding_requires_reviewer_attribution(self):

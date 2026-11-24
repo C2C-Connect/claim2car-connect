@@ -21,7 +21,7 @@
 - Bounding boxes are normalized image-space regions, not physical vehicle measurements. Camera angles are reported only with their stated source; unknown angles remain unknown.
 - A confirmed finding is a reviewer decision, not proof of collision causation.
 - Estimate source fields are declarations supplied to the renderer, not independently authenticated source records. Source applicability, OEM procedure validation, labor-time validation, local rate validation, parts fitment, taxes, and shop approval still require their own integrations and checks. Camera-angle source labels are likewise reported as supplied and are not independently authenticated by the renderer.
-- The four-tier dossier service still keeps its local version objects in process memory. The authenticated capture API now generates and returns the PDF, persists its bytes, records a chain-bound report event, supports idempotent retry and audited download, and deletes report bytes when owner capture consent is withdrawn. Owner/shop/carrier report distribution, end-user UI integration and production deployment remain outstanding.
+- The legacy four-tier in-memory service explicitly refuses damage-assessment report versioning. The authenticated capture API is the only supported report-generation path: it stores the PDF and JSON carrier as separate immutable objects, records both storage keys and SHA-256 digests in the PostgreSQL event journal, supports idempotent retry and authenticated retrieval, survives fresh-runtime reconstruction, and deletes both report objects on owner consent withdrawal. Owner/shop/carrier report distribution, end-user UI integration and production deployment remain outstanding.
 
 ## Required next implementation increments
 

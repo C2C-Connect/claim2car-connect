@@ -373,7 +373,11 @@ class CaptureHttpIntegration(unittest.TestCase):
                     report_artifact_id = report.headers["x-report-artifact-id"]
                     report_sha = report.headers["x-report-sha256"]
                     report_path = storage_root / self.db.f.tenants[0] / session_id / (report_artifact_id + ".original")
+                    report_json_artifact_id = report.headers["x-report-json-artifact-id"]
+                    report_json_sha = report.headers["x-report-json-sha256"]
+                    report_json_path = storage_root / self.db.f.tenants[0] / session_id / (report_json_artifact_id + ".original")
                     self.assertTrue(report_path.exists(), "DAMAGE_REPORT_BYTES_NOT_PERSISTED")
+                    self.assertTrue(report_json_path.exists(), "DAMAGE_REPORT_JSON_BYTES_NOT_PERSISTED")
                     self.assertEqual(hashlib.sha256(report.content).hexdigest(), report_sha)
                     report_retry = restarted.post(
                         f"/v1/review-sessions/{session_id}/damage-assessment-report",
@@ -395,6 +399,53 @@ class CaptureHttpIntegration(unittest.TestCase):
                     )
                     self.assertEqual(report_download.status_code, 200, report_download.text)
                     self.assertEqual(report_download.content, report.content)
+                    report_json_download = restarted.get(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}/json",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(report_json_download.status_code, 200, report_json_download.text)
+                    self.assertEqual(hashlib.sha256(report_json_download.content).hexdigest(), report_json_sha)
+                    carrier_payload = report_json_download.json()
+                    self.assertEqual(carrier_payload["capture_protocol_version"], DEFAULT_CAPTURE_PROTOCOL)
+                    self.assertIn("A bounding box is a suspect-region identifier only", carrier_payload["disclosures"][0])
+                    carrier_finding = carrier_payload["findings"][0]
+                    self.assertEqual(carrier_finding["slot_id"], CANONICAL_SLOTS[0])
+                    self.assertEqual(carrier_finding["bbox_normalized"], {
+                        "x_min": 0.2, "y_min": 0.2, "x_max": 0.7, "y_max": 0.7,
+                    })
+                    self.assertEqual(carrier_finding["reviewer_attribution"]["actor_id"], "claim-reviewer-0")
+                    self.assertEqual(carrier_finding["source_image"]["artifact_id"], first_artifact_id)
+                    self.assertEqual(
+                        carrier_finding["source_image"]["storage_key"],
+                        f"{self.db.f.tenants[0]}/{session_id}/{first_artifact_id}.original",
+                    )
+                    self.assertEqual(carrier_finding["camera_angle"]["yaw_degrees"], 25)
+                    self.assertEqual(report_json_download.headers["x-report-json-artifact-id"], report_json_artifact_id)
+                    report_event = self.db.f.seed.execute(
+                        "SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s "
+                        "AND kind='DAMAGE_ASSESSMENT_REPORT_GENERATED' AND payload_json::jsonb->>'request_id'=%s",
+                        (self.db.f.tenants[0], session_id, report_artifact_id),
+                    ).fetchall()
+                    self.assertEqual(len(report_event), 1, "DAMAGE_REPORT_REGISTRY_EVENT_NOT_UNIQUE")
+                    report_event_payload = json.loads(report_event[0][0])
+                    self.assertEqual(report_event_payload["report_json_artifact_id"], report_json_artifact_id)
+                    self.assertEqual(report_event_payload["report_json_sha256"], report_json_sha)
+
+                    fresh_store = CaptureSessionStore(resolver, self.db.dsns)
+                    fresh_runtime = CaptureRuntime(resolver, fresh_store, Settings(), ClaimCaseStore(fresh_store))
+                    with TestClient(create_capture_app(fresh_runtime, enable_evidence=True)) as fresh:
+                        fresh_pdf = fresh.get(
+                            f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
+                            headers={"Authorization": self.db.reviewer_auth()},
+                        )
+                        fresh_json = fresh.get(
+                            f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}/json",
+                            headers={"Authorization": self.db.reviewer_auth()},
+                        )
+                        self.assertEqual(fresh_pdf.status_code, 200, fresh_pdf.text)
+                        self.assertEqual(fresh_pdf.content, report.content)
+                        self.assertEqual(fresh_json.status_code, 200, fresh_json.text)
+                        self.assertEqual(fresh_json.content, report_json_download.content)
 
                     collision_evidence = restarted.get(
                         f"/v1/review-collisions/{collision_id}",
@@ -472,6 +523,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(withdrawn.status_code, 200, withdrawn.text)
                     self.assertFalse(stored_path.exists())
                     self.assertFalse(report_path.exists(), "CONSENT_WITHDRAWAL_DID_NOT_DELETE_REPORT_BYTES")
+                    self.assertFalse(report_json_path.exists(), "CONSENT_WITHDRAWAL_DID_NOT_DELETE_REPORT_JSON_BYTES")
                     report_after_withdrawal = restarted.get(
                         f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
