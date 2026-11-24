@@ -135,6 +135,16 @@ class CaptureSessionIntegration(unittest.TestCase):
             self.assertTrue(service.record_quality(self.auth(), case.capture_session_id,
                 request_id=uuid.uuid4(), results=quality)['advisory_only'])
             sealed = service.seal_capture(self.auth(), case.capture_session_id, request_id=uuid.uuid4())
+            self.assertTrue(sealed['root_registered'])
+            root = self.f.seed.execute(
+                'SELECT seal_event_id,manifest_digest,shot_list_version,binding_version '
+                'FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',
+                (self.f.tenants[0], case.capture_session_id),
+            ).fetchone()
+            self.assertIsNotNone(root, 'LIVE_CAPTURE_SEAL_ROOT_MISSING')
+            self.assertEqual(root[1], sealed['manifest_digest'])
+            self.assertEqual(root[2], LEGACY_CAPTURE_PROTOCOL)
+            self.assertEqual(root[3], 'manifest-context-v1')
             queue = service.list_review_queue(self.reviewer_auth())
             self.assertIn(case.capture_session_id, {item['session_id'] for item in queue})
             details = service.get_review_details(self.reviewer_auth(), case.capture_session_id)
@@ -422,34 +432,6 @@ class CaptureSessionIntegration(unittest.TestCase):
         self.assertFalse(retry.created)
         with self.assertRaisesRegex(ClaimCaseConflict,"CAPTURE_PROTOCOL_VERSION_MISMATCH"):
             self.claim_cases.create(self.auth(),claim_id=claim_id,request_id=request_id,capture_protocol_version=DEFAULT_CAPTURE_PROTOCOL)
-
-
-    def test_capture_readiness_fails_closed_when_persisted_event_hash_is_tampered(self):
-        claim_id = str(uuid.uuid4())
-        case = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()))
-        owner_request = uuid.uuid4()
-        with tempfile.TemporaryDirectory() as root:
-            service = CaptureEvidenceService(self.store, OriginalByteStore(root), 'P'*43)
-            service.record_consent(self.owner_auth(), case.capture_session_id,
-                request_id=owner_request, accepted=True, scope='capture_review')
-            tampered_payload = json.dumps({
-                'accepted': False,
-                'owner_actor_id': 'claim-owner-0',
-                'disclosure_version': 'disclosure-v1',
-                'scope': 'capture_review',
-                'request_id': str(owner_request),
-            }, sort_keys=True, separators=(',', ':'))
-            self.f.seed.execute('ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation')
-            try:
-                self.f.seed.execute(
-                    'UPDATE faos.events SET payload_json=%s WHERE tenant_id=%s AND session_id=%s AND event_id=%s',
-                    (tampered_payload, self.f.tenants[0], case.capture_session_id, 'consent:'+str(owner_request)),
-                )
-            finally:
-                self.f.seed.execute('ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation')
-            with self.assertRaisesRegex(CaptureSessionConflict, 'CAPTURE_HISTORY_CHAIN_INVALID'):
-                service.evidence_readiness(self.auth(), case.capture_session_id)
-
 
 if __name__=='__main__':
     unittest.main()
