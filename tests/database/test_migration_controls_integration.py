@@ -78,7 +78,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0029_manifest_root_chain_context_binding.sql')
+        self.assertEqual(plan[-1].name,'0030_runtime_manifest_registration.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -129,7 +129,7 @@ class MigrationControlsIntegration(unittest.TestCase):
             fixture.setUp()
             try:
                 self.assertEqual(fixture.register(),'REGISTERED')
-                self.assertEqual(run_migrations(),('0029_manifest_root_chain_context_binding.sql',))
+                self.assertEqual(run_migrations(),('0030_runtime_manifest_registration.sql',))
                 with patch.dict(os.environ,env):
                     with tenant_transaction(fixture.conn,fixture.tenant):
                         row=fixture.conn.execute(
@@ -159,7 +159,7 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql','0021_collision_claim_link.sql','0022_collision_vehicle_capture_link.sql','0023_consented_vehicle_profile.sql','0024_audited_capture_exceptions_pause_resume.sql','0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql','0027_capture_protocol_16_v2.sql','0028_persistent_event_hash_chain.sql','0029_manifest_root_chain_context_binding.sql'))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql','0021_collision_claim_link.sql','0022_collision_vehicle_capture_link.sql','0023_consented_vehicle_profile.sql','0024_audited_capture_exceptions_pause_resume.sql','0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql','0027_capture_protocol_16_v2.sql','0028_persistent_event_hash_chain.sql','0029_manifest_root_chain_context_binding.sql','0030_runtime_manifest_registration.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
