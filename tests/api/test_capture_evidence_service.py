@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
+from types import SimpleNamespace
 from uuid import UUID
 
 from app.artifact_storage import OriginalByteStore
@@ -110,6 +111,12 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         self.owner = Actor("owner-1", self.tenant, "owner")
         self.reviewer = Actor("reviewer-1", self.tenant, "reviewer")
         self.sessions = FakeSessions(self.operator.actor_id)
+        self.readback_patch = patch(
+            "database.capture_evidence.locked_verified_journal_in_transaction",
+            side_effect=self.fake_verified_readback,
+        )
+        self.readback_patch.start()
+        self.addCleanup(self.readback_patch.stop)
         self.sessions.actors = {
             "operator-token": self.operator, "owner-token": self.owner,
             "reviewer-token": self.reviewer,
@@ -120,6 +127,16 @@ class CaptureEvidenceServiceTests(unittest.TestCase):
         # dedicated Linux integration coverage in the repository.
         self.byte_store = RecordingByteStore(Path(temp.name).resolve())
         self.service = CaptureEvidenceService(self.sessions, self.byte_store, "p" * 43)
+
+    def fake_verified_readback(self, conn, tenant, session_id):
+        # This suite exercises service state logic with an in-memory fake. The
+        # PostgreSQL integration suite verifies the real persisted-chain reader.
+        events = tuple(
+            SimpleNamespace(sequence=row[0], kind=row[1], actor=row[2],
+                            payload_json=row[3], event_id=row[4])
+            for row in conn.rows
+        )
+        return SimpleNamespace(events=events)
 
     def test_evidence_readiness_exposes_resume_state_without_sensitive_identity(self):
         readiness = self.service.evidence_readiness("operator-token", self.session_id)
