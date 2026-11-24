@@ -77,7 +77,7 @@ class RegisteredCompletionTests(unittest.TestCase):
         with self.assertRaises(psycopg.errors.RaiseException) as caught:
             self.check(tenant=str(uuid.uuid4()))
         self.assertEqual(caught.exception.sqlstate, 'P0001')
-        self.assertEqual(caught.exception.diag.message_primary, 'SESSION_NOT_FOUND')
+        self.assertEqual(caught.exception.diag.message_primary, 'TENANT_CONTEXT_MISMATCH' if self.fixture.authority_schema else 'SESSION_NOT_FOUND')
         self.assertEqual(self.check().status, 'ELIGIBLE')
 
     def test_fresh_process_loads_root_without_caller_digest(self):
