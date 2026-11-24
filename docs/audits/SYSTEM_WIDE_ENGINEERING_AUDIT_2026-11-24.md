@@ -1,7 +1,7 @@
 # Claim2Car Connect — System-Wide Engineering Audit
 **Audit date:** 2026-11-24  
 **Repository:** `C2C-Connect/claim2car-connect`  
-**Audit branch:** `audit/system-wide-engineering-2026-11-24`  
+**Audit branch:** `audit/system-wide-engineering-2026-11-24-v2`  
 **Status:** IN PROGRESS — source-level findings confirmed; three high-risk remediations merged; remaining report, identity, deletion, storage, market/legal, and field-readiness gaps remain.  
 **Purpose:** Determine whether the code actually served and its API/database/evidence/authorization paths support the product claims. This is not a security certification, forensic validation, legal opinion, or field acceptance.
 
@@ -16,16 +16,16 @@ Do not treat README statements, synthetic tests, a green workflow, or a PR descr
 
 ## Executive assessment
 
-The repository has substantial working infrastructure: tenant-scoped PostgreSQL authority, append-only event history, original-byte storage with digest checks, consent-gated capture, a browser queue with encryption on the canonical root workbench, and a live capture seal/review integration increment under PR #185. These are meaningful foundations.
+The repository has substantial working infrastructure: tenant-scoped PostgreSQL authority, append-only event history, original-byte storage with digest checks, consent-gated capture, a browser queue with encryption on the canonical root workbench, and an unmerged capture seal/review integration increment under PR #185. These are meaningful foundations.
 
 The system is **not ready for real participant evidence or staging release**. PR #190 (prototype queue metadata authentication), PR #192 (verified event-chain reads in capture/intake history paths), and PR #193 (unverified triage/direct dispatch containment) are now merged to main. The highest-priority remaining trust gaps are:
-1. Integrity/adjudication inputs are caller assertions rather than server-derived verified evidence facts.
-2. Consent withdrawal and physical deletion are not one durable, retryable lifecycle.
-3. Two independently served workbenches contain materially different offline queue cryptography and behavior.
-4. Identity remains static out-of-band credential provisioning.
-5. Valuation and jurisdiction outputs lack adequate source/effective-date substantiation.
-6. The legacy in-memory anchor/public verification path remains in the repository and must not be confused with the newer PostgreSQL provenance authority.
-7. Field, device, backup/restore, operational monitoring, and deployment acceptance are not established.
+1. Consent withdrawal and physical deletion are not one durable, per-artifact retryable lifecycle.
+2. Two separately served workbenches remain; queue cryptography is now aligned, but UI, workflow, and protocol divergence persists.
+3. Identity remains static out-of-band credential provisioning without owner proofing/recovery/revocation UX.
+4. Valuation and jurisdiction outputs lack adequate source/effective-date substantiation; the default parts catalog is synthetic seed data.
+5. Current-main report generation still has caller-asserted bindings and process-memory versions; the durable evidence-linked report path remains unmerged on PR #186.
+6. The legacy in-memory anchor/public verification module remains in the repository and must not be confused with the PostgreSQL provenance authority.
+7. Server-side storage encryption, backup/restore, retention, field/device usability, operational monitoring, and deployment acceptance are not established.
 
 ## Findings by audit layer
 
@@ -34,7 +34,7 @@ The system is **not ready for real participant evidence or staging release**. PR
 #### AUD-2026-01 — Adjudication trusted caller-supplied integrity facts (P1; remediated by PR #193; server integration remains incomplete)
 **Source:** `backend/app/api/triage.py` (`AdjudicateRequest`, `adjudicate`); `backend/app/triage/adjudicate.py`; `backend/app/integrity/s_i.py`.
 
-The internal adjudication request accepts `master_hash_valid`, `hash_tamper_suspected`, `chain_coverage`, `chain_uniqueness`, `meta_completeness`, `gps_accuracy_m`, and `gps_spoof_suspected` from the request body. These values are passed directly into `compute_s_i`. The resulting integrity tier influences `hold_for_review` and `final_tier`. The route requires the shared internal-service bearer credential and is mounted under the internal route prefix; this audit has not established an unauthenticated public exploit. The defect is the trust boundary: the service does not derive these values by independently reading and verifying the session's registered artifacts, manifest, and persisted chain at this decision point.
+Before PR #193, the internal adjudication request accepted `master_hash_valid`, `hash_tamper_suspected`, `chain_coverage`, `chain_uniqueness`, `meta_completeness`, `gps_accuracy_m`, `gps_spoof_suspected`, and internal ACV values from the request body. Those values flowed into `compute_s_i` and influenced `hold_for_review`/`final_tier`. The route required the shared internal-service bearer credential and was not an unauthenticated public endpoint. PR #193 removed the request-body contract and now returns HTTP 503 `SERVER_VERIFIED_EVIDENCE_REQUIRED`; triage health reports adjudication disabled. The pure calculation modules remain available for controlled tests only. No caller-provided integrity values can now obtain an adjudication response through this API.
 
 **Remediation status:** the unsafe API composition is contained by PR #193. To re-enable it, build a tenant-bound service that derives verification from original bytes, registered artifact records, sealed manifest, persisted chain tip, consent, vehicle identity, source-backed market data, and effective-dated jurisdiction rules. A chain failure must fail closed. Integrity status alone must never authorize payment or dispatch.
 
