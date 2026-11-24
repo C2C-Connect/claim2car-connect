@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw
 
 from backend.app.reports.damage_assessment import (
     CameraAngle, DamageAssessment, DamageEvidenceImage, DamageFinding,
-    DamageReportError, RepairEstimateLine, render_damage_assessment_pdf,
+    DamageReportError, RepairEstimateLine, render_damage_assessment_pdf, _capture_metadata,
 )
 
 
@@ -68,6 +68,22 @@ class DamageAssessmentPdfTests(unittest.TestCase):
         self.assertIn(b"Damage Assessment", pdf)
         self.assertGreaterEqual(pdf.count(b"/Subtype /Image"), 2)
         self.assertEqual(self.estimate.amount_cents, 18750)
+
+    def test_untrusted_exif_capture_fields_are_extracted_without_gps(self):
+        image = Image.new("RGB", (320, 240), "silver")
+        exif = image.getexif()
+        exif[271] = "SyntheticCamera"
+        exif[272] = "SyntheticModel"
+        exif[306] = "2026:11:24 08:00:00"
+        exif[274] = 6
+        output = BytesIO()
+        image.save(output, format="JPEG", exif=exif)
+        metadata = _capture_metadata(output.getvalue())
+        self.assertEqual(metadata["make"], "SyntheticCamera")
+        self.assertEqual(metadata["model"], "SyntheticModel")
+        self.assertEqual(metadata["datetime"], "2026:11:24 08:00:00")
+        self.assertEqual(metadata["orientation"], "6")
+        self.assertNotIn("gps", metadata)
 
     def test_original_evidence_hash_is_mandatory(self):
         with self.assertRaisesRegex(DamageReportError, "ORIGINAL_EVIDENCE_HASH_MISMATCH"):
