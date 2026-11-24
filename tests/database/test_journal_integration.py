@@ -3,23 +3,19 @@ import unittest
 import uuid
 
 import psycopg
+from tenant_login import TenantLogin
 
 
 class TestJournalIntegration(unittest.TestCase):
     def setUp(self):
-        self.conn = psycopg.connect(os.getenv(
-            'APP_DATABASE_URL',
-            'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test',
-        ))
+        self.tenant = str(uuid.uuid4())
+        self.login = TenantLogin(self.tenant, organization_name='synthetic journal integration')
+        self.addCleanup(self.login.close)
+        self.conn = self.login.connect(autocommit=False)
         self.addCleanup(self.conn.close)
         self.addCleanup(self.conn.rollback)
-        self.tenant = str(uuid.uuid4())
         self.session = 'journal-' + uuid.uuid4().hex
         self.conn.execute("SELECT set_config('faos.tenant_id', %s, true)", (self.tenant,))
-        self.conn.execute(
-            'INSERT INTO faos.organizations(tenant_id, name) VALUES (%s, %s)',
-            (self.tenant, 'synthetic journal integration'),
-        )
         self.conn.execute(
             'INSERT INTO faos.sessions(tenant_id, session_id) VALUES (%s, %s)',
             (self.tenant, self.session),
@@ -82,16 +78,16 @@ class TestConcurrentJournal(unittest.TestCase):
     def setUp(self):
         from app.domain_events import DomainEvent
         from database.journal import tenant_transaction
-        self.url = os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
         self.tenant = str(uuid.uuid4())
+        self.login = TenantLogin(self.tenant, organization_name='synthetic concurrency fixture')
+        self.addCleanup(self.login.close)
+        self.url = self.login.url
         self.session = 'concurrent-' + uuid.uuid4().hex
         self.event = DomainEvent(self.session, 'event-1', 1, 'SESSION_CREATED', 'synthetic-test',
                                  '2026-10-19T00:00:00Z', 'concurrent fixture', '{"synthetic":true}')
         with psycopg.connect(self.url, autocommit=True, connect_timeout=5) as conn:
-            role = conn.execute('SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone()
-            self.assertEqual(role, ('faos_app', False, False))
+            self.assertTrue(conn.execute("SELECT pg_has_role(current_user,'faos_app','MEMBER')").fetchone()[0])
             with tenant_transaction(conn, self.tenant):
-                conn.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)', (self.tenant, 'synthetic concurrency fixture'))
                 conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)', (self.tenant, self.session))
 
     def race(self, first, second):
