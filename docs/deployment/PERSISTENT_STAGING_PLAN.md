@@ -122,7 +122,8 @@ Storage controls:
 2. Delete original evidence bytes and all mutable incident rows.
 3. Purge any replicas, noncurrent versions or backup copies containing those original bytes, if such copies are enabled.
 4. Append a durable cryptographic revocation event to the PostgreSQL journal.
-5. Prove downstream reads fail closed and preserve only the permitted revocation/audit record.
+5. Append a minimal revocation tombstone (tenant/session/artifact identifiers, prior digest, event ID and UTC time; no original bytes or unnecessary PII) to a separately permissioned, append-only recovery-control archive outside the PostgreSQL PITR rollback domain. This archive is a recovery guard, not a replacement for the PostgreSQL event journal as the domain source of truth.
+6. Prove downstream reads fail closed and preserve only the permitted revocation/audit record.
 
 For staging, use synthetic evidence only. Object replication and evidence-object backup copies are disabled by default. Before enabling any such copy, prove that deletion propagates to every copy and does not leave recoverable participant bytes behind.
 
@@ -157,8 +158,9 @@ Run the drill in an isolated recovery subnet using synthetic fixtures:
 4. Restore/reconnect the corresponding synthetic evidence objects and verify object-key/digest bindings.
 5. Run migrations/checksum validation and the complete DB-01–DB-14 authority runner.
 6. Verify forced RLS, actor/tenant binding, event-chain links, manifest roots, report registry retrieval, idempotency and revocation behavior.
-7. Confirm the restored environment does not resurrect bytes that a consent-withdrawal event required to be deleted.
-8. Record RPO, RTO, restore timestamp, database identifier, migration inventory, test report, failures and corrective actions.
+7. Consult the out-of-band revocation tombstone archive before opening application traffic. Replay every later revocation into the restored database and purge its original objects and mutable incident rows.
+8. Confirm the restored environment does not resurrect bytes or rows that a consent-withdrawal event required to be deleted.
+9. Record RPO, RTO, restore timestamp, database identifier, migration inventory, revocation replay evidence, test report, failures and corrective actions.
 
 **Pass condition:** the restored environment passes all applicable DB gates with zero skipped tests and no cross-tenant visibility, missing evidence, resurrected revoked bytes/rows or broken chain links. No application traffic is enabled until revocation replay and object purge are complete.
 
