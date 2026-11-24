@@ -49,7 +49,7 @@ class ManifestRootTests(unittest.TestCase):
                 admin.execute(sql.SQL('GRANT faos_app TO {}').format(sql.Identifier(self.app_role)))
                 admin.execute(sql.SQL('GRANT faos_fixture,faos_writer TO {}').format(sql.Identifier(self.fixture_role)))
                 for role in (self.app_role,self.fixture_role):
-                    admin.execute('INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=%s',(self.tenant,role))
+                    admin.execute('INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) SELECT oid,rolname,%s,true FROM pg_catalog.pg_roles WHERE rolname=%s',(self.tenant,role))
             self.addCleanup(self._drop_fixture_roles)
             self.app_url=make_conninfo(self.admin_url,dbname=dbname,user=self.app_role,password=self.app_password)
             fixture_url=make_conninfo(self.admin_url,dbname=dbname,user=self.fixture_role,password=self.fixture_password)
@@ -58,7 +58,7 @@ class ManifestRootTests(unittest.TestCase):
             self.fixture_conn=psycopg.connect(fixture_url,autocommit=True)
             self.addCleanup(self.fixture_conn.close)
             self.addCleanup(self.conn.close)
-            identity=self.conn.execute('SELECT current_user,rolsuper,rolbypassrls,pg_has_role(current_user,%s,%s) FROM pg_roles WHERE rolname=current_user',('faos_app','MEMBER')).fetchone()
+            identity=self.conn.execute('SELECT current_user,rolsuper,rolbypassrls,pg_has_role(current_user,%s,%s) FROM pg_catalog.pg_roles WHERE rolname=current_user',('faos_app','MEMBER')).fetchone()
             self.assertEqual(identity,(self.app_role,False,False,True))
             for event in self.events:
                 self.assertEqual(append(self.fixture_conn,self.tenant,event),'ACCEPTED')
@@ -66,7 +66,7 @@ class ManifestRootTests(unittest.TestCase):
             self.fixture_url=self.admin_url
             self.conn=psycopg.connect(self.app_url,autocommit=True)
             self.addCleanup(self.conn.close)
-            self.assertEqual(self.conn.execute('SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone(),('faos_app',False,False))
+            self.assertEqual(self.conn.execute('SELECT current_user,rolsuper,rolbypassrls FROM pg_catalog.pg_roles WHERE rolname=current_user').fetchone(),('faos_app',False,False))
             for event in self.events:
                 self.assertEqual(append(self.conn,self.tenant,event),'ACCEPTED')
 
