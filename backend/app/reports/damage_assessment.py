@@ -321,5 +321,9 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
     doc = EvidenceDocTemplate(buffer, pagesize=letter, rightMargin=.55*inch, leftMargin=.55*inch, topMargin=.55*inch, bottomMargin=.6*inch, title=f"Claim2Car Damage Assessment {assessment.session_id}", author="Claim2Car")
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="normal")
     doc.addPageTemplates([PageTemplate(id="evidence", frames=[frame], onPage=page_footer)])
-    doc.build(story, canvasmaker=lambda *args, **kwargs: Canvas(*args, invariant=1, **kwargs))
+    def invariant_canvas(*args, **kwargs):
+        kwargs["invariant"] = 1
+        return Canvas(*args, **kwargs)
+
+    doc.build(story, canvasmaker=invariant_canvas)
     return buffer.getvalue()
