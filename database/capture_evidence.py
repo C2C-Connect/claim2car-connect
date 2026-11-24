@@ -785,6 +785,24 @@ class CaptureEvidenceService:
                          kind="QUALITY_RECORDED", reason="advisory image quality recorded", payload=payload)
         return {"session_id": session_id, "advisory_only": True, "replayed": False}
 
+    @staticmethod
+    def _register_manifest_root(conn, actor, session_id, seal_event_id, request_id, payload):
+        status = conn.execute(
+            "SELECT faos.register_manifest_root_from_capture("
+            "%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::uuid)",
+            (actor.tenant_id, session_id, seal_event_id, payload["manifest_digest"],
+             payload["shot_list_version"], actor.actor_id, request_id),
+        ).fetchone()[0]
+        if status not in ("REGISTERED", "DUPLICATE"):
+            raise CaptureSessionConflict("MANIFEST_ROOT_REGISTRATION_FAILED")
+        verified = conn.execute(
+            "SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)",
+            (actor.tenant_id, session_id, seal_event_id),
+        ).fetchone()[0]
+        if verified is not True:
+            raise CaptureSessionConflict("MANIFEST_ROOT_BINDING_INVALID")
+        return status
+
     def seal_capture(self, authorization, session_id, *, request_id):
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
@@ -802,7 +820,8 @@ class CaptureEvidenceService:
             for kind, _who, old, old_id in history:
                 if old_id == event_id:
                     if kind == "MANIFEST_SEALED" and type(old) is dict:
-                        return {"session_id": session_id, **old, "replayed": True}
+                        self._register_manifest_root(conn, actor, session_id, event_id, request_id, old)
+                        return {"session_id": session_id, **old, "root_registered": True, "replayed": True}
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             last_capture_event = self._last_capture_event(history)
             if last_capture_event is None or last_capture_event[0] != "QUALITY_RECORDED":
@@ -817,7 +836,8 @@ class CaptureEvidenceService:
             }
             self._append(conn, actor, session_id, history, event_id=event_id,
                          kind="MANIFEST_SEALED", reason="verified original-byte manifest sealed", payload=payload)
-        return {"session_id": session_id, **payload, "replayed": False}
+            self._register_manifest_root(conn, actor, session_id, event_id, request_id, payload)
+        return {"session_id": session_id, **payload, "root_registered": True, "replayed": False}
 
     def record_review(self, authorization, session_id, *, request_id, disposition, reason):
         session_id = self._session_id(session_id)
@@ -848,6 +868,10 @@ class CaptureEvidenceService:
             seal = last_capture_event[2]
             if seal.get("manifest_digest") != manifest.digest():
                 raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
+            self._register_manifest_root(
+                conn, actor, session_id, last_capture_event[3],
+                seal["request_id"], seal,
+            )
             payload = {
                 "request_id": request_id,
                 "manifest_digest": manifest.digest(),
@@ -888,6 +912,10 @@ class CaptureEvidenceService:
                     raise CaptureSessionConflict("UNSUPPORTED_SEAL_HISTORY")
                 # Verify the sealed originals before exposing reviewer-safe metadata.
                 manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
+                self._register_manifest_root(
+                    conn, actor, session_id, last_capture_event[3],
+                    seal_payload["request_id"], seal_payload,
+                )
                 expected_artifact_ids = [entry.artifact_id for entry in manifest.entries]
                 if (
                     manifest.digest() != seal_payload["manifest_digest"]
@@ -931,6 +959,10 @@ class CaptureEvidenceService:
             if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
+            self._register_manifest_root(
+                conn, actor, session_id, last_capture_event[3],
+                last_capture_event[2]["request_id"], last_capture_event[2],
+            )
             latest = self._artifact_set(history, session.capture_protocol_version)
             return {
                 "session_id": session_id,
@@ -963,6 +995,10 @@ class CaptureEvidenceService:
             if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
+            self._register_manifest_root(
+                conn, actor, session_id, last_capture_event[3],
+                last_capture_event[2]["request_id"], last_capture_event[2],
+            )
             entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
             if entry is None:
                 raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
