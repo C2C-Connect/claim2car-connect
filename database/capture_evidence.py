@@ -788,13 +788,13 @@ class CaptureEvidenceService:
         return {"session_id": session_id, "advisory_only": True, "replayed": False}
 
     @staticmethod
-    def _register_manifest_root(conn, actor, session_id, seal_event_id, request_id, payload):
+    def _register_manifest_root(conn, actor, session_id, seal_event_id, request_id, payload, *, seal_actor=None):
         try:
             status = conn.execute(
                 "SELECT faos.register_manifest_root_from_capture("
                 "%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::uuid)",
                 (actor.tenant_id, session_id, seal_event_id, payload["manifest_digest"],
-                 payload["shot_list_version"], actor.actor_id, request_id),
+                 payload["shot_list_version"], seal_actor or actor.actor_id, request_id),
             ).fetchone()[0]
         except psycopg.errors.RaiseException as error:
             code = error.diag.message_primary or "MANIFEST_ROOT_REGISTRATION_FAILED"
@@ -877,7 +877,7 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
             self._register_manifest_root(
                 conn, actor, session_id, prior_seal[3],
-                prior_seal[2]["request_id"], prior_seal[2],
+                prior_seal[2]["request_id"], prior_seal[2], seal_actor=prior_seal[1],
             )
             for kind, _who, old, old_id in history:
                 if old_id == event_id:
@@ -937,7 +937,7 @@ class CaptureEvidenceService:
                 manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
                 self._register_manifest_root(
                     conn, actor, session_id, last_capture_event[3],
-                    seal_payload["request_id"], seal_payload,
+                    seal_payload["request_id"], seal_payload, seal_actor=last_capture_event[1],
                 )
                 expected_artifact_ids = [entry.artifact_id for entry in manifest.entries]
                 if (
@@ -985,6 +985,7 @@ class CaptureEvidenceService:
             self._register_manifest_root(
                 conn, actor, session_id, last_capture_event[3],
                 last_capture_event[2]["request_id"], last_capture_event[2],
+                seal_actor=last_capture_event[1],
             )
             latest = self._artifact_set(history, session.capture_protocol_version)
             return {
