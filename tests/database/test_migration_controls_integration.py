@@ -423,7 +423,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_parity_migration_preserves_existing_event_payload_bytes(self):
         plan = self.authority_plan()
-        apply(self.conn, plan[:-4])
+        apply(self.conn, plan[:-5])
         tenant = str(uuid.uuid4())
         session = 'preserve-payload-' + uuid.uuid4().hex
         payload = '{"label":"é","metric":0.00001}'
@@ -497,6 +497,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0030_runtime_manifest_registration.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0031_damage_assessment_report_event.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
