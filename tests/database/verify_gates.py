@@ -274,8 +274,8 @@ def verify_db_02(context):
     result = _gate(context, "DB-02")
     inventory = (context.get("diagnostics") or {}).get("migration_inventory") or []
     names = [row[0] for row in inventory if isinstance(row, (list, tuple)) and row]
-    expected = [f"{number:04d}_" for number in range(1, 30)]
-    if len(names) != 29 or any(not name.startswith(prefix) for name, prefix in zip(names, expected)):
+    expected = [f"{number:04d}_" for number in range(1, 31)]
+    if len(names) != 30 or any(not name.startswith(prefix) for name, prefix in zip(names, expected)):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("ORDERED_COMPLETE_MIGRATION_INVENTORY")
     if (len(inventory) != 30 or any(
