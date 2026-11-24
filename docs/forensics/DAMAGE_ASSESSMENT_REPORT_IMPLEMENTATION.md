@@ -10,7 +10,7 @@
 - Each finding renders its source image and a separate annotated image with a red image-space bounding box.
 - Reports show normalized bounding-box coordinates, derived pixel bounds, source image dimensions, capture slot, capture timestamp, image digest, and camera-angle values with an explicit provenance label.
 - A confirmed finding requires reviewer identity and review time. The document service additionally requires that the finding reviewer match the reviewer bound to the sealed evidence dossier.
-- Estimate line items include category, quantity/unit, unit rate, calculated amount, related finding, source name/reference, and effective date.
+- Estimate line items include category, quantity/unit, unit rate, calculated amount, related finding, declared source name/reference, and effective date.
 - Financial arithmetic uses integer cents and decimal quantity rounding. No estimate is fabricated when no sourced line items are supplied.
 - Generated PDF bytes receive a SHA-256 digest and are versioned by the existing in-process dossier service.
 
@@ -20,7 +20,7 @@
 - The current contrast detector is a deterministic heuristic baseline, not a trained/validated vehicle damage model. It does not establish damage class, severity, depth, structural condition, hidden damage, causation, repairability, or roadworthiness.
 - Bounding boxes are normalized image-space regions, not physical vehicle measurements. Camera angles are reported only with their stated source; unknown angles remain unknown.
 - A confirmed finding is a reviewer decision, not proof of collision causation.
-- Estimate line provenance is required, but source applicability, OEM procedure validation, labor-time validation, local rate validation, parts fitment, taxes, and shop approval still require their own integrations and checks.
+- Estimate source fields are declarations supplied to the renderer, not independently authenticated source records. Source applicability, OEM procedure validation, labor-time validation, local rate validation, parts fitment, taxes, and shop approval still require their own integrations and checks. Camera-angle source labels are likewise reported as supplied and are not independently authenticated by the renderer.
 - The current dossier service stores document versions in process memory. Durable report registry/storage, event-journal audit, authenticated report-generation/download routes, and end-user UI integration remain to be completed before production use.
 
 ## Required next implementation increments
