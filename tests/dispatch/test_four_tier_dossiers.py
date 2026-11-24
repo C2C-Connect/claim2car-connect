@@ -141,6 +141,14 @@ class FourTierDossierTests(unittest.TestCase):
         self.assertIn(b"/Subtype /Image", report.pdf_bytes)
         self.assertEqual(report.pages[0]["findings"][0]["evidence_artifact_id"], "artifact-1")
         self.assertEqual(report.pages[0]["findings"][0]["bbox_normalized"], [.2,.2,.6,.7])
+        wrong_digest_binding = SourceEvidenceBinding(
+            **{**self.binding.__dict__, "artifact_sha256_by_id": {"artifact-1": "f" * 64}}
+        )
+        with self.assertRaisesRegex(DossierGenerationError, "DAMAGE_REPORT_IMAGE_DIGEST_NOT_IN_MANIFEST"):
+            self.service.generate_damage_assessment_report(
+                consent=self.consent, binding=wrong_digest_binding, assessment=assessment,
+                generated_by="forensic-report",
+            )
         with self.assertRaisesRegex(DossierGenerationError, "DAMAGE_REPORT_IMAGE_NOT_IN_VERIFIED_MANIFEST"):
             unbound = DamageAssessment(
                 session_id="session-1", vehicle_description="2022 Example Sedan",
