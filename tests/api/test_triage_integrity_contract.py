@@ -1,37 +1,38 @@
-"""Regression coverage for fail-closed integrity API inputs and diagnostics."""
-from backend.app.api.triage import AdjudicateRequest, adjudicate, triage_health
+"""The adjudication API must not trust client-asserted integrity or valuation inputs."""
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from backend.app.api.triage import router, triage_health
+from backend.app.security import require_internal_service
 
 
-def test_health_names_the_integrity_contract_implemented_by_s_i():
-    assert "s_i_weighted_sum_strict_chain" in triage_health()["modules"]
+def test_health_marks_adjudication_disabled_until_server_verification():
+    health = triage_health()
+    assert health["status"] == "disabled"
+    assert health["adjudication_enabled"] is False
+    assert health["reason"] == "SERVER_VERIFIED_EVIDENCE_REQUIRED"
 
 
-def test_adjudication_api_reports_incomplete_chain_collapse():
-    response = adjudicate(AdjudicateRequest(
-        session_id="api-integrity-incomplete-chain",
-        gps_accuracy_m=5,
-        chain_coverage=0.99,
-        chain_uniqueness=1.0,
-        meta_completeness=1.0,
-    ))
-    integrity = response["integrity"]
-    assert integrity["c_chain"] == 0.0
-    assert integrity["c_hash"] == 0.0
-    assert integrity["s_i"] == 0.0
-    assert integrity["all_or_nothing_collapse"] is True
-    assert integrity["chain_failure_reason"] == "CHAIN_COVERAGE_INCOMPLETE"
-    assert "CHAIN_COVERAGE_INCOMPLETE" in integrity["integrity_failure_reasons"]
-    assert abs(integrity["c_chain_geometric"] - (0.99 ** 0.5)) < 1e-4
-
-
-def test_api_accepts_and_applies_tamper_and_spoof_signals():
-    for field, reason in (
-        ("hash_tamper_suspected", "HASH_TAMPER_SUSPECTED"),
-        ("gps_spoof_suspected", "GPS_SPOOF_SUSPECTED"),
-    ):
-        body = AdjudicateRequest(session_id=f"api-integrity-{field}", **{field: True})
-        response = adjudicate(body)
-        integrity = response["integrity"]
-        assert integrity["s_i"] == 0.0
-        assert integrity["all_or_nothing_collapse"] is True
-        assert reason in integrity["integrity_failure_reasons"]
+def test_client_asserted_integrity_inputs_cannot_reach_adjudication():
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[require_internal_service] = lambda: None
+    client = TestClient(app)
+    response = client.post(
+        "/api/v1/triage/adjudicate",
+        json={
+            "session_id": "forged-session",
+            "master_hash_valid": True,
+            "hash_tamper_suspected": False,
+            "chain_coverage": 1.0,
+            "chain_uniqueness": 1.0,
+            "meta_completeness": 1.0,
+            "gps_accuracy_m": 0.1,
+            "internal_acv_a": 25000,
+            "internal_acv_b": 25000,
+            "internal_acv_c": 25000,
+        },
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "SERVER_VERIFIED_EVIDENCE_REQUIRED"
+    assert response.headers["cache-control"] == "no-store"
