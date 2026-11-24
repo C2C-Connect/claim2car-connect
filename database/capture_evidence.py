@@ -1129,7 +1129,8 @@ class CaptureEvidenceService:
                 if existing is not None:
                     if existing[0] != "DAMAGE_ASSESSMENT_REPORT_GENERATED" or existing[2] != payload:
                         raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
-                    self.byte_store.put(key, pdf_bytes, expected_sha256=report_sha256)
+                    receipt = self.byte_store.put(key, pdf_bytes, expected_sha256=report_sha256)
+                    created = bool(getattr(receipt, "created", False))
                     return {**payload, "replayed": True}
                 if report_revision != next_revision:
                     raise CaptureSessionConflict("DAMAGE_REPORT_REVISION_CONFLICT")
@@ -1186,6 +1187,14 @@ class CaptureEvidenceService:
             metadata = report[2]
             if metadata.get("manifest_digest") != manifest.digest():
                 raise CaptureSessionConflict("DAMAGE_REPORT_MANIFEST_MISMATCH")
+            review = next((
+                item for item in history
+                if item[0] == "REVIEW_RECORDED" and item[3] == metadata.get("review_event_id")
+                and item[1] == report[1] and type(item[2]) is dict
+                and item[2].get("manifest_digest") == manifest.digest()
+            ), None)
+            if review is None:
+                raise CaptureSessionConflict("DAMAGE_REPORT_REVIEW_BINDING_INVALID")
             data = self.byte_store.get(
                 ArtifactKey(actor.tenant_id, UUID(session_id), UUID(report_artifact_id)),
                 expected_sha256=metadata["report_sha256"],
