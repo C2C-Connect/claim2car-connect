@@ -856,6 +856,13 @@ class CaptureEvidenceService:
             consent = self._consent_state(history)
             if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            prior_seal = next((item for item in reversed(history) if item[0] == "MANIFEST_SEALED"), None)
+            if prior_seal is None or type(prior_seal[2]) is not dict:
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            self._register_manifest_root(
+                conn, actor, session_id, prior_seal[3],
+                prior_seal[2]["request_id"], prior_seal[2],
+            )
             for kind, _who, old, old_id in history:
                 if old_id == event_id:
                     if kind == "REVIEW_RECORDED" and type(old) is dict and old.get("disposition") == disposition and old.get("reason") == reason:
