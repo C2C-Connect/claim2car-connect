@@ -1051,7 +1051,8 @@ class CaptureEvidenceService:
 
     def record_damage_assessment_report(
         self, authorization, session_id, *, request_id, pdf_bytes, report_sha256,
-        report_revision, finding_ids, estimate_total_cents, report_schema_version="damage-assessment-v1",
+        report_revision, finding_ids, estimate_total_cents, request_payload_sha256,
+        report_schema_version="damage-assessment-v1",
     ):
         """Persist a report artifact and bind it to the current reviewed manifest."""
         session_id = self._session_id(session_id)
@@ -1066,6 +1067,8 @@ class CaptureEvidenceService:
             raise ValueError("INVALID_DAMAGE_REPORT_REVISION")
         if type(estimate_total_cents) is not int or estimate_total_cents < 0:
             raise ValueError("INVALID_DAMAGE_REPORT_ESTIMATE_TOTAL")
+        if not isinstance(request_payload_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", request_payload_sha256) is None:
+            raise ValueError("INVALID_DAMAGE_REPORT_REQUEST_SHA256")
         if not isinstance(report_schema_version, str) or not report_schema_version.strip() or len(report_schema_version) > 64:
             raise ValueError("INVALID_DAMAGE_REPORT_SCHEMA_VERSION")
         if not isinstance(finding_ids, (list, tuple)) or len(finding_ids) > 256:
@@ -1116,6 +1119,7 @@ class CaptureEvidenceService:
                     "manifest_digest": manifest.digest(),
                     "report_revision": report_revision,
                     "report_schema_version": report_schema_version,
+                    "request_payload_sha256": request_payload_sha256,
                     "finding_ids": normalized_findings,
                     "estimate_total_cents": estimate_total_cents,
                     "currency": "USD",
