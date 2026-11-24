@@ -1022,6 +1022,7 @@ class CaptureEvidenceService:
             self._register_manifest_root(
                 conn, actor, session_id, last_capture_event[3],
                 last_capture_event[2]["request_id"], last_capture_event[2],
+                seal_actor=last_capture_event[1],
             )
             entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
             if entry is None:
