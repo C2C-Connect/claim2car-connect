@@ -471,6 +471,12 @@ class CaptureHttpIntegration(unittest.TestCase):
                     )
                     self.assertEqual(withdrawn.status_code, 200, withdrawn.text)
                     self.assertFalse(stored_path.exists())
+                    self.assertFalse(report_path.exists(), "CONSENT_WITHDRAWAL_DID_NOT_DELETE_REPORT_BYTES")
+                    report_after_withdrawal = restarted.get(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(report_after_withdrawal.status_code, 409)
                     vehicle_after_withdrawal = restarted.get(
                         f"/v1/collisions/{collision_id}",
                         headers={"Authorization": self.db.auth()},
