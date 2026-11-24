@@ -176,7 +176,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_event_chain_backfill_gap_rolls_back_migration(self):
         plan=self.authority_plan()
-        apply(self.conn,plan[:-2])
+        apply(self.conn,plan[:-3])
         tenant=str(uuid.uuid4())
         session='chain-gap-'+uuid.uuid4().hex
         payload='{"synthetic":true}'
