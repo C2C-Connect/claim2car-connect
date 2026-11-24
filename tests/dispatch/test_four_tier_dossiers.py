@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from hashlib import sha256
+from io import BytesIO
 from uuid import UUID
+
+from PIL import Image
 
 from backend.app.anchor.ledger import (
     IntegerFinancialLedger, LedgerJournalEntry, LedgerPostingLine, PartnerAcceptanceRecord,
@@ -11,6 +15,9 @@ from backend.app.reports.forensic_pdf import (
     DossierGenerationError,
     FourTierDossierService,
     SourceEvidenceBinding,
+)
+from backend.app.reports.damage_assessment import (
+    CameraAngle, DamageAssessment, DamageEvidenceImage, DamageFinding,
 )
 
 
@@ -97,6 +104,14 @@ class FourTierDossierTests(unittest.TestCase):
                 session_id="session-1", document_type="DEALER_DOSSIER", recipient_actor_id="wrong",
                 recipient_role="shop", recipient_tenant_id=self.tenant,
             )
+
+    def test_damage_assessment_report_requires_durable_capture_registry(self):
+        with self.assertRaisesRegex(DossierGenerationError, "DURABLE_DAMAGE_REPORT_API_REQUIRED"):
+            self.service.generate_damage_assessment_report(
+                consent=self.consent, binding=self.binding, assessment=None,
+                generated_by="forensic-report",
+            )
+
 
     def test_consent_withdrawal_blocks_generation_and_revokes_versions(self):
         doc = self.service.generate_vehicle_owner_pdf(

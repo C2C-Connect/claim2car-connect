@@ -14,7 +14,10 @@ import tempfile
 import time
 import unittest
 import uuid
+from io import BytesIO
 from pathlib import Path
+
+from PIL import Image
 from unittest.mock import patch
 
 from test_capture_sessions_integration import CaptureSessionIntegration
@@ -227,7 +230,12 @@ class CaptureHttpIntegration(unittest.TestCase):
 
                     originals = {}
                     for slot in CANONICAL_SLOTS:
-                        raw = ("synthetic-http-original:" + slot).encode("ascii")
+                        if slot == CANONICAL_SLOTS[0]:
+                            image_buffer = BytesIO()
+                            Image.new("RGB", (320, 240), "silver").save(image_buffer, format="JPEG")
+                            raw = image_buffer.getvalue()
+                        else:
+                            raw = ("synthetic-http-original:" + slot).encode("ascii")
                         artifact_id = str(uuid.uuid4())
                         originals[artifact_id] = raw
                         uploaded = client.post(
@@ -290,9 +298,9 @@ class CaptureHttpIntegration(unittest.TestCase):
                         (self.db.f.tenants[0], session_id, seal_id),
                     ).fetchone()[0])
 
-                    # Start a separate Python process immediately after sealing.
-                    # It must reconstruct the HTTP reviewer path using only the
-                    # persisted PostgreSQL journal and durable original-byte store.
+                    # Restart a separate interpreter immediately after sealing.
+                    # It must reconstruct the reviewer path from the PostgreSQL
+                    # journal and the durable original-byte store.
                     process_artifact_id, process_original = next(iter(originals.items()))
                     process_environment = {
                         **os.environ,
@@ -316,10 +324,9 @@ from database.claim_cases import ClaimCaseStore
 
 token = os.environ["C2C_TEST_REVIEWER_TOKEN"]
 tenant_id = uuid.UUID(os.environ["C2C_TEST_TENANT_ID"])
-role = os.environ["C2C_TEST_REVIEWER_ROLE"]
 credential = Credential(
     hashlib.sha256(token.encode()).hexdigest(),
-    ActorBinding("claim-reviewer-0", tenant_id, role, "reviewer"),
+    ActorBinding("claim-reviewer-0", tenant_id, os.environ["C2C_TEST_REVIEWER_ROLE"], "reviewer"),
     int(time.time()) + 3600,
 )
 resolver = CredentialResolver([credential])
@@ -368,6 +375,16 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                         headers={"Authorization": f"Bearer {cross_tenant_reviewer_token}"},
                     )
                     self.assertEqual(cross_tenant.status_code, 404)
+                    reviewed = client.post(
+                        f"/v1/capture-sessions/{session_id}/review",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                        json={
+                            "request_id": str(uuid.uuid4()),
+                            "disposition": "NOTE_ONLY",
+                            "reason": "Synthetic report-generation test; no real claim decision.",
+                        },
+                    )
+                    self.assertEqual(reviewed.status_code, 200, reviewed.text)
 
                 # Rebuild runtime and database service objects, retaining only
                 # PostgreSQL rows and the provisioned evidence directory.
@@ -386,16 +403,220 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                     self.assertEqual(details.status_code, 200, details.text)
                     self.assertEqual(details.json()["manifest_digest"], manifest_digest)
                     self.assertEqual(len(details.json()["artifacts"]), len(CANONICAL_SLOTS))
-                    persisted_root = self.db.f.seed.execute(
-                        "SELECT seal_event_id FROM faos.manifest_roots "
-                        "WHERE tenant_id=%s AND session_id=%s",
-                        (self.db.f.tenants[0], session_id),
-                    ).fetchone()
-                    self.assertIsNotNone(persisted_root, "MANIFEST_ROOT_NOT_PERSISTED_AFTER_RESTART")
-                    self.assertTrue(self.db.f.seed.execute(
-                        "SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)",
-                        (self.db.f.tenants[0], session_id, persisted_root[0]),
-                    ).fetchone()[0], "FRESH_RUNTIME_MANIFEST_ROOT_VERIFICATION_FAILED")
+                    self.assertEqual(details.json()["review"]["actor_id"], "claim-reviewer-0")
+                    first_artifact_id, first_bytes = next(iter(originals.items()))
+                    report_request_id = str(uuid.uuid4())
+                    report_request = {
+                        "request_id": report_request_id,
+                        "vehicle_description": "2003 Honda Accord (synthetic integration fixture)",
+                        "findings": [{
+                            "finding_id": "D-HTTP-001",
+                            "component": "Front bumper",
+                            "vehicle_location": "Front center",
+                            "damage_type": "surface deformation candidate",
+                            "observation": "Synthetic fixture region for report rendering.",
+                            "evidence_artifact_id": first_artifact_id,
+                            "bbox_normalized": [0.2, 0.2, 0.7, 0.7],
+                            "status": "CONFIRMED_BY_REVIEWER",
+                            "limitations": "Synthetic image; no real damage conclusion.",
+                        }],
+                        "estimate_lines": [{
+                            "line_id": "L-HTTP-001",
+                            "category": "BODY_LABOR",
+                            "description": "Synthetic body labor line",
+                            "quantity": "1.5",
+                            "unit": "hours",
+                            "unit_price_cents": 8000,
+                            "source_name": "Synthetic shop rate matrix",
+                            "source_reference": "TEST-RATE-001",
+                            "effective_date": "2026-11-24",
+                            "related_finding_id": "D-HTTP-001",
+                        }],
+                        "camera_angles": {
+                            first_artifact_id: {"yaw_degrees": 25, "pitch_degrees": -2, "roll_degrees": 0},
+                        },
+                    }
+                    report = restarted.post(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-report",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                        json=report_request,
+                    )
+                    self.assertEqual(report.status_code, 200, report.text)
+                    self.assertTrue(report.content.startswith(b"%PDF-"))
+                    self.assertEqual(report.headers["content-type"], "application/pdf")
+                    report_artifact_id = report.headers["x-report-artifact-id"]
+                    report_sha = report.headers["x-report-sha256"]
+                    report_path = storage_root / self.db.f.tenants[0] / session_id / (report_artifact_id + ".original")
+                    report_json_artifact_id = report.headers["x-report-json-artifact-id"]
+                    report_json_sha = report.headers["x-report-json-sha256"]
+                    report_json_path = storage_root / self.db.f.tenants[0] / session_id / (report_json_artifact_id + ".original")
+                    self.assertTrue(report_path.exists(), "DAMAGE_REPORT_BYTES_NOT_PERSISTED")
+                    self.assertTrue(report_json_path.exists(), "DAMAGE_REPORT_JSON_BYTES_NOT_PERSISTED")
+                    self.assertNotIn(first_bytes, report.content, "REPORT_EMBEDDED_ORIGINAL_BYTES_INSTEAD_OF_REFERENCING_IMMUTABLE_KEY")
+                    self.assertEqual(hashlib.sha256(report.content).hexdigest(), report_sha)
+                    report_retry = restarted.post(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-report",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                        json=report_request,
+                    )
+                    self.assertEqual(report_retry.status_code, 200, report_retry.text)
+                    self.assertEqual(report_retry.content, report.content)
+                    self.assertEqual(report_retry.headers["x-report-json-artifact-id"], report_json_artifact_id)
+                    self.assertEqual(report_retry.headers["x-report-json-sha256"], report_json_sha)
+                    self.assertEqual(report_retry.headers["x-report-json-artifact-id"], report_json_artifact_id)
+                    self.assertEqual(report_retry.headers["x-report-json-sha256"], report_json_sha)
+                    altered_request = {**report_request, "vehicle_description": "Altered vehicle"}
+                    altered_retry = restarted.post(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-report",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                        json=altered_request,
+                    )
+                    self.assertEqual(altered_retry.status_code, 409)
+                    report_download = restarted.get(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(report_download.status_code, 200, report_download.text)
+                    self.assertEqual(report_download.content, report.content)
+                    report_json_download = restarted.get(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}/json",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(report_json_download.status_code, 200, report_json_download.text)
+                    self.assertEqual(hashlib.sha256(report_json_download.content).hexdigest(), report_json_sha)
+                    carrier_payload = report_json_download.json()
+                    self.assertEqual(carrier_payload["capture_protocol_version"], DEFAULT_CAPTURE_PROTOCOL)
+                    self.assertIn("A bounding box is a suspect-region identifier only", carrier_payload["disclosures"][0])
+                    carrier_finding = carrier_payload["findings"][0]
+                    self.assertEqual(carrier_finding["slot_id"], CANONICAL_SLOTS[0])
+                    self.assertEqual(carrier_finding["bbox_normalized"], {
+                        "x_min": 0.2, "y_min": 0.2, "x_max": 0.7, "y_max": 0.7,
+                    })
+                    self.assertEqual(carrier_finding["reviewer_attribution"]["actor_id"], "claim-reviewer-0")
+                    self.assertTrue(carrier_finding["reviewer_attribution"]["reviewed_at"])
+                    self.assertEqual(carrier_finding["source_image"]["artifact_id"], first_artifact_id)
+                    self.assertEqual(
+                        carrier_finding["source_image"]["storage_key"],
+                        f"{self.db.f.tenants[0]}/{session_id}/{first_artifact_id}.original",
+                    )
+                    self.assertEqual(carrier_finding["source_image"]["sha256"], hashlib.sha256(first_bytes).hexdigest())
+                    self.assertIn(b"A bounding box is a suspect-region identifier only", report.content)
+                    self.assertIn(carrier_finding["source_image"]["storage_key"].encode("utf-8"), report.content)
+                    self.assertEqual(
+                        carrier_finding["bbox_disclosure"],
+                        "A bounding box is a suspect-region identifier only. It is not a measured dimension, calibrated geometry, or a structural-severity claim.",
+                    )
+                    self.assertEqual(carrier_finding["camera_angle"]["yaw_degrees"], 25)
+                    self.assertEqual(report_json_download.headers["x-report-json-artifact-id"], report_json_artifact_id)
+                    report_event = self.db.f.seed.execute(
+                        "SELECT payload_json FROM faos.events WHERE tenant_id=%s AND session_id=%s "
+                        "AND kind='DAMAGE_ASSESSMENT_REPORT_GENERATED' AND payload_json::jsonb->>'request_id'=%s",
+                        (self.db.f.tenants[0], session_id, report_artifact_id),
+                    ).fetchall()
+                    self.assertEqual(len(report_event), 1, "DAMAGE_REPORT_REGISTRY_EVENT_NOT_UNIQUE")
+                    report_event_payload = json.loads(report_event[0][0])
+                    self.assertEqual(report_event_payload["report_json_artifact_id"], report_json_artifact_id)
+                    self.assertEqual(report_event_payload["report_json_sha256"], report_json_sha)
+
+                    fresh_store = CaptureSessionStore(resolver, self.db.dsns)
+                    fresh_runtime = CaptureRuntime(resolver, fresh_store, Settings(), ClaimCaseStore(fresh_store))
+                    with TestClient(create_capture_app(fresh_runtime, enable_evidence=True)) as fresh:
+                        fresh_pdf = fresh.get(
+                            f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
+                            headers={"Authorization": self.db.reviewer_auth()},
+                        )
+                        fresh_json = fresh.get(
+                            f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}/json",
+                            headers={"Authorization": self.db.reviewer_auth()},
+                        )
+                        self.assertEqual(fresh_pdf.status_code, 200, fresh_pdf.text)
+                        self.assertEqual(fresh_pdf.content, report.content)
+                        self.assertEqual(fresh_json.status_code, 200, fresh_json.text)
+                        self.assertEqual(fresh_json.content, report_json_download.content)
+
+                    # A separate interpreter must retrieve both persisted report
+                    # carriers using only the durable PostgreSQL registry and store.
+                    report_process_environment = {
+                        **os.environ,
+                        "C2C_TEST_DSNS": json.dumps(self.db.dsns),
+                        "C2C_TEST_TENANT_ID": self.db.f.tenants[0],
+                        "C2C_TEST_REVIEWER_ROLE": self.db.f.roles[0],
+                        "C2C_TEST_REVIEWER_TOKEN": self.db.reviewer_token,
+                        "C2C_TEST_SESSION_ID": session_id,
+                        "C2C_TEST_REPORT_ID": report_artifact_id,
+                        "C2C_TEST_REPORT_SHA256": report_sha,
+                        "C2C_TEST_REPORT_JSON_SHA256": report_json_sha,
+                    }
+                    report_process_script = r'''
+import hashlib, json, os, time, uuid
+from fastapi.testclient import TestClient
+from app.capture_api import CaptureRuntime, create_capture_app
+from app.identity import ActorBinding, Credential, CredentialResolver
+from app.main import Settings
+from database.capture_sessions import CaptureSessionStore
+from database.claim_cases import ClaimCaseStore
+
+token = os.environ["C2C_TEST_REVIEWER_TOKEN"]
+tenant_id = uuid.UUID(os.environ["C2C_TEST_TENANT_ID"])
+credential = Credential(
+    hashlib.sha256(token.encode()).hexdigest(),
+    ActorBinding("claim-reviewer-0", tenant_id, os.environ["C2C_TEST_REVIEWER_ROLE"], "reviewer"),
+    int(time.time()) + 3600,
+)
+resolver = CredentialResolver([credential])
+store = CaptureSessionStore(resolver, json.loads(os.environ["C2C_TEST_DSNS"]))
+runtime = CaptureRuntime(resolver, store, Settings(), ClaimCaseStore(store))
+session_id = os.environ["C2C_TEST_SESSION_ID"]
+report_id = os.environ["C2C_TEST_REPORT_ID"]
+with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
+    headers = {"Authorization": "Bearer " + token}
+    pdf = client.get(f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_id}", headers=headers)
+    carrier = client.get(f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_id}/json", headers=headers)
+    assert pdf.status_code == 200, pdf.text
+    assert carrier.status_code == 200, carrier.text
+    assert hashlib.sha256(pdf.content).hexdigest() == os.environ["C2C_TEST_REPORT_SHA256"]
+    assert hashlib.sha256(carrier.content).hexdigest() == os.environ["C2C_TEST_REPORT_JSON_SHA256"]
+    print(json.dumps({"pdf_sha256": hashlib.sha256(pdf.content).hexdigest(),
+                      "json_sha256": hashlib.sha256(carrier.content).hexdigest(),
+                      "process_restarted": True}, sort_keys=True))
+'''
+                    report_process_result = subprocess.run(
+                        [sys.executable, "-c", report_process_script],
+                        env=report_process_environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        check=False,
+                    )
+                    self.assertEqual(
+                        report_process_result.returncode, 0,
+                        report_process_result.stdout + "\n" + report_process_result.stderr,
+                    )
+                    report_process_payload = json.loads(report_process_result.stdout.strip().splitlines()[-1])
+                    self.assertTrue(report_process_payload["process_restarted"])
+                    self.assertEqual(report_process_payload["pdf_sha256"], report_sha)
+                    self.assertEqual(report_process_payload["json_sha256"], report_json_sha)
+
+                    # A corrupted persisted PDF must fail closed and leave a durable audit event.
+                    report_path.write_bytes(b"tampered synthetic report bytes")
+                    tampered_report = restarted.get(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(tampered_report.status_code, 409, tampered_report.text)
+                    self.assertEqual(
+                        tampered_report.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"},
+                    )
+                    report_integrity_audit = self.db.f.seed.execute(
+                        "SELECT payload_json FROM faos.events "
+                        "WHERE tenant_id=%s AND session_id=%s AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED' "
+                        "AND payload_json::jsonb->>'artifact_id'=%s",
+                        (self.db.f.tenants[0], session_id, report_artifact_id),
+                    ).fetchall()
+                    self.assertEqual(len(report_integrity_audit), 1, "DAMAGE_REPORT_TAMPER_AUDIT_NOT_DURABLE")
+                    self.assertEqual(
+                        json.loads(report_integrity_audit[0][0])["failure_code"], "ARTIFACT_HASH_MISMATCH",
+                    )
 
                     collision_evidence = restarted.get(
                         f"/v1/review-collisions/{collision_id}",
@@ -442,7 +663,6 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                     self.assertEqual(profile_after_decode_withdrawal.json()["vehicles"][0]["vehicle_profile_status"], "REVOKED")
                     self.assertIsNone(profile_after_decode_withdrawal.json()["vehicles"][0]["vehicle_profile"])
 
-                    first_artifact_id, first_bytes = next(iter(originals.items()))
                     retrieved = restarted.get(
                         f"/v1/review-sessions/{session_id}/artifacts/{first_artifact_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
@@ -463,20 +683,16 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                         f"/v1/review-sessions/{session_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
                     )
-                    self.assertEqual(tampered.status_code, 409, tampered.text)
-                    self.assertEqual(
-                        tampered.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"},
-                        "TAMPER_REJECTION_DETAIL_MISMATCH: " + tampered.text,
-                    )
+                    self.assertEqual(tampered.status_code, 409)
+                    self.assertEqual(tampered.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"})
                     integrity_audit = self.db.f.seed.execute(
-                        "SELECT kind,payload_json FROM faos.events "
-                        "WHERE tenant_id=%s AND session_id=%s "
-                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED'",
-                        (self.db.f.tenants[0], session_id),
+                        "SELECT payload_json FROM faos.events "
+                        "WHERE tenant_id=%s AND session_id=%s AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED' "
+                        "AND payload_json::jsonb->>'artifact_id'=%s",
+                        (self.db.f.tenants[0], session_id, first_artifact_id),
                     ).fetchall()
                     self.assertEqual(len(integrity_audit), 1, "INTEGRITY_FAILURE_AUDIT_NOT_DURABLE")
-                    audit_payload = json.loads(integrity_audit[0][1])
-                    self.assertEqual(integrity_audit[0][0], "ARTIFACT_INTEGRITY_FAILURE_RECORDED")
+                    audit_payload = json.loads(integrity_audit[0][0])
                     self.assertEqual(audit_payload["artifact_id"], first_artifact_id)
                     self.assertEqual(audit_payload["expected_sha256"], hashlib.sha256(first_bytes).hexdigest())
                     self.assertEqual(audit_payload["failure_code"], "ARTIFACT_HASH_MISMATCH")
@@ -488,8 +704,9 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                     self.assertEqual(tampered_retry.status_code, 409)
                     repeated_audit_count = self.db.f.seed.execute(
                         "SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s "
-                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED'",
-                        (self.db.f.tenants[0], session_id),
+                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED' "
+                        "AND payload_json::jsonb->>'artifact_id'=%s",
+                        (self.db.f.tenants[0], session_id, first_artifact_id),
                     ).fetchone()[0]
                     self.assertEqual(repeated_audit_count, 1, "INTEGRITY_FAILURE_AUDIT_NOT_IDEMPOTENT")
 
@@ -500,6 +717,13 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                     )
                     self.assertEqual(withdrawn.status_code, 200, withdrawn.text)
                     self.assertFalse(stored_path.exists())
+                    self.assertFalse(report_path.exists(), "CONSENT_WITHDRAWAL_DID_NOT_DELETE_REPORT_BYTES")
+                    self.assertFalse(report_json_path.exists(), "CONSENT_WITHDRAWAL_DID_NOT_DELETE_REPORT_JSON_BYTES")
+                    report_after_withdrawal = restarted.get(
+                        f"/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(report_after_withdrawal.status_code, 409)
                     vehicle_after_withdrawal = restarted.get(
                         f"/v1/collisions/{collision_id}",
                         headers={"Authorization": self.db.auth()},

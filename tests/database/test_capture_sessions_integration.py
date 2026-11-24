@@ -158,6 +158,79 @@ class CaptureSessionIntegration(unittest.TestCase):
                 reason='Synthetic integration verification; no real claim decision.')
             self.assertEqual(review['manifest_digest'], sealed['manifest_digest'])
             self.assertNotIn('1HGCM82633A004352', str(details))
+            report_bytes = b"%PDF-1.4\\n% synthetic immutable damage assessment\\n"
+            report_request = uuid.uuid4()
+            request_digest = hashlib.sha256(b"synthetic-damage-report-request").hexdigest()
+            report_sha = hashlib.sha256(report_bytes).hexdigest()
+            report_details = service.get_review_details(self.reviewer_auth(), case.capture_session_id)
+            source = next(item for item in report_details["artifacts"] if item["artifact_id"] == first_artifact)
+            source_key = f"{self.f.tenants[0]}/{case.capture_session_id}/{first_artifact}.original"
+            from backend.app.reports.damage_assessment import DAMAGE_BOX_DISCLOSURE
+            carrier = {
+                "schema_version": "damage-assessment-carrier-v1",
+                "session_id": case.capture_session_id,
+                "capture_protocol_version": report_details["capture_protocol_version"],
+                "manifest_digest": report_details["manifest_digest"],
+                "seal_event_id": report_details["seal_event_id"],
+                "evidence_images": [{
+                    "artifact_id": first_artifact, "slot_id": source["slot"],
+                    "storage_key": source_key, "sha256": source["sha256"],
+                    "registered_at": source.get("registered_at") or "NOT_RECORDED",
+                }],
+                "findings": [{
+                    "finding_id": "D-001", "slot_id": source["slot"],
+                    "bbox_normalized": {"x_min": 0.1, "y_min": 0.2, "x_max": 0.7, "y_max": 0.8},
+                    "reviewer_attribution": {
+                        "actor_id": report_details["review"]["actor_id"],
+                        "reviewed_at": report_details["review"]["reviewed_at"],
+                    },
+                    "source_image": {
+                        "artifact_id": first_artifact, "storage_key": source_key,
+                        "sha256": source["sha256"],
+                    },
+                    "bbox_disclosure": DAMAGE_BOX_DISCLOSURE,
+                }],
+                "disclosures": [DAMAGE_BOX_DISCLOSURE],
+            }
+            report_json_bytes = json.dumps(carrier, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            report_json_sha = hashlib.sha256(report_json_bytes).hexdigest()
+            report = service.record_damage_assessment_report(
+                self.reviewer_auth(), case.capture_session_id,
+                request_id=report_request, pdf_bytes=report_bytes,
+                report_sha256=report_sha, report_json_bytes=report_json_bytes,
+                report_json_sha256=report_json_sha, report_revision=1,
+                finding_ids=["D-001"], estimate_total_cents=18750,
+                request_payload_sha256=request_digest,
+            )
+            self.assertEqual(report["manifest_digest"], sealed["manifest_digest"])
+            self.assertEqual(report["seal_event_id"], root[0])
+            self.assertEqual(report["report_revision"], 1)
+            self.assertFalse(report["replayed"])
+            retry = service.record_damage_assessment_report(
+                self.reviewer_auth(), case.capture_session_id,
+                request_id=report_request, pdf_bytes=report_bytes,
+                report_sha256=report_sha, report_json_bytes=report_json_bytes,
+                report_json_sha256=report_json_sha, report_revision=1,
+                finding_ids=["D-001"], estimate_total_cents=18750,
+                request_payload_sha256=request_digest,
+            )
+            self.assertTrue(retry["replayed"])
+            retrieved = service.retrieve_damage_assessment_report(
+                self.reviewer_auth(), case.capture_session_id, report["report_artifact_id"],
+            )
+            self.assertEqual(retrieved["pdf_bytes"], report_bytes)
+            self.assertEqual(retrieved["json_bytes"], report_json_bytes)
+            self.assertEqual(retrieved["metadata"]["report_sha256"], report_sha)
+            self.assertEqual(retrieved["metadata"]["report_json_sha256"], report_json_sha)
+            withdrawn = service.record_consent(
+                self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=False, scope="capture_review",
+            )
+            self.assertEqual(withdrawn["deleted_original_artifacts"], len(originals) + 2)
+            with self.assertRaises(CaptureSessionConflict):
+                service.retrieve_damage_assessment_report(
+                    self.reviewer_auth(), case.capture_session_id, report["report_artifact_id"],
+                )
         persisted = self.store.get(self.auth(), case.capture_session_id)
         self.assertEqual((persisted.scope, persisted.claim_id, persisted.owner_actor_id),
                          ('persistent-claim-case', claim_id, 'claim-owner-0'))

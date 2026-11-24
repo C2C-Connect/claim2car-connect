@@ -4,6 +4,7 @@ WORKDIR /srv/claim2car
 COPY requirements-api.txt requirements-database.txt ./
 RUN pip install --no-cache-dir -r requirements-api.txt && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin claim2car
 COPY app/ ./app/
+COPY backend/ ./backend/
 COPY database/ ./database/
 COPY contracts/ ./contracts/
 COPY migrations/ ./migrations/

@@ -17,15 +17,14 @@ from uuid import UUID, uuid5
 
 import psycopg
 
-from app.artifact_storage import (
-    ArtifactIntegrityError, ArtifactKey, ArtifactNotFound, OriginalByteStore,
-)
+from app.artifact_storage import ArtifactIntegrityError, ArtifactKey, ArtifactNotFound, OriginalByteStore
 from app.evidence_manifest import ManifestEntry, build_manifest
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
 from app.vin_guard import validate_vin
 from database.capture_sessions import (
     CaptureAuthorizationError,
     CaptureSessionConflict,
+    CaptureSessionNotFound,
     CaptureSessionStore,
 )
 
@@ -39,6 +38,7 @@ class _EvidenceArtifactIntegrityFailure(Exception):
         self.expected_sha256 = expected_sha256
         self.failure_code = failure_code
         super().__init__(failure_code)
+
 
 DISCLOSURE_VERSION = "disclosure-v1"
 VEHICLE_DECODE_DISCLOSURE_VERSION = "vehicle-decode-disclosure-v1"
@@ -132,6 +132,10 @@ class CaptureEvidenceService:
     def _last_capture_event(history):
         sidecar = {
             "VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED",
+            "REVIEW_RECORDED", "DAMAGE_ASSESSMENT_REPORT_GENERATED",
+            "CAPTURE_EXCEPTION_RECORDED", "CAPTURE_EXCEPTION_RESOLVED",
+            "CAPTURE_SESSION_PAUSED", "CAPTURE_SESSION_RESUMED",
+            "INCIDENT_INTAKE_CONSENT_RECORDED", "INCIDENT_INTAKE_RECORDED",
             "ARTIFACT_INTEGRITY_FAILURE_RECORDED",
         }
         return next((item for item in reversed(history) if item[0] not in sidecar), None)
@@ -437,9 +441,17 @@ class CaptureEvidenceService:
                              kind="CONSENT_RECORDED", reason="owner consent state recorded", payload=payload)
                 history.append(("CONSENT_RECORDED", actor.actor_id, payload, event_id))
             if not accepted:
-                artifacts = [data["artifact_id"] for kind, _who, data, _ in history
-                    if kind == "ARTIFACT_REGISTERED" and type(data) is dict
-                    and isinstance(data.get("artifact_id"), str)]
+                artifacts = []
+                for kind, _who, data, _ in history:
+                    if not isinstance(data, dict):
+                        continue
+                    if kind == "ARTIFACT_REGISTERED" and isinstance(data.get("artifact_id"), str):
+                        artifacts.append(data["artifact_id"])
+                    elif kind == "DAMAGE_ASSESSMENT_REPORT_GENERATED":
+                        if isinstance(data.get("report_artifact_id"), str):
+                            artifacts.append(data["report_artifact_id"])
+                        if isinstance(data.get("report_json_artifact_id"), str):
+                            artifacts.append(data["report_json_artifact_id"])
                 deletion_tenant = actor.tenant_id
                 if _session.scope == "persistent-claim-case" and _session.claim_id:
                     conn.execute(
@@ -1019,13 +1031,133 @@ class CaptureEvidenceService:
             self._append(
                 conn, actor, session_id, history, event_id=event_id,
                 kind="ARTIFACT_INTEGRITY_FAILURE_RECORDED",
-                reason="server detected original evidence integrity failure: " + failure.failure_code,
+                reason="server detected immutable artifact integrity failure: " + failure.failure_code,
                 payload=payload,
             )
 
     def get_review_details(self, authorization, session_id):
+        session_id = self._session_id(session_id)
+        try:
+            return self._get_review_details(authorization, session_id)
+        except _EvidenceArtifactIntegrityFailure as failure:
+            self._record_integrity_failure(authorization, session_id, failure)
+            raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
+
+    def _get_review_details(self, authorization, session_id):
         """Return a verified sealed manifest to an independent reviewer."""
         session_id = self._session_id(session_id)
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            session, history = self._history(conn, actor, session_id, creator_required=False)
+            if actor.actor_id == session.created_by:
+                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+            if self._consent_state(history) is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
+            self._register_manifest_root(
+                conn, actor, session_id, last_capture_event[3],
+                last_capture_event[2]["request_id"], last_capture_event[2],
+                seal_actor=last_capture_event[1],
+            )
+            latest = self._artifact_set(history, session.capture_protocol_version)
+            capture_times = {}
+            for kind, _event_actor, event_payload, event_id in history:
+                if kind == "ARTIFACT_REGISTERED" and type(event_payload) is dict:
+                    occurred = conn.execute(
+                        "SELECT occurred_at FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s",
+                        (actor.tenant_id, session_id, event_id),
+                    ).fetchone()
+                    if occurred:
+                        value = occurred[0]
+                        capture_times[event_payload.get("artifact_id")] = value.isoformat() if hasattr(value, "isoformat") else str(value)
+            review_event = next((
+                item for item in reversed(history)
+                if item[0] == "REVIEW_RECORDED" and item[1] == actor.actor_id
+                and type(item[2]) is dict and item[2].get("manifest_digest") == manifest.digest()
+            ), None)
+            review_details = None
+            if review_event is not None:
+                review_time = conn.execute(
+                    "SELECT occurred_at FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s",
+                    (actor.tenant_id, session_id, review_event[3]),
+                ).fetchone()
+                review_details = {
+                    "event_id": review_event[3],
+                    "actor_id": review_event[1],
+                    "disposition": review_event[2].get("disposition"),
+                    "reason": review_event[2].get("reason"),
+                    "reviewed_at": (
+                        review_time[0].isoformat() if review_time and hasattr(review_time[0], "isoformat")
+                        else str(review_time[0]) if review_time else None
+                    ),
+                }
+            revisions = [
+                item[2].get("report_revision", 0) for item in history
+                if item[0] == "DAMAGE_ASSESSMENT_REPORT_GENERATED" and type(item[2]) is dict
+            ]
+            return {
+                "session_id": session_id,
+                "manifest_digest": manifest.digest(),
+                "seal_event_id": last_capture_event[3],
+                "shot_list_version": manifest.shot_list_version,
+                "capture_protocol_version": session.capture_protocol_version,
+                "consent_recorded": True,
+                "review": review_details,
+                "next_report_revision": max((value for value in revisions if type(value) is int), default=0) + 1,
+                "artifacts": [
+                    {
+                        "artifact_id": entry.artifact_id,
+                        "slot": entry.slot,
+                        "sha256": entry.sha256_hex,
+                        "byte_length": latest[entry.slot][1]["byte_length"],
+                        "registered_at": capture_times.get(entry.artifact_id),
+                        "storage_key": ArtifactKey(actor.tenant_id, UUID(session_id), UUID(entry.artifact_id)).storage_key,
+                    }
+                    for entry in manifest.entries
+                ],
+            }
+
+    def record_damage_assessment_report(
+        self, authorization, session_id, *, request_id, pdf_bytes, report_sha256,
+        report_json_bytes, report_json_sha256, report_revision, finding_ids,
+        estimate_total_cents, request_payload_sha256, report_schema_version="damage-assessment-v1",
+    ):
+        """Persist PDF + JSON carrier objects and bind both to the reviewed manifest."""
+        session_id = self._session_id(session_id)
+        request_id = self._request_id(request_id)
+        if not isinstance(pdf_bytes, bytes) or not pdf_bytes.startswith(b"%PDF-") or len(pdf_bytes) > MAX_EVIDENCE_BYTES:
+            raise ValueError("INVALID_DAMAGE_REPORT_PDF")
+        if not isinstance(report_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", report_sha256) is None or hashlib.sha256(pdf_bytes).hexdigest() != report_sha256:
+            raise ValueError("DAMAGE_REPORT_HASH_MISMATCH")
+        if not isinstance(report_json_bytes, bytes) or not report_json_bytes or len(report_json_bytes) > 2 * 1024 * 1024:
+            raise ValueError("INVALID_DAMAGE_REPORT_JSON")
+        if not isinstance(report_json_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", report_json_sha256) is None or hashlib.sha256(report_json_bytes).hexdigest() != report_json_sha256:
+            raise ValueError("DAMAGE_REPORT_JSON_HASH_MISMATCH")
+        try:
+            carrier = json.loads(report_json_bytes)
+        except (ValueError, TypeError):
+            raise ValueError("INVALID_DAMAGE_REPORT_JSON") from None
+        if type(carrier) is not dict or carrier.get("schema_version") != "damage-assessment-carrier-v1":
+            raise ValueError("INVALID_DAMAGE_REPORT_JSON_SCHEMA")
+        if type(report_revision) is not int or report_revision < 1 or type(estimate_total_cents) is not int or estimate_total_cents < 0:
+            raise ValueError("INVALID_DAMAGE_REPORT_REVISION_OR_ESTIMATE")
+        if not isinstance(request_payload_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", request_payload_sha256) is None:
+            raise ValueError("INVALID_DAMAGE_REPORT_REQUEST_SHA256")
+        if not isinstance(report_schema_version, str) or not report_schema_version.strip() or len(report_schema_version) > 64:
+            raise ValueError("INVALID_DAMAGE_REPORT_SCHEMA_VERSION")
+        if not isinstance(finding_ids, (list, tuple)) or len(finding_ids) > 256:
+            raise ValueError("INVALID_DAMAGE_REPORT_FINDINGS")
+        normalized_findings = [str(item) for item in finding_ids]
+        if any(not item or len(item) > 64 for item in normalized_findings) or len(set(normalized_findings)) != len(normalized_findings):
+            raise ValueError("INVALID_DAMAGE_REPORT_FINDINGS")
+        artifact_id = request_id
+        json_artifact_id = str(uuid5(UUID(request_id), "claim2car-damage-assessment-json-v1"))
+        event_id = "damage-report:" + request_id
+        stored_keys = []
         try:
             with self.sessions._authorized(authorization) as (conn, actor):
                 if actor.actor_role not in ("reviewer", "supervisor"):
@@ -1035,64 +1167,195 @@ class CaptureEvidenceService:
                     raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
                 if self._consent_state(history) is None:
                     raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-                last_capture_event = self._last_capture_event(history)
-                if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
+                seal = next((item for item in reversed(history) if item[0] == "MANIFEST_SEALED"), None)
+                if seal is None or type(seal[2]) is not dict:
                     raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
                 manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
-                self._register_manifest_root(
-                    conn, actor, session_id, last_capture_event[3],
-                    last_capture_event[2]["request_id"], last_capture_event[2],
-                    seal_actor=last_capture_event[1],
-                )
-                latest = self._artifact_set(history, session.capture_protocol_version)
-                return {
-                    "session_id": session_id,
-                    "manifest_digest": manifest.digest(),
-                    "shot_list_version": manifest.shot_list_version,
-                    "consent_recorded": True,
-                    "artifacts": [
-                        {
-                            "artifact_id": entry.artifact_id,
-                            "slot": entry.slot,
-                            "sha256": entry.sha256_hex,
-                            "byte_length": latest[entry.slot][1]["byte_length"],
-                        }
-                        for entry in manifest.entries
-                    ],
+                if seal[2].get("manifest_digest") != manifest.digest():
+                    raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
+                if carrier.get("session_id") != session_id or carrier.get("capture_protocol_version") != session.capture_protocol_version:
+                    raise CaptureSessionConflict("DAMAGE_REPORT_CAPTURE_CONTEXT_MISMATCH")
+                manifest_by_id = {entry.artifact_id: entry for entry in manifest.entries}
+                for image in carrier.get("evidence_images", []):
+                    artifact_ref = manifest_by_id.get(image.get("artifact_id"))
+                    expected_key = ArtifactKey(actor.tenant_id, UUID(session_id), UUID(image.get("artifact_id"))).storage_key
+                    if artifact_ref is None or image.get("sha256") != artifact_ref.sha256_hex or image.get("storage_key") != expected_key:
+                        raise CaptureSessionConflict("DAMAGE_REPORT_SOURCE_IMAGE_BINDING_INVALID")
+                review = next((item for item in reversed(history) if item[0] == "REVIEW_RECORDED" and item[1] == actor.actor_id and type(item[2]) is dict and item[2].get("manifest_digest") == manifest.digest()), None)
+                if review is None:
+                    raise CaptureSessionConflict("INDEPENDENT_REVIEW_REQUIRED_BEFORE_REPORT")
+                carrier_findings = carrier.get("findings")
+                if type(carrier_findings) is not list or {
+                    item.get("finding_id") for item in carrier_findings if isinstance(item, dict)
+                } != set(normalized_findings):
+                    raise CaptureSessionConflict("DAMAGE_REPORT_FINDING_CARRIER_MISMATCH")
+                for finding in carrier_findings:
+                    source = finding.get("source_image")
+                    reviewer = finding.get("reviewer_attribution")
+                    bbox = finding.get("bbox_normalized")
+                    if not isinstance(source, dict) or not isinstance(reviewer, dict) or not isinstance(bbox, dict):
+                        raise CaptureSessionConflict("DAMAGE_REPORT_FINDING_CARRIER_INVALID")
+                    source_id = source.get("artifact_id")
+                    source_entry = manifest_by_id.get(source_id)
+                    source_key = ArtifactKey(actor.tenant_id, UUID(session_id), UUID(source_id)).storage_key
+                    if (source_entry is None or source.get("sha256") != source_entry.sha256_hex
+                            or source.get("storage_key") != source_key
+                            or finding.get("slot_id") != source_entry.slot
+                            or reviewer.get("actor_id") != actor.actor_id
+                            or not reviewer.get("reviewed_at")
+                            or "A bounding box is a suspect-region identifier only. It is not a measured dimension, calibrated geometry, or a structural-severity claim."
+                               not in carrier.get("disclosures", [])):
+                        raise CaptureSessionConflict("DAMAGE_REPORT_FINDING_SOURCE_OR_DISCLOSURE_INVALID")
+                    x0, y0, x1, y1 = (bbox[key] for key in ("x_min", "y_min", "x_max", "y_max"))
+                    if (any(isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1
+                            for value in (x0, y0, x1, y1)) or x1 <= x0 or y1 <= y0):
+                        raise CaptureSessionConflict("DAMAGE_REPORT_BOUNDING_BOX_INVALID")
+                self._register_manifest_root(conn, actor, session_id, seal[3], seal[2]["request_id"], seal[2], seal_actor=seal[1])
+                prior_revisions = [item[2].get("report_revision", 0) for item in history if item[0] == "DAMAGE_ASSESSMENT_REPORT_GENERATED" and type(item[2]) is dict]
+                existing = next((item for item in history if item[3] == event_id), None)
+                next_revision = max((value for value in prior_revisions if type(value) is int), default=0) + 1
+                pdf_key = ArtifactKey(actor.tenant_id, UUID(session_id), UUID(artifact_id))
+                json_key = ArtifactKey(actor.tenant_id, UUID(session_id), UUID(json_artifact_id))
+                payload = {
+                    "request_id": request_id, "report_artifact_id": artifact_id,
+                    "report_sha256": report_sha256, "report_storage_key": pdf_key.storage_key,
+                    "report_json_artifact_id": json_artifact_id, "report_json_sha256": report_json_sha256,
+                    "report_json_storage_key": json_key.storage_key, "manifest_digest": manifest.digest(),
+                    "seal_event_id": seal[3], "capture_protocol_version": session.capture_protocol_version,
+                    "report_revision": report_revision, "report_schema_version": report_schema_version,
+                    "request_payload_sha256": request_payload_sha256, "finding_ids": normalized_findings,
+                    "estimate_total_cents": estimate_total_cents, "currency": "USD", "review_event_id": review[3],
                 }
+                if existing is not None:
+                    if existing[0] != "DAMAGE_ASSESSMENT_REPORT_GENERATED" or existing[2] != payload:
+                        raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
+                    for object_key, object_bytes, digest in (
+                        (pdf_key, pdf_bytes, report_sha256), (json_key, report_json_bytes, report_json_sha256)
+                    ):
+                        receipt = self.byte_store.put(object_key, object_bytes, expected_sha256=digest)
+                        if receipt.created:
+                            stored_keys.append(object_key)
+                    return {**payload, "replayed": True}
+                if report_revision != next_revision:
+                    raise CaptureSessionConflict("DAMAGE_REPORT_REVISION_CONFLICT")
+                for object_key, object_bytes, digest in (
+                    (pdf_key, pdf_bytes, report_sha256), (json_key, report_json_bytes, report_json_sha256)
+                ):
+                    receipt = self.byte_store.put(object_key, object_bytes, expected_sha256=digest)
+                    if receipt.created:
+                        stored_keys.append(object_key)
+                self._append(conn, actor, session_id, history, event_id=event_id,
+                    kind="DAMAGE_ASSESSMENT_REPORT_GENERATED",
+                    reason="reviewer-generated PDF and JSON carrier bound to sealed manifest", payload=payload)
+            return {**payload, "replayed": False}
+        except Exception:
+            for object_key in stored_keys:
+                try:
+                    self.byte_store.delete(object_key)
+                except Exception:
+                    pass
+            raise
+
+    def retrieve_damage_assessment_report(self, authorization, session_id, report_artifact_id):
+        session_id = self._session_id(session_id)
+        report_artifact_id = self._request_id(report_artifact_id)
+        try:
+            return self._retrieve_damage_assessment_report(authorization, session_id, report_artifact_id)
         except _EvidenceArtifactIntegrityFailure as failure:
-            # Commit the audit in a fresh transaction after the failed read rolls back.
             self._record_integrity_failure(authorization, session_id, failure)
             raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
 
+    def _retrieve_damage_assessment_report(self, authorization, session_id, report_artifact_id):
+        """Read the durable report registry and both immutable carrier artifacts."""
+        session_id = self._session_id(session_id)
+        report_artifact_id = self._request_id(report_artifact_id)
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            session, history = self._history(conn, actor, session_id, creator_required=False)
+            if actor.actor_id == session.created_by:
+                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+            if self._consent_state(history) is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            seal = next((item for item in reversed(history) if item[0] == "MANIFEST_SEALED"), None)
+            if seal is None or type(seal[2]) is not dict:
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
+            self._register_manifest_root(conn, actor, session_id, seal[3], seal[2]["request_id"], seal[2], seal_actor=seal[1])
+            report = next((item for item in reversed(history) if item[0] == "DAMAGE_ASSESSMENT_REPORT_GENERATED" and type(item[2]) is dict and item[2].get("report_artifact_id") == report_artifact_id), None)
+            if report is None:
+                raise CaptureSessionNotFound("DAMAGE_REPORT_NOT_FOUND")
+            metadata = report[2]
+            if metadata.get("manifest_digest") != manifest.digest() or metadata.get("seal_event_id") != seal[3] or metadata.get("capture_protocol_version") != session.capture_protocol_version:
+                raise CaptureSessionConflict("DAMAGE_REPORT_MANIFEST_MISMATCH")
+            review = next((item for item in history if item[0] == "REVIEW_RECORDED" and item[3] == metadata.get("review_event_id") and item[1] == report[1] and type(item[2]) is dict and item[2].get("manifest_digest") == manifest.digest()), None)
+            if review is None:
+                raise CaptureSessionConflict("DAMAGE_REPORT_REVIEW_BINDING_INVALID")
+            try:
+                pdf_data = self.byte_store.get(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(report_artifact_id)),
+                    expected_sha256=metadata["report_sha256"],
+                )
+            except ArtifactIntegrityError as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    report_artifact_id, "damage-assessment-pdf", metadata["report_sha256"], "ARTIFACT_HASH_MISMATCH"
+                ) from error
+            except ArtifactNotFound as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    report_artifact_id, "damage-assessment-pdf", metadata["report_sha256"], "ARTIFACT_MISSING"
+                ) from error
+            json_artifact_id = metadata["report_json_artifact_id"]
+            try:
+                json_data = self.byte_store.get(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(json_artifact_id)),
+                    expected_sha256=metadata["report_json_sha256"],
+                )
+            except ArtifactIntegrityError as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    json_artifact_id, "damage-assessment-json", metadata["report_json_sha256"], "ARTIFACT_HASH_MISMATCH"
+                ) from error
+            except ArtifactNotFound as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    json_artifact_id, "damage-assessment-json", metadata["report_json_sha256"], "ARTIFACT_MISSING"
+                ) from error
+            carrier = json.loads(json_data)
+            if carrier.get("manifest_digest") != manifest.digest() or carrier.get("capture_protocol_version") != session.capture_protocol_version:
+                raise CaptureSessionConflict("DAMAGE_REPORT_JSON_CONTEXT_MISMATCH")
+            return {"metadata": dict(metadata), "pdf_bytes": pdf_data, "json_bytes": json_data}
+
+
     def retrieve_for_review(self, authorization, session_id, artifact_id):
         session_id = self._session_id(session_id)
-        artifact_id = self._request_id(artifact_id)
         try:
-            with self.sessions._authorized(authorization) as (conn, actor):
-                if actor.actor_role not in ("reviewer", "supervisor"):
-                    raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
-                _session, history = self._history(conn, actor, session_id, creator_required=False)
-                if actor.actor_id == _session.created_by:
-                    raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
-                if self._consent_state(history) is None:
-                    raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-                last_capture_event = self._last_capture_event(history)
-                if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
-                    raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-                manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
-                self._register_manifest_root(
-                    conn, actor, session_id, last_capture_event[3],
-                    last_capture_event[2]["request_id"], last_capture_event[2],
-                    seal_actor=last_capture_event[1],
-                )
-                entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
-                if entry is None:
-                    raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
-                return self.byte_store.get(
-                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(artifact_id)),
-                    expected_sha256=entry.sha256_hex,
-                )
+            return self._retrieve_for_review(authorization, session_id, artifact_id)
         except _EvidenceArtifactIntegrityFailure as failure:
             self._record_integrity_failure(authorization, session_id, failure)
             raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
+
+    def _retrieve_for_review(self, authorization, session_id, artifact_id):
+        session_id = self._session_id(session_id)
+        artifact_id = self._request_id(artifact_id)
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=False)
+            if actor.actor_id == _session.created_by:
+                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+            if self._consent_state(history) is None:
+                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            last_capture_event = self._last_capture_event(history)
+            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
+            self._register_manifest_root(
+                conn, actor, session_id, last_capture_event[3],
+                last_capture_event[2]["request_id"], last_capture_event[2],
+                seal_actor=last_capture_event[1],
+            )
+            entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
+            if entry is None:
+                raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
+            return self.byte_store.get(
+                ArtifactKey(actor.tenant_id, UUID(session_id), UUID(artifact_id)),
+                expected_sha256=entry.sha256_hex,
+            )

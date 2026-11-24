@@ -36,6 +36,11 @@ class ArtifactKey:
         if any(not isinstance(v, UUID) for v in (self.tenant_id, self.session_id, self.artifact_id)):
             raise ValueError('UUID_ARTIFACT_KEY_REQUIRED')
 
+    @property
+    def storage_key(self):
+        """Stable logical key, independent of the host filesystem root."""
+        return f"{self.tenant_id}/{self.session_id}/{self.artifact_id}.original"
+
 @dataclass(frozen=True)
 class ArtifactReceipt:
     key: ArtifactKey
