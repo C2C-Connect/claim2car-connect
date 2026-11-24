@@ -90,7 +90,14 @@ try {
   assert.equal(integratedStatus.total,2);
   assert.equal(integratedStatus.pending,2);
   assert.deepEqual(integratedStatus.records.map(record=>record.queueId),integratedIds);
-  assert.equal(integratedStatus.records.every(record=>record.encryptionAlgorithm==="AES-GCM"),true);
+  assert.equal(integratedStatus.records.every(record=>record.encryptionAlgorithm==="AES-GCM-HKDF-SHA256-v2"),true);
+  const integratedRaw=await page.evaluate(() => window.c2cIntegratedQueueHarness.raw());
+  assert.equal(integratedRaw.every(record=>record.bytes instanceof Uint8Array&&record.bytes.byteLength===record.byteLength+16),true);
+  await page.evaluate((queueId) => window.c2cIntegratedQueueHarness.tamperSlot(queueId,"tampered-slot"),integratedIds[0]);
+  const integratedTamper=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false));
+  assert.equal(integratedTamper.result.error,"EVIDENCE_DECRYPTION_FAILED");
+  assert.equal(integratedTamper.attempted.length,0);
+  await page.evaluate((queueId) => window.c2cIntegratedQueueHarness.tamperSlot(queueId,"00_front_exterior"),integratedIds[0]);
   assert.equal(integratedStatus.records.every(record=>!("bytes" in record)),true);
   const integratedWrongKey=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false,"wrong-operator-token-material-0123456789ABCDEFGHIJKLMN"));
   assert.equal(integratedWrongKey.result.uploaded,0);
@@ -114,7 +121,14 @@ try {
   assert.equal(integratedStatus.pending,0);
   assert.equal(integratedStatus.uploaded,2);
   assert.equal(integratedStatus.records.every(record=>!("bytes" in record)),true);
-  assert.equal(await page.evaluate(() => window.c2cIntegratedQueueHarness.purge()),2);
+  const legacyCiphertext=await page.evaluate(() => window.c2cIntegratedQueueHarness.seedLegacyV1Ciphertext());
+  const upgradedLegacy=await page.evaluate(() => window.c2cIntegratedQueueHarness.sync(false));
+  assert.equal(upgradedLegacy.result.uploaded,1);
+  assert.equal(upgradedLegacy.attempted[0].queueId,legacyCiphertext.queueId);
+  assert.equal(upgradedLegacy.attempted[0].bytes,"prototype-legacy-ciphertext");
+  integratedStatus=await page.evaluate(() => window.c2cIntegratedQueueHarness.status());
+  assert.equal(integratedStatus.records.find(record=>record.queueId===legacyCiphertext.queueId).encryptionAlgorithm,"AES-GCM-HKDF-SHA256-v2");
+  assert.equal(await page.evaluate(() => window.c2cIntegratedQueueHarness.purge()),3);
   assert.equal((await page.evaluate(() => window.c2cIntegratedQueueHarness.status())).total,0);
 
   assert.deepEqual(pageErrors, []);
@@ -129,6 +143,8 @@ try {
       "binary removal after acceptance",
       "tenant/actor isolation",
       "tenant/session purge",
+      "prototype queue metadata authentication",
+      "prototype legacy ciphertext migration",
     ],
   },null,2)+"\n");
 } finally {
