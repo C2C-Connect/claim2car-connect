@@ -135,6 +135,16 @@ class CaptureSessionIntegration(unittest.TestCase):
             self.assertTrue(service.record_quality(self.auth(), case.capture_session_id,
                 request_id=uuid.uuid4(), results=quality)['advisory_only'])
             sealed = service.seal_capture(self.auth(), case.capture_session_id, request_id=uuid.uuid4())
+            self.assertTrue(sealed['root_registered'])
+            root = self.f.seed.execute(
+                'SELECT seal_event_id,manifest_digest,shot_list_version,binding_version '
+                'FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',
+                (self.f.tenants[0], case.capture_session_id),
+            ).fetchone()
+            self.assertIsNotNone(root, 'LIVE_CAPTURE_SEAL_ROOT_MISSING')
+            self.assertEqual(root[1], sealed['manifest_digest'])
+            self.assertEqual(root[2], LEGACY_CAPTURE_PROTOCOL)
+            self.assertEqual(root[3], 'manifest-context-v1')
             queue = service.list_review_queue(self.reviewer_auth())
             self.assertIn(case.capture_session_id, {item['session_id'] for item in queue})
             details = service.get_review_details(self.reviewer_auth(), case.capture_session_id)
