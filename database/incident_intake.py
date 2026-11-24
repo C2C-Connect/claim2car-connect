@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import json
 import re
 from uuid import UUID
+from database.readback import locked_verified_journal_in_transaction
 from database.capture_sessions import CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound, CaptureSessionStore
 
 DISCLOSURE_VERSION = "incident-intake-v1"
@@ -32,16 +33,16 @@ class IncidentIntakeService:
         session = self.sessions._read(conn, actor, session_id)
         if session.scope != "persistent-claim-case" or not session.claim_id:
             raise CaptureAuthorizationError("PERSISTENT_CLAIM_CASE_REQUIRED")
-        conn.execute("SELECT faos.lock_session_for_completion(%s::uuid,%s::text)", (actor.tenant_id, session_id))
-        rows = conn.execute(
-            "SELECT sequence,kind,actor,payload_json,event_id FROM faos.events "
-            "WHERE tenant_id=%s AND session_id=%s ORDER BY sequence",
-            (actor.tenant_id, session_id),
-        ).fetchall()
-        if not rows or len(rows) > 1000 or any(row[0] != i + 1 for i, row in enumerate(rows)):
+        try:
+            journal = locked_verified_journal_in_transaction(conn, actor.tenant_id, session_id)
+        except ValueError as error:
+            raise CaptureSessionConflict("INCIDENT_HISTORY_CHAIN_INVALID") from error
+        events = journal.events
+        if not events or len(events) > 1000:
             raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_HISTORY")
         try:
-            history = [(row[1], row[2], json.loads(row[3]), row[4]) for row in rows]
+            history = [(event.kind, event.actor, json.loads(event.payload_json), event.event_id)
+                       for event in events]
         except (ValueError, TypeError):
             raise CaptureSessionConflict("INVALID_CAPTURE_HISTORY") from None
         return session, history
