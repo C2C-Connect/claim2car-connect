@@ -129,8 +129,11 @@ class FourTierDossierTests(unittest.TestCase):
             session_id="session-1", vehicle_description="2022 Example Sedan",
             report_revision=1, findings=(finding,), evidence_images=(evidence,),
         )
+        report_binding = SourceEvidenceBinding(
+            **{**self.binding.__dict__, "artifact_sha256_by_id": {"artifact-1": sha256(original).hexdigest()}}
+        )
         report = self.service.generate_damage_assessment_report(
-            consent=self.consent, binding=self.binding, assessment=assessment,
+            consent=self.consent, binding=report_binding, assessment=assessment,
             generated_by="forensic-report", now_iso=self.consent.recorded_at,
         )
         self.assertEqual(report.document_type, "DAMAGE_ASSESSMENT_REPORT")
@@ -173,9 +176,12 @@ class FourTierDossierTests(unittest.TestCase):
             session_id="session-1", vehicle_description="2022 Example Sedan",
             report_revision=1, findings=(finding,), evidence_images=(evidence,),
         )
+        report_binding = SourceEvidenceBinding(
+            **{**self.binding.__dict__, "artifact_sha256_by_id": {"artifact-1": sha256(original).hexdigest()}}
+        )
         with self.assertRaisesRegex(DossierGenerationError, "DAMAGE_REPORT_REVIEWER_IDENTITY_MISMATCH"):
             self.service.generate_damage_assessment_report(
-                consent=self.consent, binding=self.binding, assessment=assessment,
+                consent=self.consent, binding=report_binding, assessment=assessment,
                 generated_by="forensic-report",
             )
 
