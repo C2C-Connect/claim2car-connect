@@ -403,6 +403,17 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(audit_payload["expected_sha256"], hashlib.sha256(first_bytes).hexdigest())
                     self.assertEqual(audit_payload["failure_code"], "ARTIFACT_HASH_MISMATCH")
                     self.assertTrue(audit_payload["idempotency_key"])
+                    tampered_retry = restarted.get(
+                        f"/v1/review-sessions/{session_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(tampered_retry.status_code, 409)
+                    repeated_audit_count = self.db.f.seed.execute(
+                        "SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s "
+                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED'",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()[0]
+                    self.assertEqual(repeated_audit_count, 1, "INTEGRITY_FAILURE_AUDIT_NOT_IDEMPOTENT")
 
                     withdrawn = restarted.post(
                         f"/v1/capture-sessions/{session_id}/consent",

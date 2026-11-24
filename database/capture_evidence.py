@@ -127,7 +127,10 @@ class CaptureEvidenceService:
 
     @staticmethod
     def _last_capture_event(history):
-        sidecar = {"VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED"}
+        sidecar = {
+            "VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED",
+            "ARTIFACT_INTEGRITY_FAILURE_RECORDED",
+        }
         return next((item for item in reversed(history) if item[0] not in sidecar), None)
 
     @staticmethod
@@ -1054,27 +1057,31 @@ class CaptureEvidenceService:
     def retrieve_for_review(self, authorization, session_id, artifact_id):
         session_id = self._session_id(session_id)
         artifact_id = self._request_id(artifact_id)
-        with self.sessions._authorized(authorization) as (conn, actor):
-            if actor.actor_role not in ("reviewer", "supervisor"):
-                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
-            _session, history = self._history(conn, actor, session_id, creator_required=False)
-            if actor.actor_id == _session.created_by:
-                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
-            if self._consent_state(history) is None:
-                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            last_capture_event = self._last_capture_event(history)
-            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
-                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
-            self._register_manifest_root(
-                conn, actor, session_id, last_capture_event[3],
-                last_capture_event[2]["request_id"], last_capture_event[2],
-                seal_actor=last_capture_event[1],
-            )
-            entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
-            if entry is None:
-                raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
-            return self.byte_store.get(
-                ArtifactKey(actor.tenant_id, UUID(session_id), UUID(artifact_id)),
-                expected_sha256=entry.sha256_hex,
-            )
+        try:
+            with self.sessions._authorized(authorization) as (conn, actor):
+                if actor.actor_role not in ("reviewer", "supervisor"):
+                    raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+                _session, history = self._history(conn, actor, session_id, creator_required=False)
+                if actor.actor_id == _session.created_by:
+                    raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+                if self._consent_state(history) is None:
+                    raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+                last_capture_event = self._last_capture_event(history)
+                if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
+                    raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+                manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
+                self._register_manifest_root(
+                    conn, actor, session_id, last_capture_event[3],
+                    last_capture_event[2]["request_id"], last_capture_event[2],
+                    seal_actor=last_capture_event[1],
+                )
+                entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
+                if entry is None:
+                    raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
+                return self.byte_store.get(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(artifact_id)),
+                    expected_sha256=entry.sha256_hex,
+                )
+        except _EvidenceArtifactIntegrityFailure as failure:
+            self._record_integrity_failure(authorization, session_id, failure)
+            raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
