@@ -249,7 +249,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
             ["Capture slot", evidence.capture_slot, "Capture angle", angle_text],
             ["Original artifact", evidence.artifact_id, "SHA-256", evidence.expected_sha256],
             ["Image dimensions", f"{width} × {height} px", "Bounding box", f"normalized ({x0:.4f}, {y0:.4f})–({x1:.4f}, {y1:.4f})"],
-            ["Pixel bounds", f"x={pixel_box[0]}–{pixel_box[2]}, y={pixel_box[1]}–{pixel_box[3]}", "Captured at", evidence.registered_at],
+            ["Pixel bounds", f"x={pixel_box[0]}–{pixel_box[2]}, y={pixel_box[1]}–{pixel_box[3]}", "Artifact registered at", evidence.registered_at],
         ]
         table = Table(rows, colWidths=[1.0*inch, 2.45*inch, 0.95*inch, 2.45*inch])
         table.setStyle(TableStyle([
