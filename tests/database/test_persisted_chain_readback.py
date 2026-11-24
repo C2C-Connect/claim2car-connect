@@ -59,8 +59,8 @@ class PersistedChainReadbackIntegration(unittest.TestCase):
         self.admin.execute("ALTER TABLE faos.events DISABLE TRIGGER faos_event_chain_guard_mutation")
         try:
             self.admin.execute(
-                "UPDATE faos.events SET payload_json='{\"synthetic\":false}' WHERE tenant_id=%s AND session_id=%s",
-                (self.tenant,self.session),
+                "UPDATE faos.events SET payload_json=%s WHERE tenant_id=%s AND session_id=%s",
+                ('{"synthetic":false}',self.tenant,self.session),
             )
         finally:
             self.admin.execute("ALTER TABLE faos.events ENABLE TRIGGER faos_event_chain_guard_mutation")
