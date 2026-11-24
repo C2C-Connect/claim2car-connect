@@ -56,6 +56,13 @@ class TenantLogin:
                     "SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=%s",
                     (self.tenant, self.role_name),
                 )
+                binding = admin.execute(
+                    "SELECT tenant_id::text,enabled FROM faos.tenant_login_bindings "
+                    "WHERE role_name=%s",
+                    (self.role_name,),
+                ).fetchone()
+                if binding != (self.tenant, True):
+                    raise RuntimeError("TEST_LOGIN_TENANT_BINDING_FAILED")
                 self.url = make_conninfo(
                     self.app_url, user=self.role_name, password=self.password
                 )
