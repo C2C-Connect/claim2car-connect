@@ -175,6 +175,10 @@ class DamageAssessment:
             raise DamageReportError("INVALID_SEALED_MANIFEST_DIGEST")
         if self.seal_event_id and not self.seal_event_id.strip():
             raise DamageReportError("INVALID_SEAL_EVENT_ID")
+        if len(self.findings) > 64 or len(self.evidence_images) > 16 or len(self.estimate_lines) > 256:
+            raise DamageReportError("DAMAGE_ASSESSMENT_REPORT_LIMIT_EXCEEDED")
+        if sum(len(item.original_bytes) for item in self.evidence_images) > 100 * 1024 * 1024:
+            raise DamageReportError("DAMAGE_ASSESSMENT_EVIDENCE_BUDGET_EXCEEDED")
         image_ids = [item.artifact_id for item in self.evidence_images]
         if len(set(image_ids)) != len(image_ids):
             raise DamageReportError("DUPLICATE_EVIDENCE_IMAGE_ID")
