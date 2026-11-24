@@ -44,7 +44,7 @@
 
 ### Layers 6/7
 - `backend/app/dispatch/redaction.py` (allow-list + public_verify block)
-- `backend/app/dispatch/dispatcher.py` (4-role prism)
+- `backend/app/dispatch/dispatcher.py` (package builder disabled pending server-verified evidence context)
 - `backend/app/reports/forensic_pdf.py` (7-page structured dossier)
 - `backend/app/reports/acord_xml.py`
 - `backend/app/anchor/ledger.py`
@@ -53,7 +53,7 @@
 ## Decisions enforced
 
 - Owner cash incentive permanently removed (legal counsel).
-- Internal valuation/catalog only at runtime (no Black Book / Manheim dependency).
+- Current ACV uses caller-provided internal values or a coarse fallback curve; the default parts catalog is hardcoded seed/demo data. Neither is verified current market/OEM data.
 - Weighted geometric S_i with All-or-Nothing Trap.
 - Physics primacy 55/45 + hard guards (low-impact, severe-impact, structural collapse).
 - Every dispatch package carries a public-safe verification block.
@@ -64,13 +64,7 @@
 ```bash
 export PYTHONPATH=.
 pytest tests/ -q
-# Smoke dispatch
-python -c "
-from backend.app.dispatch.dispatcher import build_dispatch
-from tests.test_dispatch import _sample_adj
-r = build_dispatch(_sample_adj(), vin='1HGCM82633A004352', photo_hashes=['a','b'])
-print([p.role for p in r.packages], 'pages=', len(r.packages[0].dossier.pages))
-"
+# Dispatch is intentionally disabled until a server-issued verified evidence context is integrated.
 ```
 
 ## Next
