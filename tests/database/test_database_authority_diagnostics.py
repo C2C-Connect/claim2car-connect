@@ -191,6 +191,18 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0029_manifest_root_chain_context_binding.sql',
             ]))
 
+    def test_requires_damage_assessment_report_event_migration(self):
+        with self.assertRaisesRegex(AssertionError, 'DAMAGE_ASSESSMENT_REPORT_EVENT_MIGRATION_REQUIRED'):
+            validate_authority_migration_inventory(self.inventory([
+                '0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql',
+                '0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql',
+                '0021_collision_claim_link.sql','0022_collision_vehicle_capture_link.sql',
+                '0023_consented_vehicle_profile.sql','0024_audited_capture_exceptions_pause_resume.sql',
+                '0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql',
+                '0027_capture_protocol_16_v2.sql','0028_persistent_event_hash_chain.sql',
+                '0029_manifest_root_chain_context_binding.sql','0030_runtime_manifest_registration.sql',
+            ]))
+
     def test_rejects_0029_before_0028(self):
         with self.assertRaisesRegex(AssertionError, 'AUTHORITY_MIGRATION_ORDER_INVALID'):
             validate_authority_migration_inventory(self.inventory([
