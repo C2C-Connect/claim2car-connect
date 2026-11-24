@@ -998,17 +998,51 @@ class CaptureEvidenceService:
                 seal_actor=last_capture_event[1],
             )
             latest = self._artifact_set(history, session.capture_protocol_version)
+            capture_times = {}
+            for kind, _event_actor, event_payload, event_id in history:
+                if kind == "ARTIFACT_REGISTERED" and type(event_payload) is dict:
+                    occurred = conn.execute(
+                        "SELECT occurred_at FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s",
+                        (actor.tenant_id, session_id, event_id),
+                    ).fetchone()
+                    if occurred:
+                        capture_times[event_payload.get("artifact_id")] = occurred[0]
+            review_event = next((
+                item for item in reversed(history)
+                if item[0] == "REVIEW_RECORDED" and item[1] == actor.actor_id
+                and type(item[2]) is dict and item[2].get("manifest_digest") == manifest.digest()
+            ), None)
+            review_details = None
+            if review_event is not None:
+                review_time = conn.execute(
+                    "SELECT occurred_at FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s",
+                    (actor.tenant_id, session_id, review_event[3]),
+                ).fetchone()
+                review_details = {
+                    "event_id": review_event[3],
+                    "actor_id": review_event[1],
+                    "disposition": review_event[2].get("disposition"),
+                    "reason": review_event[2].get("reason"),
+                    "reviewed_at": review_time[0] if review_time else None,
+                }
+            revisions = [
+                item[2].get("report_revision", 0) for item in history
+                if item[0] == "DAMAGE_ASSESSMENT_REPORT_GENERATED" and type(item[2]) is dict
+            ]
             return {
                 "session_id": session_id,
                 "manifest_digest": manifest.digest(),
                 "shot_list_version": manifest.shot_list_version,
                 "consent_recorded": True,
+                "review": review_details,
+                "next_report_revision": max((value for value in revisions if type(value) is int), default=0) + 1,
                 "artifacts": [
                     {
                         "artifact_id": entry.artifact_id,
                         "slot": entry.slot,
                         "sha256": entry.sha256_hex,
                         "byte_length": latest[entry.slot][1]["byte_length"],
+                        "captured_at": capture_times.get(entry.artifact_id),
                     }
                     for entry in manifest.entries
                 ],
