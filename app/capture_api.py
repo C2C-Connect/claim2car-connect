@@ -512,7 +512,12 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
             except CaptureAuthorizationError:
                 _fail(403, 'CAPTURE_AUTHORITY_DENIED')
             except CaptureSessionConflict as error:
-                _fail(409, str(error) if expose_conflict_code else 'CAPTURE_SESSION_CONFLICT')
+                detail = (
+                    'EVIDENCE_ARTIFACT_INTEGRITY_FAILURE'
+                    if expose_conflict_code and str(error) == 'EVIDENCE_ARTIFACT_INTEGRITY_FAILURE'
+                    else 'CAPTURE_SESSION_CONFLICT'
+                )
+                _fail(409, detail)
             except CollisionLifecycleNotFound:
                 _fail(404, 'COLLISION_NOT_FOUND')
             except CaptureSessionNotFound:
