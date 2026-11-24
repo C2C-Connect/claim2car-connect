@@ -37,6 +37,10 @@ assert.ok(!appSource.includes("retryOfflineQueue"));
 assert.ok(appSource.includes('api("/v1/identity",token)'));
 assert.ok(queueSource.includes("subtle.encrypt"));
 assert.ok(queueSource.includes("subtle.decrypt"));
+assert.ok(queueSource.includes("additionalData:recordAad"));
+assert.ok(queueSource.includes("function recordAad"));
+assert.ok(queueSource.includes("AES-GCM-HKDF-SHA256-v2"));
+assert.ok(queueSource.includes("prior plaintext queue"));
 assert.ok(queueSource.includes("HKDF"));
 assert.ok(queueSource.includes("claim2car-integrated-evidence"));
 assert.ok(appHtml.includes('id="offline-queue-status"'));
@@ -54,6 +58,7 @@ assert.ok(!appSource.includes("preview.src=url"));
 class MemoryStore {
   constructor(){this.records=[];this.nextId=1;}
   async enqueue(record){const stored={...record,queueId:this.nextId++};this.records.push(stored);return {...stored};}
+  async updateRecord(queueId,replacement){const record=this.records.find(r=>r.queueId===queueId);if(!record)throw new Error("EVIDENCE_QUEUE_RECORD_NOT_FOUND");Object.assign(record,replacement,{queueId});return {...record};}
   async list(sessionId,{tenantId,actorId,includeBytes=true}={}){
     const rows=this.records.filter(r=>r.sessionId===sessionId&&r.tenantId===tenantId&&r.actorId===actorId).sort((a,b)=>a.queueId-b.queueId);
     return rows.map(r=>{if(includeBytes)return {...r};const {bytes,...meta}=r;return meta;});
@@ -78,7 +83,7 @@ assert.equal(second.artifactId,"artifact-2");assert.equal(second.requestId,"requ
 assert.equal(first.mimeType,"image/jpeg");assert.equal(second.mimeType,"image/png");
 assert.equal(first.bytes instanceof Uint8Array,true);
 assert.notEqual(Buffer.from(first.bytes).toString(),"original-one");
-assert.equal(first.encryptionAlgorithm,"AES-GCM");
+assert.equal(first.encryptionAlgorithm,"AES-GCM-HKDF-SHA256-v2");
 assert.equal(first.bytes.byteLength,first.byteLength+16);
 let snapshot=await queue.status(scope.sessionId,{tenantId:scope.tenantId,actorId:scope.actorId});
 assert.deepEqual({total:snapshot.total,pending:snapshot.pending,uploaded:snapshot.uploaded},{total:2,pending:2,uploaded:0});
@@ -103,4 +108,11 @@ assert.equal(store.records.every(r=>!("bytes" in r)),true);
 const other=await queue.status(scope.sessionId,{tenantId:"tenant-a",actorId:"different-actor"});
 assert.equal(other.total,0);
 await assert.rejects(queue.status(scope.sessionId,{tenantId:"tenant-a"}),/IDENTITY_SCOPE_REQUIRED/);
+const tamperStore=new MemoryStore(),tamperIds=["tamper-artifact","tamper-request"];
+const tamperQueue=createOfflineEvidenceQueue({store:tamperStore,cryptoProvider:webcrypto,makeUuid:()=>tamperIds.shift()});
+const tampered=await tamperQueue.queueFile({...scope,slot:"front",file:file("metadata-bound-original"),keyMaterial:tokenMaterial});
+tamperStore.records[0].slot="rear";
+const tamperResult=await tamperQueue.syncSession({...scope,keyMaterial:tokenMaterial,upload:async()=>{throw new Error("SHOULD_NOT_UPLOAD");}});
+assert.equal(tamperResult.error,"EVIDENCE_DECRYPTION_FAILED");
+assert.equal(tamperResult.blockedAtQueueId,tampered.queueId);
 process.stdout.write(JSON.stringify({outcome:"passed",checks:["AES-GCM encryption at rest","token-derived key recovery","wrong-key fails closed without deleting queued originals","tenant/actor/session scoping","FIFO stop on upload failure","stable artifact/request IDs across retry","MIME metadata","remove ciphertext after server acceptance","isolated IndexedDB database","identity-scope validation"]},null,2)+"\n");
