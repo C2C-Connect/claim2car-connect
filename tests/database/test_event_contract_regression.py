@@ -12,7 +12,7 @@ class EventContractRegression(unittest.TestCase):
         )
 
     def test_capture_exception_pause_and_resume_kinds_are_valid_contract_events(self):
-        for kind in ('CAPTURE_EXCEPTION_RECORDED','CAPTURE_EXCEPTION_RESOLVED','CAPTURE_SESSION_PAUSED','CAPTURE_SESSION_RESUMED'):
+        for kind in ('CAPTURE_EXCEPTION_RECORDED','CAPTURE_EXCEPTION_RESOLVED','CAPTURE_SESSION_PAUSED','CAPTURE_SESSION_RESUMED','DAMAGE_ASSESSMENT_REPORT_GENERATED'):
             with self.subTest(kind=kind):
                 replace(self.event, kind=kind).validate()
 
