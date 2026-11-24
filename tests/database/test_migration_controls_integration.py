@@ -132,6 +132,17 @@ class MigrationControlsIntegration(unittest.TestCase):
                 self.assertEqual(run_migrations(),('0030_runtime_manifest_registration.sql',))
                 with patch.dict(os.environ,env):
                     with tenant_transaction(fixture.conn,fixture.tenant):
+                        privileges=fixture.conn.execute(
+                            "SELECT has_schema_privilege('faos_writer','faos','CREATE'),"
+                            "has_function_privilege('faos_app',"
+                            "'faos.register_manifest_root_from_capture(uuid,text,text,text,text,text,uuid)','EXECUTE'),"
+                            "has_function_privilege('faos_app',"
+                            "'faos.register_manifest_root(uuid,text,text,text,text)','EXECUTE'),"
+                            "(SELECT pg_get_userbyid(proowner) FROM pg_proc "
+                            "WHERE oid='faos.register_manifest_root_from_capture(uuid,text,text,text,text,text,uuid)'::regprocedure)"
+                        ).fetchone()
+                        self.assertEqual(privileges,(False,True,False,'faos_writer'))
+                    with tenant_transaction(fixture.conn,fixture.tenant):
                         row=fixture.conn.execute(
                             'SELECT seal_sequence,seal_chain_hash,context_binding_hash,binding_version,'
                             'faos.verify_manifest_root_binding(tenant_id,session_id,seal_event_id) '
