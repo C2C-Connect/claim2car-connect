@@ -51,9 +51,9 @@ Inventory enforcement: the foundation app exposes ONLY these two routes
 | /api/v1/analysis/health | GET | INTERNAL_ANALYSIS | Health metadata only |
 | /api/v1/analysis/physics, /run | POST | INTERNAL_SERVICE_AUTH | Fail-closed service Bearer token; no end-user/tenant authorization |
 | /api/v1/triage/health | GET | INTERNAL_ANALYSIS | Health metadata only |
-| /api/v1/triage/adjudicate | POST | INTERNAL_SERVICE_AUTH | Fail-closed service Bearer token; no end-user/tenant authorization |
+| /api/v1/triage/adjudicate | POST | INTERNAL_DISABLED | Returns 503 until evidence integrity, manifest, identity, valuation and jurisdiction inputs are server-derived; internal service auth remains required |
 | /api/v1/dispatch/health | GET | INTERNAL_ANALYSIS | Advertises disabled state honestly |
-| /api/v1/dispatch/build | POST | INTERNAL_DISABLED | Raises regardless of client-supplied provenance (tests/api/test_dispatch_build_containment.py) |
+| /api/v1/dispatch/build | POST | INTERNAL_DISABLED | HTTP route and direct Python builder both fail closed until a server-issued verified evidence context exists |
 | /api/v1/dispatch/redact | POST | INTERNAL_SERVICE_AUTH | Fail-closed service Bearer token; no end-user/tenant authorization |
 | /api/v1/verify/ and /api/verify/ | POST | PUBLIC_VERIFY | Public verification semantics; process-local ledger |
 | /api/v1/verify/{session_id} | GET | PUBLIC_VERIFY | Public-exhibit lookup; process-local ledger |
