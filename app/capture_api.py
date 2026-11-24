@@ -841,6 +841,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                         "X-Report-Revision": str(assessment.report_revision),
                     },
                 )
+            except HTTPException:
+                raise
             except AuthenticationError:
                 _fail(401, "UNAUTHORIZED")
             except CaptureAuthorizationError:
@@ -879,6 +881,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                         "X-Report-Revision": str(metadata["report_revision"]),
                     },
                 )
+            except HTTPException:
+                raise
             except AuthenticationError:
                 _fail(401, "UNAUTHORIZED")
             except CaptureAuthorizationError:
