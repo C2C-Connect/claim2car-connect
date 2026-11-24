@@ -2,7 +2,7 @@
 **Audit date:** 2026-11-24  
 **Repository:** `C2C-Connect/claim2car-connect`  
 **Audit branch:** `audit/system-wide-engineering-2026-11-24`  
-**Status:** IN PROGRESS — source-level findings confirmed; two high-risk remediations merged; additional containment and adversarial reproduction underway.  
+**Status:** IN PROGRESS — source-level findings confirmed; three high-risk remediations merged; remaining report, identity, deletion, storage, market/legal, and field-readiness gaps remain.  
 **Purpose:** Determine whether the code actually served and its API/database/evidence/authorization paths support the product claims. This is not a security certification, forensic validation, legal opinion, or field acceptance.
 
 ## Audit method and evidence standard
@@ -18,7 +18,7 @@ Do not treat README statements, synthetic tests, a green workflow, or a PR descr
 
 The repository has substantial working infrastructure: tenant-scoped PostgreSQL authority, append-only event history, original-byte storage with digest checks, consent-gated capture, a browser queue with encryption on the canonical root workbench, and a live capture seal/review integration increment under PR #185. These are meaningful foundations.
 
-The system is **not ready for real participant evidence or staging release**. PR #190 (prototype queue metadata authentication) and PR #192 (verified event-chain reads in capture/intake history paths) are now merged to main. PR #193 is pending exact-head CI and contains fail-closed containment for triage and direct dispatch construction. The highest-priority remaining trust gaps are:
+The system is **not ready for real participant evidence or staging release**. PR #190 (prototype queue metadata authentication), PR #192 (verified event-chain reads in capture/intake history paths), and PR #193 (unverified triage/direct dispatch containment) are now merged to main. The highest-priority remaining trust gaps are:
 1. Integrity/adjudication inputs are caller assertions rather than server-derived verified evidence facts.
 2. Consent withdrawal and physical deletion are not one durable, retryable lifecycle.
 3. Two independently served workbenches contain materially different offline queue cryptography and behavior.
@@ -31,19 +31,19 @@ The system is **not ready for real participant evidence or staging release**. PR
 
 ### 1. Evidence integrity & forensic trust
 
-#### AUD-2026-01 — Adjudication trusts caller-supplied integrity facts (P1; confirmed source gap)
+#### AUD-2026-01 — Adjudication trusted caller-supplied integrity facts (P1; remediated by PR #193; server integration remains incomplete)
 **Source:** `backend/app/api/triage.py` (`AdjudicateRequest`, `adjudicate`); `backend/app/triage/adjudicate.py`; `backend/app/integrity/s_i.py`.
 
 The internal adjudication request accepts `master_hash_valid`, `hash_tamper_suspected`, `chain_coverage`, `chain_uniqueness`, `meta_completeness`, `gps_accuracy_m`, and `gps_spoof_suspected` from the request body. These values are passed directly into `compute_s_i`. The resulting integrity tier influences `hold_for_review` and `final_tier`. The route requires the shared internal-service bearer credential and is mounted under the internal route prefix; this audit has not established an unauthenticated public exploit. The defect is the trust boundary: the service does not derive these values by independently reading and verifying the session's registered artifacts, manifest, and persisted chain at this decision point.
 
-**Required correction:** adjudication must consume a server-generated verification result bound to the session and exact sealed manifest. Caller-supplied integrity booleans/fractions must be rejected or treated as non-authoritative diagnostics. A chain failure must fail closed. Integrity status alone must never authorize payment or dispatch.
+**Remediation status:** the unsafe API composition is contained by PR #193. To re-enable it, build a tenant-bound service that derives verification from original bytes, registered artifact records, sealed manifest, persisted chain tip, consent, vehicle identity, source-backed market data, and effective-dated jurisdiction rules. A chain failure must fail closed. Integrity status alone must never authorize payment or dispatch.
 
-#### AUD-2026-20 — Dispatch builder trusts caller-assembled integrity objects and photo hashes (P1; confirmed source, HTTP route contained)
+#### AUD-2026-20 — Dispatch builder trusted caller-assembled integrity objects and photo hashes (P1; remediated by PR #193)
 **Sources:** `backend/app/dispatch/dispatcher.py`; `backend/app/api/dispatch.py`; `tests/test_dispatch.py`.
 
-The HTTP `POST /api/v1/dispatch/build` route is correctly hard-disabled with HTTP 503 and does not call the builder. However, the directly callable `build_dispatch(adjudication, photo_hashes=...)` function remains enabled. Its authorization gate trusts a caller-provided dictionary containing `final_tier`, `final_fork`, and an `integrity` object with `s_i`, `tier`, `c_chain`, `c_hash`, and `all_or_nothing_collapse`. It also accepts caller-supplied 64-character photo hashes without retrieving originals or verifying them against a registered manifest. A fabricated dictionary can therefore satisfy the Python builder's integrity gate and generate role-specific packages plus a process-memory anchor if an internal caller invokes it. I found no production callsite for `build_dispatch` in the repository; current HTTP containment prevents the public route from reaching it.
+Before PR #193, the HTTP `POST /api/v1/dispatch/build` route was hard-disabled, but the directly callable `build_dispatch(adjudication, photo_hashes=...)` function remained enabled and trusted caller-supplied `final_tier`, `final_fork`, integrity fields, and 64-character photo hashes. PR #193 replaced the builder with a fail-closed function that always raises `SERVER_VERIFIED_EVIDENCE_CONTEXT_REQUIRED`; a fabricated passing dictionary or arbitrary hash list can no longer create packages or a process-memory anchor. No production callsite was found, but the direct function boundary is now contained as well.
 
-**Required correction:** keep the builder disabled at the function boundary until it accepts a server-owned, tenant-bound, manifest-verified evidence context that it cannot be forged from JSON/dict fields. The authorization object must be constructed only by the trusted evidence verifier; it must bind exact original artifact hashes, chain tip, manifest root, consent, review disposition, and recipient authorization. Tests must prove caller-created dictionaries and hash lists cannot create packages or ledger entries.
+**Remediation status:** PR #193 enforces the function-level block and adds regression tests for forged passing integrity dictionaries and arbitrary hashes. Re-enable only after a server-issued, tenant-bound verified context binds exact originals, chain tip, manifest root, consent, review disposition, and recipient authorization.
 
 #### AUD-2026-21 — Parts resolver uses a hardcoded seed catalog, not verified OEM/CAPA data (P1 for product claims; confirmed source)
 **Source:** `backend/app/catalog/parts_catalog.py`.
@@ -176,9 +176,10 @@ Synthetic browser/IndexedDB workflows prove only the tested browser behavior. Th
 ## Current implementation / release state observed
 
 - Main README describes PR #182 as merged and identifies PostgreSQL hash persistence in migration 0028.
-- PR #185 remains open at head `a7174d45a02cc6b8312a00b1ca31671019726728`; compared with current main it is 56 commits ahead and 2 behind (main advanced through PR #190 and #192). Its previously reported exact-head CI is stale after those main changes; rebase and rerun before merge.
+- PR #185 remains open at head `a7174d45a02cc6b8312a00b1ca31671019726728`; compared with current main it is 56 commits ahead and 3 behind (main advanced through PR #190, #192, and #193). Its previously reported exact-head CI is stale; rebase and rerun before merge.
 - PR #186 remains open at head `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`, stacked on an earlier PR #185 head `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. Its current branch describes a durable PDF/JSON report registry with image annotations, normalized bounding boxes, capture-angle provenance, reviewer linkage, and fresh-process retrieval tests; it still needs rebase onto the updated PR #185/main stack and exact-head CI. It is not current-main capability.
 - PR #187 records technical DB gates separately from release gates; release acceptance remains NOT ACCEPTED.
+- PR #193 merged as `26edf9da1bb293dd48f46723b5014ee5d2c44066`: triage adjudication and direct dispatch package building now fail closed until a server-verified evidence context exists. Exact-head CI passed 13/13 workflows; full suite 1,070 passed; DB authority 415/415 and DB-01–DB-14 14/14.
 - PR #188 proposes OCI staging architecture only; no infrastructure was provisioned by that proposal.
 - The integrated application is not yet deployed and operationally accessible to the founder. No real participant evidence, live payment, or dispatch activity is authorized by these code checks.
 
