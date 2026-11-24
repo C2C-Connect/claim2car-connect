@@ -464,7 +464,10 @@ with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
                         headers={"Authorization": self.db.reviewer_auth()},
                     )
                     self.assertEqual(tampered.status_code, 409, tampered.text)
-                    self.assertEqual(tampered.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"})
+                    self.assertEqual(
+                        tampered.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"},
+                        "TAMPER_REJECTION_DETAIL_MISMATCH: " + tampered.text,
+                    )
                     integrity_audit = self.db.f.seed.execute(
                         "SELECT kind,payload_json FROM faos.events "
                         "WHERE tenant_id=%s AND session_id=%s "
