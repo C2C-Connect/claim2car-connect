@@ -20,7 +20,6 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     BaseDocTemplate, Frame, Image as RLImage, PageTemplate,
     Paragraph, Spacer, Table, TableStyle,
@@ -267,8 +266,8 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
             story.append(Paragraph(f"<b>Reviewer:</b> {_safe(finding.reviewer_actor_id)} at {_safe(finding.reviewed_at)}", styles["C2CSmall"]))
         if finding.limitations:
             story.append(Paragraph(f"<b>Limitations:</b> {_safe(finding.limitations)}", styles["C2CSmall"]))
-        original = ImageReader(BytesIO(_display_image(evidence.original_bytes)))
-        annotated = ImageReader(BytesIO(_annotated_image(evidence, (finding,))))
+        original = BytesIO(_display_image(evidence.original_bytes))
+        annotated = BytesIO(_annotated_image(evidence, (finding,)))
         max_width, max_height = 3.15*inch, 2.15*inch
         scale = min(max_width/width, max_height/height)
         image_width, image_height = width*scale, height*scale
