@@ -61,7 +61,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0024_audited_capture_exceptions_pause_resume.sql',
                 '0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql',
                 '0027_capture_protocol_16_v2.sql','0028_persistent_event_hash_chain.sql',
-                '0029_manifest_root_chain_context_binding.sql',
+                '0029_manifest_root_chain_context_binding.sql','0030_runtime_manifest_registration.sql',
             ]))
 
     def test_rejects_duplicate_authority_migration_names(self):
