@@ -1043,7 +1043,7 @@ class CaptureEvidenceService:
                         "slot": entry.slot,
                         "sha256": entry.sha256_hex,
                         "byte_length": latest[entry.slot][1]["byte_length"],
-                        "captured_at": capture_times.get(entry.artifact_id),
+                        "registered_at": capture_times.get(entry.artifact_id),
                     }
                     for entry in manifest.entries
                 ],
