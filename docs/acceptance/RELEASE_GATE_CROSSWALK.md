@@ -2,7 +2,7 @@
 
 **Document ID:** C2C-REL-AC-001  
 **Version:** 1.0 — execution registry  
-**Snapshot:** 2026-11-24 22:50 UTC  
+**Snapshot:** 2026-11-24 22:54 UTC  
 **Repository:** `C2C-Connect/claim2car-connect`  
 **Base revision for this registry branch:** `55f69790df123a4602196c3c474e143808c4b87e`  
 **Authority:** Current owner Developer Execution Directive. This registry does not amend owner decisions or award acceptance.
@@ -37,7 +37,7 @@ PR #186 must not merge before PR #185 is accepted, merged, and PR #186 is rebase
 | Database authority cutover | #1196 | Success; artifact retained, artifact contents not yet independently inspected | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012240 |
 | Legacy database component | #1240 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012125 |
 | FastAPI foundation | #1182 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012063 |
-| Integrated runtime container smoke | #671 | Cancelled; targeted job rerun requested, new result pending | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012031 |
+| Integrated runtime container smoke | #671 | In progress after targeted rerun; result pending | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012031 |
 | Other PR workflows | 8 additional workflow types | Success | Exact run inventory is available from the PR head's workflow-run listing |
 
 The cancelled integrated-runtime run is not a pass. The targeted rerun request is not a result.
@@ -46,19 +46,19 @@ The cancelled integrated-runtime run is not a pass. The targeted rerun request i
 
 | Workflow | Run | Result at snapshot | Evidence |
 |---|---:|---|---|
-| Full test suite | #1129 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282583 |
+| Full test suite | #1129 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282583 |
 | Database authority cutover | #1200 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282825 |
 | Integrated runtime container smoke | #675 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282240 |
-| Legacy database component | #1244 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282176 |
-| FastAPI foundation | #1186 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282314 |
-| Controlled-test intake PostgreSQL | #1032 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282358 |
+| Legacy database component | #1244 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282176 |
+| FastAPI foundation | #1186 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282314 |
+| Controlled-test intake PostgreSQL | #1032 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282358 |
 | Browser IndexedDB queue | #795 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282214 |
 | Offline VIN lookup controller | #1033 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282594 |
 | Restricted intake container | #1017 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282442 |
 | Frontend VIN/decoder/transport | #1172 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282245 |
 | Offline guided capture | #993 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282431 |
 | Controlled synthetic demonstration | #991 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282508 |
-| Restricted container | #629 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282469 |
+| Restricted container | #629 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282469 |
 
 A workflow being in progress is not a pass. These runs prove only the workflow results at the listed SHA; they do not independently prove a release gate.
 
@@ -109,8 +109,8 @@ Every row explicitly lists its database dependencies, additional evidence not su
 
 | Component | Level | Current-head SHA | Workflow evidence | Gates satisfied | Gates remaining | Blockers |
 |---|---|---|---|---|---|---|
-| Runtime manifest registration (PR #185) | Implemented | `0431dbaf6e1a3bb3348f6d94c094e893543e513c` | Full suite #1125, DB authority #1196, FastAPI #1182 passed; integrated smoke #671 cancelled and rerun pending | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Independent inspection of authority artifact; completed integrated smoke rerun; prove restart, idempotency, independent verification, tamper rejection and audit at exact current head |
-| Evidence-linked damage reports (PR #186) | Implemented | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | Six of thirteen listed workflow runs completed successfully; seven are in progress at snapshot | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Complete all exact-head workflows; durable report registry; restart retrieval; immutable original-byte reference; per-box source linkage and disclosure; PDF/JSON parity; tamper audit; rebase after PR #185 |
+| Runtime manifest registration (PR #185) | Implemented | `0431dbaf6e1a3bb3348f6d94c094e893543e513c` | Full suite #1125, DB authority #1196, FastAPI #1182 passed; integrated smoke #671 rerun in progress | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Independent inspection of authority artifact; completed integrated smoke rerun; prove restart, idempotency, independent verification, tamper rejection and audit at exact current head |
+| Evidence-linked damage reports (PR #186) | Implemented | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | Eleven of thirteen listed workflow runs completed successfully; two are in progress at snapshot | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Complete all exact-head workflows; durable report registry; restart retrieval; immutable original-byte reference; per-box source linkage and disclosure; PDF/JSON parity; tamper audit; rebase after PR #185 |
 | Persistent integrated staging | Designed | No deployed revision | No deployment run proving persistent staging | None | GATE-04, GATE-05 and all dependent gates | No approved cost ceiling and no completed provisioning/deployment evidence |
 | Physical-device qualification | Designed | No qualified device revision | No physical-device run | None | GATE-06 | Physical iPad Pro 11-inch M5 qualification evidence absent |
 | Square sandbox reconciliation | Implemented status not established by this registry | No current-head SHA/run established | No complete current-head sandbox evidence located | None | GATE-01, GATE-07 | Success/duplicate/failure/UNKNOWN/reversal/reconciliation evidence and signed governance terms absent |
