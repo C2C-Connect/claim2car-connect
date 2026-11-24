@@ -249,6 +249,7 @@ class SourceEvidenceBinding:
     reviewed_at: str
     vin_sha256: str | None
     advisory_darci_summary: dict = field(default_factory=dict)
+    artifact_sha256_by_id: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -550,6 +551,11 @@ class FourTierDossierService:
         verified_ids = set(binding.verified_artifact_ids)
         if not attached_ids or not attached_ids.issubset(verified_ids):
             raise DossierGenerationError("DAMAGE_REPORT_IMAGE_NOT_IN_VERIFIED_MANIFEST")
+        if any(
+            binding.artifact_sha256_by_id.get(image.artifact_id) != image.expected_sha256
+            for image in assessment.evidence_images
+        ):
+            raise DossierGenerationError("DAMAGE_REPORT_IMAGE_DIGEST_NOT_IN_MANIFEST")
         if any(finding.evidence_artifact_id not in attached_ids for finding in assessment.findings):
             raise DossierGenerationError("DAMAGE_REPORT_FINDING_IMAGE_MISSING")
         if any(
