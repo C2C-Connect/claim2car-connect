@@ -17,7 +17,7 @@ from uuid import UUID, uuid5
 
 import psycopg
 
-from app.artifact_storage import ArtifactKey, OriginalByteStore
+from app.artifact_storage import ArtifactIntegrityError, ArtifactKey, ArtifactNotFound, OriginalByteStore
 from app.evidence_manifest import ManifestEntry, build_manifest
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
 from app.vin_guard import validate_vin
@@ -29,6 +29,17 @@ from database.capture_sessions import (
 )
 
 MAX_EVIDENCE_BYTES = 25 * 1024 * 1024
+
+
+class _EvidenceArtifactIntegrityFailure(Exception):
+    def __init__(self, artifact_id, slot, expected_sha256, failure_code):
+        self.artifact_id = artifact_id
+        self.slot = slot
+        self.expected_sha256 = expected_sha256
+        self.failure_code = failure_code
+        super().__init__(failure_code)
+
+
 DISCLOSURE_VERSION = "disclosure-v1"
 VEHICLE_DECODE_DISCLOSURE_VERSION = "vehicle-decode-disclosure-v1"
 
@@ -125,6 +136,7 @@ class CaptureEvidenceService:
             "CAPTURE_EXCEPTION_RECORDED", "CAPTURE_EXCEPTION_RESOLVED",
             "CAPTURE_SESSION_PAUSED", "CAPTURE_SESSION_RESUMED",
             "INCIDENT_INTAKE_CONSENT_RECORDED", "INCIDENT_INTAKE_RECORDED",
+            "ARTIFACT_INTEGRITY_FAILURE_RECORDED",
         }
         return next((item for item in reversed(history) if item[0] not in sidecar), None)
 
@@ -756,10 +768,19 @@ class CaptureEvidenceService:
         )
         for entry in manifest.entries:
             record = latest[entry.slot][1]
-            original = self.byte_store.get(
-                ArtifactKey(actor.tenant_id, UUID(session_id), UUID(entry.artifact_id)),
-                expected_sha256=entry.sha256_hex,
-            )
+            try:
+                original = self.byte_store.get(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(entry.artifact_id)),
+                    expected_sha256=entry.sha256_hex,
+                )
+            except ArtifactIntegrityError as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    entry.artifact_id, entry.slot, entry.sha256_hex, "ARTIFACT_HASH_MISMATCH"
+                ) from error
+            except ArtifactNotFound as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    entry.artifact_id, entry.slot, entry.sha256_hex, "ARTIFACT_MISSING"
+                ) from error
             if len(original) != record["byte_length"]:
                 raise CaptureSessionConflict("EVIDENCE_BYTE_LENGTH_MISMATCH")
         return manifest
@@ -982,7 +1003,47 @@ class CaptureEvidenceService:
                     break
         return queued
 
+    def _record_integrity_failure(self, authorization, session_id, failure):
+        """Commit an idempotent journal audit event after a failed original-byte read."""
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role not in ("reviewer", "supervisor"):
+                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+            _session, history = self._history(conn, actor, session_id, creator_required=False)
+            idempotency_key = (
+                "artifact-integrity-failure:" + failure.artifact_id + ":" + failure.expected_sha256[:16]
+            )
+            event_id = str(uuid5(
+                UUID(failure.artifact_id),
+                "integrity-failure:" + failure.failure_code + ":" + failure.expected_sha256,
+            ))
+            payload = {
+                "idempotency_key": idempotency_key,
+                "artifact_id": failure.artifact_id,
+                "slot": failure.slot,
+                "expected_sha256": failure.expected_sha256,
+                "failure_code": failure.failure_code,
+            }
+            existing = next((item for item in history if item[3] == event_id), None)
+            if existing is not None:
+                if existing[0] != "ARTIFACT_INTEGRITY_FAILURE_RECORDED" or existing[2] != payload:
+                    raise CaptureSessionConflict("INTEGRITY_AUDIT_IDEMPOTENCY_CONFLICT")
+                return
+            self._append(
+                conn, actor, session_id, history, event_id=event_id,
+                kind="ARTIFACT_INTEGRITY_FAILURE_RECORDED",
+                reason="server detected original evidence integrity failure: " + failure.failure_code,
+                payload=payload,
+            )
+
     def get_review_details(self, authorization, session_id):
+        session_id = self._session_id(session_id)
+        try:
+            return self._get_review_details(authorization, session_id)
+        except _EvidenceArtifactIntegrityFailure as failure:
+            self._record_integrity_failure(authorization, session_id, failure)
+            raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
+
+    def _get_review_details(self, authorization, session_id):
         """Return a verified sealed manifest to an independent reviewer."""
         session_id = self._session_id(session_id)
         with self.sessions._authorized(authorization) as (conn, actor):
@@ -1230,6 +1291,14 @@ class CaptureEvidenceService:
 
 
     def retrieve_for_review(self, authorization, session_id, artifact_id):
+        session_id = self._session_id(session_id)
+        try:
+            return self._retrieve_for_review(authorization, session_id, artifact_id)
+        except _EvidenceArtifactIntegrityFailure as failure:
+            self._record_integrity_failure(authorization, session_id, failure)
+            raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
+
+    def _retrieve_for_review(self, authorization, session_id, artifact_id):
         session_id = self._session_id(session_id)
         artifact_id = self._request_id(artifact_id)
         with self.sessions._authorized(authorization) as (conn, actor):

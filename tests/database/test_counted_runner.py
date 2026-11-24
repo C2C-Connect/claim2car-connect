@@ -148,7 +148,7 @@ class CountedRunnerTests(unittest.TestCase):
         self.assertEqual(selected.countTestCases(), 1)
         record = run_suite(selected, not_applicable=excluded, missing_not_applicable=missing)
         self.assertTrue(record['successful'])
-        self.assertEqual(record['not_applicable_count'], 7)
+        self.assertEqual(record['not_applicable_count'], 8)
         self.assertEqual(record['skipped'], 0)
 
     def test_legacy_baseline_fails_if_expected_exclusion_disappears(self):
@@ -165,7 +165,7 @@ class CountedRunnerTests(unittest.TestCase):
         selected, excluded, missing = select_suite(suite, legacy_baseline=True)
         record = run_suite(selected, not_applicable=excluded, missing_not_applicable=missing)
         self.assertFalse(record['successful'])
-        self.assertEqual(len(record['missing_not_applicable_tests']), 7)
+        self.assertEqual(len(record['missing_not_applicable_tests']), 8)
 
 if __name__ == '__main__':
     unittest.main()

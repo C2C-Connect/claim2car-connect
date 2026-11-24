@@ -556,7 +556,7 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         return invoke(runtime.store.get, authorization, session_id)
 
     if evidence is not None:
-        def invoke_evidence(action, authorization, session_id=None, **kwargs):
+        def invoke_evidence(action, authorization, session_id=None, *, expose_conflict_code=False, **kwargs):
             try:
                 result = action(authorization, **kwargs) if session_id is None else action(
                     authorization, str(session_id), **kwargs
@@ -566,8 +566,13 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 _fail(401, 'UNAUTHORIZED')
             except CaptureAuthorizationError:
                 _fail(403, 'CAPTURE_AUTHORITY_DENIED')
-            except CaptureSessionConflict:
-                _fail(409, 'CAPTURE_SESSION_CONFLICT')
+            except CaptureSessionConflict as error:
+                detail = (
+                    'EVIDENCE_ARTIFACT_INTEGRITY_FAILURE'
+                    if expose_conflict_code and str(error) == 'EVIDENCE_ARTIFACT_INTEGRITY_FAILURE'
+                    else 'CAPTURE_SESSION_CONFLICT'
+                )
+                _fail(409, detail)
             except CollisionLifecycleNotFound:
                 _fail(404, 'COLLISION_NOT_FOUND')
             except CaptureSessionNotFound:
@@ -717,7 +722,9 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
 
         @api.get('/v1/review-sessions/{session_id}')
         def review_session_details(session_id: UUID, authorization: str = Depends(authorize)):
-            return invoke_evidence(evidence.get_review_details, authorization, session_id)
+            return invoke_evidence(
+                evidence.get_review_details, authorization, session_id, expose_conflict_code=True,
+            )
 
 
         @api.post('/v1/review-sessions/{session_id}/damage-assessment-report')

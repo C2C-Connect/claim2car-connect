@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 
 # These tests are deliberately authority-schema-only. The legacy comparison
-# workflow initializes migrations 0001-0007, so these seven tests are not
+# workflow initializes migrations 0001-0007, so these eight tests are not
 # executable in that schema. They remain mandatory in the full suite and the
 # post-cutover authority workflow; they are explicitly reported as N/A here.
 LEGACY_BASELINE_NOT_APPLICABLE = frozenset({
@@ -23,6 +23,7 @@ LEGACY_BASELINE_NOT_APPLICABLE = frozenset({
     'test_manifest_roots.ManifestRootTests.test_registered_binding_rejects_tampered_chain_tail',
     'test_manifest_roots.ManifestRootTests.test_registered_root_contains_and_verifies_seal_chain_binding',
     'test_registered_completion.RegisteredCompletionTests.test_registered_root_context_binding_tamper_fails_closed',
+    'test_capture_http_integration.CaptureHttpIntegration.test_authenticated_http_capture_survives_runtime_restart_and_fails_closed',
 })
 
 
