@@ -118,7 +118,13 @@ class CaptureEvidenceService:
 
     @staticmethod
     def _last_capture_event(history):
-        sidecar = {"VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED"}
+        sidecar = {
+            "VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED",
+            "REVIEW_RECORDED", "DAMAGE_ASSESSMENT_REPORT_GENERATED",
+            "CAPTURE_EXCEPTION_RECORDED", "CAPTURE_EXCEPTION_RESOLVED",
+            "CAPTURE_SESSION_PAUSED", "CAPTURE_SESSION_RESUMED",
+            "INCIDENT_INTAKE_CONSENT_RECORDED", "INCIDENT_INTAKE_RECORDED",
+        }
         return next((item for item in reversed(history) if item[0] not in sidecar), None)
 
     @staticmethod
@@ -422,9 +428,13 @@ class CaptureEvidenceService:
                              kind="CONSENT_RECORDED", reason="owner consent state recorded", payload=payload)
                 history.append(("CONSENT_RECORDED", actor.actor_id, payload, event_id))
             if not accepted:
-                artifacts = [data["artifact_id"] for kind, _who, data, _ in history
-                    if kind == "ARTIFACT_REGISTERED" and type(data) is dict
-                    and isinstance(data.get("artifact_id"), str)]
+                artifacts = [
+                    data.get("artifact_id", data.get("report_artifact_id"))
+                    for kind, _who, data, _ in history
+                    if kind in ("ARTIFACT_REGISTERED", "DAMAGE_ASSESSMENT_REPORT_GENERATED")
+                    and type(data) is dict
+                    and isinstance(data.get("artifact_id", data.get("report_artifact_id")), str)
+                ]
                 deletion_tenant = actor.tenant_id
                 if _session.scope == "persistent-claim-case" and _session.claim_id:
                     conn.execute(
