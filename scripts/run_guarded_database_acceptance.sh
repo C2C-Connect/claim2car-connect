@@ -5,6 +5,7 @@ mkdir -p "$root/database-guard" "$root/database-evidence"
 root="$(cd "$root" && pwd)"
 export FAOS_EVIDENCE_ROOT="$root"
 gate_verification_rc=not_run
+gate_verification_exit_code=0
 finalize() {
   primary_rc=$?
   trap - EXIT
@@ -55,13 +56,22 @@ else
   harness_rc=$?
 fi
 cat "$root/database-evidence/harness.log" || true
-if python tests/database/verify_gates.py --preflight --report "$root/database-evidence/counted-tests.json" > "$root/database-evidence/gate-verification.log" 2>&1; then
-  gate_verification_rc=0
+if [ "${FAOS_LEGACY_BASELINE_ALLOWED:-0}" = "1" ]; then
+  # This workflow is intentionally pre-cutover. It validates only the legacy
+  # component comparison suite; DB-01..DB-14 acceptance is evaluated by the
+  # separate full-authority workflow after all 29 migrations are applied.
+  gate_verification_rc=not_applicable
+  printf 'classification=legacy-precutover-component-smoke\\nacceptance_gates=NOT_APPLICABLE\\nreason=authority_schema_not_installed\\n' > "$root/database-evidence/gate-verification.log"
 else
-  gate_verification_rc=$?
+  if python tests/database/verify_gates.py --preflight --report "$root/database-evidence/counted-tests.json" > "$root/database-evidence/gate-verification.log" 2>&1; then
+    gate_verification_rc=0
+  else
+    gate_verification_rc=$?
+  fi
+  gate_verification_exit_code=$gate_verification_rc
 fi
 cat "$root/database-evidence/gate-verification.log" || true
 if [ "$harness_rc" -ne 0 ]; then
   exit "$harness_rc"
 fi
-exit "$gate_verification_rc"
+exit "$gate_verification_exit_code"
