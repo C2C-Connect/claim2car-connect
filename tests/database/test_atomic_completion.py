@@ -23,7 +23,20 @@ class AtomicCompletionTests(unittest.TestCase):
 
     @contextmanager
     def writer(self):
-        with psycopg.connect(self.f.admin_url, autocommit=True) as conn:
+        f = self.f
+        if f.authority_schema and f.fixture_conn is not None:
+            # Preserve the bound login identity while assuming the writer
+            # capability; the session_user remains mapped to this tenant.
+            conn = f.fixture_conn
+            conn.execute('SET ROLE faos_writer')
+            try:
+                self.assertEqual(conn.execute('SELECT current_user').fetchone()[0], 'faos_writer')
+                yield conn
+            finally:
+                conn.execute('RESET ROLE')
+            return
+        # Compatibility path for pre-binding legacy schemas only.
+        with psycopg.connect(f.admin_url, autocommit=True) as conn:
             conn.execute('SET ROLE faos_writer')
             self.assertEqual(conn.execute('SELECT current_user').fetchone()[0], 'faos_writer')
             yield conn
