@@ -26,6 +26,9 @@ DECLARE
  latest_count integer;
  unique_latest_count integer;
  expected_slots integer;
+ expected_slot_names text[];
+ expected_slot_set text[];
+ latest_slots text[];
  existing_root boolean;
 BEGIN
  IF faos.tenant_id() IS NULL OR p_tenant IS DISTINCT FROM faos.tenant_id() THEN
@@ -62,12 +65,29 @@ BEGIN
  IF previous_capture_kind IS DISTINCT FROM 'QUALITY_RECORDED' THEN
   RAISE EXCEPTION 'QUALITY_REVIEW_REQUIRED_BEFORE_SEAL';
  END IF;
- expected_slots:=CASE
-  WHEN protocol IN ('claims2car-16-v1','claims2car-16-v2') THEN 16
-  WHEN protocol='claims2car-12-v1' THEN 12
+ expected_slot_names:=CASE protocol
+  WHEN 'claims2car-16-v1' THEN ARRAY[
+   '00_front_exterior','01_front_right_exterior','02_right_side_exterior','03_rear_right_exterior',
+   '04_rear_exterior','05_rear_left_exterior','06_left_side_exterior','07_front_left_exterior',
+   '08_wheel_front_left','09_wheel_front_right','10_wheel_rear_right','11_wheel_rear_left',
+   '12_cabin_front_airbags','13_instrument_cluster_odometer','14_physical_vin','15_license_and_insurance_docs'
+  ]
+  WHEN 'claims2car-16-v2' THEN ARRAY[
+   '00_front_exterior','01_front_right_exterior','02_right_side_exterior','03_rear_right_exterior',
+   '04_rear_exterior','05_rear_left_exterior','06_left_side_exterior','07_front_left_exterior',
+   '08_front_left_structural','09_front_right_structural','10_rear_right_structural','11_rear_left_structural',
+   '12_front_cabin_restraints','13_rear_cabin_restraints','14_instrument_cluster_telemetry','15_vehicle_identity_vin'
+  ]
+  WHEN 'claims2car-12-v1' THEN ARRAY[
+   'vin_ocr','doc_ocr','front','front_left','driver_side','rear_left',
+   'rear','rear_right','passenger_side','front_right','interior_front','undercarriage_engine'
+  ]
   ELSE NULL
  END;
- IF expected_slots IS NULL THEN RAISE EXCEPTION 'UNSUPPORTED_CAPTURE_PROTOCOL'; END IF;
+ IF expected_slot_names IS NULL THEN RAISE EXCEPTION 'UNSUPPORTED_CAPTURE_PROTOCOL'; END IF;
+ expected_slots:=cardinality(expected_slot_names);
+ SELECT array_agg(value ORDER BY value) INTO expected_slot_set
+ FROM unnest(expected_slot_names) AS expected(value);
  SELECT array_agg(value ORDER BY value) INTO seal_ids
  FROM jsonb_array_elements_text(seal_payload->'artifact_ids') AS item(value);
  WITH latest AS (
@@ -78,13 +98,15 @@ BEGIN
   ORDER BY payload_json::jsonb->>'slot',sequence DESC
  )
  SELECT array_agg(payload->>'artifact_id' ORDER BY payload->>'artifact_id'),
+        array_agg(payload->>'slot' ORDER BY payload->>'slot'),
         count(*),count(DISTINCT payload->>'artifact_id')
- INTO latest_ids,latest_count,unique_latest_count
+ INTO latest_ids,latest_slots,latest_count,unique_latest_count
  FROM latest;
  IF latest_count IS DISTINCT FROM expected_slots
     OR unique_latest_count IS DISTINCT FROM expected_slots
     OR cardinality(seal_ids) IS DISTINCT FROM expected_slots
-    OR seal_ids IS DISTINCT FROM latest_ids THEN
+    OR seal_ids IS DISTINCT FROM latest_ids
+    OR latest_slots IS DISTINCT FROM expected_slot_set THEN
   RAISE EXCEPTION 'SEALED_ARTIFACT_SET_MISMATCH';
  END IF;
  SELECT EXISTS(SELECT 1 FROM faos.manifest_roots
