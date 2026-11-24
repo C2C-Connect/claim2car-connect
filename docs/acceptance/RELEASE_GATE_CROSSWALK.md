@@ -27,41 +27,53 @@ No gate passes on a green workflow badge alone. Each pass requires the named exe
 
 PR #186 must not merge before PR #185 is accepted, merged, and PR #186 is rebased and reverified against the resulting main revision.
 
-### 2.2 Exact-head workflow runs observed
+### 2.2 Live workflow results observed at the current PR heads
 
-**PR #185 — SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`**
+All 13 workflow runs associated with each PR head are now completed successfully. This corrects the earlier snapshot that showed the integrated-runtime runs as cancelled/in progress. A green workflow result remains distinct from gate certification.
 
-| Workflow | Run | Result at snapshot | Evidence |
+**PR #185 — candidate SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`**
+
+| Workflow | Run | Result | Evidence |
 |---|---:|---|---|
-| Full test suite | #1125 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012107 |
-| Database authority cutover | #1196 | Success; inspected artifact awards DB-01–DB-14 14/14 PASS | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012240 |
+| Full test suite | #1125 | Success; 1,065 passed, **7 skipped**, 31 warnings, 218 subtests | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012107 |
+| Database authority cutover | #1196 | Success; 408/408 counted DB tests, 0 skipped; executable DB-01–DB-14 report says 14/14 PASS | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012240 |
 | Legacy database component | #1240 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012125 |
 | FastAPI foundation | #1182 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012063 |
-| Integrated runtime container smoke | #671 | Success after targeted rerun | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012031 |
-| Other PR workflows | 8 additional workflow types | Success | Exact run inventory is available from the PR head's workflow-run listing |
+| Integrated runtime container smoke | #671 | **Success** (not cancelled) | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012031 |
+| Frontend VIN, decoder and transport | #1168 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012118 |
+| Controlled synthetic demonstration | #987 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012262 |
+| Restricted intake container | #1013 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012377 |
+| Restricted container | #625 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012069 |
+| Browser IndexedDB evidence queue | #791 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012295 |
+| Offline VIN lookup controller | #1029 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012373 |
+| Offline guided capture | #989 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012054 |
+| Controlled-test intake PostgreSQL | #1028 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012058 |
 
-The targeted rerun completed successfully. All 13 PR #185 workflow types are now green on this exact head.
+The DB authority artifact is retained as artifact ID `14969394508`, SHA-256 `e74655af0c528ea76afe11beace4bb9a347d9fdbae2920ea7a90544fae67e1d5`: https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012240/artifacts/14969394508. Its metadata records candidate SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`, tested checkout `40a9e5298b2e6eb484177319552ff4ccc5042448`, 30 migrations through `0030_runtime_manifest_registration.sql`, 408/408 counted tests with zero skips, and 14/14 executable DB gate results. It also labels its DB-level `overall_acceptance` as `ACCEPTED`; that label conflicts with the owner-directed release registry baseline of 0/14 formally certified and overall release acceptance NOT ACCEPTED. Preserve both facts: technical DB runner result = 14/14 PASS; owner certification in this release registry = 0/14 certified pending owner review. The artifact's separate `publish-evidence` job was skipped, but the authority job itself successfully uploaded this artifact.
 
-**PR #186 — SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`**
+The authority artifact identifies tested checkout `40a9e5298b2e6eb484177319552ff4ccc5042448`, a pull-request merge ref, rather than the branch-head SHA. The candidate SHA is separately recorded and matches the PR head. Keep both SHAs visible; do not describe the tested checkout as the raw branch commit.
 
-| Workflow | Run | Result at snapshot | Evidence |
+**PR #186 — candidate SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`**
+
+| Workflow | Run | Result | Evidence |
 |---|---:|---|---|
-| Full test suite | #1129 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282583 |
-| Database authority cutover | #1200 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282825 |
-| Integrated runtime container smoke | #675 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282240 |
+| Full test suite | #1129 | Success; 1,074 passed, **7 skipped**, 41 warnings, 219 subtests | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282583 |
+| Database authority cutover | #1200 | Success; 409/409 counted DB tests, 0 skipped; executable DB-01–DB-14 report says 14/14 PASS | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282825 |
 | Legacy database component | #1244 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282176 |
 | FastAPI foundation | #1186 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282314 |
-| Controlled-test intake PostgreSQL | #1032 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282358 |
-| Browser IndexedDB queue | #795 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282214 |
-| Offline VIN lookup controller | #1033 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282594 |
-| Restricted intake container | #1017 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282442 |
-| Frontend VIN/decoder/transport | #1172 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282245 |
-| Offline guided capture | #993 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282431 |
+| Integrated runtime container smoke | #675 | **Success** (not in progress) | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282240 |
+| Frontend VIN, decoder and transport | #1172 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282245 |
 | Controlled synthetic demonstration | #991 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282508 |
+| Restricted intake container | #1017 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282442 |
 | Restricted container | #629 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282469 |
+| Browser IndexedDB evidence queue | #795 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282214 |
+| Offline VIN lookup controller | #1033 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282594 |
+| Offline guided capture | #993 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282431 |
+| Controlled-test intake PostgreSQL | #1032 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282358 |
 
-All 13 PR #186 workflow types completed successfully at this SHA. These runs prove the workflow results only; they do not independently prove a release gate.
+The DB authority artifact is retained as artifact ID `14972002960`, SHA-256 `8b8e387915e000cd9c431409dc8de719c736030263632a4b15e00a185e632670`: https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282825/artifacts/14972002960. Its metadata records candidate SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`, tested checkout `63ba944f0809212e968199b6afd8ab5dfac086f5`, migration `0031_damage_assessment_report_event.sql`, 409/409 counted DB tests with zero skips, and 14/14 executable DB gate results. It likewise reports DB-level `overall_acceptance: ACCEPTED`, which is not owner certification of the full release. The candidate SHA and merge-ref tested checkout are both recorded; they are not interchangeable.
 
+**Skip accounting:** the full-suite jobs for both PRs each report seven skipped tests. The database authority jobs separately report zero skipped tests. Because the owner PR rules require zero skipped tests, the seven full-suite skips remain a merge-readiness blocker until each is either executed in its required environment without being silently skipped or explicitly resolved under an owner-approved rule.
 ## 3. Database gate registry — DB-01 through DB-14
 
 **Required environment:** isolated synthetic PostgreSQL 16 with PostGIS 3.4 and required extensions; separately identified admin, migrator, and restricted application roles; full ordered migration inventory; no production credentials or participant data.  
@@ -109,54 +121,49 @@ Every row explicitly lists its database dependencies, additional evidence not su
 
 | Component | Level | Current-head SHA | Workflow evidence | Gates satisfied | Gates remaining | Blockers |
 |---|---|---|---|---|---|---|
-| Runtime manifest registration (PR #185) | Verified | `0431dbaf6e1a3bb3348f6d94c094e893543e513c` | All 13 PR workflows passed: Full suite #1125, DB authority #1196, FastAPI #1182, integrated smoke #671; 408/408 DB tests, zero skips; DB-01–DB-14 14/14 PASS. DB authority tested checkout merge ref `40a9e5298b2e6eb484177319552ff4ccc5042448` includes candidate head `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. | DB-01–DB-14 PASS | GATE-01, GATE-02, GATE-03, GATE-04, GATE-05 | No remaining PR #185 test blocker identified; owner final SHA-specific merge approval remains required. The exact-head HTTP test covers seal retry, persisted root, fresh-process verification, original-byte readback, tamper rejection and durable audit |
-| Evidence-linked damage reports (PR #186) | Verified | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | All 13 PR workflows passed: Full suite #1129, DB authority #1200, integrated smoke #675; 409/409 DB tests, zero skips; DB-01–DB-14 14/14 PASS. DB authority tested checkout merge ref `63ba944f0809212e968199b6afd8ab5dfac086f5` includes candidate head `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. | DB-01–DB-14 PASS | GATE-01, GATE-02, GATE-03, GATE-04, GATE-05 | PR #186 is verified on its current stack head; rebase and rerun all workflows after PR #185 merges. Update stale PR description to reflect durable journal-backed report registry and restart/tamper tests |
-| Persistent integrated staging | Designed | No deployed revision | No deployment run proving persistent staging | None | GATE-04, GATE-05 and all dependent gates | No approved cost ceiling and no completed provisioning/deployment evidence |
-| Physical-device qualification | Designed | No qualified device revision | No physical-device run | None | GATE-06 | Physical iPad Pro 11-inch M5 qualification evidence absent |
-| Square sandbox reconciliation | Implemented status not established by this registry | No current-head SHA/run established | No complete current-head sandbox evidence located | None | GATE-01, GATE-07 | Success/duplicate/failure/UNKNOWN/reversal/reconciliation evidence and signed governance terms absent |
+| Runtime manifest registration (PR #185) | Implemented | `0431dbaf6e1a3bb3348f6d94c094e893543e513c` | 13/13 workflows completed successfully; Full suite #1125 (1,065 passed, 7 skipped); DB authority #1196 (408/408 counted, 0 skipped, 14/14 executable DB results; artifact 14969394508); Integrated smoke #671 success. | No release gate formally certified by this registry. The five PR-specific behaviors have direct integration-test coverage in `test_authenticated_http_capture_survives_runtime_restart_and_fails_closed`. | GATE-02, GATE-03, GATE-04, GATE-05; formal DB-01–DB-14 certification remains 0/14 in this release record. | Seven full-suite skips violate the no-skip merge rule; DB artifact's DB-level ACCEPTED label must not be mistaken for owner certification; verify artifact and merge-ref checkout SHA distinction. |
+| Evidence-linked damage reports (PR #186) | Implemented | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | 13/13 workflows completed successfully; Full suite #1129 (1,074 passed, 7 skipped); DB authority #1200 (409/409 counted, 0 skipped, 14/14 executable DB results; artifact 14972002960); Integrated smoke #675 success. | No release gate formally certified by this registry. PDF/JSON source-link and disclosure behavior has unit-test coverage. | GATE-02, GATE-03, GATE-04, GATE-05; formal DB-01–DB-14 certification remains 0/14 in this release record. | Seven full-suite skips; no durable report registry or restart retrieval; no durable report-tamper/audit test; PR remains stacked on #185 and must be rebased after #185 lands. |
+| Persistent integrated staging | Designed | No deployed revision | No deployment run proving persistent staging | None | GATE-04, GATE-05 and all dependent gates | No persistent staging deployment, PITR/restore drill, or operational journey. |
+| Physical-device qualification | Designed | No qualified device revision | No physical-device run | None | GATE-06 | Physical iPad Pro 11-inch M5 qualification evidence absent. |
+| Square sandbox reconciliation | Implemented status not established by this registry | No current-head SHA/run established | No complete current-head sandbox evidence located | None | GATE-01, GATE-07 | Success/duplicate/failure/UNKNOWN/reversal/reconciliation evidence and signed governance terms absent. |
 
-Levels are deliberately conservative. A workflow result does not upgrade a component to Verified unless all relevant tests pass at that exact SHA and the gate-specific evidence is retained. Deployed and Operational require the actual persistent staging environment and a demonstrated operator-to-reviewer journey.
-
+The DB authority workflow reports are retained technical evidence. Their 14/14 executable results do not change the owner-directed certification baseline of 0/14 for this release registry, and they do not certify any of GATE-01 through GATE-07.
 ## 6. PR-specific acceptance criteria carried into this registry
 
 ### PR #185 — runtime manifest registration
 
-Before it can be considered Verified or merged, current-head evidence must prove all of the following:
+Before it can be considered Verified or merged, current-head evidence must prove all five owner criteria:
 
-1. A sealed manifest is durably registered in PostgreSQL's event/manifest authority; no process-memory-only or runtime-derived substitute.
-2. Exact seal retries are idempotent and return the existing registered reference without duplicate journal entries.
-3. A process restart immediately after sealing preserves manifest retrieval, verification, and linkage to original bytes.
-4. A fresh runtime independently recomputes the manifest root from persisted bytes and verifies `link_k = SHA-256(content_k || link_{k-1})`.
-5. A one-byte persisted-artifact mutation fails closed and writes a durable audit event; no unhandled exception or silent success.
+1. **Persistent registration:** migration `0030_runtime_manifest_registration.sql` registers the sealed root in PostgreSQL authority within the live capture seal transaction. The test reads the persisted `faos.manifest_roots` row and confirms the registered seal reference.
+2. **Idempotency:** the same seal request is replayed; HTTP returns success with `root_registered: true`, `replayed: true`, and the same manifest digest. The registration function returns REGISTERED/DUPLICATE and verifies the existing binding.
+3. **Restart survival:** immediately after sealing, a separate Python process reconstructs the reviewer API using persisted PostgreSQL journal rows and the durable original-byte store; it retrieves the manifest and original bytes. A fresh runtime is then reconstructed and independently rechecks the persisted root.
+4. **Independent verification:** the fresh runtime verifies the registered root binding and reads the original object through the byte store, which recomputes SHA-256 against the persisted manifest digest. The test asserts the returned original bytes and digest.
+5. **Tamper rejection:** the test mutates a persisted original object, expects HTTP 409 with `EVIDENCE_ARTIFACT_INTEGRITY_FAILURE`, verifies one durable `ARTIFACT_INTEGRITY_FAILURE_RECORDED` event with artifact ID, expected digest and failure code, and confirms repeated tamper reads do not duplicate the audit event.
 
-Current candidate: SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. All five criteria are exercised by the exact-head HTTP/PostgreSQL integration test; all 13 workflows passed, including Full suite #1125, DB authority #1196 and integrated smoke #671. The DB authority artifact records DB-01–DB-14 14/14 PASS. Component Verified; no merge until owner final approval.
+**Evidence:** `tests/database/test_capture_http_integration.py::test_authenticated_http_capture_survives_runtime_restart_and_fails_closed`, exercised by PR #185 Full suite #1125 and DB authority #1196 at candidate SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. The DB authority artifact records 408/408 counted tests, zero DB-lane skips, 30 ordered migrations through 0030, and 14/14 executable DB gate results. Artifact: https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012240/artifacts/14969394508.
+
+**Status:** all five behaviors have direct code/test evidence at the candidate. The component remains **Implemented**, not Verified for merge, because the general full suite has seven skipped tests under the owner's zero-skip rule, the authority artifact's DB-level `overall_acceptance: ACCEPTED` conflicts with the owner-directed 0/14 formal certification baseline, and the tested checkout SHA is the PR merge ref `40a9e5298b2e6eb484177319552ff4ccc5042448` rather than the raw branch SHA. No owner certification or merge authorization is implied.
 
 ### PR #186 — evidence-linked damage assessment reports
 
-**Implementation evidence discovered in the live PR branch:** `database/capture_evidence.py` implements `record_damage_assessment_report` and `retrieve_damage_assessment_report`. The write path stores PDF and JSON carrier bytes in the durable artifact store and appends a `DAMAGE_ASSESSMENT_REPORT_GENERATED` event to the PostgreSQL journal with both immutable storage keys, SHA-256 digests, manifest digest, seal event, protocol version, report revision, request digest, findings and review-event binding. The read path reconstructs report metadata from the persisted journal and fetches both objects by key with expected-digest verification. The PR description's statement that report versions remain process-memory-only is therefore stale relative to the current branch implementation and integration tests; the PR description should be reconciled before final review.
-
-The current integration test also:
-- asserts the PDF does not embed the original source byte sequence, while carrying the original image storage key and digest;
-- asserts source image, slot, normalized bounding box, reviewer actor/time, camera-angle metadata and the exact disclosure in PDF and JSON;
-- retries the same report request and checks stable PDF/JSON artifact identifiers and digests;
-- rejects changed request payload reuse;
-- retrieves both report carriers through a fresh runtime and a separate Python process;
-- mutates persisted PDF bytes, expects fail-closed HTTP 409, and checks for a durable integrity-failure journal event.
-
-This is strong implementation/test evidence, not a gate award. It still requires the full exact-head workflow set, independent review of the artifact and code, and rebase/reverification after PR #185.
-
-
 Before it can be considered Verified or merged, current-head evidence must prove all of the following:
 
-1. Every finding references the original immutable object by storage key and digest; the original bytes remain authoritative and are not replaced by PDF-rendered copies.
-2. Every bounding box has `slot_id`, normalized coordinates, camera-angle metadata, reviewer actor and review timestamp, and a non-null source-image reference tied to the sealed manifest.
-3. The PDF and JSON carrier payload both contain the disclosure: **“A bounding box is a suspect-region identifier only. It is not a measured dimension, calibrated geometry, or a structural-severity claim.”**
-4. Report versions and metadata are held in a durable registry; a fresh process can retrieve the report and verify its digest. In-memory-only versioning is not acceptable.
-5. Tampering with a persisted report fails closed and writes a durable audit event.
+1. **Immutable source reference:** each finding links to its original artifact ID, immutable storage key and SHA-256; the original artifact remains authoritative. The PDF's visual rendering is a derivative, not a replacement for original bytes.
+2. **Per-box provenance:** each finding's JSON carrier entry contains `slot_id`, normalized coordinates, camera-angle values and provenance, reviewer actor and review timestamp, and a non-null source-image reference (artifact ID, storage key and digest). The model rejects findings without an attached source image.
+3. **Disclosure parity:** the PDF and JSON carrier payload both state: **“A bounding box is a suspect-region identifier only. It is not a measured dimension, calibrated geometry, or a structural-severity claim.”**
+4. **Durable report registry:** report revisions and metadata must be stored durably and retrieved by a fresh process after restart. This is **not implemented** in the current PR: its description explicitly says report versions remain in process memory, and migration `0031_damage_assessment_report_event.sql` only adds an allowed event kind; it does not create a durable report registry or durable report-object lifecycle.
+5. **Report tamper audit:** mutation of a persisted report must fail closed and create a durable audit event. No durable report registry/tamper/restart journey is present in the current PR.
 
-Current candidate: SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. The latest commit adds HTTP assertions for source storage key, SHA-256, reviewer timestamp, disclosure text, and durable tamper audit. The PR description still states that report versions are stored in process memory; this is a documentation discrepancy, not a code blocker if the durable implementation and restart evidence remain present on the final rebased head.
+**Evidence:** PR #186 Full suite #1129, DB authority #1200 and Integrated runtime smoke #675 all completed successfully at candidate SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. The DB authority artifact records 409/409 counted tests, zero DB-lane skips and 14/14 executable DB gate results: https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282825/artifacts/14972002960. The full suite reports seven skipped tests. The current PR description and code/migration scope confirm that durable report registry integration remains separate work.
 
+**Status:** criteria 1–3 have implementation and unit-test evidence; criteria 4–5 are unmet. The component remains **Implemented**, not Verified. PR #186 is stacked on PR #185; after #185 is accepted and merged, #186 must be rebased onto the resulting `main` and all required workflows rerun at its new head.
 ## 7. Live-source discrepancies requiring explicit reconciliation
+
+
+### 7.1 Historical PR #29 state discrepancy
+
+The supplied condensed snapshot describes PR #29 as Draft/unmerged with 222 commits and 93 files. Live GitHub now reports PR #29 as **closed and merged**, with 296 commits and 103 changed files; its recorded head is `25b1067d87649318d518f49ab2e12f1a905a2acc`. Current `main` is `55f69790df123a4602196c3c474e143808c4b87e`. The repository is authoritative for current state. The earlier 222/93 figures remain historical, not a live baseline. Since PR #29 has already merged, the proposed per-slice extraction cannot be performed as if it were still an unmerged branch; audit the landed paths and subsequent corrective PRs instead. Do not rewrite history or attempt to undo the merge under this registry.
+
 
 The owner directive's canonical capture identifiers are `12-v1` and `16-v1`. The live code on the PR #185 branch sets `DEFAULT_CAPTURE_PROTOCOL = claims2car-16-v1`, keeps `claims2car-12-v1` as a supported legacy protocol, and also exposes `claims2car-16-v2` as a separate FAOS protocol. The repository's versioning document records the exact 16-v1 view list as owner-approved on 2026-11-11 and enabled. The 16-v2 protocol is not named in the current owner decision and is therefore a separate, non-default protocol whose semantics must not be merged into 16-v1.
 
