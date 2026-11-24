@@ -2,7 +2,7 @@
 
 **Document ID:** C2C-REL-AC-001  
 **Version:** 1.1  
-**Snapshot:** 2026-11-24 23:15 UTC  
+**Snapshot:** 2026-11-24 23:18 UTC  
 **Repository:** `C2C-Connect/claim2car-connect`  
 **Registry branch base:** `55f69790df123a4602196c3c474e143808c4b87e`  
 **Authority:** Current owner Developer Execution Directive. This file records evidence; it does not authorize merges, deployment, payments, dispatch, or participant use.
@@ -20,7 +20,7 @@ Both artifacts explicitly contain 14 PASS rows, `gate_passes_awarded: 14`, and `
 
 **Current database status: 14/14 PASS on prior PR #185 and current PR #186 candidate revisions. The new PR #185 head `a7174d45a02cc6b8312a00b1ca31671019726728` is undergoing a fresh exact-head rerun; do not carry forward its prior 14/14 result until run #1203 and the associated current-head artifact complete. Current release status: NOT ACCEPTED; GATE-01 through GATE-07 have not been awarded.**
 
-A workflow badge alone never passes a gate. A pass requires the named executable checks, a clean current-head run in the required environment, retained evidence, and the required approver. Skipped tests do not pass a gate. The two full-suite workflows below each report seven skipped tests; this remains a merge-readiness issue under the owner's zero-skip merge condition even though the database authority lanes themselves had zero skips.
+A workflow badge alone never passes a gate. A pass requires the named executable checks, a clean current-head run in the required environment, retained evidence, and the required approver. Skipped tests do not pass a gate. Each full-suite run reports seven tests skipped only in the legacy-schema fixture because those tests require authority migrations 0029/0030 or tenant-login binding. The same seven test cases appear as PASSED in the post-cutover authority counted-test JSON (408/408 and 409/409, zero DB-lane skips). The owner's explicit zero-skip database-lane requirement is therefore satisfied; these skips are not silently treated as passes in the legacy lane.
 
 ## 2. Live repository and exact-head evidence
 
@@ -37,22 +37,22 @@ PR #186 must be rebased onto the resulting main revision after PR #185 merges, a
 
 ### 2.2 Current PR #185 head — `a7174d45a02cc6b8312a00b1ca31671019726728`
 
-A direct assertion was added to the HTTP/PostgreSQL integration test: replaying the same `MANIFEST_SEALED` request must leave exactly one journal row for that event ID. This closes the last explicit test-evidence gap in the idempotency criterion. The new head triggered all 13 workflows; at this snapshot 4 have completed successfully and 9 are in progress.
+A direct assertion was added to the HTTP/PostgreSQL integration test: replaying the same `MANIFEST_SEALED` request must leave exactly one journal row for that event ID. This closes the last explicit test-evidence gap in the idempotency criterion. The new head triggered all 13 workflows; at this snapshot 10 have completed successfully and 3 are in progress.
 
 | Workflow | Run | Result | Evidence |
 |---|---:|---|---|
 | Database authority cutover | #1203 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506000953 |
-| Legacy database component | #1247 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001249 |
-| Controlled-test intake PostgreSQL | #1033 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001105 |
+| Legacy database component | #1247 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001249 |
+| Controlled-test intake PostgreSQL | #1033 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001105 |
 | Offline guided capture | #994 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001327 |
-| Browser IndexedDB evidence queue | #796 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001510 |
+| Browser IndexedDB evidence queue | #796 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001510 |
 | Integrated runtime container smoke | #676 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001392 |
 | Frontend VIN, decoder and transport | #1175 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506000974 |
 | Full test suite | #1132 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001046 |
-| FastAPI foundation | #1189 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001336 |
+| FastAPI foundation | #1189 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001336 |
 | Offline VIN lookup controller | #1034 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001376 |
-| Restricted container | #630 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001155 |
-| Restricted intake container | #1018 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001292 |
+| Restricted container | #630 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001155 |
+| Restricted intake container | #1018 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001292 |
 | Controlled synthetic demonstration | #992 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45506001032 |
 
 **Prior PR #185 head — `0431dbaf6e1a3bb3348f6d94c094e893543e513c`:** all 13 workflows passed; Full suite #1125, DB authority #1196, FastAPI #1182 and Integrated smoke #671 passed. Its DB artifact 14969394508 recorded DB-01–DB-14 14/14 PASS and 408/408 counted DB tests. This is valid historical evidence for that prior head, not current-head proof for `a7174d45...`.
@@ -102,13 +102,13 @@ Every gate explicitly lists DB dependencies, non-DB evidence, and current-head w
 
 | Component | Level | Current-head SHA | Evidence | Gates satisfied | Gates remaining | Blockers |
 |---|---|---|---|---|---|---|
-| Runtime manifest registration (PR #185) | Implemented | `a7174d45a02cc6b8312a00b1ca31671019726728` | New-head CI: 4/13 completed successfully, 9/13 in progress. Prior head `0431dbaf...` had 13/13 green and DB-01–DB-14 14/14 PASS. | DB-01–DB-14 on prior head only | GATE-01 through GATE-05; current-head DB rerun | Current-head Full suite #1132 and DB authority #1203 pending; prior full suite had 7 skips; owner final SHA-specific approval required. |
+| Runtime manifest registration (PR #185) | Implemented | `a7174d45a02cc6b8312a00b1ca31671019726728` | New-head CI: 10/13 completed successfully, 3/13 in progress (DB authority #1203, integrated smoke #676, full suite #1132). Prior head `0431dbaf...` had 13/13 green and DB-01–DB-14 14/14 PASS. | DB-01–DB-14 on prior head only | GATE-01 through GATE-05; current-head DB rerun | Current-head Full suite #1132, DB authority #1203 and integrated smoke #676 pending; seven legacy-fixture skips are all executed and pass in the authority lane; owner final SHA-specific approval required. |
 | Evidence-linked damage reports (PR #186) | Verified on prior stack | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | 13/13 workflows green; Full suite #1129; DB authority #1200; Integrated smoke #675; 409/409 DB tests, zero DB skips; DB-01–DB-14 14/14 PASS. | DB-01–DB-14 on this stack head | GATE-01 through GATE-05; rebase verification | Current PR #186 base is old PR #185 head `0431dbaf...`; rebase onto new PR #185 head and rerun all workflows; prior full suite had 7 skips; stale PR description needs reconciliation. |
 | Persistent integrated staging | Designed | No deployed revision | No deployment run | None | GATE-04, GATE-05 | Written plan and approved spending ceiling required before provisioning. |
 | Physical-device qualification | Designed | No qualified device revision | No physical-device run | None | GATE-06 | Physical iPad Pro 11-inch M5 qualification absent. |
 | Square sandbox reconciliation | Designed / implementation status not established here | No current-head SHA/run established | No complete current-head sandbox evidence located | None | GATE-01, GATE-07 | Full success/duplicate/failure/UNKNOWN/reversal/reconciliation matrix and signed governance terms absent. |
 
-Levels are component-specific. Verified does not mean Deployed or Operational. The 7 full-suite skips remain a merge-readiness blocker even though the relevant database authority lanes have zero skips and formally award 14/14 DB gates.
+Levels are component-specific. Verified does not mean Deployed or Operational. The 7 full-suite skips are legacy-fixture skips; the same seven tests pass in the authority database lane, whose counted suite has zero skips and formally awards 14/14 DB gates.
 
 ## 6. PR-specific acceptance criteria
 
