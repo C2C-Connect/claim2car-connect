@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from types import SimpleNamespace
 from uuid import UUID
 
