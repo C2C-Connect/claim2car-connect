@@ -1,3 +1,12 @@
+## Verified checkpoint — PR #184 merged (2026-11-24)
+
+PR #184 merged to main as `55f69790df123a4602196c3c474e143808c4b87e`; exact tested PR head `95692eaf30f76ca9ab8b7c0cf71c4bcf9fac5d68`. All 13 PR workflows passed. Full suite: **1,064 passed, 7 skipped, 31 warnings, 218 subtests**. Post-cutover authority suite: **407/407 counted tests passed**, DB-01–DB-14 **14/14 PASS**, **340 tenant-isolation assertions**. This establishes database authority acceptance for manifest chain-tip/context binding; it is not field validation or forensic accuracy qualification.
+
+**Active increment — PR #185:** branch `cto/m1-runtime-manifest-registration`, current head `18b617facf9a3772a4d6d568acac315b0327be6f`. Migration 0030 adds a narrow application path to register the verified root in the same tenant transaction as live capture sealing. Review queue/details/artifact retrieval/review decisions verify the root before use. Exact 12-v1, 16-v1 and 16-v2 slot sets are enforced by the registration function. Initial CI exposed an ownership-transfer privilege issue and stale 29-migration test fixtures; the migration now grants schema CREATE only during the function-owner transfer and revokes it immediately, and the fixtures/gate counts are updated. Re-run of the corrected head is pending. Do not merge until all 13 workflows and the authority acceptance pass.
+
+**M1 status:** database chain/context binding is merged; runtime seal registration is the remaining M1 integration task in PR #185. After it passes, proceed to M2 original-artifact provenance and then the observation/measurement/report vertical slice. No deployment, external notarization, trusted timestamp, participant evidence, field qualification, payment or dispatch is claimed.
+
+
 # Current mission focus — forensic substantiation (2026-11-23)
 
 ## Latest verified checkpoint — PR #182 merged (2026-11-23)
