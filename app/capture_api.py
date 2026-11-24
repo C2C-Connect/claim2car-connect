@@ -7,12 +7,14 @@ separately provisioned original-byte storage. Service credentials are not
 end-user sign-in; actor roles come from private config.
 """
 from dataclasses import asdict, dataclass, field
+from decimal import Decimal
+from hashlib import sha256
 import json
 import base64
 import binascii
 import os
 from pathlib import Path
-from typing import NoReturn
+from typing import Literal, NoReturn
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Query
@@ -41,6 +43,10 @@ from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCO
 from app.damage_localization import zone_for_slot
 from app.vision.photo_baseline import PhotoBaselineError, analyze_photo_bytes
 from app.vehicle_intelligence.vpic import VpicClient
+from backend.app.reports.damage_assessment import (
+    CameraAngle, DamageAssessment, DamageEvidenceImage, DamageFinding,
+    RepairEstimateLine, render_damage_assessment_pdf,
+)
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
 CONFIGURATION_SIZE_LIMIT = 65536
@@ -179,6 +185,54 @@ class HumanReviewRequest(BaseModel):
     reason: StrictStr = Field(min_length=1, max_length=1000)
     class Config:
         extra = 'forbid'
+
+class DamageFindingRequest(BaseModel):
+    finding_id: StrictStr = Field(min_length=1, max_length=64)
+    component: StrictStr = Field(min_length=1, max_length=128)
+    vehicle_location: StrictStr = Field(min_length=1, max_length=160)
+    damage_type: StrictStr = Field(min_length=1, max_length=96)
+    observation: StrictStr = Field(min_length=1, max_length=1200)
+    evidence_artifact_id: UUID
+    bbox_normalized: tuple[float, float, float, float]
+    status: Literal["CONFIRMED_BY_REVIEWER", "PROVISIONAL", "INCONCLUSIVE", "REJECTED"] = "PROVISIONAL"
+    limitations: StrictStr = Field(default="", max_length=1200)
+    class Config:
+        extra = "forbid"
+
+
+class CameraAngleRequest(BaseModel):
+    yaw_degrees: float | None = Field(default=None, ge=-360, le=360)
+    pitch_degrees: float | None = Field(default=None, ge=-360, le=360)
+    roll_degrees: float | None = Field(default=None, ge=-360, le=360)
+    class Config:
+        extra = "forbid"
+
+
+class RepairEstimateLineRequest(BaseModel):
+    line_id: StrictStr = Field(min_length=1, max_length=64)
+    category: Literal["PART", "BODY_LABOR", "PAINT_LABOR", "MATERIAL", "DIAGNOSTIC", "CALIBRATION", "SUBLET", "TAX", "OTHER"]
+    description: StrictStr = Field(min_length=1, max_length=240)
+    quantity: Decimal = Field(gt=0, le=100000)
+    unit: StrictStr = Field(min_length=1, max_length=24)
+    unit_price_cents: int = Field(ge=0, le=1000000000)
+    source_name: StrictStr = Field(min_length=1, max_length=120)
+    source_reference: StrictStr = Field(min_length=1, max_length=160)
+    effective_date: StrictStr = Field(min_length=10, max_length=10)
+    related_finding_id: StrictStr | None = Field(default=None, max_length=64)
+    class Config:
+        extra = "forbid"
+
+
+class DamageAssessmentReportRequest(BaseModel):
+    request_id: UUID
+    vehicle_description: StrictStr = Field(min_length=1, max_length=256)
+    findings: list[DamageFindingRequest] = Field(min_items=1, max_items=64)
+    estimate_lines: list[RepairEstimateLineRequest] = Field(default_factory=list, max_items=256)
+    camera_angles: dict[str, CameraAngleRequest] = Field(default_factory=dict)
+    class Config:
+        extra = "forbid"
+
+
 
 def _unique(pairs):
     value = {}
