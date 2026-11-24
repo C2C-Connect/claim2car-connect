@@ -124,7 +124,7 @@ Storage controls:
 4. Append a durable cryptographic revocation event to the PostgreSQL journal.
 5. Prove downstream reads fail closed and preserve only the permitted revocation/audit record.
 
-For staging, use synthetic evidence only. Before enabling any object replication or object backup, prove that deletion propagates to every copy and does not leave recoverable participant bytes behind.
+For staging, use synthetic evidence only. Object replication and evidence-object backup copies are disabled by default. Before enabling any such copy, prove that deletion propagates to every copy and does not leave recoverable participant bytes behind.
 
 ## 6. Backup schedule and recovery objectives
 
@@ -160,7 +160,7 @@ Run the drill in an isolated recovery subnet using synthetic fixtures:
 7. Confirm the restored environment does not resurrect bytes that a consent-withdrawal event required to be deleted.
 8. Record RPO, RTO, restore timestamp, database identifier, migration inventory, test report, failures and corrective actions.
 
-**Pass condition:** the restored environment passes all applicable DB gates with zero skipped tests and no cross-tenant visibility, missing evidence, resurrected revoked bytes or broken chain links.
+**Pass condition:** the restored environment passes all applicable DB gates with zero skipped tests and no cross-tenant visibility, missing evidence, resurrected revoked bytes/rows or broken chain links. No application traffic is enabled until revocation replay and object purge are complete.
 
 ## 7. Secret and key management
 
