@@ -30,7 +30,7 @@ class DamageAssessmentPdfTests(unittest.TestCase):
             capture_slot="front_right_oblique",
             original_bytes=self.raw,
             expected_sha256=sha256(self.raw).hexdigest(),
-            captured_at="2026-11-24T08:00:00-06:00",
+            registered_at="2026-11-24T08:00:00-06:00",
             camera_angle=CameraAngle(yaw_degrees=35.0, pitch_degrees=-4.0, roll_degrees=0.5, source="CAPTURE_METADATA"),
         )
         self.finding = DamageFinding(
@@ -74,7 +74,7 @@ class DamageAssessmentPdfTests(unittest.TestCase):
             DamageEvidenceImage(
                 artifact_id="tampered", capture_slot="front",
                 original_bytes=self.raw + b"x", expected_sha256=sha256(self.raw).hexdigest(),
-                captured_at="2026-11-24T08:00:00-06:00",
+                registered_at="2026-11-24T08:00:00-06:00",
             )
 
     def test_finding_must_reference_an_attached_image(self):
