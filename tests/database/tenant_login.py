@@ -53,7 +53,7 @@ class TenantLogin:
                     )
                 admin.execute(
                     "INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) "
-                    "SELECT oid,rolname,%s,true FROM pg_roles WHERE rolname=%s",
+                    "SELECT oid,rolname,%s,true FROM pg_catalog.pg_roles WHERE rolname=%s",
                     (self.tenant, self.role_name),
                 )
                 binding = admin.execute(
