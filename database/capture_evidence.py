@@ -17,7 +17,9 @@ from uuid import UUID, uuid5
 
 import psycopg
 
-from app.artifact_storage import ArtifactKey, OriginalByteStore
+from app.artifact_storage import (
+    ArtifactIntegrityError, ArtifactKey, ArtifactNotFound, OriginalByteStore,
+)
 from app.evidence_manifest import ManifestEntry, build_manifest
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
 from app.vin_guard import validate_vin
@@ -31,11 +33,12 @@ MAX_EVIDENCE_BYTES = 25 * 1024 * 1024
 
 
 class _EvidenceArtifactIntegrityFailure(Exception):
-    def __init__(self, artifact_id, slot, expected_sha256):
+    def __init__(self, artifact_id, slot, expected_sha256, failure_code):
         self.artifact_id = artifact_id
         self.slot = slot
         self.expected_sha256 = expected_sha256
-        super().__init__("ARTIFACT_HASH_MISMATCH")
+        self.failure_code = failure_code
+        super().__init__(failure_code)
 
 DISCLOSURE_VERSION = "disclosure-v1"
 VEHICLE_DECODE_DISCLOSURE_VERSION = "vehicle-decode-disclosure-v1"
@@ -760,7 +763,11 @@ class CaptureEvidenceService:
                 )
             except ArtifactIntegrityError as error:
                 raise _EvidenceArtifactIntegrityFailure(
-                    entry.artifact_id, entry.slot, entry.sha256_hex
+                    entry.artifact_id, entry.slot, entry.sha256_hex, "ARTIFACT_HASH_MISMATCH"
+                ) from error
+            except ArtifactNotFound as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    entry.artifact_id, entry.slot, entry.sha256_hex, "ARTIFACT_MISSING"
                 ) from error
             if len(original) != record["byte_length"]:
                 raise CaptureSessionConflict("EVIDENCE_BYTE_LENGTH_MISMATCH")
@@ -993,13 +1000,16 @@ class CaptureEvidenceService:
             idempotency_key = (
                 "artifact-integrity-failure:" + failure.artifact_id + ":" + failure.expected_sha256[:16]
             )
-            event_id = str(uuid5(UUID(failure.artifact_id), "integrity-failure:" + failure.expected_sha256))
+            event_id = str(uuid5(
+                UUID(failure.artifact_id),
+                "integrity-failure:" + failure.failure_code + ":" + failure.expected_sha256,
+            ))
             payload = {
                 "idempotency_key": idempotency_key,
                 "artifact_id": failure.artifact_id,
                 "slot": failure.slot,
                 "expected_sha256": failure.expected_sha256,
-                "failure_code": "ARTIFACT_HASH_MISMATCH",
+                "failure_code": failure.failure_code,
             }
             existing = next((item for item in history if item[3] == event_id), None)
             if existing is not None:
@@ -1009,7 +1019,7 @@ class CaptureEvidenceService:
             self._append(
                 conn, actor, session_id, history, event_id=event_id,
                 kind="ARTIFACT_INTEGRITY_FAILURE_RECORDED",
-                reason="server detected original evidence byte integrity failure",
+                reason="server detected original evidence integrity failure: " + failure.failure_code,
                 payload=payload,
             )
 
