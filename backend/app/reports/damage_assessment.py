@@ -216,7 +216,13 @@ def _capture_metadata(raw: bytes) -> dict[str, str]:
     try:
         with Image.open(BytesIO(raw)) as image:
             exif = image.getexif()
-            tags = {ExifTags.TAGS.get(key, str(key)): value for key, value in exif.items()}
+            raw_tags = dict(exif.items())
+            if hasattr(exif, "get_ifd") and hasattr(ExifTags, "IFD"):
+                try:
+                    raw_tags.update(exif.get_ifd(ExifTags.IFD.Exif))
+                except (KeyError, TypeError, ValueError):
+                    pass
+            tags = {ExifTags.TAGS.get(key, str(key)): value for key, value in raw_tags.items()}
         def value(name: str) -> str:
             item = tags.get(name)
             if item is None:
