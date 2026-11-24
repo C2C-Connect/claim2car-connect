@@ -820,6 +820,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                     evidence_images=tuple(evidence_images),
                     estimate_lines=estimate_lines,
                     prepared_at=review["reviewed_at"],
+                    manifest_digest=details["manifest_digest"],
+                    seal_event_id=details["seal_event_id"],
                 )
                 pdf_bytes = render_damage_assessment_pdf(assessment)
                 report_sha256 = sha256(pdf_bytes).hexdigest()
