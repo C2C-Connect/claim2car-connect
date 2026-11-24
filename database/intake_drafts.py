@@ -7,6 +7,8 @@ import json
 import re
 from uuid import UUID
 
+from database.readback import locked_verified_journal_in_transaction
+
 class DraftConflict(ValueError):
     pass
 
@@ -36,11 +38,14 @@ class IntakeDraftStore:
         self.sessions=sessions
 
     def _rows(self,conn,actor,session_id):
-        rows=conn.execute('SELECT sequence,kind,actor,payload_json,event_id FROM faos.events '
-                          'WHERE tenant_id=%s AND session_id=%s ORDER BY sequence LIMIT 1001',
-                          (actor.tenant_id,session_id)).fetchall()
-        if not rows or len(rows)>1000:
+        try:
+            journal=locked_verified_journal_in_transaction(conn,actor.tenant_id,session_id)
+        except ValueError as error:
+            raise DraftConflict('INTAKE_HISTORY_CHAIN_INVALID') from error
+        events=journal.events
+        if not events or len(events)>1000:
             raise DraftConflict('UNSUPPORTED_INTAKE_HISTORY')
+        rows=[(event.sequence,event.kind,event.actor,event.payload_json,event.event_id) for event in events]
         snapshots=[]
         for index,(sequence,kind,creator,payload,event_id) in enumerate(rows):
             if sequence!=index+1:
@@ -68,7 +73,6 @@ class IntakeDraftStore:
         session=self.sessions._read(conn,actor,session_id)
         if session.created_by!=actor.actor_id:
             raise DraftAccessDenied('INTAKE_OWNER_REQUIRED')
-        conn.execute('SELECT faos.lock_session_for_completion(%s::uuid,%s::text)',(actor.tenant_id,session_id))
         return self._rows(conn,actor,session_id)
 
     def get(self,authorization,session_id):
