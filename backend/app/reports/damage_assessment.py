@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from xml.sax.saxutils import escape
 from hashlib import sha256
 from io import BytesIO
 import re
@@ -151,7 +152,7 @@ class RepairEstimateLine:
 
     @property
     def amount_cents(self) -> int:
-        return int((Decimal(str(self.quantity)) * self.unit_price_cents).quantize(Decimal("1")))
+        return int((Decimal(str(self.quantity)) * self.unit_price_cents).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 @dataclass(frozen=True)
@@ -188,6 +189,17 @@ def _money(cents: int) -> str:
     return f"${cents / 100:,.2f}"
 
 
+def _safe(value: object) -> str:
+    return escape(str(value))
+
+
+def _display_image(raw: bytes) -> bytes:
+    image = Image.open(BytesIO(raw)).convert("RGB")
+    out = BytesIO()
+    image.save(out, format="PNG", optimize=False)
+    return out.getvalue()
+
+
 def _annotated_image(evidence: DamageEvidenceImage, findings: Sequence[DamageFinding]) -> bytes:
     image = Image.open(BytesIO(evidence.original_bytes)).convert("RGB")
     draw = ImageDraw.Draw(image)
@@ -216,7 +228,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
     story = [
         Paragraph("Claim2Car — Vehicle Damage Assessment", styles["C2CTitle"]),
         Spacer(1, 8),
-        Paragraph(f"<b>Session:</b> {assessment.session_id}<br/><b>Vehicle:</b> {assessment.vehicle_description}<br/><b>Revision:</b> {assessment.report_revision}<br/><b>Prepared:</b> {assessment.prepared_at or 'Not recorded'}", styles["BodyText"]),
+        Paragraph(f"<b>Session:</b> {_safe(assessment.session_id)}<br/><b>Vehicle:</b> {_safe(assessment.vehicle_description)}<br/><b>Revision:</b> {assessment.report_revision}<br/><b>Prepared:</b> {_safe(assessment.prepared_at or 'Not recorded')}", styles["BodyText"]),
         Spacer(1, 10),
         Paragraph("<b>Scope:</b> This report describes the supplied evidence, reviewer-attributed findings and sourced estimate inputs. It does not establish hidden damage, causation, structural integrity or roadworthiness unless separately supported.", styles["C2CSmall"]),
         Paragraph("Damage findings", styles["C2CHeading"]),
@@ -230,7 +242,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
         pixel_box = (round(x0 * width), round(y0 * height), round(x1 * width), round(y1 * height))
         angle = evidence.camera_angle
         angle_text = "Not recorded" if angle.source == "NOT_RECORDED" else f"Yaw {angle.yaw_degrees if angle.yaw_degrees is not None else '—'}°, pitch {angle.pitch_degrees if angle.pitch_degrees is not None else '—'}°, roll {angle.roll_degrees if angle.roll_degrees is not None else '—'}° ({angle.source})"
-        story.append(Paragraph(f"<b>{finding.finding_id} — {finding.component}</b> | {finding.status}", styles["Heading3"]))
+        story.append(Paragraph(f"<b>{_safe(finding.finding_id)} — {_safe(finding.component)}</b> | {_safe(finding.status)}", styles["Heading3"]))
         rows = [
             ["Vehicle location", finding.vehicle_location, "Damage type", finding.damage_type],
             ["Capture slot", evidence.capture_slot, "Capture angle", angle_text],
@@ -249,12 +261,12 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
             ("LEFTPADDING", (0,0), (-1,-1), 4),
             ("RIGHTPADDING", (0,0), (-1,-1), 4),
         ]))
-        story.extend([table, Spacer(1, 5), Paragraph(f"<b>Observation:</b> {finding.observation}", styles["BodyText"])])
+        story.extend([table, Spacer(1, 5), Paragraph(f"<b>Observation:</b> {_safe(finding.observation)}", styles["BodyText"])])
         if finding.reviewer_actor_id:
-            story.append(Paragraph(f"<b>Reviewer:</b> {finding.reviewer_actor_id} at {finding.reviewed_at}", styles["C2CSmall"]))
+            story.append(Paragraph(f"<b>Reviewer:</b> {_safe(finding.reviewer_actor_id)} at {_safe(finding.reviewed_at)}", styles["C2CSmall"]))
         if finding.limitations:
-            story.append(Paragraph(f"<b>Limitations:</b> {finding.limitations}", styles["C2CSmall"]))
-        original = ImageReader(BytesIO(evidence.original_bytes))
+            story.append(Paragraph(f"<b>Limitations:</b> {_safe(finding.limitations)}", styles["C2CSmall"]))
+        original = ImageReader(BytesIO(_display_image(evidence.original_bytes)))
         annotated = ImageReader(BytesIO(_annotated_image(evidence, (finding,))))
         max_width, max_height = 3.15*inch, 2.15*inch
         scale = min(max_width/width, max_height/height)
@@ -269,7 +281,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
     if assessment.estimate_lines:
         rows = [["Line", "Category", "Description", "Qty", "Unit rate", "Amount", "Source"]]
         for line in assessment.estimate_lines:
-            rows.append([line.line_id, line.category, line.description, f"{Decimal(str(line.quantity)):f} {line.unit}", _money(line.unit_price_cents), _money(line.amount_cents), f"{line.source_name}: {line.source_reference} ({line.effective_date})"])
+            rows.append([line.line_id, line.category, line.description, f"{Decimal(str(line.quantity)):f} {line.unit}", _money(line.unit_price_cents), _money(line.amount_cents), f"{_safe(line.source_name)}: {_safe(line.source_reference)} ({_safe(line.effective_date)})"])
         rows.append(["", "", "", "", "TOTAL", _money(sum(line.amount_cents for line in assessment.estimate_lines)), ""])
         estimate_table = Table(rows, repeatRows=1, colWidths=[.55*inch,.75*inch,1.55*inch,.75*inch,.7*inch,.65*inch,1.85*inch])
         estimate_table.setStyle(TableStyle([
