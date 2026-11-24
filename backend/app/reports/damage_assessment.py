@@ -231,7 +231,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
         Spacer(1, 8),
         Paragraph(f"<b>Session:</b> {_safe(assessment.session_id)}<br/><b>Vehicle:</b> {_safe(assessment.vehicle_description)}<br/><b>Revision:</b> {assessment.report_revision}<br/><b>Prepared:</b> {_safe(assessment.prepared_at or 'Not recorded')}", styles["BodyText"]),
         Spacer(1, 10),
-        Paragraph("<b>Scope:</b> This report describes the supplied evidence, reviewer-attributed findings and sourced estimate inputs. It does not establish hidden damage, causation, structural integrity or roadworthiness unless separately supported.", styles["C2CSmall"]),
+        Paragraph("<b>Scope:</b> This report describes supplied evidence, reviewer-attributed findings and source-attributed estimate inputs. It does not establish hidden damage, causation, structural integrity or roadworthiness unless separately supported. Camera-angle source labels and estimate references are presented as supplied; this renderer does not independently authenticate their origin.", styles["C2CSmall"]),
         Paragraph("Damage findings", styles["C2CHeading"]),
     ]
     image_by_id = {image.artifact_id: image for image in assessment.evidence_images}
@@ -278,7 +278,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
         pair.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("ALIGN",(0,1),(-1,1),"CENTER"),("BOX",(0,0),(-1,-1),.35,colors.HexColor("#B7C9D6"))]))
         story.extend([Spacer(1, 5), pair, Spacer(1, 12)])
 
-    story.append(Paragraph("Repair estimate — source-backed inputs only", styles["C2CHeading"]))
+    story.append(Paragraph("Repair estimate — source-attributed inputs only", styles["C2CHeading"]))
     if assessment.estimate_lines:
         rows = [["Line", "Finding", "Category", "Description", "Qty", "Unit rate", "Amount", "Source"]]
         for line in assessment.estimate_lines:
@@ -304,7 +304,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
     story.extend([
         Spacer(1, 8),
         Paragraph("Estimate provenance and scope", styles["C2CHeading"]),
-        Paragraph("Each line item identifies its source, reference and effective date. Labor hours/rates, parts applicability, repair procedures, taxes and shop-specific operations must be independently validated. A photographic finding does not prove hidden damage or determine repairability.", styles["C2CSmall"]),
+        Paragraph("Each line item declares a source name, reference and effective date. The renderer does not authenticate the source document or independently validate rate, part fitment, labor time, OEM procedure applicability, tax, or shop-specific operations. Those inputs require independent verification. A photographic finding does not prove hidden damage or determine repairability.", styles["C2CSmall"]),
     ])
 
     def page_footer(canvas, doc):
