@@ -34,6 +34,7 @@ class CaptureHttpIntegration(unittest.TestCase):
             from database.capture_sessions import CaptureSessionStore
             from database.claim_cases import ClaimCaseStore
             from app.evidence_manifest import CANONICAL_SLOTS
+            from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL
         except ModuleNotFoundError as error:
             self.skipTest(f"HTTP integration dependencies unavailable in this test lane: {error.name}")
 
