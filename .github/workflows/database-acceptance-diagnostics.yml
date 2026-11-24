@@ -43,6 +43,7 @@ jobs:
       - name: Pre-cutover components and isolated full-plan migration/integration tests
         env:
           FAOS_MIGRATIONS_ALREADY_APPLIED: '1'
+          FAOS_LEGACY_BASELINE_ALLOWED: '1'
         run: bash scripts/run_guarded_database_acceptance.sh
       - name: Upgrade primary database using the normal full-authority entry point and rerun
         run: |
@@ -50,7 +51,13 @@ jobs:
           python -m database.migrate 2>&1 | tee output/acceptance-diagnostics/authority-migrations.log
           python -m database.migrate 2>&1 | tee output/acceptance-diagnostics/authority-rerun.log
           docker exec faos-active-run-database-1 psql -U postgres -d claim2car_test -v ON_ERROR_STOP=1 -c 'TABLE public.faos_migration_history;' > output/acceptance-diagnostics/migration-ledger.txt
+      - name: Run full post-cutover counted database regression suite
+        run: |
+          mkdir -p output/acceptance-diagnostics/post-cutover
+          python scripts/run_counted_tests.py database --record output/acceptance-diagnostics/post-cutover/counted-tests.json
       - name: Post-cutover authority and validation diagnostics
+        env:
+          FAOS_COUNTED_DATABASE_REPORT: output/acceptance-diagnostics/post-cutover/counted-tests.json
         run: |
           set -o pipefail
           python -m scripts.database_authority_diagnostics 2>&1 | tee output/acceptance-diagnostics/diagnostics.log
@@ -80,7 +87,7 @@ jobs:
                       'classification':'executable-db-01-through-db-14-gate-results','gate_passes_awarded':0,
                       'criteria_passes':0,'overall_acceptance':'NOT ACCEPTED',
                       'component_phase':'legacy primary through0007; isolated full-authority migration and integration databases',
-                      'diagnostic_phase':'primary after full default migration plan through0028'}
+                      'diagnostic_phase':'primary after full default migration plan through0029'}
           metadata['diagnostic_report_present'] = report.is_file()
           if report.is_file():
               metadata['classification'] = value.get('classification', metadata['classification'])
@@ -93,10 +100,17 @@ jobs:
           metadata['counted_test_report_count'] = len(counted)
           if len(counted) == 1:
               value = json.loads(counted[0].read_text())
-              allowed = ('suite','discovered','executed','failures','errors','skipped','expected_failures','unexpected_successes','successful','tests')
+              allowed = ('suite','execution_profile','discovered','executed','failures','errors','skipped','expected_failures','unexpected_successes','successful','not_applicable_count','not_applicable_tests','tests')
               record = {k:value[k] for k in allowed if k in value}
               record['primary_schema_phase'] = 'pre-cutover-through0007; not a complete primary-post-cutover regression suite'
-              (out/'counted-tests.json').write_text(json.dumps(record,indent=2)+'\n')
+              (out/'pre-cutover-counted-tests.json').write_text(json.dumps(record,indent=2)+'\n')
+          post = Path('output/acceptance-diagnostics/post-cutover/counted-tests.json')
+          if post.is_file():
+              value = json.loads(post.read_text())
+              allowed = ('suite','execution_profile','discovered','executed','failures','errors','skipped','expected_failures','unexpected_successes','successful','not_applicable_count','not_applicable_tests','tests')
+              record = {k:value[k] for k in allowed if k in value}
+              record['primary_schema_phase'] = 'post-cutover-full-authority'
+              (out/'post-cutover-counted-tests.json').write_text(json.dumps(record,indent=2)+'\n')
           (out/'evidence-metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
       - name: Upload evidence even on failure
         if: always()

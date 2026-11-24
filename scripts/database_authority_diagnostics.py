@@ -358,6 +358,12 @@ def run(report):
     report['diagnostics_successful'] = len(report['checks'])==14 and all(row['status']=='PASS' for row in report['checks'])
 
 def load_counted_database_report():
+    configured = os.environ.get('FAOS_COUNTED_DATABASE_REPORT')
+    if configured:
+        path = Path(configured)
+        if not path.is_file():
+            raise RuntimeError('CONFIGURED_POSTCUTOVER_COUNTED_REPORT_UNAVAILABLE')
+        return path, json.loads(path.read_text(encoding='utf-8'))
     candidates = sorted(Path('output/database-runs').glob('*/database-evidence/counted-tests.json'))
     if len(candidates) != 1:
         raise RuntimeError('EXACTLY_ONE_COUNTED_DATABASE_TEST_REPORT_REQUIRED')
