@@ -145,21 +145,20 @@ def test_acord_xml_contains_extensions():
     assert "ForensicExtension" in xml or "gavel" in xml.lower() or "RTV" in xml
 
 
-def test_build_dispatch_four_packages():
-    result = build_dispatch(
-        _sample_adj(),
-        photo_hashes=["a" * 64, "b" * 64],
-        vin="1HGCM82633A004352",
-        vehicle={"year": 2019, "make": "Honda", "model": "Civic"},
-    )
-    assert len(result.packages) == 4
-    roles = {p.role for p in result.packages}
-    assert roles == {"owner", "dealer", "shop", "carrier"}
-    carrier = next(p for p in result.packages if p.role == "carrier")
-    assert carrier.acord_xml is not None
-    assert result.anchor.get("merkle_root")
-    owner = next(p for p in result.packages if p.role == "owner")
-    assert "vin" not in owner.payload or owner.payload.get("vin") is None
+def test_dispatch_builder_blocks_caller_asserted_integrity_and_photo_hashes():
+    import pytest
+    sample = _sample_adj()
+    sample["integrity"] = {
+        "s_i": 1.0, "tier": "pass", "c_hash": 1.0, "c_chain": 1.0,
+        "all_or_nothing_collapse": False,
+    }
+    with pytest.raises(DispatchBlocked, match="SERVER_VERIFIED_EVIDENCE_CONTEXT_REQUIRED"):
+        build_dispatch(
+            sample,
+            photo_hashes=["a" * 64, "b" * 64],
+            vin="1HGCM82633A004352",
+            vehicle={"year": 2019, "make": "Honda", "model": "Civic"},
+        )
 
 
 def test_no_owner_payout():
@@ -170,34 +169,12 @@ def test_no_owner_payout():
     assert not hasattr(C, "OWNER_CONSENT_PAYOUT_USD")
 
 
-def test_dispatch_fails_closed_without_integrity_or_evidence_hashes():
+def test_dispatch_never_accepts_forged_or_incomplete_context():
     import pytest
-    sample = _sample_adj()
-    sample.pop("integrity")
-    with pytest.raises(DispatchBlocked, match="DISPATCH_INTEGRITY_REQUIRED"):
-        build_dispatch(sample, photo_hashes=["a" * 64])
-    with pytest.raises(DispatchBlocked, match="DISPATCH_EVIDENCE_HASHES_REQUIRED"):
-        build_dispatch(_sample_adj(), photo_hashes=[])
-
-
-def test_dispatch_fails_closed_for_duplicate_or_invalid_photo_hashes():
-    import pytest
-    sample = _sample_adj()
-    with pytest.raises(DispatchBlocked, match="DISPATCH_DUPLICATE_EVIDENCE_HASH"):
-        build_dispatch(sample, photo_hashes=["a" * 64, "a" * 64])
-    with pytest.raises(DispatchBlocked, match="DISPATCH_INVALID_EVIDENCE_HASH"):
-        build_dispatch(sample, photo_hashes=["not-a-hash"])
-
-
-def test_dispatch_fails_closed_for_integrity_review_and_chain_collapse():
-    import pytest
-    sample = _sample_adj()
-    sample["integrity"]["c_chain"] = 0.0
-    sample["integrity"]["c_hash"] = 0.0
-    sample["integrity"]["all_or_nothing_collapse"] = True
-    with pytest.raises(DispatchBlocked, match="DISPATCH_INTEGRITY_NOT_PASSED"):
-        build_dispatch(sample, photo_hashes=["a" * 64])
-    sample = _sample_adj()
-    sample["hold_for_review"] = True
-    with pytest.raises(DispatchBlocked, match="DISPATCH_REVIEW_HOLD"):
-        build_dispatch(sample, photo_hashes=["a" * 64])
+    for sample, hashes in (
+        (_sample_adj(), ["a" * 64]),
+        ({}, ["a" * 64]),
+        (_sample_adj(), []),
+    ):
+        with pytest.raises(DispatchBlocked, match="SERVER_VERIFIED_EVIDENCE_CONTEXT_REQUIRED"):
+            build_dispatch(sample, photo_hashes=hashes)
