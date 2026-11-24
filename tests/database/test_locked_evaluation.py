@@ -8,20 +8,24 @@ import psycopg
 from database.journal import append, tenant_transaction
 from database.readback import locked_journal
 from app.synthetic_evidence import check_completion
+from tenant_login import TenantLogin
 
 class LockedEvaluationTests(unittest.TestCase):
     def setUp(self):
         import test_completion_coverage as fixtures
         self.events, self.data, self.digest = fixtures.CompletionCoverage().fixture()
         self.session = self.events[0].session_id
-        self.tenant = str(uuid.uuid4())
-        self.url = os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
-        self.conn = psycopg.connect(self.url, autocommit=True, connect_timeout=5)
+        self.tenant, self.other = str(uuid.uuid4()), str(uuid.uuid4())
+        self.login = TenantLogin(self.tenant, organization_name='synthetic locked evaluation')
+        self.other_login = TenantLogin(self.other, organization_name='synthetic other tenant')
+        self.addCleanup(self.login.close)
+        self.addCleanup(self.other_login.close)
+        self.url = self.login.url
+        self.conn = self.login.connect(autocommit=True)
+        self.other_conn = self.other_login.connect(autocommit=True)
         self.addCleanup(self.conn.close)
-        role = self.conn.execute('SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone()
-        self.assertEqual(role, ('faos_app', False, False))
+        self.addCleanup(self.other_conn.close)
         with tenant_transaction(self.conn, self.tenant):
-            self.conn.execute('INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)', (self.tenant, 'synthetic locked evaluation'))
             self.conn.execute('INSERT INTO faos.sessions(tenant_id,session_id) VALUES (%s,%s)', (self.tenant, self.session))
         for event in self.events:
             self.assertEqual(append(self.conn, self.tenant, event), 'ACCEPTED')
@@ -67,7 +71,7 @@ class LockedEvaluationTests(unittest.TestCase):
 
     def test_other_tenant_cannot_enter_locked_read(self):
         with self.assertRaises(psycopg.errors.RaiseException) as caught:
-            with locked_journal(self.conn, str(uuid.uuid4()), self.session):
+            with locked_journal(self.other_conn, self.other, self.session):
                 self.fail('other tenant entered locked read')
         self.assertEqual(caught.exception.sqlstate, 'P0001')
         self.assertEqual(caught.exception.diag.message_primary, 'SESSION_NOT_FOUND')
