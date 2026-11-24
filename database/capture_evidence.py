@@ -24,6 +24,7 @@ from app.vin_guard import validate_vin
 from database.capture_sessions import (
     CaptureAuthorizationError,
     CaptureSessionConflict,
+    CaptureSessionNotFound,
     CaptureSessionStore,
 )
 
