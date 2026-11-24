@@ -260,7 +260,7 @@ def verify_db_01(context):
         database and database[0] == "claim2car_test"
         and "PostgreSQL" in str(database[1] if len(database) > 1 else "")
         and {"plpgsql", "postgis", "pgcrypto"}.issubset(extensions)
-        and len(inventory) == 29
+        and len(inventory) == 30
         and connections_ok
         and context.get("environment_is_synthetic") is True
     )
@@ -278,7 +278,7 @@ def verify_db_02(context):
     if len(names) != 29 or any(not name.startswith(prefix) for name, prefix in zip(names, expected)):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("ORDERED_COMPLETE_MIGRATION_INVENTORY")
-    if (len(inventory) != 29 or any(
+    if (len(inventory) != 30 or any(
             not isinstance(row, (list, tuple)) or len(row) != 2
             or not isinstance(row[1], str) or len(row[1]) != 64
             or any(character not in "0123456789abcdef" for character in row[1])
@@ -344,7 +344,7 @@ def verify_db_14(context):
             or not diagnostics.get("commit")
             or not diagnostics.get("candidate_commit")
             or not diagnostics.get("tested_checkout_commit")
-            or len(diagnostics.get("migration_inventory") or []) != 29):
+            or len(diagnostics.get("migration_inventory") or []) != 30):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("SAME_RUN_COMPLETE_GATE_EVIDENCE_AND_FAILURE_ACCOUNTING")
     return result
