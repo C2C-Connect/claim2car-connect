@@ -1,7 +1,7 @@
 # Dispatch build containment
 
-Status: proposed implementation on safety/synthetic-provenance-integration.
-Baseline: f16be7405ebf88ea7fab95394e6b482f2e506b6d.
+Status: enforced in main; HTTP and direct builder containment verified.
+Current boundary: no dispatch packages may be built from caller-supplied adjudication dictionaries or photo-hash lists.
 
 ## Scope
 
@@ -11,7 +11,7 @@ This intentionally disables HTTP package construction until server-owned authori
 
 ## Limits
 
-This is containment of one HTTP handler, not a complete provenance implementation. Internal build_dispatch calls, report builders, analysis and triage routes, redaction, public verification and the process-local ledger remain unchanged. Internal synthetic previews are not made operationally safe by this change. No model loading, durable anchoring, tenant authorization, financial eligibility, consent enforcement or deployment readiness is established.
+The direct Python `build_dispatch` function now also raises `SERVER_VERIFIED_EVIDENCE_CONTEXT_REQUIRED`; a fabricated integrity dictionary and arbitrary photo-hash list cannot generate packages. This is still containment, not a complete provenance implementation: report builders, analysis modules, redaction, legacy public-verification module code, and the process-local ledger have separate audit findings. No tenant-bound verified-evidence context, durable recipient authorization, or external checkpoint is implied. No model loading, durable anchoring, tenant authorization, financial eligibility, consent enforcement or deployment readiness is established.
 
 No commercial rules, migrations, runtime packaging, real-data collection, external dispatch, payments, merge or deployment are changed or authorized.
 
