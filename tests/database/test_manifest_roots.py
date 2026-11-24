@@ -53,6 +53,7 @@ class ManifestRootTests(unittest.TestCase):
             self.addCleanup(self._drop_fixture_roles)
             self.app_url=make_conninfo(self.admin_url,dbname=dbname,user=self.app_role,password=self.app_password)
             fixture_url=make_conninfo(self.admin_url,dbname=dbname,user=self.fixture_role,password=self.fixture_password)
+            self.fixture_url=fixture_url
             self.conn=psycopg.connect(self.app_url,autocommit=True)
             self.fixture_conn=psycopg.connect(fixture_url,autocommit=True)
             self.addCleanup(self.fixture_conn.close)
@@ -62,6 +63,7 @@ class ManifestRootTests(unittest.TestCase):
             for event in self.events:
                 self.assertEqual(append(self.fixture_conn,self.tenant,event),'ACCEPTED')
         else:
+            self.fixture_url=self.admin_url
             self.conn=psycopg.connect(self.app_url,autocommit=True)
             self.addCleanup(self.conn.close)
             self.assertEqual(self.conn.execute('SELECT current_user,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone(),('faos_app',False,False))
