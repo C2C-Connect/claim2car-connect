@@ -110,7 +110,7 @@ Every row explicitly lists its database dependencies, additional evidence not su
 | Component | Level | Current-head SHA | Workflow evidence | Gates satisfied | Gates remaining | Blockers |
 |---|---|---|---|---|---|---|
 | Runtime manifest registration (PR #185) | Implemented | `0431dbaf6e1a3bb3348f6d94c094e893543e513c` | Full suite #1125, DB authority #1196, FastAPI #1182 passed; integrated smoke #671 cancelled and rerun pending | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Independent inspection of authority artifact; completed integrated smoke rerun; prove restart, idempotency, independent verification, tamper rejection and audit at exact current head |
-| Evidence-linked damage reports (PR #186) | Implemented | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | Five of thirteen listed workflow runs completed successfully; six are in progress at snapshot | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Complete all exact-head workflows; durable report registry; restart retrieval; immutable original-byte reference; per-box source linkage and disclosure; PDF/JSON parity; tamper audit; rebase after PR #185 |
+| Evidence-linked damage reports (PR #186) | Implemented | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | Six of thirteen listed workflow runs completed successfully; seven are in progress at snapshot | None formally awarded by this release registry | GATE-02, GATE-03, GATE-04, GATE-05; DB-01–DB-14 certification | Complete all exact-head workflows; durable report registry; restart retrieval; immutable original-byte reference; per-box source linkage and disclosure; PDF/JSON parity; tamper audit; rebase after PR #185 |
 | Persistent integrated staging | Designed | No deployed revision | No deployment run proving persistent staging | None | GATE-04, GATE-05 and all dependent gates | No approved cost ceiling and no completed provisioning/deployment evidence |
 | Physical-device qualification | Designed | No qualified device revision | No physical-device run | None | GATE-06 | Physical iPad Pro 11-inch M5 qualification evidence absent |
 | Square sandbox reconciliation | Implemented status not established by this registry | No current-head SHA/run established | No complete current-head sandbox evidence located | None | GATE-01, GATE-07 | Success/duplicate/failure/UNKNOWN/reversal/reconciliation evidence and signed governance terms absent |
@@ -143,7 +143,20 @@ Before it can be considered Verified or merged, current-head evidence must prove
 
 Current candidate: SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. The latest commit adds HTTP assertions for source storage key, SHA-256, reviewer timestamp, disclosure text, and durable tamper audit. The PR description still states that report versions are stored in process memory; that is a merge blocker until replaced with a durable report registry and tested across restart.
 
-## 7. Owner and environment approvals
+## 7. Live-source discrepancies requiring explicit reconciliation
+
+The owner directive's canonical capture identifiers are `12-v1` and `16-v1`. The current repository acceptance matrix on the base revision also describes `claims2car-16-v2` as selectable, `claims2car-16-v1` as the default, and `claims2car-12-v1` as the legacy alternative. This is a material protocol-version naming and default-state discrepancy, not a cosmetic documentation difference.
+
+Until the actual contracts, migrations, API validators, frontend selector, session-creation defaults, and report/reviewer consumers are reconciled against the owner's canonical `12-v1` / `16-v1` decision:
+- do not enable or silently rename any protocol;
+- do not reinterpret existing sessions;
+- persist and display the exact protocol identifier stored at session creation;
+- treat any `16-v2` session as a distinct immutable protocol, not as `16-v1`;
+- report the discrepancy in every acceptance decision that depends on capture protocol.
+
+The owner directive supersedes stale repository prose where it conflicts, while the live code remains the source of truth for what is actually implemented. This registry does not rewrite historical protocol records or certify compatibility.
+
+## 8. Owner and environment approvals
 
 | Approval / condition | Required approver | Current status |
 |---|---|---|
@@ -156,7 +169,7 @@ Current candidate: SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. The latest co
 
 No unsigned draft proposing $100 changes the canonical $110 disabled record. No staging authorization in this registry waives the requirement for a written plan and approved spending ceiling. No merge is authorized by this file.
 
-## 8. Change control
+## 9. Change control
 
 - Update this registry only with exact current refs, workflow run numbers, run URLs, artifact identifiers, environment identity, and test results.
 - Recompute the crosswalk when a gate's implementation, test mapping, or dependency changes.
