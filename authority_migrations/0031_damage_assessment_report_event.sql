@@ -1,0 +1,14 @@
+-- Append-only audit event for an image-rich damage assessment PDF.
+-- The report bytes are stored as an immutable original-byte artifact; this event
+-- binds that artifact digest and revision to the sealed evidence manifest.
+ALTER TABLE faos.events DROP CONSTRAINT events_kind_check;
+ALTER TABLE faos.events ADD CONSTRAINT events_kind_check CHECK(kind IN (
+ 'SESSION_CREATED','CONSENT_RECORDED','VEHICLE_RECORDED',
+ 'ARTIFACT_REGISTERED','QUALITY_RECORDED','MANIFEST_SEALED',
+ 'REVIEW_RECORDED','SESSION_ABORTED',
+ 'INCIDENT_INTAKE_CONSENT_RECORDED','INCIDENT_INTAKE_RECORDED',
+ 'VEHICLE_DECODE_CONSENT_RECORDED','VEHICLE_PROFILE_DECODED',
+ 'CAPTURE_EXCEPTION_RECORDED','CAPTURE_EXCEPTION_RESOLVED',
+ 'CAPTURE_SESSION_PAUSED','CAPTURE_SESSION_RESUMED',
+ 'DAMAGE_ASSESSMENT_REPORT_GENERATED'
+));
