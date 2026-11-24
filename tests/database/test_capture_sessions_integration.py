@@ -158,6 +158,42 @@ class CaptureSessionIntegration(unittest.TestCase):
                 reason='Synthetic integration verification; no real claim decision.')
             self.assertEqual(review['manifest_digest'], sealed['manifest_digest'])
             self.assertNotIn('1HGCM82633A004352', str(details))
+            report_bytes = b"%PDF-1.4\\n% synthetic immutable damage assessment\\n"
+            report_request = uuid.uuid4()
+            request_digest = hashlib.sha256(b"synthetic-damage-report-request").hexdigest()
+            report_sha = hashlib.sha256(report_bytes).hexdigest()
+            report = service.record_damage_assessment_report(
+                self.reviewer_auth(), case.capture_session_id,
+                request_id=report_request, pdf_bytes=report_bytes,
+                report_sha256=report_sha, report_revision=1,
+                finding_ids=["D-001"], estimate_total_cents=18750,
+                request_payload_sha256=request_digest,
+            )
+            self.assertEqual(report["manifest_digest"], sealed["manifest_digest"])
+            self.assertEqual(report["report_revision"], 1)
+            self.assertFalse(report["replayed"])
+            retry = service.record_damage_assessment_report(
+                self.reviewer_auth(), case.capture_session_id,
+                request_id=report_request, pdf_bytes=report_bytes,
+                report_sha256=report_sha, report_revision=1,
+                finding_ids=["D-001"], estimate_total_cents=18750,
+                request_payload_sha256=request_digest,
+            )
+            self.assertTrue(retry["replayed"])
+            retrieved = service.retrieve_damage_assessment_report(
+                self.reviewer_auth(), case.capture_session_id, report["report_artifact_id"],
+            )
+            self.assertEqual(retrieved["pdf_bytes"], report_bytes)
+            self.assertEqual(retrieved["metadata"]["report_sha256"], report_sha)
+            withdrawn = service.record_consent(
+                self.owner_auth(), case.capture_session_id,
+                request_id=uuid.uuid4(), accepted=False, scope="capture_review",
+            )
+            self.assertEqual(withdrawn["deleted_original_artifacts"], len(originals) + 1)
+            with self.assertRaises(CaptureSessionConflict):
+                service.retrieve_damage_assessment_report(
+                    self.reviewer_auth(), case.capture_session_id, report["report_artifact_id"],
+                )
         persisted = self.store.get(self.auth(), case.capture_session_id)
         self.assertEqual((persisted.scope, persisted.claim_id, persisted.owner_actor_id),
                          ('persistent-claim-case', claim_id, 'claim-owner-0'))
