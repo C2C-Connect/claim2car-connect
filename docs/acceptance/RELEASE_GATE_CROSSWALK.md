@@ -11,9 +11,9 @@
 
 GATE-01 through GATE-07 are release-level acceptance gates. DB-01 through DB-14 are a database-foundation subset. Passing 14/14 DB gates does **not** pass any release gate automatically and does not establish deployment or operational acceptance.
 
-The directive's earlier 0/14 figure was the pre-rerun technical baseline. Newer workflow artifacts now show **14/14 executable DB checks PASS** on the prior PR #185 candidate and PR #186 candidate. This is a technical result, not owner certification: the owner-directed formal certification status remains **0/14 formally certified**, and overall release acceptance remains **NOT ACCEPTED**.
+The directive's 0/14 figure is retained as the **owner-certified** DB-gate status pending formal owner review. Newer exact-head workflow artifacts now show **14/14 executable DB checks PASS** technically on current PR #185 SHA `a7174d45...` and PR #186 stack SHA `0a4b608...`. These are distinct statuses: technical runner result 14/14; owner-certified DB gates 0/14 until the owner formally accepts the registry. Overall release acceptance remains **NOT ACCEPTED**.
 
-- PR #185 run #1196: 14/14 executable DB checks PASS at prior candidate SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`; current PR #185 head is `a7174d45a02cc6b8312a00b1ca31671019726728` after an additional seal-replay uniqueness assertion, and authority rerun #1203 is in progress.
+- PR #185 run #1203: 14/14 executable DB checks PASS at current candidate SHA `a7174d45a02cc6b8312a00b1ca31671019726728`.
 - PR #186 run #1200: 14/14 executable DB checks PASS at candidate SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`.
 
 Both artifacts report 14 PASS rows and `gate_passes_awarded: 14`; their `overall_acceptance: ACCEPTED` label is scoped to the workflow's DB contract and must not be treated as owner certification or release acceptance. Their counted DB lanes executed 408/408 and 409/409 tests respectively, with zero failures, errors, or skips. Tested checkout SHAs are PR merge refs: `40a9e5298b2e6eb484177319552ff4ccc5042448` (PR #185 candidate merged into main base `55f69790...`) and `63ba944f0809212e968199b6afd8ab5dfac086f5` (PR #186 candidate merged into PR #185 base `0431dbaf...`). Candidate SHA and tested merge-ref SHA remain separately recorded.
@@ -87,7 +87,7 @@ PR #186 must be rebased onto the resulting main revision after PR #185 merges, a
 **Required environment:** synthetic PostgreSQL 16 with PostGIS 3.4 and required extensions; distinct admin, migrator and restricted application roles; complete ordered migrations; no production credentials or participant data.  
 **Executable runner:** `python tests/database/verify_gates.py` plus the mapped integration tests and SQL checks.  
 **Approver:** Product Owner for formal release use; the technical DB award is not a substitute for owner/counsel approval.  
-**Current candidate result:** DB-01–DB-14 **14/14 PASS** on PR #185 run #1196 and PR #186 run #1200. Re-run after any source change or rebase.  
+**Current candidate result:** DB-01–DB-14 **14/14 PASS** on PR #185 run #1203 and PR #186 run #1200. Re-run after any source change or rebase.  
 **Blocking:** These gates are release dependencies, principally through GATE-02; their pass does not pass GATE-02 as a whole.
 
 | Gate | Requirement | Executable tests / SQL evidence | Current result | Additional retained evidence | Blocking |
@@ -128,7 +128,7 @@ Every gate explicitly lists DB dependencies, non-DB evidence, and current-head w
 | Component | Level | Current-head SHA | Evidence | Gates satisfied | Gates remaining | Blockers |
 |---|---|---|---|---|---|---|
 | Runtime manifest registration (PR #185) | Verified | `a7174d45a02cc6b8312a00b1ca31671019726728` | 13/13 workflows passed; Full suite #1132 (1,283 tests, zero skips); DB authority #1203 (408/408, zero skips, 14/14); Integrated smoke #676; artifact 14973725808. | DB-01–DB-14 | GATE-01 through GATE-05 | Owner final SHA-specific merge approval required; PR #186 must be rebased after #185 merges. |
-| Evidence-linked damage reports (PR #186) | Implemented | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | Five owner-defined report behaviors exercised in HTTP/PostgreSQL integration; Full suite #1129; DB authority #1200 (409/409, zero DB skips); Integrated smoke #675; DB technical checks 14/14 PASS. | PR-specific report criteria 1–4 have implementation/test evidence; no release gate formally certified. | GATE-01 through GATE-05; rebase and current-head rerun | PR #186 is stacked on old PR #185 base `0431dbaf...`; rebase onto resulting main after PR #185 merge and rerun. Full suite reports seven legacy-schema N/A skips, all executed and passed in authority lane; PR description is stale about persistence. |
+| Evidence-linked damage reports (PR #186) | Verified on prior stack | `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` | 13/13 workflows passed; Full suite #1129; DB authority #1200 (409/409, zero skips, 14/14); FastAPI #1186; Integrated smoke #675; artifact 14972002960. | DB-01–DB-14 technical PASS on this stack | GATE-01 through GATE-05; rebase verification | PR #186 is based on old PR #185 head `0431dbaf...`; rebase onto current PR #185 head `a7174d45...` and rerun all workflows; reconcile stale PR description before owner review. |
 | Persistent integrated staging | Designed | No deployed revision | No deployment run | None | GATE-04, GATE-05 | Written plan and approved spending ceiling required before provisioning. |
 | Physical-device qualification | Designed | No qualified device revision | No physical-device run | None | GATE-06 | Physical iPad Pro 11-inch M5 qualification absent. |
 | Square sandbox reconciliation | Designed / implementation status not established here | No current-head SHA/run established | No complete current-head sandbox evidence located | None | GATE-01, GATE-07 | Full success/duplicate/failure/UNKNOWN/reversal/reconciliation matrix and signed governance terms absent. |
