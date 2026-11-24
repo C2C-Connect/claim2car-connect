@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from hashlib import sha256
+from io import BytesIO
 from uuid import UUID
+
+from PIL import Image
 
 from backend.app.anchor.ledger import (
     IntegerFinancialLedger, LedgerJournalEntry, LedgerPostingLine, PartnerAcceptanceRecord,
@@ -11,6 +15,9 @@ from backend.app.reports.forensic_pdf import (
     DossierGenerationError,
     FourTierDossierService,
     SourceEvidenceBinding,
+)
+from backend.app.reports.damage_assessment import (
+    CameraAngle, DamageAssessment, DamageEvidenceImage, DamageFinding,
 )
 
 
@@ -96,6 +103,54 @@ class FourTierDossierTests(unittest.TestCase):
             self.service.retrieve_and_audit_download(
                 session_id="session-1", document_type="DEALER_DOSSIER", recipient_actor_id="wrong",
                 recipient_role="shop", recipient_tenant_id=self.tenant,
+            )
+
+    def test_damage_assessment_report_requires_manifest_bound_images_and_review(self):
+        image_buffer = BytesIO()
+        Image.new("RGB", (320, 240), "silver").save(image_buffer, format="JPEG")
+        original = image_buffer.getvalue()
+        evidence = DamageEvidenceImage(
+            artifact_id="artifact-1", capture_slot="front_right_oblique",
+            original_bytes=original, expected_sha256=sha256(original).hexdigest(),
+            captured_at="2026-11-08T18:00:00+00:00",
+            camera_angle=CameraAngle(yaw_degrees=30, pitch_degrees=0, roll_degrees=0, source="CAPTURE_METADATA"),
+        )
+        finding = DamageFinding(
+            finding_id="D-001", component="Front fender",
+            vehicle_location="Passenger-side front quarter",
+            damage_type="surface deformation candidate",
+            observation="Localized visible contour change",
+            evidence_artifact_id="artifact-1",
+            bbox_normalized=(.2,.2,.6,.7),
+            status="CONFIRMED_BY_REVIEWER",
+            reviewer_actor_id="reviewer-1", reviewed_at="2026-11-08T18:01:00+00:00",
+        )
+        assessment = DamageAssessment(
+            session_id="session-1", vehicle_description="2022 Example Sedan",
+            report_revision=1, findings=(finding,), evidence_images=(evidence,),
+        )
+        report = self.service.generate_damage_assessment_report(
+            consent=self.consent, binding=self.binding, assessment=assessment,
+            generated_by="forensic-report", now_iso=self.consent.recorded_at,
+        )
+        self.assertEqual(report.document_type, "DAMAGE_ASSESSMENT_REPORT")
+        self.assertTrue(report.pdf_bytes.startswith(b"%PDF-"))
+        self.assertIn(b"/Subtype /Image", report.pdf_bytes)
+        self.assertEqual(report.pages[0]["findings"][0]["evidence_artifact_id"], "artifact-1")
+        self.assertEqual(report.pages[0]["findings"][0]["bbox_normalized"], [.2,.2,.6,.7])
+        with self.assertRaisesRegex(DossierGenerationError, "DAMAGE_REPORT_IMAGE_NOT_IN_VERIFIED_MANIFEST"):
+            unbound = DamageAssessment(
+                session_id="session-1", vehicle_description="2022 Example Sedan",
+                report_revision=2, findings=(),
+                evidence_images=(DamageEvidenceImage(
+                    artifact_id="not-in-manifest", capture_slot="front",
+                    original_bytes=original, expected_sha256=sha256(original).hexdigest(),
+                    captured_at="2026-11-08T18:00:00+00:00",
+                ),),
+            )
+            self.service.generate_damage_assessment_report(
+                consent=self.consent, binding=self.binding, assessment=unbound,
+                generated_by="forensic-report",
             )
 
     def test_consent_withdrawal_blocks_generation_and_revokes_versions(self):
