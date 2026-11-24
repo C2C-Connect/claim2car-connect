@@ -3,7 +3,7 @@
 - **Merge commit:** `55f69790df123a4602196c3c474e143808c4b87e`; tested head `95692eaf30f76ca9ab8b7c0cf71c4bcf9fac5d68`; **13/13 workflows passed**.
 - **Full suite:** 1,064 passed, 7 skipped, 31 warnings, 218 subtests.
 - **Authority acceptance:** 407/407 counted tests passed; DB-01–DB-14 14/14 PASS; 340 tenant-isolation assertions.
-- **Active PR #185:** `cto/m1-runtime-manifest-registration`, current branch head (verify live PR #185 before acting). It wires root registration into the live seal/review path through migration 0030, in the same tenant transaction, with exact protocol slot-set validation and root checks before review access. Corrected migration-owner privileges and 30-migration inventory fixtures are awaiting a fresh full CI/authority run.
+- **Active PR #185:** `cto/m1-runtime-manifest-registration`, current branch head (verify live PR #185 before acting). It wires root registration into the live seal/review path through migration 0030, in the same tenant transaction, with exact protocol slot-set validation and root checks before review access. Corrected migration-owner privileges, exact slot-set validation, reviewer/seal-actor binding, event-chain backfill fixture ordering, and 30-migration checksum/order fixtures are awaiting a fresh full CI/authority run.
 - **Merge gate:** all 13 workflows green plus DB-01–DB-14 accepted on the exact current head. PR #185 is not merged.
 
 **M1:** chain-tip/context binding is in main; live runtime registration is the remaining integration step. **Next after M1:** M2 original-artifact provenance, followed by persisted observations, calibrated measurements, source-backed findings, and deterministic report generation. Do not use the legacy in-memory dossier service as a production report path.
