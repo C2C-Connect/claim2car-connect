@@ -30,6 +30,7 @@ class CompletionReceiptTests(unittest.TestCase):
         if context:
             with tenant_transaction(f.fixture_conn, f.tenant):
                 return f.fixture_conn.execute(RECORD, values or self.values()).fetchone()[0]
+        # Missing tenant context must fail even for a correctly bound login.
         with f.fixture_conn.transaction():
             return f.fixture_conn.execute(RECORD, values or self.values()).fetchone()[0]
 
