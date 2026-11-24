@@ -2,7 +2,7 @@
 
 **Document ID:** C2C-REL-AC-001  
 **Version:** 1.1  
-**Snapshot:** 2026-11-24 23:24 UTC  
+**Snapshot:** 2026-11-24 23:30 UTC  
 **Repository:** `C2C-Connect/claim2car-connect`  
 **Registry branch base:** `55f69790df123a4602196c3c474e143808c4b87e`  
 **Authority:** Current owner Developer Execution Directive. This file records evidence; it does not authorize merges, deployment, payments, dispatch, or participant use.
@@ -36,7 +36,7 @@ PR #186 must be rebased onto the resulting main revision after PR #185 merges, a
 
 ### 2.2 Current PR #185 head — `a7174d45a02cc6b8312a00b1ca31671019726728`
 
-<badge>13/13 workflows passed</badge> The latest test change explicitly counts the `MANIFEST_SEALED` journal row after an identical seal replay and asserts the count remains exactly one.
+**13/13 workflows passed.** The latest test change explicitly counts the `MANIFEST_SEALED` journal row after an identical seal replay and asserts the count remains exactly one.
 
 | Workflow | Run | Result | Evidence |
 |---|---:|---|---|
@@ -60,7 +60,7 @@ PR #186 must be rebased onto the resulting main revision after PR #185 merges, a
 
 ### 2.3 PR #186 — candidate SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`
 
-<badge>13/13 workflows passed on its current stack head</badge> PR #186 is still based on the prior PR #185 head `0431dbaf...`; it must be rebased onto `a7174d45...` and all workflows rerun before merge.
+**13/13 workflows passed on its current stack head.** PR #186 is still based on the prior PR #185 head `0431dbaf...`; it must be rebased onto `a7174d45...` and all workflows rerun before merge.
 
 | Workflow | Run | Result | Evidence |
 |---|---:|---|---|
@@ -116,7 +116,7 @@ Every gate explicitly lists DB dependencies, non-DB evidence, and current-head w
 | Release gate | DB dependencies | Additional evidence not supplied by DB gates | Current-head proof and status |
 |---|---|---|---|
 | **GATE-01 — Governance and commercial compliance** | DB-06, DB-07, DB-09, DB-11, DB-12, DB-14 | Owner-approved commercial terms; prohibited owner incentive blocked in contracts/denylist/tests/ledger; operator compensation disabled; dealer/shop earning-event rules; signed partner terms; counsel review; consent and distribution authority. | **NOT ACCEPTED.** PR #185 Full suite #1125 and DB authority #1196 are technical evidence only. No workflow substitutes for owner, counsel or partner signatures. |
-| **GATE-02 — Security and database authority** | DB-01 through DB-14 (all fourteen) | App/API authorization, server-derived actor and tenant, private internal routes, secret handling, TLS, threat review, and proof deployed configuration equals tested configuration. | DB subset **14/14 PASS**: PR #185 DB authority #1196 at SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c` (408/408, zero DB skips); PR #186 DB authority #1200 at SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` (409/409, zero DB skips). **GATE-02 NOT ACCEPTED** until the additional security and deployed-configuration evidence is complete. |
+| **GATE-02 — Security and database authority** | DB-01 through DB-14 (all fourteen) | App/API authorization, server-derived actor and tenant, private internal routes, secret handling, TLS, threat review, and proof deployed configuration equals tested configuration. | DB subset **14/14 PASS**: PR #185 DB authority #1203 at SHA `a7174d45a02cc6b8312a00b1ca31671019726728` (408/408, zero DB skips); PR #186 DB authority #1200 at SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` (409/409, zero DB skips). **GATE-02 NOT ACCEPTED** until the additional security and deployed-configuration evidence is complete. |
 | **GATE-03 — Operator and reviewer product experience** | DB-03, DB-04, DB-05, DB-06, DB-07, DB-08, DB-09, DB-13, DB-14 | Usable authenticated operator/reviewer journey; consent UX; protocol version visible to consumers; VIN/capture workflow; original-byte retrieval; reviewer attribution/reason; human usability and recovery. | PR #185 Full suite #1125, FastAPI #1182 and Integrated smoke #671 passed; PR #186 Full suite #1129, FastAPI #1186 and Integrated smoke #675 passed. These are synthetic automated journeys, not a field/operational acceptance run. **NOT ACCEPTED.** |
 | **GATE-04 — Durable storage, consent deletion and PITR drills** | DB-01, DB-02, DB-04, DB-07, DB-09, DB-10, DB-12, DB-13, DB-14 | Encrypted remote object storage; consent withdrawal deletion of originals and mutable incident rows; durable revocation event; downstream fail-closed behavior; backup policy; PITR and witnessed restore drill; post-restore integrity check. | Synthetic local-store deletion and tamper tests pass in PR #185/#186. No encrypted remote object-store lifecycle or PITR/restore drill is recorded. **NOT ACCEPTED.** |
 | **GATE-05 — Persistent integrated staging** | DB-01, DB-02, DB-03, DB-04, DB-05, DB-07, DB-08, DB-09, DB-10, DB-11, DB-12, DB-13, DB-14 | Persistent PostgreSQL 16/PostGIS 3.4, encrypted durable object storage, real auth, TLS, managed secrets, backups/restore drills, monitoring/alerts, deployed immutable image and restart-surviving operator-to-reviewer journey. Restricted Railway/container smoke is not staging. | PR #185 Integrated smoke #671 and PR #186 Integrated smoke #675 passed, but both are disposable CI containers. No persistent staging deployment exists. **NOT ACCEPTED.** |
@@ -153,14 +153,14 @@ The code's seal replay path checks the existing journal event ID before append; 
 
 The current branch's `database/capture_evidence.py` implements `record_damage_assessment_report` and `retrieve_damage_assessment_report`. PDF and JSON carrier bytes are stored in the durable artifact store; the PostgreSQL journal event `DAMAGE_ASSESSMENT_REPORT_GENERATED` stores immutable storage keys, digests, manifest digest, seal event, protocol version, report revision, request digest, finding IDs and review-event binding. Retrieval rebuilds metadata from the journal and reads objects by key with expected-digest verification.
 
-The current HTTP integration test exercises:
-1. **Immutable source reference:** original artifact ID, storage key and SHA-256 are carried in the report; the original source byte sequence is not substituted by PDF bytes. Embedded PDF visuals are derived renderings, while the immutable source remains addressable by key/digest.
-2. **Per-box provenance:** slot ID, normalized bounding box, camera-angle metadata, reviewer actor/time and non-null source-image reference are present and tied to the sealed manifest.
-3. **Disclosure parity:** PDF and JSON both contain: **“A bounding box is a suspect-region identifier only. It is not a measured dimension, calibrated geometry, or a structural-severity claim.”**
+The current HTTP integration test exercises all five owner criteria:
+1. **Immutable source reference:** each finding carries original artifact ID, immutable storage key and SHA-256; PDF visuals are derived renderings, not replacement originals.
+2. **Per-box provenance:** slot ID, normalized coordinates, camera-angle metadata, reviewer actor/time and a non-null source-image reference are tied to the sealed manifest.
+3. **Disclosure parity:** PDF and JSON both state: **“A bounding box is a suspect-region identifier only. It is not a measured dimension, calibrated geometry, or a structural-severity claim.”**
 4. **Durable report registry:** event-journal metadata and PDF/JSON objects survive fresh-runtime and separate-interpreter retrieval.
 5. **Tamper audit:** mutation of persisted PDF bytes fails closed with HTTP 409 and a durable integrity-failure event.
 
-All five behaviors have implementation and current-head test evidence on SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`; all 13 workflows passed. The component level remains **Implemented** until PR #186 is rebased onto the resulting main after PR #185 is accepted/merged and the required workflows rerun. The PR description still says report versions are process-memory-only, which is stale relative to code/tests and should be reconciled before final owner review.
+All five behaviors have implementation and test evidence at SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`; all 13 workflows passed on that stack head and DB-01–DB-14 are 14/14. However, PR #186 remains based on prior PR #185 head `0431dbaf...`. It must be rebased onto current PR #185 head `a7174d45...` and all workflows rerun before merge. The PR description still claims process-memory-only report versions; that text is stale and should be corrected before final owner review.
 
 ## 7. Live-source discrepancies and historical facts
 
