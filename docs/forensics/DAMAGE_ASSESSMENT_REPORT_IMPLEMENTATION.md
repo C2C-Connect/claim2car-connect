@@ -8,11 +8,11 @@
 - Each finding references an image artifact that is part of the report's evidence inventory.
 - Original image bytes are SHA-256 checked before rendering.
 - Each finding renders its source image and a separate annotated image with a red image-space bounding box.
-- Reports show normalized bounding-box coordinates, derived pixel bounds, source image dimensions, capture slot, capture timestamp, image digest, and camera-angle values with an explicit provenance label.
+- Reports show normalized bounding-box coordinates, derived pixel bounds, source image dimensions, capture slot, server-side artifact registration timestamp, image digest, and camera-angle values with an explicit provenance label.
 - A confirmed finding requires reviewer identity and review time. The document service additionally requires that the finding reviewer match the reviewer bound to the sealed evidence dossier.
 - Estimate line items include category, quantity/unit, unit rate, calculated amount, related finding, declared source name/reference, and effective date.
 - Financial arithmetic uses integer cents and decimal quantity rounding. No estimate is fabricated when no sourced line items are supplied.
-- Generated PDF bytes receive a SHA-256 digest and are versioned by the existing in-process dossier service.
+- Generated PDF bytes receive a SHA-256 digest, are stored in the tenant/session-scoped original-byte store, and are bound to an append-only `DAMAGE_ASSESSMENT_REPORT_GENERATED` event with manifest digest, reviewer event, report revision, finding IDs, estimate total and request digest.
 
 ## Boundaries that remain explicit
 
@@ -21,16 +21,15 @@
 - Bounding boxes are normalized image-space regions, not physical vehicle measurements. Camera angles are reported only with their stated source; unknown angles remain unknown.
 - A confirmed finding is a reviewer decision, not proof of collision causation.
 - Estimate source fields are declarations supplied to the renderer, not independently authenticated source records. Source applicability, OEM procedure validation, labor-time validation, local rate validation, parts fitment, taxes, and shop approval still require their own integrations and checks. Camera-angle source labels are likewise reported as supplied and are not independently authenticated by the renderer.
-- The current dossier service stores document versions in process memory. Durable report registry/storage, event-journal audit, authenticated report-generation/download routes, and end-user UI integration remain to be completed before production use.
+- The four-tier dossier service still keeps its local version objects in process memory. The authenticated capture API now generates and returns the PDF, persists its bytes, records a chain-bound report event, supports idempotent retry and audited download, and deletes report bytes when owner capture consent is withdrawn. Owner/shop/carrier report distribution, end-user UI integration and production deployment remain outstanding.
 
 ## Required next implementation increments
 
-1. Connect the report builder to tenant-authorized sealed-artifact retrieval and authenticated independent review.
-2. Persist PDF artifacts and report revision metadata in durable storage with append-only journal binding and audited downloads.
-3. Add the capture metadata contract for camera pose/orientation and calibration provenance; do not infer pose from slot names.
-4. Add per-finding multi-view correspondence and reviewer annotation editing.
-5. Integrate sourced parts/labor/paint/material/diagnostic/ADAS operations and vehicle-configuration applicability.
-6. Replace the heuristic baseline only after trained model provenance, reviewer-labeled datasets, blind evaluation, calibration, and pre-registered acceptance thresholds.
-7. Run end-to-end tests against original bytes, persisted reports, consent withdrawal, tenant isolation, report revisions, and PDF image extraction.
+1. Add capture-device camera pose/orientation and calibration provenance; the current report accepts only explicit manual angle entry or `NOT_RECORDED`, never an angle inferred from a slot name.
+2. Add per-finding multi-view correspondence, segmentation masks/polygons, calibrated measurement and reviewer annotation editing.
+3. Integrate independently sourced parts/labor/paint/material/diagnostic/ADAS operations and vehicle-configuration applicability.
+4. Add owner/shop/carrier delivery authorization, recipient-specific redaction and end-user report UI.
+5. Replace the heuristic baseline only after trained model provenance, reviewer-labeled datasets, blind evaluation, calibration, and pre-registered acceptance thresholds.
+6. Run production-grade end-to-end tests for restart recovery, consent withdrawal, tenant isolation, report revisions, request idempotency, tampering and PDF image extraction.
 
 **Release rule:** a passing PDF-rendering test is a document-functionality result, not evidence of forensic accuracy. Do not market damage-detection accuracy or automated estimating accuracy until the independent validation gates are passed.
