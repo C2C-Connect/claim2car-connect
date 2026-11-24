@@ -5,20 +5,20 @@
 ## Implemented in this increment
 
 - A typed damage assessment contract with unique finding and estimate-line IDs.
-- Each finding references an image artifact that is part of the report's evidence inventory.
+- Each finding references a manifest-bound image artifact and its immutable tenant/session-scoped storage key; a finding cannot exist without that source reference.
 - Original image bytes are SHA-256 checked before rendering.
-- Each finding renders its source image and a separate annotated image with a red image-space bounding box.
-- Reports show normalized bounding-box coordinates, derived pixel bounds, source image dimensions, capture slot, server-side artifact registration timestamp, image digest, and camera-angle values with an explicit provenance label.
+- Each finding renders a derived source preview and a separate annotated derivative with a red image-space bounding box. The original byte object is retrieved by immutable storage key and is not represented by the embedded preview.
+- Every bounding box carries `slot_id`, normalized coordinates, camera-angle metadata and provenance, reviewer attribution, and a source-image reference (artifact ID, immutable storage key, SHA-256). Reports also show derived pixel bounds, source image dimensions, server-side artifact registration timestamp, and the capture protocol version.
 - A confirmed finding requires reviewer identity and review time. The document service additionally requires that the finding reviewer match the reviewer bound to the sealed evidence dossier.
 - Estimate line items include category, quantity/unit, unit rate, calculated amount, related finding, declared source name/reference, and effective date.
 - Financial arithmetic uses integer cents and decimal quantity rounding. No estimate is fabricated when no sourced line items are supplied.
-- Generated PDF bytes receive a SHA-256 digest, are stored in the tenant/session-scoped original-byte store, and are bound to an append-only `DAMAGE_ASSESSMENT_REPORT_GENERATED` event with manifest digest, reviewer event, report revision, finding IDs, estimate total and request digest.
+- The PDF and JSON carrier each receive a SHA-256 digest and are stored as separate immutable tenant/session-scoped objects. An append-only `DAMAGE_ASSESSMENT_REPORT_GENERATED` event binds both storage keys and digests to the sealed manifest, capture protocol version, reviewer event, report revision, finding IDs, estimate total and request digest. Both carriers can be retrieved after a fresh process start.
 
 ## Boundaries that remain explicit
 
 - The PDF embeds a visual rendering of each source image plus a marked derivative. The original byte object remains authoritative in the evidence store and is identified by its verified digest; the PDF is not a substitute for retrieving the original bytes.
 - The current contrast detector is a deterministic heuristic baseline, not a trained/validated vehicle damage model. It does not establish damage class, severity, depth, structural condition, hidden damage, causation, repairability, or roadworthiness.
-- Bounding boxes are normalized image-space regions, not physical vehicle measurements. Camera angles are reported only with their stated source; unknown angles remain unknown.
+- Bounding boxes are normalized image-space suspect regions, not physical vehicle measurements. The PDF and JSON carrier both state that a box is not a measured dimension, calibrated geometry, or structural-severity claim. Camera angles are reported only with their stated source; unknown angles remain unknown.
 - A confirmed finding is a reviewer decision, not proof of collision causation.
 - Estimate source fields are declarations supplied to the renderer, not independently authenticated source records. Source applicability, OEM procedure validation, labor-time validation, local rate validation, parts fitment, taxes, and shop approval still require their own integrations and checks. Camera-angle source labels are likewise reported as supplied and are not independently authenticated by the renderer.
 - The legacy four-tier in-memory service explicitly refuses damage-assessment report versioning. The authenticated capture API is the only supported report-generation path: it stores the PDF and JSON carrier as separate immutable objects, records both storage keys and SHA-256 digests in the PostgreSQL event journal, supports idempotent retry and authenticated retrieval, survives fresh-runtime reconstruction, and deletes both report objects on owner consent withdrawal. Owner/shop/carrier report distribution, end-user UI integration and production deployment remain outstanding.
