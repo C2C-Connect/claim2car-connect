@@ -497,6 +497,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0029_manifest_root_chain_context_binding.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0030_runtime_manifest_registration.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
