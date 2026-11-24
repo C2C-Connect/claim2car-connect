@@ -24,6 +24,10 @@ class TestAccessHardening(unittest.TestCase):
         self.assertTrue(role[3])
         self.session = 'access-' + uuid.uuid4().hex
         self.conn.execute("SELECT set_config('faos.tenant_id', %s, true)", (self.tenant,))
+        self.assertEqual(
+            self.conn.execute("SELECT faos.tenant_id()").fetchone()[0],
+            uuid.UUID(self.tenant),
+        )
         self.conn.execute(
             'INSERT INTO faos.sessions(tenant_id, session_id) VALUES (%s, %s)',
             (self.tenant, self.session),
