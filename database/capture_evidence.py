@@ -15,6 +15,8 @@ import json
 import re
 from uuid import UUID
 
+import psycopg
+
 from app.artifact_storage import ArtifactKey, OriginalByteStore
 from app.evidence_manifest import ManifestEntry, build_manifest
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
@@ -787,12 +789,26 @@ class CaptureEvidenceService:
 
     @staticmethod
     def _register_manifest_root(conn, actor, session_id, seal_event_id, request_id, payload):
-        status = conn.execute(
-            "SELECT faos.register_manifest_root_from_capture("
-            "%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::uuid)",
-            (actor.tenant_id, session_id, seal_event_id, payload["manifest_digest"],
-             payload["shot_list_version"], actor.actor_id, request_id),
-        ).fetchone()[0]
+        try:
+            status = conn.execute(
+                "SELECT faos.register_manifest_root_from_capture("
+                "%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::uuid)",
+                (actor.tenant_id, session_id, seal_event_id, payload["manifest_digest"],
+                 payload["shot_list_version"], actor.actor_id, request_id),
+            ).fetchone()[0]
+        except psycopg.errors.RaiseException as error:
+            code = error.diag.message_primary or "MANIFEST_ROOT_REGISTRATION_FAILED"
+            if code in {
+                "TENANT_CONTEXT_MISMATCH", "SESSION_NOT_FOUND",
+                "ROOT_PROTOCOL_SESSION_MISMATCH", "SEAL_EVENT_NOT_FOUND",
+                "CAPTURE_SEAL_ACTOR_OR_KIND_MISMATCH", "ROOT_SEAL_MISMATCH",
+                "QUALITY_REVIEW_REQUIRED_BEFORE_SEAL", "UNSUPPORTED_CAPTURE_PROTOCOL",
+                "SEALED_ARTIFACT_SET_MISMATCH", "SEAL_NOT_CURRENT_EVENT",
+                "MANIFEST_BINDING_CHAIN_INVALID", "MANIFEST_BINDING_SEAL_PREFIX_INVALID",
+                "MANIFEST_BINDING_CHAIN_TAIL_INVALID", "ROOT_CONFLICT",
+            }:
+                raise CaptureSessionConflict(code) from None
+            raise
         if status not in ("REGISTERED", "DUPLICATE"):
             raise CaptureSessionConflict("MANIFEST_ROOT_REGISTRATION_FAILED")
         verified = conn.execute(
