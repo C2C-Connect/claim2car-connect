@@ -5,6 +5,7 @@ import unittest
 import uuid
 import psycopg
 from database.journal import append, tenant_transaction
+from database.manifest_binding import manifest_binding_schema_available
 
 RECORD = 'SELECT faos.record_completion_receipt(%s::uuid,%s::text,%s::uuid,%s::text,%s::bigint)'
 
@@ -23,6 +24,17 @@ class CompletionReceiptTests(unittest.TestCase):
 
     def record(self, values=None, context=True):
         f = self.fixture
+        if f.authority_schema and f.fixture_conn is not None:
+            # The authority schema maps this dedicated fixture login to the
+            # tenant. Never substitute an administrative login for it.
+            if context:
+                with tenant_transaction(f.fixture_conn, f.tenant):
+                    return f.fixture_conn.execute(RECORD, values or self.values()).fetchone()[0]
+            with f.fixture_conn.transaction():
+                return f.fixture_conn.execute(RECORD, values or self.values()).fetchone()[0]
+
+        # Legacy schema compatibility: no tenant-login binding exists yet.
+        # Use the narrowly scoped fixture role and transaction-local context.
         with psycopg.connect(f.admin_url, autocommit=True) as conn:
             with conn.transaction():
                 conn.execute('SET LOCAL ROLE faos_writer')
@@ -77,6 +89,34 @@ class CompletionReceiptTests(unittest.TestCase):
                         raise AssertionError('UNEXPECTED_RECEIPT_MUTATION_ALLOWED')
                 self.assertEqual(caught.exception.sqlstate, '42501')
                 self.assertEqual(self.receipts(), expected)
+
+    def test_receipt_inspection_fails_closed_on_root_binding_tamper(self):
+        if not manifest_binding_schema_available(self.fixture.conn):
+            self.skipTest('requires authority migration 0029')
+        f = self.fixture
+        self.assertEqual(self.record(), 'RECORDED')
+        with psycopg.connect(f.admin_url, autocommit=True) as admin:
+            admin.execute(
+                "UPDATE faos.manifest_roots SET context_binding_hash=%s WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s",
+                ('0' * 64, f.tenant, f.session, f.seal),
+            )
+        from database.receipts import inspect_completion_receipt
+        with self.assertRaisesRegex(ValueError, '^MANIFEST_ROOT_CONTEXT_HASH_MISMATCH$'):
+            inspect_completion_receipt(f.conn, f.tenant, f.session, self.request)
+
+    def test_receipt_write_rejects_root_binding_tamper(self):
+        if not manifest_binding_schema_available(self.fixture.conn):
+            self.skipTest('requires authority migration 0029')
+        f=self.fixture
+        with psycopg.connect(f.admin_url,autocommit=True) as admin:
+            admin.execute(
+                "UPDATE faos.manifest_roots SET context_binding_hash=%s WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s",
+                ('0'*64,f.tenant,f.session,f.seal),
+            )
+        with self.assertRaises(psycopg.errors.RaiseException) as caught:
+            self.record()
+        self.assertEqual(caught.exception.diag.message_primary,'MANIFEST_ROOT_BINDING_INVALID')
+        self.assertEqual(self.receipts(),[])
 
     def test_wrong_sequence_rejected_without_receipt(self):
         values = self.values()

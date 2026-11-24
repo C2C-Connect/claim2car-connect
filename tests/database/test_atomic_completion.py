@@ -23,7 +23,20 @@ class AtomicCompletionTests(unittest.TestCase):
 
     @contextmanager
     def writer(self):
-        with psycopg.connect(self.f.admin_url, autocommit=True) as conn:
+        f = self.f
+        if f.authority_schema and f.fixture_conn is not None:
+            # Preserve the bound login identity while assuming the writer
+            # capability; the session_user remains mapped to this tenant.
+            conn = f.fixture_conn
+            conn.execute('SET ROLE faos_writer')
+            try:
+                self.assertEqual(conn.execute('SELECT current_user').fetchone()[0], 'faos_writer')
+                yield conn
+            finally:
+                conn.execute('RESET ROLE')
+            return
+        # Compatibility path for pre-binding legacy schemas only.
+        with psycopg.connect(f.admin_url, autocommit=True) as conn:
             conn.execute('SET ROLE faos_writer')
             self.assertEqual(conn.execute('SELECT current_user').fetchone()[0], 'faos_writer')
             yield conn
@@ -101,7 +114,7 @@ with psycopg.connect(os.environ['RECOVERY_DATABASE_URL'], autocommit=True) as co
 print(json.dumps(rows))
 """
         env = os.environ.copy()
-        env['RECOVERY_DATABASE_URL'] = os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
+        env['RECOVERY_DATABASE_URL'] = self.f.app_url if self.f.authority_schema else os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
         result = subprocess.run([sys.executable, '-c', child], input=json.dumps({'tenant':self.f.tenant,'session':self.f.session}),
                                 cwd=Path(__file__).resolve().parents[2], env=env, text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)

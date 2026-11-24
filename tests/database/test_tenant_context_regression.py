@@ -1,52 +1,44 @@
-import os
 import unittest
 import uuid
-
 import psycopg
+from tenant_login import TenantLogin
 
 
 class TenantContextRegression(unittest.TestCase):
     def setUp(self):
-        self.conn = psycopg.connect(os.getenv(
-            'APP_DATABASE_URL',
-            'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test',
-        ))
+        self.tenant = uuid.uuid4()
+        self.login = TenantLogin(self.tenant)
+        self.addCleanup(self.login.close)
+        self.conn = self.login.connect(autocommit=False)
         self.addCleanup(self.conn.close)
 
     def context(self):
         return self.conn.execute('SELECT faos.tenant_id()').fetchone()[0]
 
     def set_context(self, tenant):
-        self.conn.execute(
-            "SELECT set_config('faos.tenant_id', %s, true)", (str(tenant),)
-        )
+        self.conn.execute("SELECT set_config('faos.tenant_id', %s, true)", (str(tenant),))
 
     def test_context_clears_after_commit_on_same_connection(self):
-        tenant = uuid.uuid4()
         self.assertIsNone(self.context())
-        self.set_context(tenant)
-        self.assertEqual(self.context(), tenant)
+        self.set_context(self.tenant)
+        self.assertEqual(self.context(), self.tenant)
         self.conn.commit()
         self.assertIsNone(self.context())
 
     def test_context_clears_after_rollback_on_same_connection(self):
-        tenant = uuid.uuid4()
         self.assertIsNone(self.context())
-        self.set_context(tenant)
-        self.assertEqual(self.context(), tenant)
+        self.set_context(self.tenant)
+        self.assertEqual(self.context(), self.tenant)
         self.conn.rollback()
         self.assertIsNone(self.context())
 
     def test_empty_context_returns_null(self):
-        self.conn.execute(
-            "SELECT set_config('faos.tenant_id', '', true)"
-        )
+        self.conn.execute("SELECT set_config('faos.tenant_id', '', true)")
         self.assertIsNone(self.context())
+        self.conn.rollback()
 
     def test_malformed_context_rejected_as_invalid_uuid(self):
-        self.conn.execute(
-            "SELECT set_config('faos.tenant_id', 'not-a-uuid', true)"
-        )
+        self.conn.execute("SELECT set_config('faos.tenant_id', 'not-a-uuid', true)")
         with self.assertRaises(psycopg.errors.InvalidTextRepresentation) as caught:
             self.context()
         self.assertEqual(caught.exception.sqlstate, '22P02')
@@ -64,9 +56,7 @@ class TenantContextRegression(unittest.TestCase):
                  'context regression', '{}', '0.1'),
             )
         self.assertEqual(caught.exception.sqlstate, 'P0001')
-        self.assertEqual(
-            caught.exception.diag.message_primary, 'TENANT_CONTEXT_MISMATCH'
-        )
+        self.assertEqual(caught.exception.diag.message_primary, 'TENANT_CONTEXT_MISMATCH')
         self.conn.rollback()
 
     def test_append_rejects_mismatched_context_with_exact_error(self):

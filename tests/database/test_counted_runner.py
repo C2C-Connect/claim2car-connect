@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from scripts.run_counted_tests import run_suite, source_revision_metadata
+from scripts.run_counted_tests import (LEGACY_BASELINE_NOT_APPLICABLE, run_suite, select_suite, source_revision_metadata)
 
 class CountedRunnerTests(unittest.TestCase):
     def execute_case(self, body, decorator=None):
@@ -129,6 +129,43 @@ class CountedRunnerTests(unittest.TestCase):
         self.assertFalse(record['successful'])
         self.assertEqual(record['errors'], 1)
         self.assertEqual(record['tests'][0]['outcome'], 'error')
+
+    def test_legacy_baseline_excludes_only_explicit_authority_schema_cases(self):
+        class NamedTest(unittest.TestCase):
+            def __init__(self, name):
+                super().__init__('runTest')
+                self._qualified_name = name
+            def id(self):
+                return self._qualified_name
+            def runTest(self):
+                self.assertTrue(True)
+
+        all_ids = sorted(LEGACY_BASELINE_NOT_APPLICABLE)
+        suite = unittest.TestSuite([NamedTest(name) for name in all_ids] + [NamedTest('legacy.Legacy.test_runs')])
+        selected, excluded, missing = select_suite(suite, legacy_baseline=True)
+        self.assertEqual(excluded, tuple(all_ids))
+        self.assertEqual(missing, ())
+        self.assertEqual(selected.countTestCases(), 1)
+        record = run_suite(selected, not_applicable=excluded, missing_not_applicable=missing)
+        self.assertTrue(record['successful'])
+        self.assertEqual(record['not_applicable_count'], 7)
+        self.assertEqual(record['skipped'], 0)
+
+    def test_legacy_baseline_fails_if_expected_exclusion_disappears(self):
+        class NamedTest(unittest.TestCase):
+            def __init__(self, name):
+                super().__init__('runTest')
+                self._qualified_name = name
+            def id(self):
+                return self._qualified_name
+            def runTest(self):
+                self.assertTrue(True)
+
+        suite = unittest.TestSuite([NamedTest('legacy.Legacy.test_runs')])
+        selected, excluded, missing = select_suite(suite, legacy_baseline=True)
+        record = run_suite(selected, not_applicable=excluded, missing_not_applicable=missing)
+        self.assertFalse(record['successful'])
+        self.assertEqual(len(record['missing_not_applicable_tests']), 7)
 
 if __name__ == '__main__':
     unittest.main()

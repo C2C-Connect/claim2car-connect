@@ -2,6 +2,8 @@
 from dataclasses import replace
 import hashlib
 import os
+import subprocess
+import sys
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -10,6 +12,8 @@ import psycopg
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
 from database.migrate import apply, LOCK_KEY, run_migrations
+from database.journal import tenant_transaction
+from database.manifest_binding import verify_registered_manifest_binding
 from database.migration_plan import Migration, discover, discover_authority
 
 class MigrationControlsIntegration(unittest.TestCase):
@@ -74,7 +78,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_default_entry_point_clean_full_initialization_and_rerun(self):
         plan = self.authority_plan()
-        self.assertEqual(plan[-1].name,'0028_persistent_event_hash_chain.sql')
+        self.assertEqual(plan[-1].name,'0029_manifest_root_chain_context_binding.sql')
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
             self.assertEqual(run_migrations(),tuple(item.name for item in plan))
             before = self.history()
@@ -82,6 +86,72 @@ class MigrationControlsIntegration(unittest.TestCase):
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in plan])
         self.assertEqual(self.history(),before)
         self.assertIsNotNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
+        # Exercise M1 root binding consumers against an isolated full authority schema.
+        selectors = (
+            'test_manifest_roots.ManifestRootTests.test_registered_root_contains_and_verifies_seal_chain_binding',
+            'test_manifest_roots.ManifestRootTests.test_privileged_context_binding_tamper_fails_verification',
+            'test_manifest_roots.ManifestRootTests.test_registered_binding_rejects_tampered_chain_tail',
+            'test_registered_completion.RegisteredCompletionTests.test_registered_root_context_binding_tamper_fails_closed',
+            'test_completion_receipts.CompletionReceiptTests.test_receipt_inspection_fails_closed_on_root_binding_tamper',
+            'test_completion_receipts.CompletionReceiptTests.test_receipt_write_rejects_root_binding_tamper',
+            'test_receipt_inspection.ReceiptInspectionTests.test_metadata_matches_committed_snapshot',
+        )
+        env = os.environ.copy()
+        admin_base = os.getenv('MIGRATION_TEST_ADMIN_URL','postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test')
+        app_base = os.getenv('APP_DATABASE_URL','postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
+        env.update({
+            'PYTHONPATH': str(Path(__file__).resolve().parents[2]) + os.pathsep + env.get('PYTHONPATH',''),
+            'MIGRATION_DATABASE_URL': self.url,
+            'MIGRATION_TEST_ADMIN_URL': make_conninfo(admin_base,dbname=self.db),
+            'APP_DATABASE_URL': make_conninfo(app_base,dbname=self.db),
+            'RECOVERY_DATABASE_URL': make_conninfo(app_base,dbname=self.db),
+        })
+        result = subprocess.run(
+            [sys.executable,'-m','unittest',*selectors],
+            cwd=Path(__file__).resolve().parent,env=env,text=True,capture_output=True,timeout=120,
+        )
+        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+
+    def test_manifest_binding_migration_backfills_existing_root_and_restores_rls(self):
+        plan=self.authority_plan()
+        apply(self.conn,plan[:-1])
+        from test_manifest_roots import ManifestRootTests
+        admin_base=os.getenv('MIGRATION_TEST_ADMIN_URL','postgresql://postgres:synthetic-container-only@127.0.0.1:55432/claim2car_test')
+        app_base=os.getenv('APP_DATABASE_URL','postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
+        fixture=ManifestRootTests()
+        env={
+            'MIGRATION_DATABASE_URL':self.url,
+            'MIGRATION_TEST_ADMIN_URL':make_conninfo(admin_base,dbname=self.db),
+            'APP_DATABASE_URL':make_conninfo(app_base,dbname=self.db),
+            'RECOVERY_DATABASE_URL':make_conninfo(app_base,dbname=self.db),
+        }
+        with patch.dict(os.environ,env):
+            fixture.setUp()
+            try:
+                self.assertEqual(fixture.register(),'REGISTERED')
+                self.assertEqual(run_migrations(),('0029_manifest_root_chain_context_binding.sql',))
+                with patch.dict(os.environ,env):
+                    with tenant_transaction(fixture.conn,fixture.tenant):
+                        row=fixture.conn.execute(
+                            'SELECT seal_sequence,seal_chain_hash,context_binding_hash,binding_version,'
+                            'faos.verify_manifest_root_binding(tenant_id,session_id,seal_event_id) '
+                            'FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s AND seal_event_id=%s',
+                            (fixture.tenant,fixture.session,fixture.seal),
+                        ).fetchone()
+                        self.assertTrue(row[4])
+                        self.assertEqual(row[0],len(fixture.events))
+                        seal_hash=fixture.conn.execute('SELECT entry_hash FROM faos.events WHERE tenant_id=%s AND session_id=%s AND event_id=%s',(fixture.tenant,fixture.session,fixture.seal)).fetchone()[0]
+                        self.assertEqual(row[1],seal_hash)
+                        self.assertEqual(row[3],'manifest-context-v1')
+                        self.assertTrue(verify_registered_manifest_binding(
+                            fixture.conn,fixture.tenant,fixture.session,fixture.seal)['valid'])
+                rls=self.admin_db.execute(
+                    "SELECT c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+                    "WHERE n.nspname='faos' AND c.relname IN ('events','sessions','manifest_roots') ORDER BY c.relname"
+                ).fetchall()
+                self.assertEqual(rls,[(True,True),(True,True),(True,True)])
+            finally:
+                fixture.doCleanups()
 
     def test_default_entry_point_upgrades_legacy_seven_migration_schema(self):
         legacy = discover(Path(__file__).resolve().parents[2]/'migrations')
@@ -89,13 +159,13 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,legacy)
         self.assertIsNone(self.conn.execute("SELECT to_regclass('faos.tenant_login_bindings')").fetchone()[0])
         with patch.dict(os.environ,{'MIGRATION_DATABASE_URL':self.url}):
-            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql','0021_collision_claim_link.sql','0022_collision_vehicle_capture_link.sql','0023_consented_vehicle_profile.sql','0024_audited_capture_exceptions_pause_resume.sql','0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql','0027_capture_protocol_16_v2.sql','0028_persistent_event_hash_chain.sql'))
+            self.assertEqual(run_migrations(),('0008_tenant_login_authority.sql','0009_integer_financial_ledger.sql','0010_claim_case_registry.sql','0011_claim_case_idempotency_conflicts.sql','0012_claim_case_retry_without_update_lock.sql','0013_claim_case_capture_session.sql','0014_claim_case_incident_intake.sql','0015_incident_event_kinds.sql','0016_claim_case_incident_read_boundary.sql','0017_event_contract_parity.sql','0018_capture_protocol_session_binding.sql','0019_manifest_root_protocol_binding.sql','0020_collision_lifecycle_record.sql','0021_collision_claim_link.sql','0022_collision_vehicle_capture_link.sql','0023_consented_vehicle_profile.sql','0024_audited_capture_exceptions_pause_resume.sql','0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql','0027_capture_protocol_16_v2.sql','0028_persistent_event_hash_chain.sql','0029_manifest_root_chain_context_binding.sql'))
             self.assertEqual(run_migrations(),())
         self.assertEqual(self.history(),[(item.name,item.sha256) for item in self.authority_plan()])
 
     def test_event_chain_backfill_gap_rolls_back_migration(self):
         plan=self.authority_plan()
-        apply(self.conn,plan[:-1])
+        apply(self.conn,plan[:-2])
         tenant=str(uuid.uuid4())
         session='chain-gap-'+uuid.uuid4().hex
         payload='{"synthetic":true}'
@@ -416,6 +486,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0028_persistent_event_hash_chain.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0029_manifest_root_chain_context_binding.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)

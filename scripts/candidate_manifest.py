@@ -90,3 +90,7 @@ if __name__ == '__main__':
         if args.second is None:
             parser.error('compare requires two manifests')
         compare(json.loads(Path(args.first).read_text()), json.loads(Path(args.second).read_text()))
+
+REQUIRED += ['authority_migrations/0029_manifest_root_chain_context_binding.sql','database/manifest_binding.py']
+
+REQUIRED += ['tests/database/test_manifest_binding_hash_unit.py']

@@ -11,6 +11,7 @@ import psycopg
 from database.eligibility import check_registered_completion
 from database.journal import append
 from database.receipts import inspect_completion_receipt
+from database.manifest_binding import manifest_binding_schema_available
 
 class ReceiptInspectionTests(unittest.TestCase):
     def setUp(self):
@@ -37,6 +38,8 @@ class ReceiptInspectionTests(unittest.TestCase):
         self.assertTrue(result.authority_session)
         self.assertIsNotNone(result.recorded_at.utcoffset())
         self.assertTrue(result.snapshot_matches_current_history)
+        expected_binding = 'VERIFIED' if manifest_binding_schema_available(f.conn) else 'LEGACY_UNBOUND'
+        self.assertEqual(result.binding_status,expected_binding)
         self.assertEqual(result.current_event_sequence, len(f.events))
         self.assertIsNone(f.conn.execute('SELECT faos.tenant_id()').fetchone()[0])
 
@@ -64,7 +67,7 @@ class ReceiptInspectionTests(unittest.TestCase):
         with self.assertRaises(psycopg.errors.RaiseException) as caught:
             self.inspect(tenant=str(uuid.uuid4()))
         self.assertEqual(caught.exception.sqlstate, 'P0001')
-        self.assertEqual(caught.exception.diag.message_primary, 'SESSION_NOT_FOUND')
+        self.assertEqual(caught.exception.diag.message_primary, 'TENANT_CONTEXT_MISMATCH' if self.f.authority_schema else 'SESSION_NOT_FOUND')
         self.assertEqual(self.inspect().request_id, self.request)
 
     def test_fresh_process_reads_same_metadata(self):
@@ -78,7 +81,7 @@ with psycopg.connect(os.environ['RECOVERY_DATABASE_URL'], autocommit=True) as co
 print(json.dumps(asdict(result),default=str,sort_keys=True))
 """
         env = os.environ.copy()
-        env['RECOVERY_DATABASE_URL'] = os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
+        env['RECOVERY_DATABASE_URL'] = self.base.storage.fixture.app_url if self.base.storage.fixture.authority_schema else os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
         payload = {'tenant':self.f.tenant,'session':self.f.session,'request':self.request}
         result = subprocess.run([sys.executable,'-c',child],input=json.dumps(payload),cwd=Path(__file__).resolve().parents[2],
                                 env=env,text=True,capture_output=True,timeout=30)

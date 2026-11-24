@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 from database.readback import locked_journal
+from database.manifest_binding import manifest_binding_schema_available, verify_registered_manifest_binding
 
 @dataclass(frozen=True)
 class ReceiptInspection:
@@ -22,10 +23,11 @@ class ReceiptInspection:
     authority_session: str
     current_event_sequence: int
     snapshot_matches_current_history: bool
+    binding_status: str = 'LEGACY_UNBOUND'
 
 
 def inspect_completion_receipt(conn, tenant, session_id, request_id):
-    """Read receipt/root metadata under the session lock; never assert eligibility."""
+    """Read receipt/root metadata under session lock; fail closed on root-binding tamper."""
     tenant = str(UUID(str(tenant)))
     request_id = str(UUID(str(request_id)))
     with locked_journal(conn, tenant, session_id) as journal:
@@ -40,6 +42,10 @@ def inspect_completion_receipt(conn, tenant, session_id, request_id):
         ).fetchone()
         if row is None:
             raise ValueError('RECEIPT_NOT_FOUND_OR_NOT_VISIBLE')
+        binding_status = 'LEGACY_UNBOUND'
+        if manifest_binding_schema_available(conn):
+            verify_registered_manifest_binding(conn, tenant, session_id, row[1])
+            binding_status = 'VERIFIED'
         current = journal.events[-1].sequence if journal.events else 0
-        result = ReceiptInspection(tenant, session_id, *row, current, row[2] == current)
+        result = ReceiptInspection(tenant, session_id, *row, current, row[2] == current, binding_status)
     return result

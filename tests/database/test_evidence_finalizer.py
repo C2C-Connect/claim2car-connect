@@ -46,6 +46,10 @@ exec @SHA@ "$@"
 
     def run_fixture(self, **overrides):
         env = {key: value for key, value in os.environ.items() if not key.startswith('FIXTURE_')}
+        # The legacy workflow sets this profile flag for its outer harness;
+        # the nested failure-path fixture must exercise the default authority
+        # gate path independently.
+        env.pop('FAOS_LEGACY_BASELINE_ALLOWED', None)
         env['PATH'] = str(self.root / 'bin') + os.pathsep + env['PATH']
         env.update(overrides)
         result = subprocess.run(['bash', 'scripts/run_guarded_database_acceptance.sh'], cwd=self.root,
