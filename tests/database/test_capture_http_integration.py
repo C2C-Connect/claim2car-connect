@@ -267,6 +267,12 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertTrue(seal_retry.json()["root_registered"])
                     self.assertTrue(seal_retry.json()["replayed"])
                     self.assertEqual(seal_retry.json()["manifest_digest"], manifest_digest)
+                    seal_event_count = self.db.f.seed.execute(
+                        "SELECT count(*) FROM faos.events "
+                        "WHERE tenant_id=%s AND session_id=%s AND event_id=%s AND kind='MANIFEST_SEALED'",
+                        (self.db.f.tenants[0], session_id, "seal:" + seal_request_id),
+                    ).fetchone()[0]
+                    self.assertEqual(seal_event_count, 1, "SEAL_REPLAY_CREATED_DUPLICATE_JOURNAL_EVENT")
                     root = self.db.f.seed.execute(
                         "SELECT manifest_digest,shot_list_version,seal_sequence,seal_chain_hash,"
                         "context_binding_hash,binding_version FROM faos.manifest_roots "
