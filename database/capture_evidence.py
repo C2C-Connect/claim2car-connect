@@ -13,13 +13,16 @@ import hashlib
 import hmac
 import json
 import re
-from uuid import UUID
+from uuid import UUID, uuid5
 
-from app.artifact_storage import ArtifactKey, OriginalByteStore
+import psycopg
+
+from app.artifact_storage import (
+    ArtifactIntegrityError, ArtifactKey, ArtifactNotFound, OriginalByteStore,
+)
 from app.evidence_manifest import ManifestEntry, build_manifest
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
 from app.vin_guard import validate_vin
-from database.readback import locked_verified_journal_in_transaction
 from database.capture_sessions import (
     CaptureAuthorizationError,
     CaptureSessionConflict,
@@ -27,6 +30,16 @@ from database.capture_sessions import (
 )
 
 MAX_EVIDENCE_BYTES = 25 * 1024 * 1024
+
+
+class _EvidenceArtifactIntegrityFailure(Exception):
+    def __init__(self, artifact_id, slot, expected_sha256, failure_code):
+        self.artifact_id = artifact_id
+        self.slot = slot
+        self.expected_sha256 = expected_sha256
+        self.failure_code = failure_code
+        super().__init__(failure_code)
+
 DISCLOSURE_VERSION = "disclosure-v1"
 VEHICLE_DECODE_DISCLOSURE_VERSION = "vehicle-decode-disclosure-v1"
 
@@ -59,19 +72,18 @@ class CaptureEvidenceService:
         session = self.sessions._read(conn, actor, session_id)
         if creator_required and session.created_by != actor.actor_id:
             raise CaptureAuthorizationError("CAPTURE_AUTHORITY_DENIED")
-        try:
-            journal = locked_verified_journal_in_transaction(conn, actor.tenant_id, session_id)
-        except ValueError as error:
-            raise CaptureSessionConflict("CAPTURE_HISTORY_CHAIN_INVALID") from error
-        events = journal.events
-        if not events or len(events) > 1000:
+        conn.execute("SELECT faos.lock_session_for_completion(%s::uuid,%s::text)", (actor.tenant_id, session_id))
+        rows = conn.execute(
+            "SELECT sequence,kind,actor,payload_json,event_id FROM faos.events "
+            "WHERE tenant_id=%s AND session_id=%s ORDER BY sequence",
+            (actor.tenant_id, session_id),
+        ).fetchall()
+        if not rows or len(rows) > 1000 or any(row[0] != i + 1 for i, row in enumerate(rows)):
             raise CaptureSessionConflict("UNSUPPORTED_CAPTURE_HISTORY")
         try:
-            history = [(event.kind, event.actor, json.loads(event.payload_json), event.event_id)
-                       for event in events]
+            return session, [(r[1], r[2], json.loads(r[3]), r[4]) for r in rows]
         except (ValueError, TypeError):
             raise CaptureSessionConflict("INVALID_CAPTURE_HISTORY") from None
-        return session, history
 
     @staticmethod
     def _append(conn, actor, session_id, history, *, event_id, kind, reason, payload):
@@ -118,7 +130,10 @@ class CaptureEvidenceService:
 
     @staticmethod
     def _last_capture_event(history):
-        sidecar = {"VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED"}
+        sidecar = {
+            "VEHICLE_DECODE_CONSENT_RECORDED", "VEHICLE_PROFILE_DECODED",
+            "ARTIFACT_INTEGRITY_FAILURE_RECORDED",
+        }
         return next((item for item in reversed(history) if item[0] not in sidecar), None)
 
     @staticmethod
@@ -741,10 +756,19 @@ class CaptureEvidenceService:
         )
         for entry in manifest.entries:
             record = latest[entry.slot][1]
-            original = self.byte_store.get(
-                ArtifactKey(actor.tenant_id, UUID(session_id), UUID(entry.artifact_id)),
-                expected_sha256=entry.sha256_hex,
-            )
+            try:
+                original = self.byte_store.get(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(entry.artifact_id)),
+                    expected_sha256=entry.sha256_hex,
+                )
+            except ArtifactIntegrityError as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    entry.artifact_id, entry.slot, entry.sha256_hex, "ARTIFACT_HASH_MISMATCH"
+                ) from error
+            except ArtifactNotFound as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    entry.artifact_id, entry.slot, entry.sha256_hex, "ARTIFACT_MISSING"
+                ) from error
             if len(original) != record["byte_length"]:
                 raise CaptureSessionConflict("EVIDENCE_BYTE_LENGTH_MISMATCH")
         return manifest
@@ -787,6 +811,38 @@ class CaptureEvidenceService:
                          kind="QUALITY_RECORDED", reason="advisory image quality recorded", payload=payload)
         return {"session_id": session_id, "advisory_only": True, "replayed": False}
 
+    @staticmethod
+    def _register_manifest_root(conn, actor, session_id, seal_event_id, request_id, payload, *, seal_actor=None):
+        try:
+            status = conn.execute(
+                "SELECT faos.register_manifest_root_from_capture("
+                "%s::uuid,%s::text,%s::text,%s::text,%s::text,%s::text,%s::uuid)",
+                (actor.tenant_id, session_id, seal_event_id, payload["manifest_digest"],
+                 payload["shot_list_version"], seal_actor or actor.actor_id, request_id),
+            ).fetchone()[0]
+        except psycopg.errors.RaiseException as error:
+            code = error.diag.message_primary or "MANIFEST_ROOT_REGISTRATION_FAILED"
+            if code in {
+                "TENANT_CONTEXT_MISMATCH", "SESSION_NOT_FOUND",
+                "ROOT_PROTOCOL_SESSION_MISMATCH", "SEAL_EVENT_NOT_FOUND",
+                "CAPTURE_SEAL_ACTOR_OR_KIND_MISMATCH", "ROOT_SEAL_MISMATCH",
+                "QUALITY_REVIEW_REQUIRED_BEFORE_SEAL", "UNSUPPORTED_CAPTURE_PROTOCOL",
+                "SEALED_ARTIFACT_SET_MISMATCH", "SEAL_NOT_CURRENT_EVENT",
+                "MANIFEST_BINDING_CHAIN_INVALID", "MANIFEST_BINDING_SEAL_PREFIX_INVALID",
+                "MANIFEST_BINDING_CHAIN_TAIL_INVALID", "ROOT_CONFLICT",
+            }:
+                raise CaptureSessionConflict(code) from None
+            raise
+        if status not in ("REGISTERED", "DUPLICATE"):
+            raise CaptureSessionConflict("MANIFEST_ROOT_REGISTRATION_FAILED")
+        verified = conn.execute(
+            "SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)",
+            (actor.tenant_id, session_id, seal_event_id),
+        ).fetchone()[0]
+        if verified is not True:
+            raise CaptureSessionConflict("MANIFEST_ROOT_BINDING_INVALID")
+        return status
+
     def seal_capture(self, authorization, session_id, *, request_id):
         session_id = self._session_id(session_id)
         request_id = self._request_id(request_id)
@@ -801,10 +857,11 @@ class CaptureEvidenceService:
                 raise CaptureSessionConflict("UNRESOLVED_CAPTURE_EXCEPTIONS")
             if self._consent_state(history) is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            for kind, _who, old, old_id in history:
+            for kind, seal_actor, old, old_id in history:
                 if old_id == event_id:
                     if kind == "MANIFEST_SEALED" and type(old) is dict:
-                        return {"session_id": session_id, **old, "replayed": True}
+                        self._register_manifest_root(conn, actor, session_id, event_id, request_id, old, seal_actor=seal_actor)
+                        return {"session_id": session_id, **old, "root_registered": True, "replayed": True}
                     raise CaptureSessionConflict("IDEMPOTENCY_CONFLICT")
             last_capture_event = self._last_capture_event(history)
             if last_capture_event is None or last_capture_event[0] != "QUALITY_RECORDED":
@@ -819,7 +876,8 @@ class CaptureEvidenceService:
             }
             self._append(conn, actor, session_id, history, event_id=event_id,
                          kind="MANIFEST_SEALED", reason="verified original-byte manifest sealed", payload=payload)
-        return {"session_id": session_id, **payload, "replayed": False}
+            self._register_manifest_root(conn, actor, session_id, event_id, request_id, payload)
+        return {"session_id": session_id, **payload, "root_registered": True, "replayed": False}
 
     def record_review(self, authorization, session_id, *, request_id, disposition, reason):
         session_id = self._session_id(session_id)
@@ -838,6 +896,13 @@ class CaptureEvidenceService:
             consent = self._consent_state(history)
             if consent is None:
                 raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+            prior_seal = next((item for item in reversed(history) if item[0] == "MANIFEST_SEALED"), None)
+            if prior_seal is None or type(prior_seal[2]) is not dict:
+                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+            self._register_manifest_root(
+                conn, actor, session_id, prior_seal[3],
+                prior_seal[2]["request_id"], prior_seal[2], seal_actor=prior_seal[1],
+            )
             for kind, _who, old, old_id in history:
                 if old_id == event_id:
                     if kind == "REVIEW_RECORDED" and type(old) is dict and old.get("disposition") == disposition and old.get("reason") == reason:
@@ -850,6 +915,10 @@ class CaptureEvidenceService:
             seal = last_capture_event[2]
             if seal.get("manifest_digest") != manifest.digest():
                 raise CaptureSessionConflict("SEALED_MANIFEST_MISMATCH")
+            self._register_manifest_root(
+                conn, actor, session_id, last_capture_event[3],
+                seal["request_id"], seal, seal_actor=last_capture_event[1],
+            )
             payload = {
                 "request_id": request_id,
                 "manifest_digest": manifest.digest(),
@@ -890,6 +959,10 @@ class CaptureEvidenceService:
                     raise CaptureSessionConflict("UNSUPPORTED_SEAL_HISTORY")
                 # Verify the sealed originals before exposing reviewer-safe metadata.
                 manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
+                self._register_manifest_root(
+                    conn, actor, session_id, last_capture_event[3],
+                    seal_payload["request_id"], seal_payload, seal_actor=last_capture_event[1],
+                )
                 expected_artifact_ids = [entry.artifact_id for entry in manifest.entries]
                 if (
                     manifest.digest() != seal_payload["manifest_digest"]
@@ -918,57 +991,108 @@ class CaptureEvidenceService:
                     break
         return queued
 
-    def get_review_details(self, authorization, session_id):
-        """Return a verified sealed manifest to an independent reviewer."""
-        session_id = self._session_id(session_id)
-        with self.sessions._authorized(authorization) as (conn, actor):
-            if actor.actor_role not in ("reviewer", "supervisor"):
-                raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
-            session, history = self._history(conn, actor, session_id, creator_required=False)
-            if actor.actor_id == session.created_by:
-                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
-            if self._consent_state(history) is None:
-                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            last_capture_event = self._last_capture_event(history)
-            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
-                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-            manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
-            latest = self._artifact_set(history, session.capture_protocol_version)
-            return {
-                "session_id": session_id,
-                "manifest_digest": manifest.digest(),
-                "shot_list_version": manifest.shot_list_version,
-                "consent_recorded": True,
-                "artifacts": [
-                    {
-                        "artifact_id": entry.artifact_id,
-                        "slot": entry.slot,
-                        "sha256": entry.sha256_hex,
-                        "byte_length": latest[entry.slot][1]["byte_length"],
-                    }
-                    for entry in manifest.entries
-                ],
-            }
-
-    def retrieve_for_review(self, authorization, session_id, artifact_id):
-        session_id = self._session_id(session_id)
-        artifact_id = self._request_id(artifact_id)
+    def _record_integrity_failure(self, authorization, session_id, failure):
+        """Commit an idempotent journal audit event after a failed original-byte read."""
         with self.sessions._authorized(authorization) as (conn, actor):
             if actor.actor_role not in ("reviewer", "supervisor"):
                 raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
             _session, history = self._history(conn, actor, session_id, creator_required=False)
-            if actor.actor_id == _session.created_by:
-                raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
-            if self._consent_state(history) is None:
-                raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
-            last_capture_event = self._last_capture_event(history)
-            if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
-                raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
-            manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
-            entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
-            if entry is None:
-                raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
-            return self.byte_store.get(
-                ArtifactKey(actor.tenant_id, UUID(session_id), UUID(artifact_id)),
-                expected_sha256=entry.sha256_hex,
+            idempotency_key = (
+                "artifact-integrity-failure:" + failure.artifact_id + ":" + failure.expected_sha256[:16]
             )
+            event_id = str(uuid5(
+                UUID(failure.artifact_id),
+                "integrity-failure:" + failure.failure_code + ":" + failure.expected_sha256,
+            ))
+            payload = {
+                "idempotency_key": idempotency_key,
+                "artifact_id": failure.artifact_id,
+                "slot": failure.slot,
+                "expected_sha256": failure.expected_sha256,
+                "failure_code": failure.failure_code,
+            }
+            existing = next((item for item in history if item[3] == event_id), None)
+            if existing is not None:
+                if existing[0] != "ARTIFACT_INTEGRITY_FAILURE_RECORDED" or existing[2] != payload:
+                    raise CaptureSessionConflict("INTEGRITY_AUDIT_IDEMPOTENCY_CONFLICT")
+                return
+            self._append(
+                conn, actor, session_id, history, event_id=event_id,
+                kind="ARTIFACT_INTEGRITY_FAILURE_RECORDED",
+                reason="server detected original evidence integrity failure: " + failure.failure_code,
+                payload=payload,
+            )
+
+    def get_review_details(self, authorization, session_id):
+        """Return a verified sealed manifest to an independent reviewer."""
+        session_id = self._session_id(session_id)
+        try:
+            with self.sessions._authorized(authorization) as (conn, actor):
+                if actor.actor_role not in ("reviewer", "supervisor"):
+                    raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+                session, history = self._history(conn, actor, session_id, creator_required=False)
+                if actor.actor_id == session.created_by:
+                    raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+                if self._consent_state(history) is None:
+                    raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+                last_capture_event = self._last_capture_event(history)
+                if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
+                    raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+                manifest = self._verified_manifest(actor, session_id, history, session.capture_protocol_version)
+                self._register_manifest_root(
+                    conn, actor, session_id, last_capture_event[3],
+                    last_capture_event[2]["request_id"], last_capture_event[2],
+                    seal_actor=last_capture_event[1],
+                )
+                latest = self._artifact_set(history, session.capture_protocol_version)
+                return {
+                    "session_id": session_id,
+                    "manifest_digest": manifest.digest(),
+                    "shot_list_version": manifest.shot_list_version,
+                    "consent_recorded": True,
+                    "artifacts": [
+                        {
+                            "artifact_id": entry.artifact_id,
+                            "slot": entry.slot,
+                            "sha256": entry.sha256_hex,
+                            "byte_length": latest[entry.slot][1]["byte_length"],
+                        }
+                        for entry in manifest.entries
+                    ],
+                }
+        except _EvidenceArtifactIntegrityFailure as failure:
+            # Commit the audit in a fresh transaction after the failed read rolls back.
+            self._record_integrity_failure(authorization, session_id, failure)
+            raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
+
+    def retrieve_for_review(self, authorization, session_id, artifact_id):
+        session_id = self._session_id(session_id)
+        artifact_id = self._request_id(artifact_id)
+        try:
+            with self.sessions._authorized(authorization) as (conn, actor):
+                if actor.actor_role not in ("reviewer", "supervisor"):
+                    raise CaptureAuthorizationError("REVIEWER_IDENTITY_REQUIRED")
+                _session, history = self._history(conn, actor, session_id, creator_required=False)
+                if actor.actor_id == _session.created_by:
+                    raise CaptureAuthorizationError("INDEPENDENT_REVIEWER_REQUIRED")
+                if self._consent_state(history) is None:
+                    raise CaptureSessionConflict("ACTIVE_OWNER_CONSENT_REQUIRED")
+                last_capture_event = self._last_capture_event(history)
+                if last_capture_event is None or last_capture_event[0] != "MANIFEST_SEALED":
+                    raise CaptureSessionConflict("SEALED_SESSION_REQUIRED_FOR_REVIEW")
+                manifest = self._verified_manifest(actor, session_id, history, _session.capture_protocol_version)
+                self._register_manifest_root(
+                    conn, actor, session_id, last_capture_event[3],
+                    last_capture_event[2]["request_id"], last_capture_event[2],
+                    seal_actor=last_capture_event[1],
+                )
+                entry = next((item for item in manifest.entries if item.artifact_id == artifact_id), None)
+                if entry is None:
+                    raise CaptureSessionConflict("ARTIFACT_NOT_IN_SEALED_MANIFEST")
+                return self.byte_store.get(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(artifact_id)),
+                    expected_sha256=entry.sha256_hex,
+                )
+        except _EvidenceArtifactIntegrityFailure as failure:
+            self._record_integrity_failure(authorization, session_id, failure)
+            raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
