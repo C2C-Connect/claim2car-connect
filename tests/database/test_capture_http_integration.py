@@ -252,7 +252,30 @@ class CaptureHttpIntegration(unittest.TestCase):
                         json={"request_id": str(uuid.uuid4())},
                     )
                     self.assertEqual(sealed.status_code, 200, sealed.text)
+                    self.assertTrue(sealed.json()["root_registered"])
                     manifest_digest = sealed.json()["manifest_digest"]
+                    root = self.db.f.seed.execute(
+                        "SELECT manifest_digest,shot_list_version,seal_sequence,seal_chain_hash,"
+                        "context_binding_hash,binding_version FROM faos.manifest_roots "
+                        "WHERE tenant_id=%s AND session_id=%s",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()
+                    self.assertIsNotNone(root, "CAPTURE_SEAL_DID_NOT_REGISTER_MANIFEST_ROOT")
+                    self.assertEqual(root[0], manifest_digest)
+                    self.assertEqual(root[1], DEFAULT_CAPTURE_PROTOCOL)
+                    self.assertGreater(root[2], 0)
+                    self.assertRegex(root[3], r"^[0-9a-f]{64}$")
+                    self.assertRegex(root[4], r"^[0-9a-f]{64}$")
+                    self.assertEqual(root[5], "manifest-context-v1")
+                    seal_id = self.db.f.seed.execute(
+                        "SELECT seal_event_id FROM faos.manifest_roots "
+                        "WHERE tenant_id=%s AND session_id=%s",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()[0]
+                    self.assertTrue(self.db.f.seed.execute(
+                        "SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)",
+                        (self.db.f.tenants[0], session_id, seal_id),
+                    ).fetchone()[0])
 
                     cross_tenant = client.get(
                         f"/v1/review-sessions/{session_id}",
