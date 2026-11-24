@@ -1,3 +1,12 @@
+## Current execution checkpoint — 2026-11-24
+
+PR #184 merged the M1 database manifest-root chain-tip/context binding. Exact tested head `95692eaf30f76ca9ab8b7c0cf71c4bcf9fac5d68`: 13/13 workflows green; full suite 1,064 passed (7 skipped); authority suite 407/407 counted tests; DB-01–DB-14 14/14 PASS; 340 tenant-isolation assertions.
+
+PR #185 is the active M1 runtime integration increment. It adds migration 0030 and connects the live capture seal transaction to root registration, then verifies the root before reviewer queue/details/artifact retrieval/review. It validates the exact protocol slot set for 12-v1, 16-v1 and 16-v2. The first run exposed migration ownership and stale inventory-fixture defects; corrected head `18b617facf9a3772a4d6d568acac315b0327be6f` is awaiting a fresh full CI and authority run. No merge until all checks pass.
+
+**Next code task:** finish and merge PR #185 only after exact-head verification. Then implement M2 original-artifact provenance and source/capture metadata within the existing FAOS journal/storage boundary. Do not create a parallel ledger. The old in-memory four-tier dossier/PDF service is not a production report pipeline; the report milestone must consume server-verified evidence, persist report revision/hash, and explicitly distinguish evidence inventory from assessed findings.
+
+
 # Claim2Car Forensic Substantiation Program
 ## Latest verified implementation checkpoint — PR #182 merged (2026-11-23)
 
