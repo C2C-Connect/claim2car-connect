@@ -378,6 +378,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                     report_json_path = storage_root / self.db.f.tenants[0] / session_id / (report_json_artifact_id + ".original")
                     self.assertTrue(report_path.exists(), "DAMAGE_REPORT_BYTES_NOT_PERSISTED")
                     self.assertTrue(report_json_path.exists(), "DAMAGE_REPORT_JSON_BYTES_NOT_PERSISTED")
+                    self.assertNotIn(first_bytes, report.content, "REPORT_EMBEDDED_ORIGINAL_BYTES_INSTEAD_OF_REFERENCING_IMMUTABLE_KEY")
                     self.assertEqual(hashlib.sha256(report.content).hexdigest(), report_sha)
                     report_retry = restarted.post(
                         f"/v1/review-sessions/{session_id}/damage-assessment-report",
@@ -386,6 +387,8 @@ class CaptureHttpIntegration(unittest.TestCase):
                     )
                     self.assertEqual(report_retry.status_code, 200, report_retry.text)
                     self.assertEqual(report_retry.content, report.content)
+                    self.assertEqual(report_retry.headers["x-report-json-artifact-id"], report_json_artifact_id)
+                    self.assertEqual(report_retry.headers["x-report-json-sha256"], report_json_sha)
                     altered_request = {**report_request, "vehicle_description": "Altered vehicle"}
                     altered_retry = restarted.post(
                         f"/v1/review-sessions/{session_id}/damage-assessment-report",

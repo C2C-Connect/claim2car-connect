@@ -395,7 +395,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
         max_width, max_height = 3.15*inch, 2.15*inch
         scale = min(max_width/width, max_height/height)
         image_width, image_height = width*scale, height*scale
-        pair = Table([[Paragraph("<b>Original capture (visual rendering of verified source artifact)</b>", styles["C2CSmall"]), Paragraph("<b>Annotated capture — red box identifies the reviewed image region</b>", styles["C2CSmall"])],
+        pair = Table([[Paragraph("<b>Source preview (derived display rendering; original bytes remain at immutable storage key)</b>", styles["C2CSmall"]), Paragraph("<b>Annotated capture — red box identifies the reviewed image region</b>", styles["C2CSmall"])],
                       [RLImage(original, width=image_width, height=image_height), RLImage(annotated, width=image_width, height=image_height)]],
                      colWidths=[3.25*inch, 3.25*inch])
         pair.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("ALIGN",(0,1),(-1,1),"CENTER"),("BOX",(0,0),(-1,-1),.35,colors.HexColor("#B7C9D6"))]))

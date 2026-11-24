@@ -1011,7 +1011,8 @@ class CaptureEvidenceService:
                         (actor.tenant_id, session_id, event_id),
                     ).fetchone()
                     if occurred:
-                        capture_times[event_payload.get("artifact_id")] = occurred[0]
+                        value = occurred[0]
+                        capture_times[event_payload.get("artifact_id")] = value.isoformat() if hasattr(value, "isoformat") else str(value)
             review_event = next((
                 item for item in reversed(history)
                 if item[0] == "REVIEW_RECORDED" and item[1] == actor.actor_id
@@ -1028,7 +1029,10 @@ class CaptureEvidenceService:
                     "actor_id": review_event[1],
                     "disposition": review_event[2].get("disposition"),
                     "reason": review_event[2].get("reason"),
-                    "reviewed_at": review_time[0] if review_time else None,
+                    "reviewed_at": (
+                        review_time[0].isoformat() if review_time and hasattr(review_time[0], "isoformat")
+                        else str(review_time[0]) if review_time else None
+                    ),
                 }
             revisions = [
                 item[2].get("report_revision", 0) for item in history
@@ -1119,6 +1123,32 @@ class CaptureEvidenceService:
                 review = next((item for item in reversed(history) if item[0] == "REVIEW_RECORDED" and item[1] == actor.actor_id and type(item[2]) is dict and item[2].get("manifest_digest") == manifest.digest()), None)
                 if review is None:
                     raise CaptureSessionConflict("INDEPENDENT_REVIEW_REQUIRED_BEFORE_REPORT")
+                carrier_findings = carrier.get("findings")
+                if type(carrier_findings) is not list or {
+                    item.get("finding_id") for item in carrier_findings if isinstance(item, dict)
+                } != set(normalized_findings):
+                    raise CaptureSessionConflict("DAMAGE_REPORT_FINDING_CARRIER_MISMATCH")
+                for finding in carrier_findings:
+                    source = finding.get("source_image")
+                    reviewer = finding.get("reviewer_attribution")
+                    bbox = finding.get("bbox_normalized")
+                    if not isinstance(source, dict) or not isinstance(reviewer, dict) or not isinstance(bbox, dict):
+                        raise CaptureSessionConflict("DAMAGE_REPORT_FINDING_CARRIER_INVALID")
+                    source_id = source.get("artifact_id")
+                    source_entry = manifest_by_id.get(source_id)
+                    source_key = ArtifactKey(actor.tenant_id, UUID(session_id), UUID(source_id)).storage_key
+                    if (source_entry is None or source.get("sha256") != source_entry.sha256_hex
+                            or source.get("storage_key") != source_key
+                            or finding.get("slot_id") != source_entry.slot
+                            or reviewer.get("actor_id") != actor.actor_id
+                            or not reviewer.get("reviewed_at")
+                            or "A bounding box is a suspect-region identifier only. It is not a measured dimension, calibrated geometry, or a structural-severity claim."
+                               not in carrier.get("disclosures", [])):
+                        raise CaptureSessionConflict("DAMAGE_REPORT_FINDING_SOURCE_OR_DISCLOSURE_INVALID")
+                    x0, y0, x1, y1 = (bbox[key] for key in ("x_min", "y_min", "x_max", "y_max"))
+                    if (any(isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1
+                            for value in (x0, y0, x1, y1)) or x1 <= x0 or y1 <= y0):
+                        raise CaptureSessionConflict("DAMAGE_REPORT_BOUNDING_BOX_INVALID")
                 self._register_manifest_root(conn, actor, session_id, seal[3], seal[2]["request_id"], seal[2], seal_actor=seal[1])
                 prior_revisions = [item[2].get("report_revision", 0) for item in history if item[0] == "DAMAGE_ASSESSMENT_REPORT_GENERATED" and type(item[2]) is dict]
                 existing = next((item for item in history if item[3] == event_id), None)
