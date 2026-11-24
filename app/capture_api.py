@@ -45,7 +45,7 @@ from app.vision.photo_baseline import PhotoBaselineError, analyze_photo_bytes
 from app.vehicle_intelligence.vpic import VpicClient
 from backend.app.reports.damage_assessment import (
     CameraAngle, DamageAssessment, DamageEvidenceImage, DamageFinding,
-    RepairEstimateLine, render_damage_assessment_pdf,
+    DamageReportError, RepairEstimateLine, render_damage_assessment_pdf,
 )
 
 NO_STORE_HEADERS = {'Cache-Control': 'no-store'}
@@ -717,6 +717,182 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
         @api.get('/v1/review-sessions/{session_id}')
         def review_session_details(session_id: UUID, authorization: str = Depends(authorize)):
             return invoke_evidence(evidence.get_review_details, authorization, session_id)
+
+
+        @api.post('/v1/review-sessions/{session_id}/damage-assessment-report')
+        def generate_damage_assessment_report(
+            session_id: UUID, body: DamageAssessmentReportRequest,
+            authorization: str = Depends(authorize),
+        ):
+            try:
+                request_bytes = json.dumps(
+                    body.dict(), sort_keys=True, separators=(",", ":"), default=str,
+                ).encode("utf-8")
+                request_digest = sha256(request_bytes).hexdigest()
+                try:
+                    existing = evidence.retrieve_damage_assessment_report(
+                        authorization, str(session_id), str(body.request_id),
+                    )
+                except CaptureSessionNotFound:
+                    existing = None
+                if existing is not None:
+                    metadata = existing["metadata"]
+                    if metadata.get("request_payload_sha256") != request_digest:
+                        _fail(409, "DAMAGE_REPORT_IDEMPOTENCY_CONFLICT")
+                    return Response(
+                        content=existing["pdf_bytes"], media_type="application/pdf",
+                        headers={
+                            **NO_STORE_HEADERS,
+                            "Content-Disposition": f'attachment; filename="claim2car-damage-report-{session_id}-r{metadata["report_revision"]}.pdf"',
+                            "X-Report-Artifact-ID": metadata["report_artifact_id"],
+                            "X-Report-SHA256": metadata["report_sha256"],
+                            "X-Report-Revision": str(metadata["report_revision"]),
+                        },
+                    )
+
+                details = evidence.get_review_details(authorization, str(session_id))
+                review = details.get("review")
+                if not review or not review.get("reviewed_at"):
+                    _fail(409, "INDEPENDENT_REVIEW_REQUIRED_BEFORE_REPORT")
+                artifacts_by_id = {item["artifact_id"]: item for item in details["artifacts"]}
+                referenced_ids = sorted({str(item.evidence_artifact_id) for item in body.findings})
+                evidence_images = []
+                for artifact_id in referenced_ids:
+                    metadata = artifacts_by_id.get(artifact_id)
+                    if metadata is None:
+                        _fail(409, "DAMAGE_FINDING_IMAGE_NOT_IN_SEALED_MANIFEST")
+                    original = evidence.retrieve_for_review(authorization, str(session_id), artifact_id)
+                    supplied_angle = body.camera_angles.get(artifact_id)
+                    if supplied_angle and any(
+                        value is not None for value in (
+                            supplied_angle.yaw_degrees, supplied_angle.pitch_degrees, supplied_angle.roll_degrees,
+                        )
+                    ):
+                        camera_angle = CameraAngle(
+                            yaw_degrees=supplied_angle.yaw_degrees,
+                            pitch_degrees=supplied_angle.pitch_degrees,
+                            roll_degrees=supplied_angle.roll_degrees,
+                            source="MANUAL_ENTRY",
+                        )
+                    else:
+                        camera_angle = CameraAngle()
+                    evidence_images.append(DamageEvidenceImage(
+                        artifact_id=artifact_id,
+                        capture_slot=metadata["slot"],
+                        original_bytes=original,
+                        expected_sha256=metadata["sha256"],
+                        registered_at=metadata.get("registered_at") or "NOT_RECORDED",
+                        camera_angle=camera_angle,
+                    ))
+
+                findings = tuple(DamageFinding(
+                    finding_id=item.finding_id,
+                    component=item.component,
+                    vehicle_location=item.vehicle_location,
+                    damage_type=item.damage_type,
+                    observation=item.observation,
+                    evidence_artifact_id=str(item.evidence_artifact_id),
+                    bbox_normalized=item.bbox_normalized,
+                    status=item.status,
+                    reviewer_actor_id=review["actor_id"],
+                    reviewed_at=review["reviewed_at"],
+                    limitations=item.limitations,
+                ) for item in body.findings)
+                estimate_lines = tuple(RepairEstimateLine(
+                    line_id=item.line_id,
+                    category=item.category,
+                    description=item.description,
+                    quantity=item.quantity,
+                    unit=item.unit,
+                    unit_price_cents=item.unit_price_cents,
+                    source_name=item.source_name,
+                    source_reference=item.source_reference,
+                    effective_date=item.effective_date,
+                    related_finding_id=item.related_finding_id,
+                ) for item in body.estimate_lines)
+                assessment = DamageAssessment(
+                    session_id=str(session_id),
+                    vehicle_description=body.vehicle_description,
+                    report_revision=details["next_report_revision"],
+                    findings=findings,
+                    evidence_images=tuple(evidence_images),
+                    estimate_lines=estimate_lines,
+                    prepared_at=review["reviewed_at"],
+                )
+                pdf_bytes = render_damage_assessment_pdf(assessment)
+                report_sha256 = sha256(pdf_bytes).hexdigest()
+                stored = evidence.record_damage_assessment_report(
+                    authorization, str(session_id),
+                    request_id=str(body.request_id),
+                    pdf_bytes=pdf_bytes,
+                    report_sha256=report_sha256,
+                    report_revision=assessment.report_revision,
+                    finding_ids=[item.finding_id for item in findings],
+                    estimate_total_cents=sum(item.amount_cents for item in estimate_lines),
+                    request_payload_sha256=request_digest,
+                )
+                return Response(
+                    content=pdf_bytes, media_type="application/pdf",
+                    headers={
+                        **NO_STORE_HEADERS,
+                        "Content-Disposition": f'attachment; filename="claim2car-damage-report-{session_id}-r{assessment.report_revision}.pdf"',
+                        "X-Report-Artifact-ID": stored["report_artifact_id"],
+                        "X-Report-SHA256": report_sha256,
+                        "X-Report-Revision": str(assessment.report_revision),
+                    },
+                )
+            except AuthenticationError:
+                _fail(401, "UNAUTHORIZED")
+            except CaptureAuthorizationError:
+                _fail(403, "REVIEWER_IDENTITY_REQUIRED")
+            except CaptureSessionNotFound:
+                _fail(404, "CAPTURE_SESSION_OR_REPORT_NOT_FOUND")
+            except CaptureSessionConflict as error:
+                _fail(409, str(error))
+            except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
+                _fail(503, "CAPTURE_STORAGE_UNAVAILABLE")
+            except (ArtifactConflict, ArtifactIntegrityError, ArtifactNotFound):
+                _fail(409, "EVIDENCE_ARTIFACT_CONFLICT")
+            except DamageReportError as error:
+                _fail(422, error.code)
+            except ValueError:
+                _fail(422, "INVALID_DAMAGE_ASSESSMENT_REPORT_REQUEST")
+            except Exception:
+                _fail(500, "DAMAGE_ASSESSMENT_REPORT_GENERATION_FAILED")
+
+        @api.get('/v1/review-sessions/{session_id}/damage-assessment-reports/{report_artifact_id}')
+        def download_damage_assessment_report(
+            session_id: UUID, report_artifact_id: UUID, authorization: str = Depends(authorize),
+        ):
+            try:
+                result = evidence.retrieve_damage_assessment_report(
+                    authorization, str(session_id), str(report_artifact_id),
+                )
+                metadata = result["metadata"]
+                return Response(
+                    content=result["pdf_bytes"], media_type="application/pdf",
+                    headers={
+                        **NO_STORE_HEADERS,
+                        "Content-Disposition": f'attachment; filename="claim2car-damage-report-{session_id}-r{metadata["report_revision"]}.pdf"',
+                        "X-Report-Artifact-ID": metadata["report_artifact_id"],
+                        "X-Report-SHA256": metadata["report_sha256"],
+                        "X-Report-Revision": str(metadata["report_revision"]),
+                    },
+                )
+            except AuthenticationError:
+                _fail(401, "UNAUTHORIZED")
+            except CaptureAuthorizationError:
+                _fail(403, "REVIEWER_IDENTITY_REQUIRED")
+            except CaptureSessionNotFound:
+                _fail(404, "DAMAGE_REPORT_NOT_FOUND")
+            except CaptureSessionConflict as error:
+                _fail(409, str(error))
+            except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
+                _fail(503, "CAPTURE_STORAGE_UNAVAILABLE")
+            except (ArtifactIntegrityError, ArtifactNotFound):
+                _fail(409, "DAMAGE_REPORT_ARTIFACT_INTEGRITY_FAILURE")
+            except Exception:
+                _fail(500, "DAMAGE_ASSESSMENT_REPORT_DOWNLOAD_FAILED")
 
 
         @api.get('/v1/review-collisions/{collision_id}')
