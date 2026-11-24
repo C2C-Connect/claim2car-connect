@@ -247,14 +247,24 @@ class CaptureHttpIntegration(unittest.TestCase):
                         json={"request_id": str(uuid.uuid4()), "results": {slot: True for slot in CANONICAL_SLOTS}},
                     )
                     self.assertEqual(quality.status_code, 200, quality.text)
+                    seal_request_id = str(uuid.uuid4())
                     sealed = client.post(
                         f"/v1/capture-sessions/{session_id}/seal",
                         headers=operator_headers,
-                        json={"request_id": str(uuid.uuid4())},
+                        json={"request_id": seal_request_id},
                     )
                     self.assertEqual(sealed.status_code, 200, sealed.text)
                     self.assertTrue(sealed.json()["root_registered"])
                     manifest_digest = sealed.json()["manifest_digest"]
+                    seal_retry = client.post(
+                        f"/v1/capture-sessions/{session_id}/seal",
+                        headers=operator_headers,
+                        json={"request_id": seal_request_id},
+                    )
+                    self.assertEqual(seal_retry.status_code, 200, seal_retry.text)
+                    self.assertTrue(seal_retry.json()["root_registered"])
+                    self.assertTrue(seal_retry.json()["replayed"])
+                    self.assertEqual(seal_retry.json()["manifest_digest"], manifest_digest)
                     root = self.db.f.seed.execute(
                         "SELECT manifest_digest,shot_list_version,seal_sequence,seal_chain_hash,"
                         "context_binding_hash,binding_version FROM faos.manifest_roots "
