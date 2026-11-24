@@ -2,7 +2,7 @@
 
 **Document ID:** C2C-REL-AC-001  
 **Version:** 1.0 — execution registry  
-**Snapshot:** 2026-11-24 23:04 UTC  
+**Snapshot:** 2026-11-24 23:08 UTC  
 **Repository:** `C2C-Connect/claim2car-connect`  
 **Base revision for this registry branch:** `55f69790df123a4602196c3c474e143808c4b87e`  
 **Authority:** Current owner Developer Execution Directive. This registry does not amend owner decisions or award acceptance.
@@ -37,18 +37,18 @@ PR #186 must not merge before PR #185 is accepted, merged, and PR #186 is rebase
 | Database authority cutover | #1196 | Success; artifact retained, artifact contents not yet independently inspected | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012240 |
 | Legacy database component | #1240 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012125 |
 | FastAPI foundation | #1182 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012063 |
-| Integrated runtime container smoke | #671 | In progress after targeted rerun; result pending | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012031 |
+| Integrated runtime container smoke | #671 | Success after targeted rerun | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45502012031 |
 | Other PR workflows | 8 additional workflow types | Success | Exact run inventory is available from the PR head's workflow-run listing |
 
-The cancelled integrated-runtime run is not a pass. The targeted rerun request is not a result.
+The targeted rerun completed successfully. All 13 PR #185 workflow types are now green on this exact head.
 
 **PR #186 — SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`**
 
 | Workflow | Run | Result at snapshot | Evidence |
 |---|---:|---|---|
 | Full test suite | #1129 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282583 |
-| Database authority cutover | #1200 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282825 |
-| Integrated runtime container smoke | #675 | In progress | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282240 |
+| Database authority cutover | #1200 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282825 |
+| Integrated runtime container smoke | #675 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282240 |
 | Legacy database component | #1244 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282176 |
 | FastAPI foundation | #1186 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282314 |
 | Controlled-test intake PostgreSQL | #1032 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282358 |
@@ -60,7 +60,7 @@ The cancelled integrated-runtime run is not a pass. The targeted rerun request i
 | Controlled synthetic demonstration | #991 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282508 |
 | Restricted container | #629 | Success | https://github.com/C2C-Connect/claim2car-connect/actions/runs/45504282469 |
 
-A workflow being in progress is not a pass. These runs prove only the workflow results at the listed SHA; they do not independently prove a release gate.
+All 13 PR #186 workflow types completed successfully at this SHA. These runs prove the workflow results only; they do not independently prove a release gate.
 
 ## 3. Database gate registry — DB-01 through DB-14
 
@@ -97,9 +97,9 @@ Every row explicitly lists its database dependencies, additional evidence not su
 |---|---|---|---|
 | **GATE-01 — Governance and commercial compliance** | DB-06, DB-07, DB-09, DB-11, DB-12, DB-14 | Owner-approved commercial terms; prohibited owner incentive blocked in contracts, denylist, tests and ledger; operator compensation remains disabled; dealer/shop fee earning events; signed partner terms; counsel review; documented authority for consent, distribution, payment and dispatch. | **NONE.** PR #185 Full suite #1125 (SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`) and DB authority #1196 are technical evidence only, not owner/counsel/partner approvals. No current-head workflow can substitute for signed governance evidence. |
 | **GATE-02 — Security and database authority** | DB-01 through DB-14 (all fourteen) | Application/API authorization, server-derived actor and tenant, forced RLS across all tenant tables, private internal routes, secret handling, TLS configuration, threat review, and evidence that the deployed configuration matches the tested configuration. | Candidate exact-head DB evidence: PR #185 DB authority #1196 at SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c` awarded DB-01–DB-14 14/14 PASS (408/408, zero skips); PR #186 DB authority #1200 at SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de` awarded 14/14 PASS (409/409, zero skips). This satisfies the database subset only. Additional release-security evidence and deployed-configuration equivalence remain outstanding. |
-| **GATE-03 — Operator and reviewer product experience** | DB-03, DB-04, DB-05, DB-06, DB-07, DB-08, DB-09, DB-13, DB-14 | Usable authenticated operator and reviewer journey; consent UX; protocol version shown to every consumer; VIN and capture workflow; reviewer access to original bytes; attributed review and reason; human usability and error recovery. | Candidate exact-head evidence: PR #185 Full suite #1125 and FastAPI #1182 at SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. Integrated runtime smoke #671 was cancelled and its targeted rerun is pending. No operational journey is certified. |
-| **GATE-04 — Durable storage, consent-deletion and PITR drills** | DB-01, DB-02, DB-04, DB-07, DB-09, DB-10, DB-12, DB-13, DB-14 | Durable immutable original-byte storage; deletion of original bytes and mutable incident rows on withdrawal; durable revocation journal event; downstream fail-closed behavior; encrypted storage; backup policy; point-in-time recovery and witnessed restore drill; post-restore integrity verification. | Candidate exact-head evidence: PR #185 DB authority #1196 and Full suite #1125 at SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. No current-head object-store deletion proof or PITR/restore drill is recorded. **No gate proof.** |
-| **GATE-05 — Persistent integrated staging** | DB-01, DB-02, DB-03, DB-04, DB-05, DB-07, DB-08, DB-09, DB-10, DB-11, DB-12, DB-13, DB-14 | Actual persistent integrated environment: PostgreSQL 16/PostGIS 3.4, durable encrypted object storage, real auth, TLS, managed secrets, backups and restore drills, monitoring/alerts, deployed immutable image, and a successful operator-to-reviewer journey after restart. Restricted Railway/container smoke is not staging. | PR #185 Integrated runtime smoke #671 was cancelled; targeted rerun requested. PR #186 Integrated runtime smoke #675 is in progress at SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. Neither is persistent staging proof. **No gate proof.** |
+| **GATE-03 — Operator and reviewer product experience** | DB-03, DB-04, DB-05, DB-06, DB-07, DB-08, DB-09, DB-13, DB-14 | Usable authenticated operator and reviewer journey; consent UX; protocol version shown to every consumer; VIN and capture workflow; reviewer access to original bytes; attributed review and reason; human usability and error recovery. | Candidate exact-head evidence: PR #185 Full suite #1125, FastAPI #1182 and Integrated runtime smoke #671 all passed at SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`; PR #186 Full suite #1129, FastAPI #1186 and Integrated runtime smoke #675 also passed at SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. This is synthetic automated journey evidence, not an operational field or persistent-staging journey. |
+| **GATE-04 — Durable storage, consent-deletion and PITR drills** | DB-01, DB-02, DB-04, DB-07, DB-09, DB-10, DB-12, DB-13, DB-14 | Durable immutable original-byte storage; deletion of original bytes and mutable incident rows on withdrawal; durable revocation journal event; downstream fail-closed behavior; encrypted storage; backup policy; point-in-time recovery and witnessed restore drill; post-restore integrity verification. | Candidate exact-head evidence: PR #185 DB authority #1196 and Full suite #1125 at SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`; synthetic local durable-store consent deletion and tamper cases pass. No encrypted remote object-store lifecycle or PITR/restore drill is recorded. **No release-gate proof.** |
+| **GATE-05 — Persistent integrated staging** | DB-01, DB-02, DB-03, DB-04, DB-05, DB-07, DB-08, DB-09, DB-10, DB-11, DB-12, DB-13, DB-14 | Actual persistent integrated environment: PostgreSQL 16/PostGIS 3.4, durable encrypted object storage, real auth, TLS, managed secrets, backups and restore drills, monitoring/alerts, deployed immutable image, and a successful operator-to-reviewer journey after restart. Restricted Railway/container smoke is not staging. | PR #185 Integrated runtime smoke #671 and PR #186 Integrated runtime smoke #675 both passed. They are container smoke tests, not a persistent deployed staging environment with real PostgreSQL, durable remote storage, TLS, managed secrets, backups, monitoring and restore drills. **No release-gate proof.** |
 | **GATE-06 — Physical-device qualification** | DB-04, DB-05, DB-07, DB-10, DB-13 | Physical reference iPad Pro 11-inch M5 qualification; recorded device and OS; camera capture, framing, low-light and motion cases, offline interruption/recovery, queue encryption at rest, upload/retry, thermal and battery behavior. Simulator and desktop browser runs do not qualify. | **NONE.** No current-head physical-device workflow or signed device qualification report was found. |
 | **GATE-07 — Counsel, partner agreements and sandbox reconciliation before live payment** | DB-06, DB-07, DB-08, DB-09, DB-11, DB-12, DB-13, DB-14 | Counsel sign-off; signed dealer/shop/operator agreements; owner authorization; Square sandbox success, duplicate, failure, UNKNOWN, reversal and reconciliation scenarios; webhook signature/dedup evidence; internal ledger as source of truth; explicit live-money release authorization. | **NONE.** No current-head workflow run in this snapshot demonstrates the complete required sandbox reconciliation matrix plus counsel and signed-partner evidence. PR #185/#186 general CI does not prove this gate. |
 
@@ -129,7 +129,7 @@ Before it can be considered Verified or merged, current-head evidence must prove
 4. A fresh runtime independently recomputes the manifest root from persisted bytes and verifies `link_k = SHA-256(content_k || link_{k-1})`.
 5. A one-byte persisted-artifact mutation fails closed and writes a durable audit event; no unhandled exception or silent success.
 
-Current candidate: SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. The DB authority run #1196 and Full suite #1125 are green, but the integrated smoke #671 was cancelled and is being rerun. Do not mark Verified until the five criteria are individually evidenced on the final current head.
+Current candidate: SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. All five criteria are exercised by the exact-head HTTP/PostgreSQL integration test; all 13 workflows passed, including Full suite #1125, DB authority #1196 and integrated smoke #671. The DB authority artifact records DB-01–DB-14 14/14 PASS. Component Verified; no merge until owner final approval.
 
 ### PR #186 — evidence-linked damage assessment reports
 
@@ -173,7 +173,7 @@ The owner directive governs the canonical 12-v1 / 16-v1 target; the live reposit
 
 | Approval / condition | Required approver | Current status |
 |---|---|---|
-| Formal DB-01–DB-14 acceptance | Owner, with retained exact-head gate report | Pending; 0/14 certified in this release registry |
+| Formal DB-01–DB-14 acceptance | Owner, with retained exact-head gate report | 14/14 PASS awarded in PR #185 #1196 and PR #186 #1200; rerun after rebase/source change |
 | GATE-01 governance and commercial rules | Owner and counsel where applicable | Pending |
 | GATE-05 persistent staging cost ceiling | Owner, after written provider/region/cost/backup/restore/secrets/monitoring plan | Pending |
 | Physical device qualification (GATE-06) | Owner after review of physical-device evidence | Pending |
