@@ -2,7 +2,7 @@
 
 **Document ID:** C2C-REL-AC-001  
 **Version:** 1.0 — execution registry  
-**Snapshot:** 2026-11-24 22:54 UTC  
+**Snapshot:** 2026-11-24 22:58 UTC  
 **Repository:** `C2C-Connect/claim2car-connect`  
 **Base revision for this registry branch:** `55f69790df123a4602196c3c474e143808c4b87e`  
 **Authority:** Current owner Developer Execution Directive. This registry does not amend owner decisions or award acceptance.
@@ -133,6 +133,19 @@ Current candidate: SHA `0431dbaf6e1a3bb3348f6d94c094e893543e513c`. The DB author
 
 ### PR #186 — evidence-linked damage assessment reports
 
+**Implementation evidence discovered in the live PR branch:** `database/capture_evidence.py` implements `record_damage_assessment_report` and `retrieve_damage_assessment_report`. The write path stores PDF and JSON carrier bytes in the durable artifact store and appends a `DAMAGE_ASSESSMENT_REPORT_GENERATED` event to the PostgreSQL journal with both immutable storage keys, SHA-256 digests, manifest digest, seal event, protocol version, report revision, request digest, findings and review-event binding. The read path reconstructs report metadata from the persisted journal and fetches both objects by key with expected-digest verification. The PR description's statement that report versions remain process-memory-only is therefore stale relative to the current branch implementation and integration tests.
+
+The current integration test also:
+- asserts the PDF does not embed the original source byte sequence, while carrying the original image storage key and digest;
+- asserts source image, slot, normalized bounding box, reviewer actor/time, camera-angle metadata and the exact disclosure in PDF and JSON;
+- retries the same report request and checks stable PDF/JSON artifact identifiers and digests;
+- rejects changed request payload reuse;
+- retrieves both report carriers through a fresh runtime and a separate Python process;
+- mutates persisted PDF bytes, expects fail-closed HTTP 409, and checks for a durable integrity-failure journal event.
+
+This is strong implementation/test evidence, not a gate award. It still requires the full exact-head workflow set, independent review of the artifact and code, and rebase/reverification after PR #185.
+
+
 Before it can be considered Verified or merged, current-head evidence must prove all of the following:
 
 1. Every finding references the original immutable object by storage key and digest; the original bytes remain authoritative and are not replaced by PDF-rendered copies.
@@ -145,7 +158,7 @@ Current candidate: SHA `0a4b6087049d2483d8cf4ecc68fa0faaaa3126de`. The latest co
 
 ## 7. Live-source discrepancies requiring explicit reconciliation
 
-The owner directive's canonical capture identifiers are `12-v1` and `16-v1`. The current repository acceptance matrix on the base revision also describes `claims2car-16-v2` as selectable, `claims2car-16-v1` as the default, and `claims2car-12-v1` as the legacy alternative. This is a material protocol-version naming and default-state discrepancy, not a cosmetic documentation difference.
+The owner directive's canonical capture identifiers are `12-v1` and `16-v1`. The live code on the PR #185 branch sets `DEFAULT_CAPTURE_PROTOCOL = claims2car-16-v1`, lists `claims2car-16-v2` as a separate FAOS protocol, and lists `claims2car-12-v1` as the legacy protocol. The repository's versioning document records the 16-v1 view list as owner-approved on 2026-11-11 and enabled. The additional 16-v2 protocol is not named in the current owner decision and must remain a distinct version, never an alias or reinterpretation of 16-v1.
 
 Until the actual contracts, migrations, API validators, frontend selector, session-creation defaults, and report/reviewer consumers are reconciled against the owner's canonical `12-v1` / `16-v1` decision:
 - do not enable or silently rename any protocol;
