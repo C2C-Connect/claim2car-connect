@@ -552,6 +552,12 @@ class FourTierDossierService:
             raise DossierGenerationError("DAMAGE_REPORT_IMAGE_NOT_IN_VERIFIED_MANIFEST")
         if any(finding.evidence_artifact_id not in attached_ids for finding in assessment.findings):
             raise DossierGenerationError("DAMAGE_REPORT_FINDING_IMAGE_MISSING")
+        if any(
+            finding.status == "CONFIRMED_BY_REVIEWER"
+            and finding.reviewer_actor_id != binding.reviewer_actor_id
+            for finding in assessment.findings
+        ):
+            raise DossierGenerationError("DAMAGE_REPORT_REVIEWER_IDENTITY_MISMATCH")
         try:
             pdf_bytes = render_damage_assessment_pdf(assessment)
         except DamageReportError as exc:
