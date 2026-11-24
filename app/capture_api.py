@@ -756,6 +756,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                     _fail(409, "INDEPENDENT_REVIEW_REQUIRED_BEFORE_REPORT")
                 artifacts_by_id = {item["artifact_id"]: item for item in details["artifacts"]}
                 referenced_ids = sorted({str(item.evidence_artifact_id) for item in body.findings})
+                if set(body.camera_angles) - set(referenced_ids):
+                    _fail(422, "CAMERA_ANGLE_REFERENCES_UNATTACHED_IMAGE")
                 evidence_images = []
                 for artifact_id in referenced_ids:
                     metadata = artifacts_by_id.get(artifact_id)
