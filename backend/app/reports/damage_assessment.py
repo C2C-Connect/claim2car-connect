@@ -7,7 +7,6 @@ estimate line items supplied by the assessment pipeline.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from xml.sax.saxutils import escape
 from hashlib import sha256
@@ -15,18 +14,17 @@ from io import BytesIO
 import re
 from typing import Sequence
 
-from PIL import Image, ImageDraw, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageDraw, UnidentifiedImageError
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
-    BaseDocTemplate, Frame, Image as RLImage, KeepTogether, PageTemplate,
-    PageBreak, Paragraph, Spacer, Table, TableStyle,
+    BaseDocTemplate, Frame, Image as RLImage, PageTemplate,
+    Paragraph, Spacer, Table, TableStyle,
 )
-from reportlab.pdfbase.pdfmetrics import stringWidth
 
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -180,13 +178,16 @@ class DamageAssessment:
         for finding in self.findings:
             if finding.evidence_artifact_id not in image_ids:
                 raise DamageReportError("FINDING_EVIDENCE_IMAGE_NOT_ATTACHED")
+        line_ids = [line.line_id for line in self.estimate_lines]
+        if len(set(line_ids)) != len(line_ids):
+            raise DamageReportError("DUPLICATE_ESTIMATE_LINE_ID")
         for line in self.estimate_lines:
             if line.related_finding_id and line.related_finding_id not in finding_ids:
                 raise DamageReportError("ESTIMATE_LINE_FINDING_REFERENCE_NOT_FOUND")
 
 
 def _money(cents: int) -> str:
-    return f"${cents / 100:,.2f}"
+    return f"${(Decimal(cents) / Decimal(100)):,.2f}"
 
 
 def _safe(value: object) -> str:
@@ -208,7 +209,7 @@ def _annotated_image(evidence: DamageEvidenceImage, findings: Sequence[DamageFin
         x0, y0, x1, y1 = finding.bbox_normalized
         box = (round(x0 * width), round(y0 * height), round(x1 * width), round(y1 * height))
         draw.rectangle(box, outline=(220, 30, 30), width=max(3, round(min(width, height) / 240)))
-        label = f"{finding.finding_id} | {finding.component}"
+        label = f"{finding.finding_id} | {finding.component}".encode("ascii", "replace").decode("ascii")
         draw.rectangle((box[0], max(0, box[1] - 22), min(width, box[0] + max(150, len(label) * 8)), box[1]), fill=(220, 30, 30))
         draw.text((box[0] + 4, max(0, box[1] - 19)), label, fill=(255, 255, 255))
     out = BytesIO()
@@ -271,7 +272,7 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
         max_width, max_height = 3.15*inch, 2.15*inch
         scale = min(max_width/width, max_height/height)
         image_width, image_height = width*scale, height*scale
-        pair = Table([[Paragraph("<b>Original capture</b>", styles["C2CSmall"]), Paragraph("<b>Annotated capture — red box identifies the reviewed image region</b>", styles["C2CSmall"])],
+        pair = Table([[Paragraph("<b>Original capture (visual rendering of verified source artifact)</b>", styles["C2CSmall"]), Paragraph("<b>Annotated capture — red box identifies the reviewed image region</b>", styles["C2CSmall"])],
                       [RLImage(original, width=image_width, height=image_height), RLImage(annotated, width=image_width, height=image_height)]],
                      colWidths=[3.25*inch, 3.25*inch])
         pair.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("ALIGN",(0,1),(-1,1),"CENTER"),("BOX",(0,0),(-1,-1),.35,colors.HexColor("#B7C9D6"))]))
@@ -279,11 +280,11 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
 
     story.append(Paragraph("Repair estimate — source-backed inputs only", styles["C2CHeading"]))
     if assessment.estimate_lines:
-        rows = [["Line", "Category", "Description", "Qty", "Unit rate", "Amount", "Source"]]
+        rows = [["Line", "Finding", "Category", "Description", "Qty", "Unit rate", "Amount", "Source"]]
         for line in assessment.estimate_lines:
-            rows.append([line.line_id, line.category, line.description, f"{Decimal(str(line.quantity)):f} {line.unit}", _money(line.unit_price_cents), _money(line.amount_cents), f"{_safe(line.source_name)}: {_safe(line.source_reference)} ({_safe(line.effective_date)})"])
-        rows.append(["", "", "", "", "TOTAL", _money(sum(line.amount_cents for line in assessment.estimate_lines)), ""])
-        estimate_table = Table(rows, repeatRows=1, colWidths=[.55*inch,.75*inch,1.55*inch,.75*inch,.7*inch,.65*inch,1.85*inch])
+            rows.append([_safe(line.line_id), _safe(line.related_finding_id or "Case"), _safe(line.category), _safe(line.description), f"{Decimal(str(line.quantity)):f} {_safe(line.unit)}", _money(line.unit_price_cents), _money(line.amount_cents), f"{_safe(line.source_name)}: {_safe(line.source_reference)} ({_safe(line.effective_date)})"])
+        rows.append(["", "", "", "", "", "TOTAL", _money(sum(line.amount_cents for line in assessment.estimate_lines)), ""])
+        estimate_table = Table(rows, repeatRows=1, colWidths=[.45*inch,.5*inch,.65*inch,1.35*inch,.55*inch,.65*inch,.65*inch,2.0*inch])
         estimate_table.setStyle(TableStyle([
             ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#17365D")),
             ("TEXTCOLOR",(0,0),(-1,0),colors.white),
@@ -293,6 +294,11 @@ def render_damage_assessment_pdf(assessment: DamageAssessment) -> bytes:
             ("BACKGROUND",(0,-1),(-1,-1),colors.HexColor("#EAF0F5")),
         ]))
         story.append(estimate_table)
+        category_totals = {}
+        for line in assessment.estimate_lines:
+            category_totals[line.category] = category_totals.get(line.category, 0) + line.amount_cents
+        story.append(Spacer(1, 6))
+        story.append(Paragraph("<b>Category subtotals:</b> " + " | ".join(f"{_safe(category)}: {_money(amount)}" for category, amount in sorted(category_totals.items())), styles["C2CSmall"]))
     else:
         story.append(Paragraph("No priced repair estimate was supplied. No parts, labor, paint, materials, tax or total is inferred by this report renderer.", styles["BodyText"]))
     story.extend([
