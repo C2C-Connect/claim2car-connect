@@ -372,6 +372,8 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(report.headers["content-type"], "application/pdf")
                     report_artifact_id = report.headers["x-report-artifact-id"]
                     report_sha = report.headers["x-report-sha256"]
+                    report_path = storage_root / self.db.f.tenants[0] / session_id / (report_artifact_id + ".original")
+                    self.assertTrue(report_path.exists(), "DAMAGE_REPORT_BYTES_NOT_PERSISTED")
                     self.assertEqual(hashlib.sha256(report.content).hexdigest(), report_sha)
                     report_retry = restarted.post(
                         f"/v1/review-sessions/{session_id}/damage-assessment-report",
