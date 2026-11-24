@@ -120,7 +120,22 @@
           }});
           return {result,attempted};
         },
-        async purge(){return queue.deleteSession(sessionId,{tenantId});}
+        async purge(){return queue.deleteSession(sessionId,{tenantId});},
+        async raw(){return store.list(sessionId,{tenantId,actorId,includeBytes:true});},
+        async tamperSlot(queueId,slot){
+          const records=await store.list(sessionId,{tenantId,actorId,includeBytes:true});
+          const record=records.find(item=>item.queueId===queueId);if(!record)throw new Error("NOT_FOUND");
+          await store.updateRecord(queueId,{...record,slot});return true;
+        },
+        async seedLegacyV1Ciphertext(){
+          const bytes=new TextEncoder().encode("prototype-legacy-ciphertext");
+          const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),b=>b.toString(16).padStart(2,"0")).join("");
+          const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+          const imported=await crypto.subtle.importKey("raw",new TextEncoder().encode(keyMaterial),"HKDF",false,["deriveKey"]);
+          const key=await crypto.subtle.deriveKey({name:"HKDF",hash:"SHA-256",salt,info:new TextEncoder().encode("Claim2Car offline evidence queue v1")},imported,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+          const encrypted=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},key,bytes));
+          return store.enqueue({sessionId,tenantId,actorId,slot:"legacy",artifactId:"legacy-ciphertext-artifact",requestId:"legacy-ciphertext-request",sha256:digest,byteLength:bytes.byteLength,mimeType:"image/jpeg",encryptionAlgorithm:"AES-GCM",salt,iv,queuedAt:new Date().toISOString(),uploaded:false,bytes:encrypted});
+        }
       });
     </script>
 \n</body>
