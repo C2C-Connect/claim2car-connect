@@ -8,6 +8,8 @@ import base64
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -34,6 +36,7 @@ class CaptureHttpIntegration(unittest.TestCase):
             from database.capture_sessions import CaptureSessionStore
             from database.claim_cases import ClaimCaseStore
             from app.evidence_manifest import CANONICAL_SLOTS
+            from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL
         except ModuleNotFoundError as error:
             self.skipTest(f"HTTP integration dependencies unavailable in this test lane: {error.name}")
 
@@ -246,13 +249,125 @@ class CaptureHttpIntegration(unittest.TestCase):
                         json={"request_id": str(uuid.uuid4()), "results": {slot: True for slot in CANONICAL_SLOTS}},
                     )
                     self.assertEqual(quality.status_code, 200, quality.text)
+                    seal_request_id = str(uuid.uuid4())
                     sealed = client.post(
                         f"/v1/capture-sessions/{session_id}/seal",
                         headers=operator_headers,
-                        json={"request_id": str(uuid.uuid4())},
+                        json={"request_id": seal_request_id},
                     )
                     self.assertEqual(sealed.status_code, 200, sealed.text)
+                    self.assertTrue(sealed.json()["root_registered"])
                     manifest_digest = sealed.json()["manifest_digest"]
+                    seal_retry = client.post(
+                        f"/v1/capture-sessions/{session_id}/seal",
+                        headers=operator_headers,
+                        json={"request_id": seal_request_id},
+                    )
+                    self.assertEqual(seal_retry.status_code, 200, seal_retry.text)
+                    self.assertTrue(seal_retry.json()["root_registered"])
+                    self.assertTrue(seal_retry.json()["replayed"])
+                    self.assertEqual(seal_retry.json()["manifest_digest"], manifest_digest)
+                    seal_event_count = self.db.f.seed.execute(
+                        "SELECT count(*) FROM faos.events "
+                        "WHERE tenant_id=%s AND session_id=%s AND event_id=%s AND kind='MANIFEST_SEALED'",
+                        (self.db.f.tenants[0], session_id, "seal:" + seal_request_id),
+                    ).fetchone()[0]
+                    self.assertEqual(seal_event_count, 1, "SEAL_REPLAY_CREATED_DUPLICATE_JOURNAL_EVENT")
+                    root = self.db.f.seed.execute(
+                        "SELECT manifest_digest,shot_list_version,seal_sequence,seal_chain_hash,"
+                        "context_binding_hash,binding_version FROM faos.manifest_roots "
+                        "WHERE tenant_id=%s AND session_id=%s",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()
+                    self.assertIsNotNone(root, "CAPTURE_SEAL_DID_NOT_REGISTER_MANIFEST_ROOT")
+                    self.assertEqual(root[0], manifest_digest)
+                    self.assertEqual(root[1], DEFAULT_CAPTURE_PROTOCOL)
+                    self.assertGreater(root[2], 0)
+                    self.assertRegex(root[3], r"^[0-9a-f]{64}$")
+                    self.assertRegex(root[4], r"^[0-9a-f]{64}$")
+                    self.assertEqual(root[5], "manifest-context-v1")
+                    seal_id = self.db.f.seed.execute(
+                        "SELECT seal_event_id FROM faos.manifest_roots "
+                        "WHERE tenant_id=%s AND session_id=%s",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()[0]
+                    self.assertTrue(self.db.f.seed.execute(
+                        "SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)",
+                        (self.db.f.tenants[0], session_id, seal_id),
+                    ).fetchone()[0])
+
+                    # Start a separate Python process immediately after sealing.
+                    # It must reconstruct the HTTP reviewer path using only the
+                    # persisted PostgreSQL journal and durable original-byte store.
+                    process_artifact_id, process_original = next(iter(originals.items()))
+                    process_environment = {
+                        **os.environ,
+                        "C2C_TEST_DSNS": json.dumps(self.db.dsns),
+                        "C2C_TEST_TENANT_ID": self.db.f.tenants[0],
+                        "C2C_TEST_REVIEWER_ROLE": self.db.f.roles[0],
+                        "C2C_TEST_REVIEWER_TOKEN": self.db.reviewer_token,
+                        "C2C_TEST_SESSION_ID": session_id,
+                        "C2C_TEST_ARTIFACT_ID": process_artifact_id,
+                        "C2C_TEST_ORIGINAL_B64": base64.b64encode(process_original).decode("ascii"),
+                        "C2C_TEST_EXPECTED_MANIFEST": manifest_digest,
+                    }
+                    process_script = r'''
+import base64, hashlib, json, os, time, uuid
+from fastapi.testclient import TestClient
+from app.capture_api import CaptureRuntime, create_capture_app
+from app.identity import ActorBinding, Credential, CredentialResolver
+from app.main import Settings
+from database.capture_sessions import CaptureSessionStore
+from database.claim_cases import ClaimCaseStore
+
+token = os.environ["C2C_TEST_REVIEWER_TOKEN"]
+tenant_id = uuid.UUID(os.environ["C2C_TEST_TENANT_ID"])
+role = os.environ["C2C_TEST_REVIEWER_ROLE"]
+credential = Credential(
+    hashlib.sha256(token.encode()).hexdigest(),
+    ActorBinding("claim-reviewer-0", tenant_id, role, "reviewer"),
+    int(time.time()) + 3600,
+)
+resolver = CredentialResolver([credential])
+store = CaptureSessionStore(resolver, json.loads(os.environ["C2C_TEST_DSNS"]))
+runtime = CaptureRuntime(resolver, store, Settings(), ClaimCaseStore(store))
+session_id = os.environ["C2C_TEST_SESSION_ID"]
+artifact_id = os.environ["C2C_TEST_ARTIFACT_ID"]
+expected_bytes = base64.b64decode(os.environ["C2C_TEST_ORIGINAL_B64"])
+with TestClient(create_capture_app(runtime, enable_evidence=True)) as client:
+    headers = {"Authorization": "Bearer " + token}
+    details = client.get(f"/v1/review-sessions/{session_id}", headers=headers)
+    assert details.status_code == 200, details.text
+    assert details.json()["manifest_digest"] == os.environ["C2C_TEST_EXPECTED_MANIFEST"]
+    original = client.get(f"/v1/review-sessions/{session_id}/artifacts/{artifact_id}", headers=headers)
+    assert original.status_code == 200, original.text
+    assert original.content == expected_bytes
+    print(json.dumps({
+        "manifest_digest": details.json()["manifest_digest"],
+        "artifact_sha256": hashlib.sha256(original.content).hexdigest(),
+        "artifact_id": artifact_id,
+        "process_restarted": True,
+    }, sort_keys=True))
+'''
+                    process_result = subprocess.run(
+                        [sys.executable, "-c", process_script],
+                        env=process_environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        check=False,
+                    )
+                    self.assertEqual(
+                        process_result.returncode, 0,
+                        process_result.stdout + "\n" + process_result.stderr,
+                    )
+                    process_result_payload = json.loads(process_result.stdout.strip().splitlines()[-1])
+                    self.assertTrue(process_result_payload["process_restarted"])
+                    self.assertEqual(process_result_payload["manifest_digest"], manifest_digest)
+                    self.assertEqual(
+                        process_result_payload["artifact_sha256"],
+                        hashlib.sha256(process_original).hexdigest(),
+                    )
 
                     cross_tenant = client.get(
                         f"/v1/review-sessions/{session_id}",
@@ -277,6 +392,16 @@ class CaptureHttpIntegration(unittest.TestCase):
                     self.assertEqual(details.status_code, 200, details.text)
                     self.assertEqual(details.json()["manifest_digest"], manifest_digest)
                     self.assertEqual(len(details.json()["artifacts"]), len(CANONICAL_SLOTS))
+                    persisted_root = self.db.f.seed.execute(
+                        "SELECT seal_event_id FROM faos.manifest_roots "
+                        "WHERE tenant_id=%s AND session_id=%s",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()
+                    self.assertIsNotNone(persisted_root, "MANIFEST_ROOT_NOT_PERSISTED_AFTER_RESTART")
+                    self.assertTrue(self.db.f.seed.execute(
+                        "SELECT faos.verify_manifest_root_binding(%s::uuid,%s::text,%s::text)",
+                        (self.db.f.tenants[0], session_id, persisted_root[0]),
+                    ).fetchone()[0], "FRESH_RUNTIME_MANIFEST_ROOT_VERIFICATION_FAILED")
 
                     collision_evidence = restarted.get(
                         f"/v1/review-collisions/{collision_id}",
@@ -344,8 +469,35 @@ class CaptureHttpIntegration(unittest.TestCase):
                         f"/v1/review-sessions/{session_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
                     )
-                    self.assertEqual(tampered.status_code, 409)
-                    self.assertEqual(tampered.json(), {"detail": "EVIDENCE_ARTIFACT_CONFLICT"})
+                    self.assertEqual(tampered.status_code, 409, tampered.text)
+                    self.assertEqual(
+                        tampered.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"},
+                        "TAMPER_REJECTION_DETAIL_MISMATCH: " + tampered.text,
+                    )
+                    integrity_audit = self.db.f.seed.execute(
+                        "SELECT kind,payload_json FROM faos.events "
+                        "WHERE tenant_id=%s AND session_id=%s "
+                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED'",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchall()
+                    self.assertEqual(len(integrity_audit), 1, "INTEGRITY_FAILURE_AUDIT_NOT_DURABLE")
+                    audit_payload = json.loads(integrity_audit[0][1])
+                    self.assertEqual(integrity_audit[0][0], "ARTIFACT_INTEGRITY_FAILURE_RECORDED")
+                    self.assertEqual(audit_payload["artifact_id"], first_artifact_id)
+                    self.assertEqual(audit_payload["expected_sha256"], hashlib.sha256(first_bytes).hexdigest())
+                    self.assertEqual(audit_payload["failure_code"], "ARTIFACT_HASH_MISMATCH")
+                    self.assertTrue(audit_payload["idempotency_key"])
+                    tampered_retry = restarted.get(
+                        f"/v1/review-sessions/{session_id}",
+                        headers={"Authorization": self.db.reviewer_auth()},
+                    )
+                    self.assertEqual(tampered_retry.status_code, 409)
+                    repeated_audit_count = self.db.f.seed.execute(
+                        "SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s "
+                        "AND kind='ARTIFACT_INTEGRITY_FAILURE_RECORDED'",
+                        (self.db.f.tenants[0], session_id),
+                    ).fetchone()[0]
+                    self.assertEqual(repeated_audit_count, 1, "INTEGRITY_FAILURE_AUDIT_NOT_IDEMPOTENT")
 
                     withdrawn = restarted.post(
                         f"/v1/capture-sessions/{session_id}/consent",
