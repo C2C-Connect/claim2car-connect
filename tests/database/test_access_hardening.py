@@ -17,7 +17,7 @@ class TestAccessHardening(unittest.TestCase):
         role = self.conn.execute(
             "SELECT current_user,rolsuper,rolbypassrls,"
             "pg_has_role(current_user,'faos_app','MEMBER') "
-            "FROM pg_roles WHERE rolname=current_user"
+            "FROM pg_catalog.pg_roles WHERE rolname=current_user"
         ).fetchone()
         self.assertFalse(role[1])
         self.assertFalse(role[2])
