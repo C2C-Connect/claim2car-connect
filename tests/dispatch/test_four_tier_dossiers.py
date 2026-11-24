@@ -105,93 +105,13 @@ class FourTierDossierTests(unittest.TestCase):
                 recipient_role="shop", recipient_tenant_id=self.tenant,
             )
 
-    def test_damage_assessment_report_requires_manifest_bound_images_and_review(self):
-        image_buffer = BytesIO()
-        Image.new("RGB", (320, 240), "silver").save(image_buffer, format="JPEG")
-        original = image_buffer.getvalue()
-        evidence = DamageEvidenceImage(
-            artifact_id="artifact-1", capture_slot="front_right_oblique",
-            original_bytes=original, expected_sha256=sha256(original).hexdigest(),
-            registered_at="2026-11-08T18:00:00+00:00",
-            camera_angle=CameraAngle(yaw_degrees=30, pitch_degrees=0, roll_degrees=0, source="CAPTURE_METADATA"),
-        )
-        finding = DamageFinding(
-            finding_id="D-001", component="Front fender",
-            vehicle_location="Passenger-side front quarter",
-            damage_type="surface deformation candidate",
-            observation="Localized visible contour change",
-            evidence_artifact_id="artifact-1",
-            bbox_normalized=(.2,.2,.6,.7),
-            status="CONFIRMED_BY_REVIEWER",
-            reviewer_actor_id="reviewer-1", reviewed_at="2026-11-08T18:01:00+00:00",
-        )
-        assessment = DamageAssessment(
-            session_id="session-1", vehicle_description="2022 Example Sedan",
-            report_revision=1, findings=(finding,), evidence_images=(evidence,),
-        )
-        report_binding = SourceEvidenceBinding(
-            **{**self.binding.__dict__, "artifact_sha256_by_id": {"artifact-1": sha256(original).hexdigest()}}
-        )
-        report = self.service.generate_damage_assessment_report(
-            consent=self.consent, binding=report_binding, assessment=assessment,
-            generated_by="forensic-report", now_iso=self.consent.recorded_at,
-        )
-        self.assertEqual(report.document_type, "DAMAGE_ASSESSMENT_REPORT")
-        self.assertTrue(report.pdf_bytes.startswith(b"%PDF-"))
-        self.assertIn(b"/Subtype /Image", report.pdf_bytes)
-        self.assertEqual(report.pages[0]["findings"][0]["evidence_artifact_id"], "artifact-1")
-        self.assertEqual(report.pages[0]["findings"][0]["bbox_normalized"], [.2,.2,.6,.7])
-        wrong_digest_binding = SourceEvidenceBinding(
-            **{**self.binding.__dict__, "artifact_sha256_by_id": {"artifact-1": "f" * 64}}
-        )
-        with self.assertRaisesRegex(DossierGenerationError, "DAMAGE_REPORT_IMAGE_DIGEST_NOT_IN_MANIFEST"):
+    def test_damage_assessment_report_requires_durable_capture_registry(self):
+        with self.assertRaisesRegex(DossierGenerationError, "DURABLE_DAMAGE_REPORT_API_REQUIRED"):
             self.service.generate_damage_assessment_report(
-                consent=self.consent, binding=wrong_digest_binding, assessment=assessment,
-                generated_by="forensic-report",
-            )
-        with self.assertRaisesRegex(DossierGenerationError, "DAMAGE_REPORT_IMAGE_NOT_IN_VERIFIED_MANIFEST"):
-            unbound = DamageAssessment(
-                session_id="session-1", vehicle_description="2022 Example Sedan",
-                report_revision=2, findings=(),
-                evidence_images=(DamageEvidenceImage(
-                    artifact_id="not-in-manifest", capture_slot="front",
-                    original_bytes=original, expected_sha256=sha256(original).hexdigest(),
-                    registered_at="2026-11-08T18:00:00+00:00",
-                ),),
-            )
-            self.service.generate_damage_assessment_report(
-                consent=self.consent, binding=self.binding, assessment=unbound,
+                consent=self.consent, binding=self.binding, assessment=None,
                 generated_by="forensic-report",
             )
 
-    def test_confirmed_damage_finding_must_match_bound_reviewer_identity(self):
-        image_buffer = BytesIO()
-        Image.new("RGB", (320, 240), "silver").save(image_buffer, format="JPEG")
-        original = image_buffer.getvalue()
-        evidence = DamageEvidenceImage(
-            artifact_id="artifact-1", capture_slot="front_right_oblique",
-            original_bytes=original, expected_sha256=sha256(original).hexdigest(),
-            registered_at="2026-11-08T18:00:00+00:00",
-        )
-        finding = DamageFinding(
-            finding_id="D-002", component="Front fender", vehicle_location="Passenger front",
-            damage_type="dent", observation="Visible deformation",
-            evidence_artifact_id="artifact-1", bbox_normalized=(.2,.2,.5,.5),
-            status="CONFIRMED_BY_REVIEWER", reviewer_actor_id="spoofed-reviewer",
-            reviewed_at="2026-11-08T18:01:00+00:00",
-        )
-        assessment = DamageAssessment(
-            session_id="session-1", vehicle_description="2022 Example Sedan",
-            report_revision=1, findings=(finding,), evidence_images=(evidence,),
-        )
-        report_binding = SourceEvidenceBinding(
-            **{**self.binding.__dict__, "artifact_sha256_by_id": {"artifact-1": sha256(original).hexdigest()}}
-        )
-        with self.assertRaisesRegex(DossierGenerationError, "DAMAGE_REPORT_REVIEWER_IDENTITY_MISMATCH"):
-            self.service.generate_damage_assessment_report(
-                consent=self.consent, binding=report_binding, assessment=assessment,
-                generated_by="forensic-report",
-            )
 
     def test_consent_withdrawal_blocks_generation_and_revokes_versions(self):
         doc = self.service.generate_vehicle_owner_pdf(

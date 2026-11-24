@@ -543,75 +543,8 @@ class FourTierDossierService:
         self, *, consent: ConsentSnapshot, binding: SourceEvidenceBinding,
         assessment: DamageAssessment, generated_by: str, now_iso: str | None = None,
     ) -> GeneratedDocumentVersion:
-        """Generate an image-rich report from verified source images and attributed findings."""
-        self._verify_consent_and_review(consent, binding, "DAMAGE_ASSESSMENT_REPORT")
-        if assessment.session_id != binding.session_id:
-            raise DossierGenerationError("DAMAGE_REPORT_SESSION_BINDING_MISMATCH")
-        attached_ids = {image.artifact_id for image in assessment.evidence_images}
-        verified_ids = set(binding.verified_artifact_ids)
-        if not attached_ids or not attached_ids.issubset(verified_ids):
-            raise DossierGenerationError("DAMAGE_REPORT_IMAGE_NOT_IN_VERIFIED_MANIFEST")
-        if any(
-            binding.artifact_sha256_by_id.get(image.artifact_id) != image.expected_sha256
-            for image in assessment.evidence_images
-        ):
-            raise DossierGenerationError("DAMAGE_REPORT_IMAGE_DIGEST_NOT_IN_MANIFEST")
-        if any(finding.evidence_artifact_id not in attached_ids for finding in assessment.findings):
-            raise DossierGenerationError("DAMAGE_REPORT_FINDING_IMAGE_MISSING")
-        if any(
-            finding.status == "CONFIRMED_BY_REVIEWER"
-            and finding.reviewer_actor_id != binding.reviewer_actor_id
-            for finding in assessment.findings
-        ):
-            raise DossierGenerationError("DAMAGE_REPORT_REVIEWER_IDENTITY_MISMATCH")
-        try:
-            pdf_bytes = render_damage_assessment_pdf(assessment)
-        except DamageReportError as exc:
-            raise DossierGenerationError("INVALID_DAMAGE_ASSESSMENT", exc.code) from exc
-        pages = ({
-            "page": 1,
-            "title": "Evidence-linked vehicle damage assessment",
-            "session_id": assessment.session_id,
-            "vehicle_description": assessment.vehicle_description,
-            "report_revision": assessment.report_revision,
-            "evidence_images": [
-                {"artifact_id": image.artifact_id, "capture_slot": image.capture_slot,
-                 "sha256": image.expected_sha256, "captured_at": image.captured_at,
-                 "camera_angle": {
-                     "yaw_degrees": image.camera_angle.yaw_degrees,
-                     "pitch_degrees": image.camera_angle.pitch_degrees,
-                     "roll_degrees": image.camera_angle.roll_degrees,
-                     "source": image.camera_angle.source,
-                 }}
-                for image in assessment.evidence_images
-            ],
-            "findings": [
-                {"finding_id": item.finding_id, "component": item.component,
-                 "vehicle_location": item.vehicle_location, "damage_type": item.damage_type,
-                 "observation": item.observation, "evidence_artifact_id": item.evidence_artifact_id,
-                 "bbox_normalized": list(item.bbox_normalized), "status": item.status,
-                 "reviewer_actor_id": item.reviewer_actor_id, "reviewed_at": item.reviewed_at,
-                 "limitations": item.limitations}
-                for item in assessment.findings
-            ],
-            "estimate_lines": [
-                {"line_id": line.line_id, "category": line.category,
-                 "description": line.description, "quantity": str(line.quantity),
-                 "unit": line.unit, "unit_price_cents": line.unit_price_cents,
-                 "amount_cents": line.amount_cents, "source_name": line.source_name,
-                 "source_reference": line.source_reference, "effective_date": line.effective_date,
-                 "related_finding_id": line.related_finding_id}
-                for line in assessment.estimate_lines
-            ],
-            "estimate_total_cents": sum(line.amount_cents for line in assessment.estimate_lines),
-            "currency": assessment.currency,
-            "scope_notice": "No unprovided parts, labor, hidden damage, causation or safety conclusions are inferred.",
-        },)
-        return self._store_version(
-            binding=binding, document_type="DAMAGE_ASSESSMENT_REPORT", pages=pages,
-            ledger_entry=None, generated_by=generated_by, now_iso=now_iso,
-            rendered_pdf_bytes=pdf_bytes,
-        )
+        """Refuse process-local report versioning; use the durable capture API registry."""
+        raise DossierGenerationError("DURABLE_DAMAGE_REPORT_API_REQUIRED")
 
     def retrieve_and_audit_download(
         self, *, session_id: str, document_type: str, recipient_actor_id: str,
