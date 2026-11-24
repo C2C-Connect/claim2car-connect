@@ -1033,6 +1033,7 @@ class CaptureEvidenceService:
             return {
                 "session_id": session_id,
                 "manifest_digest": manifest.digest(),
+                "seal_event_id": last_capture_event[3],
                 "shot_list_version": manifest.shot_list_version,
                 "consent_recorded": True,
                 "review": review_details,
@@ -1117,6 +1118,7 @@ class CaptureEvidenceService:
                     "report_artifact_id": artifact_id,
                     "report_sha256": report_sha256,
                     "manifest_digest": manifest.digest(),
+                    "seal_event_id": seal[3],
                     "report_revision": report_revision,
                     "report_schema_version": report_schema_version,
                     "request_payload_sha256": request_payload_sha256,
@@ -1185,7 +1187,7 @@ class CaptureEvidenceService:
             if report is None:
                 raise CaptureSessionNotFound("DAMAGE_REPORT_NOT_FOUND")
             metadata = report[2]
-            if metadata.get("manifest_digest") != manifest.digest():
+            if metadata.get("manifest_digest") != manifest.digest() or metadata.get("seal_event_id") != seal[3]:
                 raise CaptureSessionConflict("DAMAGE_REPORT_MANIFEST_MISMATCH")
             review = next((
                 item for item in history
