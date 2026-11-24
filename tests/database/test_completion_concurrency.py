@@ -23,10 +23,12 @@ class CompletionConcurrencyTests(unittest.TestCase):
     def race(self, first, second):
         barrier = Barrier(2, timeout=10)
         def worker(role, action):
-            url = self.f.admin_url if role == 'faos_writer' else os.getenv('APP_DATABASE_URL', 'postgresql://faos_app:synthetic-app-only@127.0.0.1:55432/claim2car_test')
+            if role == 'faos_writer':
+                url = self.f.fixture_url if self.f.authority_schema else self.f.admin_url
+            else:
+                url = self.f.app_url
             with psycopg.connect(url, autocommit=True, connect_timeout=5) as conn:
-                if role == 'faos_writer':
-                    conn.execute('SET ROLE faos_writer')
+                conn.execute(f'SET ROLE {role}')
                 self.assertEqual(conn.execute('SELECT current_user').fetchone()[0], role)
                 conn.execute("SET default_transaction_isolation='read committed'")
                 conn.execute("SET lock_timeout='5s'")
