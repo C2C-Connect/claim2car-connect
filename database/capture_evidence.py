@@ -1031,7 +1031,7 @@ class CaptureEvidenceService:
             self._append(
                 conn, actor, session_id, history, event_id=event_id,
                 kind="ARTIFACT_INTEGRITY_FAILURE_RECORDED",
-                reason="server detected original evidence integrity failure: " + failure.failure_code,
+                reason="server detected immutable artifact integrity failure: " + failure.failure_code,
                 payload=payload,
             )
 
@@ -1257,6 +1257,15 @@ class CaptureEvidenceService:
             raise
 
     def retrieve_damage_assessment_report(self, authorization, session_id, report_artifact_id):
+        session_id = self._session_id(session_id)
+        report_artifact_id = self._request_id(report_artifact_id)
+        try:
+            return self._retrieve_damage_assessment_report(authorization, session_id, report_artifact_id)
+        except _EvidenceArtifactIntegrityFailure as failure:
+            self._record_integrity_failure(authorization, session_id, failure)
+            raise CaptureSessionConflict("EVIDENCE_ARTIFACT_INTEGRITY_FAILURE") from None
+
+    def _retrieve_damage_assessment_report(self, authorization, session_id, report_artifact_id):
         """Read the durable report registry and both immutable carrier artifacts."""
         session_id = self._session_id(session_id)
         report_artifact_id = self._request_id(report_artifact_id)
@@ -1282,8 +1291,33 @@ class CaptureEvidenceService:
             review = next((item for item in history if item[0] == "REVIEW_RECORDED" and item[3] == metadata.get("review_event_id") and item[1] == report[1] and type(item[2]) is dict and item[2].get("manifest_digest") == manifest.digest()), None)
             if review is None:
                 raise CaptureSessionConflict("DAMAGE_REPORT_REVIEW_BINDING_INVALID")
-            pdf_data = self.byte_store.get(ArtifactKey(actor.tenant_id, UUID(session_id), UUID(report_artifact_id)), expected_sha256=metadata["report_sha256"])
-            json_data = self.byte_store.get(ArtifactKey(actor.tenant_id, UUID(session_id), UUID(metadata["report_json_artifact_id"])), expected_sha256=metadata["report_json_sha256"])
+            try:
+                pdf_data = self.byte_store.get(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(report_artifact_id)),
+                    expected_sha256=metadata["report_sha256"],
+                )
+            except ArtifactIntegrityError as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    report_artifact_id, "damage-assessment-pdf", metadata["report_sha256"], "ARTIFACT_HASH_MISMATCH"
+                ) from error
+            except ArtifactNotFound as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    report_artifact_id, "damage-assessment-pdf", metadata["report_sha256"], "ARTIFACT_MISSING"
+                ) from error
+            json_artifact_id = metadata["report_json_artifact_id"]
+            try:
+                json_data = self.byte_store.get(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(json_artifact_id)),
+                    expected_sha256=metadata["report_json_sha256"],
+                )
+            except ArtifactIntegrityError as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    json_artifact_id, "damage-assessment-json", metadata["report_json_sha256"], "ARTIFACT_HASH_MISMATCH"
+                ) from error
+            except ArtifactNotFound as error:
+                raise _EvidenceArtifactIntegrityFailure(
+                    json_artifact_id, "damage-assessment-json", metadata["report_json_sha256"], "ARTIFACT_MISSING"
+                ) from error
             carrier = json.loads(json_data)
             if carrier.get("manifest_digest") != manifest.digest() or carrier.get("capture_protocol_version") != session.capture_protocol_version:
                 raise CaptureSessionConflict("DAMAGE_REPORT_JSON_CONTEXT_MISMATCH")
