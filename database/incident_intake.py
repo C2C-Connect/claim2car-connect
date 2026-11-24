@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import json
 import re
 from uuid import UUID
+from database.readback import locked_verified_journal_in_transaction
 from database.capture_sessions import CaptureAuthorizationError, CaptureSessionConflict, CaptureSessionNotFound, CaptureSessionStore
 
 DISCLOSURE_VERSION = "incident-intake-v1"
