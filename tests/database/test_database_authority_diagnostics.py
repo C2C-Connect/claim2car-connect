@@ -24,6 +24,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0027_capture_protocol_16_v2.sql',
             '0028_persistent_event_hash_chain.sql',
             '0029_manifest_root_chain_context_binding.sql',
+            '0030_runtime_manifest_registration.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
@@ -196,7 +197,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0023_consented_vehicle_profile.sql','0024_audited_capture_exceptions_pause_resume.sql',
                 '0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql',
                 '0027_capture_protocol_16_v2.sql','0029_manifest_root_chain_context_binding.sql',
-                '0028_persistent_event_hash_chain.sql',
+                '0028_persistent_event_hash_chain.sql','0030_runtime_manifest_registration.sql',
             ]))
 
     def test_rejects_unreviewed_migration_after_0030(self):
