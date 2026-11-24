@@ -388,7 +388,7 @@ class CaptureHttpIntegration(unittest.TestCase):
                         f"/v1/review-sessions/{session_id}",
                         headers={"Authorization": self.db.reviewer_auth()},
                     )
-                    self.assertEqual(tampered.status_code, 409)
+                    self.assertEqual(tampered.status_code, 409, tampered.text)
                     self.assertEqual(tampered.json(), {"detail": "EVIDENCE_ARTIFACT_INTEGRITY_FAILURE"})
                     integrity_audit = self.db.f.seed.execute(
                         "SELECT kind,payload_json FROM faos.events "

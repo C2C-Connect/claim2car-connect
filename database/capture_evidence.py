@@ -13,7 +13,7 @@ import hashlib
 import hmac
 import json
 import re
-from uuid import UUID
+from uuid import UUID, uuid5
 
 import psycopg
 
@@ -993,6 +993,7 @@ class CaptureEvidenceService:
             idempotency_key = (
                 "artifact-integrity-failure:" + failure.artifact_id + ":" + failure.expected_sha256[:16]
             )
+            event_id = str(uuid5(UUID(failure.artifact_id), "integrity-failure:" + failure.expected_sha256))
             payload = {
                 "idempotency_key": idempotency_key,
                 "artifact_id": failure.artifact_id,
@@ -1000,13 +1001,13 @@ class CaptureEvidenceService:
                 "expected_sha256": failure.expected_sha256,
                 "failure_code": "ARTIFACT_HASH_MISMATCH",
             }
-            existing = next((item for item in history if item[3] == idempotency_key), None)
+            existing = next((item for item in history if item[3] == event_id), None)
             if existing is not None:
                 if existing[0] != "ARTIFACT_INTEGRITY_FAILURE_RECORDED" or existing[2] != payload:
                     raise CaptureSessionConflict("INTEGRITY_AUDIT_IDEMPOTENCY_CONFLICT")
                 return
             self._append(
-                conn, actor, session_id, history, event_id=idempotency_key,
+                conn, actor, session_id, history, event_id=event_id,
                 kind="ARTIFACT_INTEGRITY_FAILURE_RECORDED",
                 reason="server detected original evidence byte integrity failure",
                 payload=payload,
