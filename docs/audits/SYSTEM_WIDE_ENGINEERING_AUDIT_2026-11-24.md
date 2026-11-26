@@ -5,6 +5,16 @@
 **Status:** IN PROGRESS — source-level findings confirmed; three high-risk remediations merged; remaining report, identity, deletion, storage, market/legal, and field-readiness gaps remain.  
 **Purpose:** Determine whether the code actually served and its API/database/evidence/authorization paths support the product claims. This is not a security certification, forensic validation, legal opinion, or field acceptance.
 
+## Remediation checkpoint — 2026-11-26
+
+- **PR #185 merged:** runtime manifest-root registration is now on main at merge commit `590724597a65395ece225128b40ec48fa6ece34b`. Its exact candidate head had 13/13 workflow types green and DB-01–DB-14 14/14 technical PASS; this candidate evidence is not a substitute for post-merge verification.
+- **Consent deletion retry:** PR #196 now makes capture-consent withdrawal cleanup retryable by the same original owner after a transient object-store deletion failure. The first CI run exposed an incorrect test slot for the active protocol; the fixture was corrected and the current exact-head rerun is pending. This is not yet accepted.
+- **Evidence substantiation:** PR #195 adds the executable v1.0.0 server model and TypeScript mirror. Exact-head verification passed 13/13 workflow types; full suite 1,082 passed, 7 skipped and 218 subtests; authority lane 415/415, zero DB skips, DB-01–DB-14 14/14. It does not validate sensors, metrology, models or legal certification.
+- **M1 acceptance registry:** PR #187 has been narrowed to Intake & Preservation. LiDAR volumetric measurement, structural-yield adjudication, autonomous repair/total-loss decisions, payment, dispatch and marketplace are excluded from M1 acceptance.
+- **PR #186 report work:** remains based on an earlier capture/storage tree. Shared source files differ from merged main; rebase/integration and exact-head verification are still required. Do not reuse its prior green runs as proof for current main.
+- **Backup hygiene:** encrypted remote backups, retention/immutability controls, PITR and a witnessed restore/integrity drill remain unimplemented/unverified. Disposable CI database tests are not backup/restore evidence.
+- **Device qualification:** no physical reference iPad has passed camera/original-byte, calibration metadata, offline recovery, thermal/battery, accessibility or roadside pause/abort qualification. Browser and container CI are not device qualification.
+
 ## Audit method and evidence standard
 
 Trace the real entry point through UI → API → service → database/storage → authorization → downstream consumer. For each issue distinguish:
@@ -16,7 +26,7 @@ Do not treat README statements, synthetic tests, a green workflow, or a PR descr
 
 ## Executive assessment
 
-The repository has substantial working infrastructure: tenant-scoped PostgreSQL authority, append-only event history, original-byte storage with digest checks, consent-gated capture, a browser queue with encryption on the canonical root workbench, and an unmerged capture seal/review integration increment under PR #185. These are meaningful foundations.
+The repository has substantial working infrastructure: tenant-scoped PostgreSQL authority, append-only event history, original-byte storage with digest checks, consent-gated capture, a browser queue with encryption on the canonical root workbench, and the merged capture seal/review integration increment from PR #185. These are meaningful foundations.
 
 The system is **not ready for real participant evidence or staging release**. PR #190 (prototype queue metadata authentication), PR #192 (verified event-chain reads in capture/intake history paths), and PR #193 (unverified triage/direct dispatch containment) are now merged to main. The highest-priority remaining trust gaps are:
 1. Consent withdrawal and physical deletion are not one durable, per-artifact retryable lifecycle.
