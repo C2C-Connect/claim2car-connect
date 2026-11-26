@@ -1,3 +1,28 @@
+# Current governing calibration — 26 November 2026
+
+> **Authority notice:** This is the current project calibration. Older dated checkpoints and “next task” statements below this notice are retained as history only. They are not active instructions where they conflict with this notice, the Foundational Vision & Technical White Paper, the current M1 acceptance registry, or a newer exact-head verified checkpoint.
+
+- **Canonical product repository:** `C2C-Connect/claim2car-connect`; `main` is the only active product line. Historical/prototype repositories and branches are reference material, not alternate sources of truth.
+- **Product:** a controlled evidence acquisition and substantiation platform for the accident-response ecosystem. Its differentiator is traceability from original observation through measurement and inference to an authorized decision.
+- **Governing evidence architecture:** **Acquisition → Measurement → Inference → Decision**. Preserve original bytes; make derivatives traceable; attach methods, versions, units, calibration and uncertainty; abstain when inputs are insufficient; human-authorize consequential decisions.
+- **Architecture direction:** React/Capacitor capture client; FastAPI modular monolith; PostgreSQL/PostGIS transactional authority; durable object storage; background workers/outbox. Do not introduce a parallel ledger or polyglot database without a demonstrated need.
+- **M1 boundary:** authorized intake, consent and actor attribution; versioned 16-point capture accounting with safety exceptions/retakes and legacy interpretation; original-byte preservation; offline synchronization; server-side verification; authorized reviewer retrieval and attributable human decision.
+- **M1 exclusions:** LiDAR volumetric crush measurement, autonomous structural/yield adjudication, CRASH3 outcome verdicts, collision causation, roadworthiness, repair authorization, total-loss decisions, payments, dispatch and marketplace. These remain separate research or release-gated workstreams.
+- **Live repository checkpoint (26 Nov):** PR #185 is recorded merged to main as `590724597a65395ece225128b40ec48fa6ece34b`; its candidate head had 13/13 workflow types and DB-01–DB-14 14/14 technical PASS (408/408 counted DB tests). Post-merge exact-main verification is still required. PR #195 is open/draft with Evidence Measurement and Substantiation Contract v1.0.0; its recorded exact head `934f7cca7ff9d145d2a187f444c9bbcc4422c0f8` had 13/13 workflow types, 1,082 full-suite passes, 7 skips, 218 subtests, and DB authority 415/415 with 14/14 technical gates. This is contract validation, not sensor/metrology/model validation. PR #196 contains a consent-deletion retry fix; exact corrected-head verification remains pending. PR #186 report work is stale/stacked and must be rebased before use. PR #187 narrows M1 acceptance. PR #194 is a source-level audit checkpoint. PR #188 is an OCI proposal only.
+- **Release truth:** M1 is not accepted; no physical-device field qualification, persistent integrated staging deployment, real participant evidence, live payment, or dispatch activation is established. Do not claim otherwise.
+- **Device decision:** exact iPad baseline and whether LiDAR is an M1 requirement remain unresolved pending device-specific qualification. Standardized managed fleet is the intended operating model; hardware capability is not assumed from marketing specifications.
+- **Commercial planning:** dealer fee $375 on qualified close; shop fee $275 on recorded acceptance per current planning documents; operator amount $110 carried forward but payout trigger/eligibility/ledger remain unresolved; owner cash incentive is excluded. No live payment or payout logic until its release and contract gates pass.
+- **Claims discipline:** no “legally conclusive,” “tamper-proof,” automatic admissibility, universal sub-centimeter accuracy, validated physics/AI verdict, guaranteed financial outcome, or zero-liability claims. Integrity, provenance, authenticity, reliability and sufficiency remain distinct.
+- **Execution rule:** implement working product slices; tests verify functionality. Report exact commit, tests, pass/fail, incomplete items, deployment and operational status. Never equate a green CI run with field qualification, acceptance or deployment.
+
+**Authoritative references**
+1. [Foundational Vision & Technical White Paper](CLAIM2CAR_FOUNDATIONAL_VISION_AND_TECHNICAL_WHITE_PAPER.md)
+2. [System-Wide Engineering Audit — 2026-11-26](audits/SYSTEM_WIDE_ENGINEERING_AUDIT_2026-11-26.md)
+3. [M1 Acceptance & Release Gate Matrix](acceptance/ACCEPTANCE_MATRIX.md)
+4. [Evidence Measurement and Substantiation Contract v1.0](forensics/EVIDENCE_SUBSTANTIATION_CONTRACT_V1.md) — PR #195 until merged; not device or measurement validation.
+
+---
+
 # Claim2Car Product Premise: Forensic Intelligence, Truth, and Resolution
 
 ## Current implementation focus / handoff (2026-11-23)
