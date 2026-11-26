@@ -1,6 +1,6 @@
+from unittest import TestCase
 from uuid import uuid4
 
-import pytest
 from pydantic import ValidationError
 
 from app.evidence_substantiation import EvidenceSubstantiationContract
@@ -25,7 +25,7 @@ def envelope():
                 "camera_model": "qualified-camera-profile", "image_width_px": 4032, "image_height_px": 3024,
                 "intrinsics_3x3": [1, 0, 0, 0, 1, 0, 0, 0, 1],
                 "distortion_coefficients": [0.01, -0.02], "calibration_source": "device-capture-api",
-                "calibration_error_px": 0.2,
+                "source_api": "AVCameraCalibrationData", "calibration_error_px": 0.2,
             },
         }],
         "quality_assessments": [{
@@ -49,6 +49,7 @@ def envelope():
             "result": "inconclusive in synthetic fixture", "status": "INCONCLUSIVE",
             "confidence": None, "confidence_calibrated": False, "assumptions": [],
             "alternatives": ["alternative explanation"], "missing_inputs": [],
+            "source_references": ["synthetic-fixture://reference"],
         }],
         "decisions": [{
             "decision_id": str(uuid4()), "input_inference_ids": [str(inference_id)],
@@ -66,94 +67,77 @@ def envelope():
     }
 
 
-def test_contract_accepts_distinct_layers_and_explicit_uncertainty():
-    model = EvidenceSubstantiationContract.model_validate(envelope())
-    assert model.contract_version == "1.0.0"
-    assert model.acquisitions[0].raw_unmodified is True
-    assert model.quality_assessments[0].advisory_only is True
-    assert model.measurements[0].uncertainty.kind == "BOUNDED_INTERVAL"
-    assert model.inferences[0].status == "INCONCLUSIVE"
-    assert model.decisions[0].action == "HUMAN_REVIEW"
-    assert model.custody.certification_status == "NOT_CERTIFIED"
+class EvidenceSubstantiationContractTests(TestCase):
+    def assert_contract_error(self, data, message):
+        with self.assertRaisesRegex(ValidationError, message):
+            EvidenceSubstantiationContract.model_validate(data)
 
+    def test_contract_accepts_distinct_layers_and_explicit_uncertainty(self):
+        model = EvidenceSubstantiationContract.model_validate(envelope())
+        self.assertEqual(model.contract_version, "1.0.0")
+        self.assertTrue(model.acquisitions[0].raw_unmodified)
+        self.assertTrue(model.quality_assessments[0].advisory_only)
+        self.assertEqual(model.measurements[0].uncertainty.kind, "BOUNDED_INTERVAL")
+        self.assertEqual(model.inferences[0].status, "INCONCLUSIVE")
+        self.assertEqual(model.decisions[0].action, "HUMAN_REVIEW")
+        self.assertEqual(model.custody.certification_status, "NOT_CERTIFIED")
 
-def test_original_artifact_cannot_claim_a_derivative_transformation():
-    data = envelope()
-    data["acquisitions"][0]["artifact"]["transformation_id"] = "rectify-v1"
-    with pytest.raises(ValidationError, match="ORIGINAL_MUST_NOT_HAVE_TRANSFORMATION"):
-        EvidenceSubstantiationContract.model_validate(data)
+    def test_original_artifact_cannot_claim_a_derivative_transformation(self):
+        data = envelope()
+        data["acquisitions"][0]["artifact"]["transformation_id"] = "rectify-v1"
+        self.assert_contract_error(data, "ORIGINAL_MUST_NOT_HAVE_TRANSFORMATION")
 
+    def test_derivative_requires_parent_and_transformation(self):
+        data = envelope()
+        artifact = data["acquisitions"][0]["artifact"]
+        artifact["role"] = "DERIVATIVE"
+        artifact["parent_artifact_id"] = None
+        self.assert_contract_error(data, "DERIVATIVE_REQUIRES_PARENT_AND_TRANSFORMATION")
 
-def test_derivative_requires_parent_and_transformation():
-    data = envelope()
-    artifact = data["acquisitions"][0]["artifact"]
-    artifact["role"] = "DERIVATIVE"
-    artifact["parent_artifact_id"] = None
-    with pytest.raises(ValidationError, match="DERIVATIVE_REQUIRES_PARENT_AND_TRANSFORMATION"):
-        EvidenceSubstantiationContract.model_validate(data)
+    def test_acquisition_time_must_be_explicit_utc(self):
+        data = envelope()
+        data["acquisitions"][0]["captured_at_utc"] = "2026-11-26T12:00:00-06:00"
+        self.assert_contract_error(data, "CAPTURE_TIMESTAMP_MUST_BE_UTC")
 
+    def test_measurement_must_reference_known_acquisition(self):
+        data = envelope()
+        data["measurements"][0]["source_acquisition_ids"] = [str(uuid4())]
+        self.assert_contract_error(data, "MEASUREMENT_REFERENCES_UNKNOWN_ACQUISITION")
 
-def test_acquisition_time_must_be_explicit_utc():
-    data = envelope()
-    data["acquisitions"][0]["captured_at_utc"] = "2026-11-26T12:00:00-06:00"
-    with pytest.raises(ValidationError, match="CAPTURE_TIMESTAMP_MUST_BE_UTC"):
-        EvidenceSubstantiationContract.model_validate(data)
+    def test_inference_cannot_publish_uncalibrated_probability(self):
+        data = envelope()
+        data["inferences"][0]["confidence"] = 0.67
+        data["inferences"][0]["confidence_calibrated"] = False
+        self.assert_contract_error(data, "UNCALIBRATED_CONFIDENCE_FORBIDDEN")
 
+    def test_abstention_requires_a_missing_input_reason(self):
+        data = envelope()
+        data["inferences"][0]["status"] = "ABSTAINED"
+        data["inferences"][0]["missing_inputs"] = []
+        self.assert_contract_error(data, "ABSTENTION_REQUIRES_MISSING_INPUT_REASON")
 
-def test_measurement_must_reference_known_acquisition():
-    data = envelope()
-    data["measurements"][0]["source_acquisition_ids"] = [str(uuid4())]
-    with pytest.raises(ValidationError, match="MEASUREMENT_REFERENCES_UNKNOWN_ACQUISITION"):
-        EvidenceSubstantiationContract.model_validate(data)
+    def test_decision_cannot_reference_unknown_inference(self):
+        data = envelope()
+        data["decisions"][0]["input_inference_ids"] = [str(uuid4())]
+        self.assert_contract_error(data, "DECISION_REFERENCES_UNKNOWN_INFERENCE")
 
+    def test_qualified_certification_requires_certifier_and_certificate_artifact(self):
+        data = envelope()
+        data["custody"]["certification_status"] = "CERTIFIED_BY_QUALIFIED_PERSON"
+        data["custody"]["certification_basis"] = "FRE_902_14"
+        self.assert_contract_error(data, "QUALIFIED_CERTIFICATION_REQUIRES_BASIS_CERTIFIER_AND_CERTIFICATE")
 
-def test_inference_cannot_publish_uncalibrated_probability():
-    data = envelope()
-    data["inferences"][0]["confidence"] = 0.67
-    data["inferences"][0]["confidence_calibrated"] = False
-    with pytest.raises(ValidationError, match="UNCALIBRATED_CONFIDENCE_FORBIDDEN"):
-        EvidenceSubstantiationContract.model_validate(data)
+    def test_raw_original_must_remain_unmodified(self):
+        data = envelope()
+        data["acquisitions"][0]["raw_unmodified"] = False
+        self.assert_contract_error(data, "ORIGINAL_ACQUISITION_MUST_BE_UNMODIFIED")
 
+    def test_quality_assessment_must_reference_a_registered_original_or_derivative(self):
+        data = envelope()
+        data["quality_assessments"][0]["artifact_id"] = str(uuid4())
+        self.assert_contract_error(data, "QUALITY_REFERENCES_UNKNOWN_ARTIFACT")
 
-def test_abstention_requires_a_missing_input_reason():
-    data = envelope()
-    data["inferences"][0]["status"] = "ABSTAINED"
-    data["inferences"][0]["missing_inputs"] = []
-    with pytest.raises(ValidationError, match="ABSTENTION_REQUIRES_MISSING_INPUT_REASON"):
-        EvidenceSubstantiationContract.model_validate(data)
-
-
-def test_decision_cannot_reference_unknown_inference():
-    data = envelope()
-    data["decisions"][0]["input_inference_ids"] = [str(uuid4())]
-    with pytest.raises(ValidationError, match="DECISION_REFERENCES_UNKNOWN_INFERENCE"):
-        EvidenceSubstantiationContract.model_validate(data)
-
-
-def test_qualified_certification_requires_certifier_and_certificate_artifact():
-    data = envelope()
-    data["custody"]["certification_status"] = "CERTIFIED_BY_QUALIFIED_PERSON"
-    data["custody"]["certification_basis"] = "FRE_902_14"
-    with pytest.raises(ValidationError, match="QUALIFIED_CERTIFICATION_REQUIRES_BASIS_CERTIFIER_AND_CERTIFICATE"):
-        EvidenceSubstantiationContract.model_validate(data)
-
-
-def test_raw_original_must_remain_unmodified():
-    data = envelope()
-    data["acquisitions"][0]["raw_unmodified"] = False
-    with pytest.raises(ValidationError, match="ORIGINAL_ACQUISITION_MUST_BE_UNMODIFIED"):
-        EvidenceSubstantiationContract.model_validate(data)
-
-
-def test_quality_assessment_must_reference_a_registered_original_or_derivative():
-    data = envelope()
-    data["quality_assessments"][0]["artifact_id"] = str(uuid4())
-    with pytest.raises(ValidationError, match="QUALITY_REFERENCES_UNKNOWN_ARTIFACT"):
-        EvidenceSubstantiationContract.model_validate(data)
-
-
-def test_merkle_root_requires_tree_version_and_leaf_count():
-    data = envelope()
-    data["custody"]["merkle_leaf_count"] = None
-    with pytest.raises(ValidationError, match="MERKLE_ROOT_REQUIRES_TREE_VERSION_AND_LEAF_COUNT"):
-        EvidenceSubstantiationContract.model_validate(data)
+    def test_merkle_root_requires_tree_version_and_leaf_count(self):
+        data = envelope()
+        data["custody"]["merkle_leaf_count"] = None
+        self.assert_contract_error(data, "MERKLE_ROOT_REQUIRES_TREE_VERSION_AND_LEAF_COUNT")
