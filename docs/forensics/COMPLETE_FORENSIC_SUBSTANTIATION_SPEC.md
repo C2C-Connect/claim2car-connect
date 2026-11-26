@@ -19,7 +19,7 @@
 1. [Foundational Vision & Technical White Paper](CLAIM2CAR_FOUNDATIONAL_VISION_AND_TECHNICAL_WHITE_PAPER.md)
 2. [System-Wide Engineering Audit — 2026-11-26](audits/SYSTEM_WIDE_ENGINEERING_AUDIT_2026-11-26.md)
 3. [M1 Acceptance & Release Gate Matrix](acceptance/ACCEPTANCE_MATRIX.md)
-4. [Evidence Measurement and Substantiation Contract v1.0](forensics/EVIDENCE_SUBSTANTIATION_CONTRACT_V1.md) — PR #195 until merged; not device or measurement validation.
+4. [Evidence Measurement and Substantiation Contract v1.0 — PR #195](https://github.com/C2C-Connect/claim2car-connect/pull/195) — open/draft implementation; not device or measurement validation.
 
 ---
 
