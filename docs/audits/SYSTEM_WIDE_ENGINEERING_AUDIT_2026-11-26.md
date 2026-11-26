@@ -21,7 +21,7 @@ The largest remaining gaps are: post-merge M1 exact-main verification; complete 
 | PR #194 | Open/draft audit PR | Valuable source-level audit; update its findings and dispositions before treating as current canonical audit. |
 | PR #188 | OCI staging proposal | Documentation only; no infrastructure provisioning or deployment evidenced. |
 
-**Documentation drift confirmed:** README still calls #185 pending and points to an older M1 task; acceptance matrix still says #182 is latest and migration 0029 is next; handoff/status/product premise/FAOS guide/program contain older active checkpoint text; legal checklist contains legacy score, WORM, VIN, AI, blockchain and legal claims without a current evidence status. The exact main SHA was not conclusively surfaced by the available branch search during this pass; fetched file blob SHAs are recorded in the audit PDF.
+**Documentation drift confirmed:** README still calls #185 pending and points to an older M1 task; acceptance matrix still says #182 is latest and migration 0029 is next; handoff/status/product premise/FAOS guide/program contain older active checkpoint text; legal checklist contains legacy score, WORM, VIN, AI, blockchain and legal claims without a current evidence status. The current main HEAD at PR #197 creation was confirmed by the PR base reference as `590724597a65395ece225128b40ec48fa6ece34b` (PR #185 merge commit). The combined-status endpoint returned no status entries for that merge SHA in this pass; therefore post-merge exact-main workflow evidence was not established.
 
 ## Priority findings
 
@@ -91,4 +91,4 @@ M1 remains **NOT ACCEPTED**. Candidate CI and technical database gates are compo
 
 ## Audit limitations
 
-This audit reconciles the 24 November source-level audit with current PR descriptions, changed-file inventories, selected source code, acceptance registry and workflow runs. It does not repeat every adversarial test against a deployed environment. It does not establish current cloud resource state, protected secrets, external provider accounts, physical device behavior or production monitoring. Exact main SHA and post-merge #185 workflow status were not conclusively established in this pass. No deployment, participant evidence, live payment or dispatch is authorized by this report.
+This audit reconciles the 24 November source-level audit with current PR descriptions, changed-file inventories, selected source code, acceptance registry and workflow runs. It does not repeat every adversarial test against a deployed environment. It does not establish current cloud resource state, protected secrets, external provider accounts, physical device behavior or production monitoring. Main HEAD was confirmed as `590724597a65395ece225128b40ec48fa6ece34b`; post-merge #185 workflow status was not established in this pass. No deployment, participant evidence, live payment or dispatch is authorized by this report.
