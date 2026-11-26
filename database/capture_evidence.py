@@ -433,8 +433,14 @@ class CaptureEvidenceService:
                         raise CaptureSessionConflict("CONSENT_ALREADY_RECORDED")
                     if any(kind in ("VEHICLE_RECORDED", "ARTIFACT_REGISTERED", "QUALITY_RECORDED", "MANIFEST_SEALED", "REVIEW_RECORDED") for kind, *_ in history):
                         raise CaptureSessionConflict("CONSENT_ORDER_VIOLATION")
-                elif consent_events and (previous is None or previous[0] != actor.actor_id):
-                    raise CaptureAuthorizationError("CONSENT_OWNER_REQUIRED")
+                elif consent_events:
+                    # A withdrawal may need to be retried after the journal commit if
+                    # object-store deletion was interrupted. Bind every retry to the
+                    # owner who originally granted/declined consent, not to the
+                    # currently active-consent projection (which is None after revoke).
+                    original_owner = consent_events[0][1].get("owner_actor_id")
+                    if original_owner != actor.actor_id:
+                        raise CaptureAuthorizationError("CONSENT_OWNER_REQUIRED")
                 self._append(conn, actor, session_id, history, event_id=event_id,
                              kind="CONSENT_RECORDED", reason="owner consent state recorded", payload=payload)
                 history.append(("CONSENT_RECORDED", actor.actor_id, payload, event_id))
