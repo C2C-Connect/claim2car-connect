@@ -19,6 +19,7 @@ class ContractModel(BaseModel):
     class Config:
         extra = "forbid"
         allow_mutation = False
+        allow_inf_nan = False
 
 
 class ArtifactReference(ContractModel):
@@ -49,6 +50,7 @@ class CameraCalibration(ContractModel):
     intrinsics_3x3: tuple[float, ...] = Field(min_length=9, max_length=9)
     distortion_coefficients: tuple[float, ...] = ()
     calibration_source: StrictStr = Field(min_length=1, max_length=256)
+    source_api: StrictStr | None = Field(default=None, max_length=128)
     calibration_error_px: float | None = Field(default=None, ge=0)
 
     @validator("intrinsics_3x3", "distortion_coefficients", each_item=True)
@@ -114,6 +116,26 @@ class Uncertainty(ContractModel):
         return values
 
 
+class QualityAssessment(ContractModel):
+    quality_id: UUID
+    artifact_id: UUID
+    metric: Literal["LAPLACIAN_VARIANCE", "LUMINANCE_MEAN", "MOTION_MAGNITUDE", "FRAMING_COMPLIANCE", "FOCUS_SCORE", "CUSTOM"]
+    observed_value: float
+    comparator: Literal["GTE", "LTE", "BETWEEN", "BOOLEAN"]
+    threshold_policy_id: StrictStr = Field(min_length=1, max_length=128)
+    threshold_policy_version: StrictStr = Field(min_length=1, max_length=64)
+    threshold_values: list[float] = Field(default_factory=list)
+    result: Literal["PASS", "WARN", "FAIL", "NOT_ASSESSABLE"]
+    method_version: StrictStr = Field(min_length=1, max_length=64)
+    advisory_only: StrictBool = True
+
+    @validator("observed_value")
+    def finite_quality_value(cls, value):
+        if not isfinite(value):
+            raise ValueError("NON_FINITE_QUALITY_VALUE")
+        return value
+
+
 class MeasurementRecord(ContractModel):
     measurement_id: UUID
     source_acquisition_ids: list[UUID] = Field(min_items=1)
@@ -147,6 +169,10 @@ class InferenceRecord(ContractModel):
     assumptions: list[StrictStr] = Field(default_factory=list)
     alternatives: list[StrictStr] = Field(default_factory=list)
     missing_inputs: list[StrictStr] = Field(default_factory=list)
+    source_references: list[StrictStr] = Field(default_factory=list)
+    vehicle_applicability: StrictStr | None = Field(default=None, max_length=512)
+    source_revision: StrictStr | None = Field(default=None, max_length=128)
+    effective_date: StrictStr | None = Field(default=None, max_length=32)
 
     @root_validator(skip_on_failure=True)
     def confidence_and_abstention_are_honest(cls, values):
@@ -174,18 +200,27 @@ class CustodyAttestation(ContractModel):
     event_chain_tip_sha256: StrictStr = Field(regex=SHA256)
     manifest_sha256: StrictStr = Field(regex=SHA256)
     merkle_root_sha256: StrictStr | None = Field(default=None, pattern=SHA256)
+    merkle_tree_version: StrictStr | None = Field(default=None, max_length=64)
+    merkle_leaf_count: int | None = Field(default=None, gt=0)
     hash_algorithm: Literal["SHA-256"] = "SHA-256"
     serialization_version: StrictStr = Field(min_length=1, max_length=64)
-    storage_claim: Literal["DURABLE_STORAGE", "APPEND_ONLY_POLICY", "WORM_VERIFIED"] = "DURABLE_STORAGE"
+    storage_claim: Literal["DURABLE_STORAGE", "APPEND_ONLY_POLICY"] = "DURABLE_STORAGE"
+    immutability_verification_ref: StrictStr | None = Field(default=None, max_length=512)
     certification_status: Literal["NOT_CERTIFIED", "PENDING_QUALIFIED_CERTIFIER", "CERTIFIED_BY_QUALIFIED_PERSON"] = "NOT_CERTIFIED"
     certification_basis: Literal["FRE_902_13", "FRE_902_14"] | None = None
     certifier_identity: StrictStr | None = Field(default=None, max_length=256)
     certificate_artifact_id: UUID | None = None
+    certifier_qualification_reference: StrictStr | None = Field(default=None, max_length=512)
+    certified_at_utc: StrictStr | None = Field(default=None, max_length=40)
 
     @root_validator(skip_on_failure=True)
     def certification_is_not_self_asserted(cls, values):
+        merkle_parts = (values.get("merkle_root_sha256"), values.get("merkle_tree_version"), values.get("merkle_leaf_count"))
+        if any(part is not None for part in merkle_parts) and not all(part is not None for part in merkle_parts):
+            raise ValueError("MERKLE_ROOT_REQUIRES_TREE_VERSION_AND_LEAF_COUNT")
         if values.get("certification_status") == "CERTIFIED_BY_QUALIFIED_PERSON":
-            if not all((values.get("certification_basis"), values.get("certifier_identity"), values.get("certificate_artifact_id"))):
+            required = (values.get("certification_basis"), values.get("certifier_identity"), values.get("certificate_artifact_id"), values.get("certifier_qualification_reference"), values.get("certified_at_utc"))
+            if not all(required):
                 raise ValueError("QUALIFIED_CERTIFICATION_REQUIRES_BASIS_CERTIFIER_AND_CERTIFICATE")
         return values
 
@@ -194,6 +229,7 @@ class EvidenceSubstantiationContract(ContractModel):
     contract_version: Literal["1.0.0"] = "1.0.0"
     session_id: UUID
     acquisitions: list[AcquisitionRecord] = Field(default_factory=list)
+    quality_assessments: list[QualityAssessment] = Field(default_factory=list)
     measurements: list[MeasurementRecord] = Field(default_factory=list)
     inferences: list[InferenceRecord] = Field(default_factory=list)
     decisions: list[DecisionRecord] = Field(default_factory=list)
@@ -203,6 +239,9 @@ class EvidenceSubstantiationContract(ContractModel):
     def references_resolve_and_layers_do_not_collapse(cls, values):
         acquisitions = {x.acquisition_id for x in values.get("acquisitions", [])}
         measurements = {x.measurement_id for x in values.get("measurements", [])}
+        for quality in values.get("quality_assessments", []):
+            if quality.artifact_id not in {a.artifact.artifact_id for a in values.get("acquisitions", [])}:
+                raise ValueError("QUALITY_REFERENCES_UNKNOWN_ARTIFACT")
         inferences = {x.inference_id for x in values.get("inferences", [])}
         for item in values.get("measurements", []):
             if not set(item.source_acquisition_ids + item.calibration_acquisition_ids) <= acquisitions:
