@@ -23,7 +23,7 @@ class ContractModel(BaseModel):
 
 class ArtifactReference(ContractModel):
     artifact_id: UUID
-    sha256: StrictStr = Field(regex=SHA256)
+    sha256: StrictStr = Field(pattern=SHA256)
     byte_length: int = Field(gt=0)
     mime_type: StrictStr = Field(min_length=1, max_length=128)
     role: Literal["ORIGINAL", "DERIVATIVE"] = "ORIGINAL"
@@ -46,7 +46,7 @@ class CameraCalibration(ContractModel):
     camera_model: StrictStr = Field(min_length=1, max_length=128)
     image_width_px: int = Field(gt=0)
     image_height_px: int = Field(gt=0)
-    intrinsics_3x3: tuple[float, ...] = Field(min_items=9, max_items=9)
+    intrinsics_3x3: tuple[float, ...] = Field(min_length=9, max_length=9)
     distortion_coefficients: tuple[float, ...] = ()
     calibration_source: StrictStr = Field(min_length=1, max_length=256)
     calibration_error_px: float | None = Field(default=None, ge=0)
@@ -173,7 +173,7 @@ class DecisionRecord(ContractModel):
 class CustodyAttestation(ContractModel):
     event_chain_tip_sha256: StrictStr = Field(regex=SHA256)
     manifest_sha256: StrictStr = Field(regex=SHA256)
-    merkle_root_sha256: StrictStr | None = Field(default=None, regex=SHA256)
+    merkle_root_sha256: StrictStr | None = Field(default=None, pattern=SHA256)
     hash_algorithm: Literal["SHA-256"] = "SHA-256"
     serialization_version: StrictStr = Field(min_length=1, max_length=64)
     storage_claim: Literal["DURABLE_STORAGE", "APPEND_ONLY_POLICY", "WORM_VERIFIED"] = "DURABLE_STORAGE"
