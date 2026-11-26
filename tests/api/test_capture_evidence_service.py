@@ -55,6 +55,10 @@ class FakeConnection:
             return Result(many=[(str(UUID(int=2)),)])
         if "SELECT sequence,kind,actor,payload_json,event_id" in sql:
             return Result(many=list(self.rows))
+        if "faos.register_manifest_root_from_capture" in sql:
+            return Result(one=("REGISTERED",))
+        if "faos.verify_manifest_root_binding" in sql:
+            return Result(one=(True,))
         if "faos.append_event" in sql:
             tenant, session, event_id, sequence, kind, actor, when, reason, payload, version = args
             self.rows.append((sequence, kind, actor, payload, event_id))

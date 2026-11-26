@@ -1,12 +1,12 @@
 # Claim2Car Connect / FAOS — San Antonio pilot
 
-## Latest authoritative handoff — forensic substantiation (2026-11-23)
+## Latest authoritative handoff — forensic substantiation (2026-11-24)
 
-**Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows green**. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests and DB-01–DB-14 14/14 PASS. This is database acceptance, not forensic M1 acceptance.
+**Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). PR #184 merged as `55f69790df123a4602196c3c474e143808c4b87e`; exact tested head `95692eaf30f76ca9ab8b7c0cf71c4bcf9fac5d68`; **13/13 workflows green**. Full suite: 1,064 passed, 7 skipped, 31 warnings, 218 subtests. Isolated synthetic PostgreSQL authority acceptance: 407/407 counted tests, DB-01–DB-14 14/14 PASS, 340 tenant-isolation assertions.
 
-**Current M1 code:** migration 0028 persists SHA-256 hashes; server-owned readback recomputes chain from PostgreSQL; invalid authority-schema chains fail closed before replay/locked consumers; legacy-unhashed status explicit and partial schema fails closed. M1 remains incomplete: migration 0029 chain-tip/context binding, registered-original/artifact binding, independent verifier, recovery/adversarial/fork tests and external checkpoint remain. No deployment/field qualification/participant evidence/payment/dispatch.
+**Active implementation:** [PR #185 — runtime manifest registration](https://github.com/C2C-Connect/claim2car-connect/pull/185), branch `cto/m1-runtime-manifest-registration`, current branch head (verify live PR #185 before acting). Migration 0030 wires root registration into the live capture seal transaction and makes review consumers verify it. Exact protocol slot sets are enforced. The latest fixes include persisted seal-actor verification across review queue, details, and original-artifact retrieval; corrected event-chain gap fixture ordering; and migration-0030 checksum/order fixtures. The exact-head rerun must include the final `retrieve_for_review` fix: reviewer access now passes the persisted seal actor into root verification, matching the queue and details paths. Fresh exact-head CI/authority verification is pending; do not merge before all 13 workflows and DB gates pass.
 
-**Next implementation:** migration 0029 manifest-root chain-tip/context binding and verified registration/consumers, artifact provenance, independent/recovery/adversarial tests. Continue in code, not planning.
+**M1 status:** database chain/context binding is merged; live runtime registration is the remaining M1 integration step. Then M2 original-artifact provenance, persisted observations, calibrated measurements, source-backed findings, and a deterministic report pipeline. The legacy in-memory four-tier dossier service is not production-ready. No deployment, external notarization, trusted timestamp, field qualification, participant evidence, live payment or dispatch is claimed.
 
 ## Active engineering focus — forensic substantiation
 

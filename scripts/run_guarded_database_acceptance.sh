@@ -59,7 +59,7 @@ cat "$root/database-evidence/harness.log" || true
 if [ "${FAOS_LEGACY_BASELINE_ALLOWED:-0}" = "1" ]; then
   # This workflow is intentionally pre-cutover. It validates only the legacy
   # component comparison suite; DB-01..DB-14 acceptance is evaluated by the
-  # separate full-authority workflow after all 29 migrations are applied.
+  # separate full-authority workflow after all 30 migrations are applied.
   gate_verification_rc=not_applicable
   printf 'classification=legacy-precutover-component-smoke\\nacceptance_gates=NOT_APPLICABLE\\nreason=authority_schema_not_installed\\n' > "$root/database-evidence/gate-verification.log"
 else
