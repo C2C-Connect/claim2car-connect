@@ -24,6 +24,7 @@ export interface CameraCalibration {
   intrinsics_3x3: [number, number, number, number, number, number, number, number, number];
   distortion_coefficients: number[];
   calibration_source: string;
+  source_api?: string | null;
   calibration_error_px?: number | null;
 }
 
@@ -44,6 +45,20 @@ export type Uncertainty =
   | { kind: "STANDARD_UNCERTAINTY"; standard_uncertainty: number; lower_bound?: never; upper_bound?: never; limitation?: never; coverage_probability?: number }
   | { kind: "BOUNDED_INTERVAL"; lower_bound: number; upper_bound: number; standard_uncertainty?: never; limitation?: never; coverage_probability?: number }
   | { kind: "QUALITATIVE_LIMITATION"; limitation: string; standard_uncertainty?: never; lower_bound?: never; upper_bound?: never; coverage_probability?: never };
+
+export interface QualityAssessment {
+  quality_id: UUID;
+  artifact_id: UUID;
+  metric: "LAPLACIAN_VARIANCE" | "LUMINANCE_MEAN" | "MOTION_MAGNITUDE" | "FRAMING_COMPLIANCE" | "FOCUS_SCORE" | "CUSTOM";
+  observed_value: number;
+  comparator: "GTE" | "LTE" | "BETWEEN" | "BOOLEAN";
+  threshold_policy_id: string;
+  threshold_policy_version: string;
+  threshold_values: number[];
+  result: "PASS" | "WARN" | "FAIL" | "NOT_ASSESSABLE";
+  method_version: string;
+  advisory_only: true;
+}
 
 export interface MeasurementRecord {
   measurement_id: UUID;
@@ -73,6 +88,10 @@ export interface InferenceRecord {
   assumptions: string[];
   alternatives: string[];
   missing_inputs: string[];
+  source_references: string[];
+  vehicle_applicability?: string | null;
+  source_revision?: string | null;
+  effective_date?: string | null;
 }
 
 export interface DecisionRecord {
@@ -86,22 +105,30 @@ export interface DecisionRecord {
 
 export interface CustodyAttestation {
   event_chain_tip_sha256: Sha256;
+  event_chain_tip_sequence: number;
+  hash_chain_version: string;
   manifest_sha256: Sha256;
   merkle_root_sha256?: Sha256 | null;
+  merkle_tree_version?: string | null;
+  merkle_leaf_count?: number | null;
   hash_algorithm: "SHA-256";
   serialization_version: string;
   /** WORM_VERIFIED is allowed only after independent storage-control verification. */
-  storage_claim: "DURABLE_STORAGE" | "APPEND_ONLY_POLICY" | "WORM_VERIFIED";
+  storage_claim: "DURABLE_STORAGE" | "APPEND_ONLY_POLICY";
+  immutability_verification_ref?: string | null;
   certification_status: "NOT_CERTIFIED" | "PENDING_QUALIFIED_CERTIFIER" | "CERTIFIED_BY_QUALIFIED_PERSON";
   certification_basis?: "FRE_902_13" | "FRE_902_14" | null;
   certifier_identity?: string | null;
   certificate_artifact_id?: UUID | null;
+  certifier_qualification_reference?: string | null;
+  certified_at_utc?: UtcTimestamp | null;
 }
 
 export interface EvidenceSubstantiationContractV1 {
   contract_version: "1.0.0";
   session_id: UUID;
   acquisitions: AcquisitionRecord[];
+  quality_assessments: QualityAssessment[];
   measurements: MeasurementRecord[];
   inferences: InferenceRecord[];
   decisions: DecisionRecord[];
