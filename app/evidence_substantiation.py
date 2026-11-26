@@ -60,6 +60,16 @@ class CameraCalibration(ContractModel):
         return value
 
 
+def _require_utc_timestamp(value):
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError("INVALID_CAPTURE_TIMESTAMP") from None
+    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        raise ValueError("CAPTURE_TIMESTAMP_MUST_BE_UTC")
+    return value
+
+
 class AcquisitionRecord(ContractModel):
     acquisition_id: UUID
     artifact: ArtifactReference
@@ -74,13 +84,7 @@ class AcquisitionRecord(ContractModel):
 
     @validator("captured_at_utc")
     def require_utc_timestamp(cls, value):
-        try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            raise ValueError("INVALID_CAPTURE_TIMESTAMP") from None
-        if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
-            raise ValueError("CAPTURE_TIMESTAMP_MUST_BE_UTC")
-        return value
+        return _require_utc_timestamp(value)
 
     @root_validator(skip_on_failure=True)
     def original_fidelity_is_explicit(cls, values):
@@ -138,7 +142,7 @@ class QualityAssessment(ContractModel):
 
 class MeasurementRecord(ContractModel):
     measurement_id: UUID
-    source_acquisition_ids: list[UUID] = Field(min_items=1)
+    source_acquisition_ids: list[UUID] = Field(min_length=1)
     method_id: StrictStr = Field(min_length=1, max_length=128)
     method_version: StrictStr = Field(min_length=1, max_length=64)
     value: float
@@ -185,20 +189,22 @@ class InferenceRecord(ContractModel):
 
 class DecisionRecord(ContractModel):
     decision_id: UUID
-    input_inference_ids: list[UUID] = Field(min_items=1)
+    input_inference_ids: list[UUID] = Field(min_length=1)
     action: Literal["LOW_SEVERITY_TRIAGE", "HIGH_SEVERITY_TRIAGE", "HUMAN_REVIEW", "ABSTAIN", "NO_ACTION"]
-    reason_codes: list[StrictStr] = Field(min_items=1)
+    reason_codes: list[StrictStr] = Field(min_length=1)
     decided_by: StrictStr = Field(min_length=1, max_length=128)
     decided_at_utc: StrictStr
 
     @validator("decided_at_utc")
     def require_utc_decision_time(cls, value):
-        return AcquisitionRecord.require_utc_timestamp(value)
+        return _require_utc_timestamp(value)
 
 
 class CustodyAttestation(ContractModel):
-    event_chain_tip_sha256: StrictStr = Field(regex=SHA256)
-    manifest_sha256: StrictStr = Field(regex=SHA256)
+    event_chain_tip_sha256: StrictStr = Field(pattern=SHA256)
+    event_chain_tip_sequence: int = Field(gt=0)
+    hash_chain_version: StrictStr = Field(min_length=1, max_length=64)
+    manifest_sha256: StrictStr = Field(pattern=SHA256)
     merkle_root_sha256: StrictStr | None = Field(default=None, pattern=SHA256)
     merkle_tree_version: StrictStr | None = Field(default=None, max_length=64)
     merkle_leaf_count: int | None = Field(default=None, gt=0)
