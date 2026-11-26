@@ -179,7 +179,7 @@ class CaptureSessionIntegration(unittest.TestCase):
                 request_id=uuid.uuid4(), artifact_id=artifact_id, slot=CANONICAL_SLOTS[0],
                 payload_base64=base64.b64encode(raw).decode('ascii'),
                 sha256_hex=hashlib.sha256(raw).hexdigest())
-            key = ArtifactKey(self.f.tenants[0], uuid.UUID(session_id), uuid.UUID(artifact_id))
+            key = ArtifactKey(uuid.UUID(str(self.f.tenants[0])), uuid.UUID(session_id), uuid.UUID(artifact_id))
             original_delete = byte_store.delete
             calls = {'count': 0}
 
