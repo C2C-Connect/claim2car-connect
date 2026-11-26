@@ -176,7 +176,7 @@ class CaptureSessionIntegration(unittest.TestCase):
             raw = b'consent-withdrawal-retry-original'
             artifact_id = str(uuid.uuid4())
             service.register_artifact(self.auth(), session_id,
-                request_id=uuid.uuid4(), artifact_id=artifact_id, slot=LEGACY_CANONICAL_SLOTS[0],
+                request_id=uuid.uuid4(), artifact_id=artifact_id, slot=CANONICAL_SLOTS[0],
                 payload_base64=base64.b64encode(raw).decode('ascii'),
                 sha256_hex=hashlib.sha256(raw).hexdigest())
             key = ArtifactKey(self.f.tenants[0], uuid.UUID(session_id), uuid.UUID(artifact_id))
