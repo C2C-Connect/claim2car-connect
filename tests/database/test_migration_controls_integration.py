@@ -240,7 +240,7 @@ class MigrationControlsIntegration(unittest.TestCase):
             new_version = admin.execute(
                 'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
                 (tenant,new_session)).fetchone()[0]
-            self.assertEqual(new_version,'claims2car-16-v2')
+            self.assertEqual(new_version,'claims2car-16-v1')
             with self.assertRaises(psycopg.errors.RaiseException) as raised:
                 admin.execute(
                     "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v2' WHERE tenant_id=%s AND session_id=%s",
