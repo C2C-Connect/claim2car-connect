@@ -26,8 +26,6 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0029_manifest_root_chain_context_binding.sql',
             '0030_runtime_manifest_registration.sql',
             '0031_faos_v2_manifest_root_protocol.sql',
-            '0031_faos_v2_manifest_root_protocol.sql',
-            '0031_faos_v2_manifest_root_protocol.sql',
         ]))
 
     def test_requires_event_contract_parity_migration(self):
@@ -65,6 +63,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql',
                 '0027_capture_protocol_16_v2.sql','0028_persistent_event_hash_chain.sql',
                 '0029_manifest_root_chain_context_binding.sql','0030_runtime_manifest_registration.sql',
+                '0031_faos_v2_manifest_root_protocol.sql',
             ]))
 
     def test_rejects_duplicate_authority_migration_names(self):
@@ -201,6 +200,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0025_square_sandbox_payment_intents.sql','0026_square_sandbox_webhook_reconciliation.sql',
                 '0027_capture_protocol_16_v2.sql','0029_manifest_root_chain_context_binding.sql',
                 '0028_persistent_event_hash_chain.sql','0030_runtime_manifest_registration.sql',
+                '0031_faos_v2_manifest_root_protocol.sql',
             ]))
 
     def test_rejects_unreviewed_migration_after_0031(self):
@@ -220,6 +220,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
                 '0028_persistent_event_hash_chain.sql',
                 '0029_manifest_root_chain_context_binding.sql',
                 '0030_runtime_manifest_registration.sql',
+                '0031_faos_v2_manifest_root_protocol.sql',
                 '0032_unreviewed.sql',
             ]))
 
