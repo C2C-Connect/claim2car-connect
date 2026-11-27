@@ -1,9 +1,10 @@
 # Claim2Car — M1 Intake & Evidence Preservation Acceptance Registry
 
 **Document ID:** C2C-M1-AC-001  
-**Version:** 2.0.0  
+**Version:** 2.0.1  
 **Scope:** M1 Intake & Preservation only  
 **Authority:** Owner-approved M1 boundary. This registry does not authorize field deployment, real participant evidence, payment, dispatch, or marketplace activity.
+**Status snapshot:** 2026-11-27. This registry is proposed in open draft PR #187 and is not part of `main` until merged.
 
 ## 1. M1 product promise
 
@@ -26,12 +27,12 @@ Each gate requires implementation evidence on the current main revision, exact-h
 
 | Gate | Acceptance requirement | Required evidence | Current status |
 |---|---|---|---|
-| M1-01 Authorization & consent | Authenticated actor and tenant; disclosure version; explicit scope/acceptance; withdrawal and retry semantics fail safely; no consent inferred from session creation. | API/database tests for unauthorized, declined, withdrawn, duplicate, retry, tenant-isolation and audit behavior. | PARTIAL — core consent path exists; PR #194 records deletion/retry semantics as an open audit item. |
+| M1-01 Authorization & consent | Authenticated actor and tenant; disclosure version; explicit scope/acceptance; withdrawal and retry semantics fail safely; no consent inferred from session creation. | API/database tests for unauthorized, declined, withdrawn, duplicate, retry, tenant-isolation and audit behavior. | PARTIAL — PR #196 is open/draft at exact head `5b6560082d509c597b1cce68f99c1781a10b80dc` and all 13 workflow types passed. It adds durable intent/receipts for registered originals with owner-triggered retries; derivative/report, backup/PITR, offline-device and legal-hold lifecycle remain open. |
 | M1-02 Versioned capture | Exact 16-point protocol identity and ordering; 12-slot legacy sessions remain interpretable; retakes supersede rather than erase; unavailable/unsafe slots are explicit exceptions and never represented as captured. | Protocol contract, operator workflow tests, safety pause/abort tests, quality/retake and package-completeness tests. | IMPLEMENTED IN SOFTWARE / FIELD-UNQUALIFIED — physical device and operator qualification remain open. |
-| M1-03 Original evidence preservation | Original bytes, artifact ID, SHA-256, byte length, MIME, actor/session/protocol and immutable storage reference are bound to a registered manifest. Derivatives remain separate and parent-linked. | Original-byte round trip, manifest/artifact binding, mismatch and mutation rejection, fresh-process retrieval. | VERIFIED COMPONENT — PR #185 merged as `590724597a65395ece225128b40ec48fa6ece34b`; post-merge exact-main verification still required. |
+| M1-03 Original evidence preservation | Original bytes, artifact ID, SHA-256, byte length, MIME, actor/session/protocol and immutable storage reference are bound to a registered manifest. Derivatives remain separate and parent-linked. | Original-byte round trip, manifest/artifact binding, mismatch and mutation rejection, fresh-process retrieval. | VERIFIED COMPONENT IN MERGED PR #185; current `main` is `3ee88aa022efb12a2d428ab31f91721eb41bfbcc`. The current combined-status query returned no entries for that SHA, so post-merge exact-main workflow evidence is not established. PR #196 deletion covers registered originals only. |
 | M1-04 Offline/online synchronization | Durable encrypted local queue; stable artifact/request IDs; FIFO retry; idempotent server ingest; conflict and partial failure do not silently lose or duplicate evidence. | Browser IndexedDB and API integration tests, interrupted upload/restart/retry and tamper tests. | IMPLEMENTED IN SOFTWARE / FIELD-UNQUALIFIED — field-device recovery qualification remains open. |
-| M1-05 Independent server verification | Server recomputes persisted event chain and original artifact digests; registered manifest root is bound to the exact seal event, chain tip/sequence/version, tenant/session/protocol context; failures block downstream use and create durable audit events. | PostgreSQL authority tests, authenticated HTTP seal/replay, fresh-runtime verification, one-byte tamper rejection and tenant isolation. | VERIFIED COMPONENT — PR #185 merge contains runtime manifest registration; post-merge exact-main checks required. |
-| M1-06 Reviewer retrieval & decision | Authorized reviewer retrieves verified originals and manifest; reviewer identity, decision, reason and referenced artifacts are recorded; invalid/unverified context fails closed. | Separate reviewer identity, cross-tenant denial, original retrieval, attributable decision and tamper-failure tests. | VERIFIED COMPONENT IN PR #185; confirm current-main exact-head integration after merge. |
+| M1-05 Independent server verification | Server recomputes persisted event chain and original artifact digests; registered manifest root is bound to the exact seal event, chain tip/sequence/version, tenant/session/protocol context; failures block downstream use and create durable audit events. | PostgreSQL authority tests, authenticated HTTP seal/replay, fresh-runtime verification, one-byte tamper rejection and tenant isolation. | VERIFIED COMPONENT IN MERGED PR #185; exact-main evidence for current `main` SHA `3ee88aa022efb12a2d428ab31f91721eb41bfbcc` remains unestablished by the available status query. |
+| M1-06 Reviewer retrieval & decision | Authorized reviewer retrieves verified originals and manifest; reviewer identity, decision, reason and referenced artifacts are recorded; invalid/unverified context fails closed. | Separate reviewer identity, cross-tenant denial, original retrieval, attributable decision and tamper-failure tests. | VERIFIED COMPONENT IN MERGED PR #185; exact-main integration evidence for current `main` remains unestablished. |
 | M1-07 Operational readiness | Consent lifecycle, storage encryption, backup/restore, recovery, monitoring, access/device qualification and a repeatable controlled demonstration are evidenced. | Restore drill, key/access controls, device qualification, monitoring evidence, controlled end-to-end run and incident/recovery procedures. | NOT ACCEPTED — PR #194 audit retains open consent, encryption/backup, device qualification and monitoring findings. |
 
 ## 4. Explicitly excluded from M1 acceptance
@@ -62,13 +63,14 @@ Use only these implementation states:
 
 A green workflow is not field qualification, acceptance, deployment or operational status. A database technical gate is not a product release gate.
 
-## 6. Current implementation checkpoint
+## 6. Current implementation checkpoint — 2026-11-27
 
-- PR #185, `Wire chain-bound manifest registration into live capture seal/review path`, was squash-merged to main as `590724597a65395ece225128b40ec48fa6ece34b` on 2026-11-26.
-- Its exact candidate head `a7174d45a02cc6b8312a00b1ca31671019726728` had 13/13 workflow types green and DB-01–DB-14 14/14 technical PASS (408/408 counted authority tests, zero DB skips). This evidence is for the candidate head, not a substitute for post-merge main verification.
-- PR #186 report rendering remains stacked on an earlier pre-merge #185 head. Rebase onto the merged main commit and rerun the full workflow set before considering merge. Reports must preserve original bytes as authoritative and label bounding boxes as suspect-region identifiers, not measured geometry.
-- PR #194 audit remains draft. Its open findings include consent deletion/retry semantics, application-level storage encryption and backup/restore, field/device/accessibility/performance qualification and operational monitoring.
-- PR #195 defines the Evidence Measurement and Substantiation Contract v1.0.0; it is a schema/validation increment, not sensor capture, metrology validation or M1 acceptance.
+- **Main:** `3ee88aa022efb12a2d428ab31f91721eb41bfbcc`, the PR #198 merge commit. PR #185 is merged at `590724597a65395ece225128b40ec48fa6ece34b`. The combined-status query for the current main SHA returned no entries; candidate-head checks do not establish post-merge exact-main verification.
+- **PR #195:** open/draft at `934f7cca7ff9d145d2a187f444c9bbcc4422c0f8`; all 13 distinct workflow types passed. This implements contract validation, not sensor, metrology, model validation or M1 acceptance.
+- **PR #196:** open/draft at `5b6560082d509c597b1cce68f99c1781a10b80dc`; all 13 workflow types passed, including the full suite and database authority cutover. It adds a durable per-original deletion outbox and receipts. Retries are initiated by the same owner; derivative/report cleanup, backups/PITR, offline-device acknowledgement and legal-hold semantics are out of scope.
+- **PR #186:** open and based on an earlier pre-#198 main revision; rebase and exact-head verification are required before its report implementation is treated as current.
+- **PR #187 and #194:** open draft proposals; neither registry nor audit is canonical on main. **PR #188:** infrastructure proposal only; no integrated deployment is established.
+- **Release disposition:** M1 remains **NOT ACCEPTED**. Real participant evidence, field use, payment, dispatch and production deployment are not authorized.
 
 ## 7. Release prohibitions
 
