@@ -131,7 +131,7 @@ class MigrationControlsIntegration(unittest.TestCase):
             fixture.setUp()
             try:
                 self.assertEqual(fixture.register(),'REGISTERED')
-                self.assertEqual(run_migrations(),('0030_runtime_manifest_registration.sql',))
+                self.assertEqual(run_migrations(),('0031_faos_v2_manifest_root_protocol.sql',))
                 with patch.dict(os.environ,env):
                     with tenant_transaction(fixture.conn,fixture.tenant):
                         privileges=fixture.conn.execute(
