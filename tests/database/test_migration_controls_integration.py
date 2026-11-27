@@ -506,6 +506,6 @@ class MigrationControlsIntegration(unittest.TestCase):
         apply(self.conn,plan)
         before = self.history()
         changed = plan[:-1]+(replace(plan[-1],sha256='0'*64),)
-        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0031_faos_v2_manifest_root_protocol.sql'):
+        with self.assertRaisesRegex(ValueError,'APPLIED_MIGRATION_CHANGED:0032_original_artifact_deletion_outbox.sql'):
             apply(self.conn,changed)
         self.assertEqual(self.history(),before)
