@@ -144,6 +144,7 @@ class AuthorityMigrationInventoryTests(unittest.TestCase):
             '0027_capture_protocol_16_v2.sql',
             '0028_persistent_event_hash_chain.sql', '0029_manifest_root_chain_context_binding.sql',
             '0030_runtime_manifest_registration.sql',
+            '0031_faos_v2_manifest_root_protocol.sql',
         ]
         selectors = (
             'test_migration_plan.MigrationPlanTests.test_order',
