@@ -178,7 +178,11 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_event_chain_backfill_gap_rolls_back_migration(self):
         plan=self.authority_plan()
-        apply(self.conn,plan[:-4])
+        hash_chain_index=next(
+            index for index,migration in enumerate(plan)
+            if migration.name=='0028_persistent_event_hash_chain.sql'
+        )
+        apply(self.conn,plan[:hash_chain_index])
         tenant=str(uuid.uuid4())
         session='chain-gap-'+uuid.uuid4().hex
         payload='{"synthetic":true}'
