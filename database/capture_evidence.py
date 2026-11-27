@@ -2,7 +2,8 @@
 
 Metadata is committed to the existing RLS-protected append-only event journal.
 Original media is written to the administrator-provisioned POSIX byte store;
-no raw VIN is persisted, and consent withdrawal deletes registered originals.
+no raw VIN is persisted, and consent withdrawal durably queues each registered
+original for deletion with a per-artifact completion receipt.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from uuid import UUID, uuid5
 import psycopg
 
 from app.artifact_storage import (
-    ArtifactIntegrityError, ArtifactKey, ArtifactNotFound, OriginalByteStore,
+    ArtifactIntegrityError, ArtifactKey, ArtifactNotFound, ArtifactStorageUnavailable, OriginalByteStore,
 )
 from app.evidence_manifest import ManifestEntry, build_manifest
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, require_implemented_protocol
@@ -40,6 +41,13 @@ class _EvidenceArtifactIntegrityFailure(Exception):
         self.expected_sha256 = expected_sha256
         self.failure_code = failure_code
         super().__init__(failure_code)
+
+
+class OriginalArtifactDeletionPending(OSError):
+    """Consent is revoked and deletion is durably queued for a same-owner retry."""
+
+    def __init__(self, detail):
+        super().__init__(str(detail))
 
 DISCLOSURE_VERSION = "disclosure-v1"
 VEHICLE_DECODE_DISCLOSURE_VERSION = "vehicle-decode-disclosure-v1"
@@ -410,7 +418,6 @@ class CaptureEvidenceService:
                 ).fetchone()[0]
                 if binding != "BOUND":
                     raise CaptureAuthorizationError("CLAIM_CASE_OWNER_BINDING_DENIED")
-            previous = self._consent_state(history)
             event_id = "consent:" + request_id
             payload = {
                 "accepted": accepted,
@@ -445,10 +452,11 @@ class CaptureEvidenceService:
                              kind="CONSENT_RECORDED", reason="owner consent state recorded", payload=payload)
                 history.append(("CONSENT_RECORDED", actor.actor_id, payload, event_id))
             if not accepted:
-                artifacts = [data["artifact_id"] for kind, _who, data, _ in history
-                    if kind == "ARTIFACT_REGISTERED" and type(data) is dict
-                    and isinstance(data.get("artifact_id"), str)]
-                deletion_tenant = actor.tenant_id
+                conn.execute(
+                    "SELECT faos.enqueue_original_artifact_deletions("
+                    "%s::uuid,%s::text,%s::text,%s::text)",
+                    (actor.tenant_id, session_id, actor.actor_id, event_id),
+                ).fetchone()
                 if _session.scope == "persistent-claim-case" and _session.claim_id:
                     conn.execute(
                         "SELECT faos.revoke_collision_vehicle_source(%s::uuid,%s::text,%s::text)",
@@ -462,13 +470,72 @@ class CaptureEvidenceService:
                         "SELECT faos.revoke_vehicle_decode_profiles(%s::uuid,%s::text,%s::text)",
                         (actor.tenant_id, session_id, actor.actor_id),
                     )
-            else:
-                artifacts = []
-                deletion_tenant = actor.tenant_id
-        deleted = sum(bool(self.byte_store.delete(
-            ArtifactKey(deletion_tenant, UUID(session_id), UUID(artifact_id)))) for artifact_id in artifacts)
+        if accepted:
+            deleted = pending = 0
+        else:
+            deleted, pending = self._process_pending_original_deletions(authorization, session_id)
         return {"session_id": session_id, "accepted": accepted, "replayed": replayed,
-                "deleted_original_artifacts": deleted}
+                "deleted_original_artifacts": deleted,
+                "pending_original_artifacts": pending,
+                "original_artifact_deletion_status": "NOT_REQUESTED" if accepted else "COMPLETE"}
+
+    def _process_pending_original_deletions(self, authorization, session_id):
+        """Attempt queued original deletions outside the consent transaction.
+
+        The database records intent in the consent transaction and records each
+        idempotent storage outcome afterward. A crash between them leaves a
+        pending row for the same owner to retry.
+        """
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role != "owner":
+                raise CaptureAuthorizationError("OWNER_IDENTITY_REQUIRED")
+            jobs = conn.execute(
+                "SELECT artifact_id,attempt_count "
+                "FROM faos.pending_original_artifact_deletions(%s::uuid,%s::text,%s::text)",
+                (actor.tenant_id, session_id, actor.actor_id),
+            ).fetchall()
+
+        outcomes = []
+        deleted = 0
+        first_failure = None
+        for artifact_id, _attempt_count in jobs:
+            try:
+                removed = self.byte_store.delete(
+                    ArtifactKey(actor.tenant_id, UUID(session_id), UUID(str(artifact_id)))
+                )
+                outcome = "DELETED" if removed else "ALREADY_ABSENT"
+                error_code = None
+                deleted += int(bool(removed))
+            except Exception as error:
+                outcome = "FAILED"
+                error_code = (
+                    "ARTIFACT_STORAGE_UNAVAILABLE"
+                    if isinstance(error, ArtifactStorageUnavailable)
+                    else "DELETION_ATTEMPT_FAILED"
+                )
+                if first_failure is None:
+                    first_failure = error
+            outcomes.append((str(artifact_id), outcome, error_code))
+
+        with self.sessions._authorized(authorization) as (conn, actor):
+            if actor.actor_role != "owner":
+                raise CaptureAuthorizationError("OWNER_IDENTITY_REQUIRED")
+            for artifact_id, outcome, error_code in outcomes:
+                conn.execute(
+                    "SELECT faos.record_original_artifact_deletion_attempt("
+                    "%s::uuid,%s::text,%s::uuid,%s::text,%s::text,%s::text)",
+                    (actor.tenant_id, session_id, artifact_id, actor.actor_id, outcome, error_code),
+                )
+            remaining = conn.execute(
+                "SELECT count(*) FROM faos.pending_original_artifact_deletions("
+                "%s::uuid,%s::text,%s::text)",
+                (actor.tenant_id, session_id, actor.actor_id),
+            ).fetchone()[0]
+        if first_failure is not None or remaining:
+            raise OriginalArtifactDeletionPending(
+                first_failure or "ORIGINAL_ARTIFACT_DELETION_PENDING"
+            ) from None
+        return deleted, int(remaining)
 
     def record_vehicle_decode_consent(self, authorization, session_id, *, request_id, accepted, scope, disclosure_version):
         session_id = self._session_id(session_id)

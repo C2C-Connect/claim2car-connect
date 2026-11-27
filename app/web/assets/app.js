@@ -255,14 +255,17 @@ async function withdrawCaptureConsent() {
       body:JSON.stringify({request_id:uuid(),accepted:false,scope:"capture_review"})
     });
   } catch (error) {
+    if (error.message === "ORIGINAL_ARTIFACT_DELETION_PENDING") {
+      return message("owner-message","Consent withdrawal is recorded, but server deletion is still queued. Local browser evidence was not purged. Retry the withdrawal, then confirm the queue is cleared before reusing this device.",true);
+    }
     return message("owner-message",`Server withdrawal was not confirmed; local evidence was not purged. ${error.message}`,true);
   }
   try {
     const localDeleted = evidenceQueue ? await evidenceQueue.deleteSession(id,{tenantId:identity.tenant_id}) : 0;
     if (activeSession === id) { activeReadiness = {...result,session_id:id,consent_active:false,vehicle_reference_present:false,capture_allowed:false}; renderWorkflowProgress(activeReadiness); await refreshCaptureQueueStatus(id); }
-    message("owner-message",`Capture consent withdrawn. Server deleted ${result.deleted_original_artifacts ?? 0} original(s); local browser queue removed ${localDeleted} item(s).`);
+    message("owner-message",`Capture consent withdrawn. Server deletion receipts are complete; local browser queue removed ${localDeleted} item(s).`);
   } catch (error) {
-    message("owner-message",`Capture consent was withdrawn and the server deleted ${result.deleted_original_artifacts ?? 0} original(s), but local browser deletion failed: ${error.message}. Do not reuse this device until its pending evidence storage is cleared.`,true);
+    message("owner-message",`Capture consent was withdrawn and server deletion receipts are complete, but local browser deletion failed: ${error.message}. Do not reuse this device until its pending evidence storage is cleared.`,true);
   }
 }
 async function recordIncidentConsent(accepted = true) {

@@ -164,9 +164,9 @@ def _check_map(diagnostics):
 def _matrix_ok(check):
     if not isinstance(check, dict) or check.get("status") != "PASS":
         return False
-    if check.get("table_count") != 17 or check.get("tenant_directions") != 2:
+    if check.get("table_count") != 18 or check.get("tenant_directions") != 2:
         return False
-    if check.get("assertion_count") != 340 or len(check.get("results", [])) != 34:
+    if check.get("assertion_count") != 360 or len(check.get("results", [])) != 36:
         return False
     required = {
         "rls_flags", "own_read", "cross_read", "cross_insert", "cross_update",
@@ -260,7 +260,7 @@ def verify_db_01(context):
         database and database[0] == "claim2car_test"
         and "PostgreSQL" in str(database[1] if len(database) > 1 else "")
         and {"plpgsql", "postgis", "pgcrypto"}.issubset(extensions)
-        and len(inventory) == 30
+        and len(inventory) == 31
         and connections_ok
         and context.get("environment_is_synthetic") is True
     )
@@ -274,11 +274,11 @@ def verify_db_02(context):
     result = _gate(context, "DB-02")
     inventory = (context.get("diagnostics") or {}).get("migration_inventory") or []
     names = [row[0] for row in inventory if isinstance(row, (list, tuple)) and row]
-    expected = [f"{number:04d}_" for number in range(1, 31)]
-    if len(names) != 30 or any(not name.startswith(prefix) for name, prefix in zip(names, expected)):
+    expected = [f"{number:04d}_" for number in range(1, 32)]
+    if len(names) != 31 or any(not name.startswith(prefix) for name, prefix in zip(names, expected)):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("ORDERED_COMPLETE_MIGRATION_INVENTORY")
-    if (len(inventory) != 30 or any(
+    if (len(inventory) != 31 or any(
             not isinstance(row, (list, tuple)) or len(row) != 2
             or not isinstance(row[1], str) or len(row[1]) != 64
             or any(character not in "0123456789abcdef" for character in row[1])
@@ -344,7 +344,7 @@ def verify_db_14(context):
             or not diagnostics.get("commit")
             or not diagnostics.get("candidate_commit")
             or not diagnostics.get("tested_checkout_commit")
-            or len(diagnostics.get("migration_inventory") or []) != 30):
+            or len(diagnostics.get("migration_inventory") or []) != 31):
         result["status"] = "FAIL"
         result["failed_sql_checks"].append("SAME_RUN_COMPLETE_GATE_EVIDENCE_AND_FAILURE_ACCOUNTING")
     return result
