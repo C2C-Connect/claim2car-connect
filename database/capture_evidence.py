@@ -493,10 +493,11 @@ class CaptureEvidenceService:
                 "SELECT artifact_id,attempt_count "
                 "FROM faos.pending_original_artifact_deletions(%s::uuid,%s::text,%s::text)",
                 (actor.tenant_id, session_id, actor.actor_id),
-            ).fetchall()
+            ).fetchall() or []
 
         outcomes = []
         deleted = 0
+        pending = 0
         first_failure = None
         for artifact_id, _attempt_count in jobs:
             try:
@@ -521,21 +522,18 @@ class CaptureEvidenceService:
             if actor.actor_role != "owner":
                 raise CaptureAuthorizationError("OWNER_IDENTITY_REQUIRED")
             for artifact_id, outcome, error_code in outcomes:
-                conn.execute(
+                result = conn.execute(
                     "SELECT faos.record_original_artifact_deletion_attempt("
                     "%s::uuid,%s::text,%s::uuid,%s::text,%s::text,%s::text)",
                     (actor.tenant_id, session_id, artifact_id, actor.actor_id, outcome, error_code),
-                )
-            remaining = conn.execute(
-                "SELECT count(*) FROM faos.pending_original_artifact_deletions("
-                "%s::uuid,%s::text,%s::text)",
-                (actor.tenant_id, session_id, actor.actor_id),
-            ).fetchone()[0]
-        if first_failure is not None or remaining:
+                ).fetchone()
+                status = result[0] if result is not None else outcome
+                pending += int(status == "PENDING")
+        if first_failure is not None or pending:
             raise OriginalArtifactDeletionPending(
                 first_failure or "ORIGINAL_ARTIFACT_DELETION_PENDING"
             ) from None
-        return deleted, int(remaining)
+        return deleted, pending
 
     def record_vehicle_decode_consent(self, authorization, session_id, *, request_id, accepted, scope, disclosure_version):
         session_id = self._session_id(session_id)
