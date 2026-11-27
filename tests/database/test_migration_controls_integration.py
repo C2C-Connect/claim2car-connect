@@ -1,4 +1,4 @@
-"""PostgreSQL migration controls with session-bound tenant context and 16-v1 root binding."""
+"""PostgreSQL migration controls with session-bound tenant context and versioned root binding."""
 from dataclasses import replace
 import hashlib
 import os
@@ -178,7 +178,7 @@ class MigrationControlsIntegration(unittest.TestCase):
 
     def test_event_chain_backfill_gap_rolls_back_migration(self):
         plan=self.authority_plan()
-        apply(self.conn,plan[:-3])
+        apply(self.conn,plan[:-4])
         tenant=str(uuid.uuid4())
         session='chain-gap-'+uuid.uuid4().hex
         payload='{"synthetic":true}'
@@ -240,10 +240,10 @@ class MigrationControlsIntegration(unittest.TestCase):
             new_version = admin.execute(
                 'SELECT capture_protocol_version FROM faos.sessions WHERE tenant_id=%s AND session_id=%s',
                 (tenant,new_session)).fetchone()[0]
-            self.assertEqual(new_version,'claims2car-16-v1')
+            self.assertEqual(new_version,'claims2car-16-v2')
             with self.assertRaises(psycopg.errors.RaiseException) as raised:
                 admin.execute(
-                    "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v1' WHERE tenant_id=%s AND session_id=%s",
+                    "UPDATE faos.sessions SET capture_protocol_version='claims2car-16-v2' WHERE tenant_id=%s AND session_id=%s",
                     (tenant,legacy_session))
             self.assertEqual(raised.exception.diag.message_primary,'CAPTURE_PROTOCOL_VERSION_IMMUTABLE')
 
@@ -251,23 +251,23 @@ class MigrationControlsIntegration(unittest.TestCase):
         plan = self.authority_plan()
         apply(self.conn, plan)
         tenant = str(uuid.uuid4())
-        session = 'manifest-root-16-' + uuid.uuid4().hex
-        seal = 'seal-16-' + uuid.uuid4().hex
+        session = 'manifest-root-16-v2-' + uuid.uuid4().hex
+        seal = 'seal-16-v2-' + uuid.uuid4().hex
         digest = 'a' * 64
-        payload = '{"manifest_digest":"' + digest + '","schema_version":"0.1","shot_list_version":"claims2car-16-v1"}'
+        payload = '{"manifest_digest":"' + digest + '","schema_version":"0.1","shot_list_version":"claims2car-16-v2"}'
         self.admin_db.execute(
             'INSERT INTO faos.organizations(tenant_id,name) VALUES (%s,%s)',
             (tenant, 'synthetic manifest root protocol fixture'),
         )
         self.admin_db.execute(
             'INSERT INTO faos.sessions(tenant_id,session_id,capture_protocol_version) VALUES (%s,%s,%s)',
-            (tenant, session, 'claims2car-16-v1'),
+            (tenant, session, 'claims2car-16-v2'),
         )
         self.admin_db.execute(
             'INSERT INTO faos.events(tenant_id,session_id,event_id,sequence,kind,actor,occurred_at,reason,payload_json,schema_version) '
             'VALUES (%s,%s,%s,1,%s,%s,%s,%s,%s,%s)',
             (tenant, session, seal, 'MANIFEST_SEALED', 'synthetic-test',
-             '2026-01-01T00:00:00Z', 'synthetic 16-v1 manifest root', payload, '0.1'),
+             '2026-01-01T00:00:00Z', 'synthetic 16-v2 manifest root', payload, '0.1'),
         )
         self.admin_db.execute(
             'INSERT INTO faos.tenant_login_bindings(role_oid,role_name,tenant_id,enabled) '
@@ -288,9 +288,9 @@ class MigrationControlsIntegration(unittest.TestCase):
                     (tenant, session, seal, digest, version),
                 ).fetchone()[0]
 
-        self.assertEqual(register('claims2car-16-v1'), 'REGISTERED')
+        self.assertEqual(register('claims2car-16-v2'), 'REGISTERED')
         with self.assertRaisesRegex(psycopg.errors.RaiseException, 'ROOT_PROTOCOL_SESSION_MISMATCH'):
-            register('claims2car-12-v1')
+            register('claims2car-16-v1')
 
         with self.assertRaises(psycopg.errors.RaiseException) as raised:
             with self.admin_db.transaction():
@@ -303,7 +303,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                 self.admin_db.execute(
                     'INSERT INTO faos.manifest_roots(tenant_id,session_id,seal_event_id,manifest_digest,shot_list_version) '
                     'VALUES (%s,%s,%s,%s,%s)',
-                    (tenant, session, seal, digest, 'claims2car-12-v1'),
+                    (tenant, session, seal, digest, 'claims2car-16-v1'),
                 )
         self.assertEqual(raised.exception.diag.message_primary, 'ROOT_PROTOCOL_SESSION_MISMATCH')
         self.assertEqual(
@@ -311,7 +311,7 @@ class MigrationControlsIntegration(unittest.TestCase):
                 'SELECT shot_list_version FROM faos.manifest_roots WHERE tenant_id=%s AND session_id=%s',
                 (tenant, session),
             ).fetchall(),
-            [('claims2car-16-v1',)],
+            [('claims2car-16-v2',)],
         )
 
     def test_full_migration_enforces_python_sql_event_contract_parity(self):
