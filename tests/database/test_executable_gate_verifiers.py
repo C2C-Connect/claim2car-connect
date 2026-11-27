@@ -1,4 +1,4 @@
-"""Unit tests for 14-gate acceptance, 30 migrations, and 16-v1 root binding."""
+"""Unit tests for 14-gate acceptance, 31 migrations, and versioned manifest-root binding."""
 import unittest
 
 from verify_gates import (
@@ -67,6 +67,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             '0028_persistent_event_hash_chain.sql',
             '0029_manifest_root_chain_context_binding.sql',
             '0030_runtime_manifest_registration.sql',
+            '0031_faos_v2_manifest_root_protocol.sql',
         ]
         selectors = (
             'test_candidate_manifest.CandidateManifestTests.test_added_migration_detected',
