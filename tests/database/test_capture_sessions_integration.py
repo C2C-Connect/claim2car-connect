@@ -174,11 +174,12 @@ class CaptureSessionIntegration(unittest.TestCase):
             service.record_vehicle(self.auth(), session_id,
                 request_id=uuid.uuid4(), vin='1HGCM82633A004352')
             raw = b'consent-withdrawal-retry-original'
+            expected_sha256 = hashlib.sha256(raw).hexdigest()
             artifact_id = str(uuid.uuid4())
             service.register_artifact(self.auth(), session_id,
                 request_id=uuid.uuid4(), artifact_id=artifact_id, slot=CANONICAL_SLOTS[0],
                 payload_base64=base64.b64encode(raw).decode('ascii'),
-                sha256_hex=hashlib.sha256(raw).hexdigest())
+                sha256_hex=expected_sha256)
             key = ArtifactKey(uuid.UUID(str(self.f.tenants[0])), uuid.UUID(session_id), uuid.UUID(artifact_id))
             original_delete = byte_store.delete
             calls = {'count': 0}
@@ -193,14 +194,14 @@ class CaptureSessionIntegration(unittest.TestCase):
             with self.assertRaisesRegex(OSError, 'synthetic transient'):
                 service.record_consent(self.owner_auth(), session_id,
                     request_id=uuid.uuid4(), accepted=False, scope='capture_review')
-            self.assertEqual(byte_store.get(key), raw)
+            self.assertEqual(byte_store.get(key, expected_sha256=expected_sha256), raw)
 
             retried = service.record_consent(self.owner_auth(), session_id,
                 request_id=uuid.uuid4(), accepted=False, scope='capture_review')
             self.assertFalse(retried['accepted'])
             self.assertEqual(retried['deleted_original_artifacts'], 1)
             with self.assertRaises(ArtifactNotFound):
-                byte_store.get(key)
+                byte_store.get(key, expected_sha256=expected_sha256)
             consent_rows = self.f.seed.execute(
                 "SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s AND kind='CONSENT_RECORDED'",
                 (self.f.tenants[0], session_id),
