@@ -118,7 +118,7 @@ class ExecutableGateVerifierTests(unittest.TestCase):
             "tested_checkout_commit": "checkout",
             "migration_inventory": [
                 (f"{number:04d}_migration.sql", "0" * 64)
-                for number in range(1, 32)
+                for number in range(1, 33)
             ],
         }
         context = {
