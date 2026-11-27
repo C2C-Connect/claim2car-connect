@@ -46,7 +46,7 @@ Migration 0028 persists SHA-256 event hashes and transactionally backfills. PR #
 
 **M1 remains incomplete:** manifest-root chain-tip/sequence/hash-version/context binding, registered original/artifact binding, independent verifier agreement, restart/restore/concurrency/fork and external checkpoint. No deployment, field qualification, participant evidence, payment or dispatch.
 
-**Next code target:** migration 0029 for seal/root chain-tip and context binding; recompute/validate the persisted chain at registration; make root/readback/completion/receipt consumers verify the binding. Then artifact provenance and independent/recovery/adversarial tests.
+**Historical next code target:** migration 0029 for seal/root chain-tip and context binding; this was completed by later migrations and PR #185. The current next action is exact-main M1 verification in [Execution Status](EXECUTION_STATUS.md).
 
 ## Historical checkpoint before PR #180 (superseded)
 
@@ -243,7 +243,7 @@ For each increment:
 - **PR #127 verification (separate earlier increment):** 13/13 workflows green; 1,185 tests, 0 failures/errors/skips; DB-01–DB-14 14/14; 26 migrations; 17 tenant-scoped tables and 34 tenant-matrix entries. Synthetic CI acceptance, not field validation or production certification.
 - **OCI staging remains NOT deployed.** Terraform state bucket, plan/apply, infrastructure, host, Postgres/PostGIS, persistent evidence storage, backup/restore and integrated journey have not been executed/verified. Cloud credentials and protected GitHub environments are not inspectable or dispatchable from this session. The private staging host cannot receive Square webhooks from Square directly; no relay has been reviewed or deployed. Live payments remain disabled.
 
-## Current next task — M1 readback and seal binding (after PR #180)
+## Historical next task — M1 readback and seal binding (superseded by PR #182)
 
 Continue from current main. Implement server-owned readback verification; bind manifest seal/root to verified chain tip, sequence/version and capture context; bind registered original/artifacts; then independent verifier, restart/restore, concurrency and adversarial tests. Keep dispatch/payment disabled. M1 remains incomplete; do not claim acceptance.
 
