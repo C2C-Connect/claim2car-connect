@@ -34,7 +34,7 @@ Use [Execution Status](../EXECUTION_STATUS.md) and [Execution Handoff](../EXECUT
 Current main is `3ee88aa022efb12a2d428ab31f91721eb41bfbcc`. Exact-main post-merge M1 verification is not established by the available status query. PR #196 is a passing draft candidate for registered-original deletion only; M1 remains NOT ACCEPTED.
 
 # Claim2Car Forensic Substantiation Program
-## Latest verified implementation checkpoint — PR #182 merged (2026-11-23)
+## Historical implementation checkpoint — PR #182 merged (2026-11-23; superseded)
 
 PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows green**. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests, DB-01–DB-14 14/14 PASS and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
 
@@ -42,7 +42,7 @@ Migration 0028 persists SHA-256 event hashes and fail-closed backfill. PR #182 a
 
 **M1 incomplete:** sealed manifest roots do not bind verified chain tip, sequence, hash version and context; registered original/artifact binding, independent verifier agreement, recovery/concurrency/fork tests and external checkpoint remain. No staging, field qualification, participant evidence, payment or dispatch.
 
-**Next code task:** migration 0029 for manifest-root chain-tip/context binding and verified registration/consumers; then artifact provenance and independent/recovery/adversarial tests. No planning loop.
+**Historical next code task:** migration 0029 for manifest-root chain-tip/context binding. Later migrations and PR #185 implemented that work; exact-main M1 verification is now the next technical action. See [Execution Status](../EXECUTION_STATUS.md).
 
 ## Mission
 
