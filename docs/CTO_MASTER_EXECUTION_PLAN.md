@@ -1,17 +1,12 @@
 # Claim2Car Connect — CTO Master Execution Plan
 
-## Updated execution priority — forensic substantiation (2026-11-23)
+## Current execution checkpoint — 27 November 2026
 
-## Latest verified checkpoint — PR #182 merged (2026-11-23)
+Current main is `3ee88aa022efb12a2d428ab31f91721eb41bfbcc`. PR #185 is merged; post-merge exact-main M1 verification remains open. PR #196 is a draft candidate with all 13 workflow types passing and implements durable deletion receipts for registered originals only. M1 remains NOT ACCEPTED.
 
-PR #182 merged as `f0c6fbfc7d0278e77964a45004e0e42ede7a8146`; exact tested head `668785ea465b807932e63fdb6a555ed419099b6b`, **13/13 workflows green**. Full suite: 1,054 passed, 31 warnings, 219 subtests. Isolated synthetic PostgreSQL acceptance: 390 counted tests; DB-01–DB-14 14/14 PASS and database overall ACCEPTED. This is not forensic M1 acceptance or field qualification.
+The current ordered work is recorded in [Execution Status](EXECUTION_STATUS.md): exact-main M1 verification, full consent deletion lifecycle, storage/backup recovery, then device/workbench convergence. The execution program below is the long-range product plan, not a current implementation checkpoint.
 
-Migration 0028 persists SHA-256 event hashes and fail-closed backfill. PR #182 adds server-owned persisted-chain readback from PostgreSQL; invalid chains fail closed before replay/locked consumers; legacy unhashed status is explicit; partial schema fails closed. Tamper, tenant, legacy and locked-consumer tests passed.
-
-**M1 incomplete:** sealed manifest roots do not bind verified chain tip, sequence, hash version and context; registered original/artifact binding, independent verifier agreement, recovery/concurrency/fork tests and external checkpoint remain. No staging, field qualification, participant evidence, payment or dispatch.
-
-**Next code task:** migration 0029 for manifest-root chain-tip/context binding and verified registration/consumers; then artifact provenance and independent/recovery/adversarial tests. No planning loop.
-
+---
 
 **Document ID:** C2C-CTO-EXEC-001  
 **Version:** 1.0  

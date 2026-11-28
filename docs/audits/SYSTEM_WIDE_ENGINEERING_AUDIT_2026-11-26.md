@@ -1,5 +1,7 @@
 # Claim2Car Connect — System-Wide Engineering Audit (26 November 2026)
 
+> Historical snapshot. Current PR dispositions and next priorities are in [the 27 November 2026 audit checkpoint](SYSTEM_WIDE_ENGINEERING_AUDIT_2026-11-27.md).
+
 **Repository:** `C2C-Connect/claim2car-connect`  
 **Status:** Source-level audit reconciled with live pull-request search, selected source files and workflow evidence. Not a penetration test, legal opinion, field qualification, forensic validation or release acceptance.
 

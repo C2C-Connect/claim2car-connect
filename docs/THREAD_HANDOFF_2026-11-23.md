@@ -1,5 +1,7 @@
 # Claim2Car — authoritative thread handoff / current engineering state
 
+> **Archived handoff:** superseded on 27 November 2026. Use [the current execution handoff](EXECUTION_HANDOFF.md) and [status snapshot](EXECUTION_STATUS.md) for active project state.
+
 ## 0. Current checkpoint — 2026-11-24
 
 - **PR #184 merged:** `55f69790df123a4602196c3c474e143808c4b87e`; exact tested head `95692eaf30f76ca9ab8b7c0cf71c4bcf9fac5d68`; 13/13 workflows passed. Full suite 1,064 passed, 7 skipped, 31 warnings, 218 subtests. Authority suite 407/407 counted tests; DB-01–DB-14 14/14 PASS; 340 tenant-isolation assertions.

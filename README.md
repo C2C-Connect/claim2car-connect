@@ -1,6 +1,6 @@
-# Current governing calibration — 26 November 2026
+# Current governing calibration — 27 November 2026
 
-> **Authority notice:** This is the current project calibration. Older dated checkpoints and “next task” statements below this notice are retained as history only. They are not active instructions where they conflict with this notice, the Foundational Vision & Technical White Paper, the current M1 acceptance registry, or a newer exact-head verified checkpoint.
+> **Authority notice:** This is the current project calibration. Older dated checkpoints and “next task” statements below this notice are retained as history only. They are not active instructions where they conflict with this notice, the Foundational Vision & Technical White Paper, the M1 acceptance matrix and draft registry in PR #187, or a newer exact-head verified checkpoint.
 
 - **Canonical product repository:** `C2C-Connect/claim2car-connect`; `main` is the only active product line. Historical/prototype repositories and branches are reference material, not alternate sources of truth.
 - **Product:** a controlled evidence acquisition and substantiation platform for the accident-response ecosystem. Its differentiator is traceability from original observation through measurement and inference to an authorized decision.
@@ -8,7 +8,11 @@
 - **Architecture direction:** React/Capacitor capture client; FastAPI modular monolith; PostgreSQL/PostGIS transactional authority; durable object storage; background workers/outbox. Do not introduce a parallel ledger or polyglot database without a demonstrated need.
 - **M1 boundary:** authorized intake, consent and actor attribution; versioned 16-point capture accounting with safety exceptions/retakes and legacy interpretation; original-byte preservation; offline synchronization; server-side verification; authorized reviewer retrieval and attributable human decision.
 - **M1 exclusions:** LiDAR volumetric crush measurement, autonomous structural/yield adjudication, CRASH3 outcome verdicts, collision causation, roadworthiness, repair authorization, total-loss decisions, payments, dispatch and marketplace. These remain separate research or release-gated workstreams.
-- **Live repository checkpoint (26 Nov):** PR #185 is recorded merged to main as `590724597a65395ece225128b40ec48fa6ece34b`; its candidate head had 13/13 workflow types and DB-01–DB-14 14/14 technical PASS (408/408 counted DB tests). Post-merge exact-main verification is still required. PR #195 is open/draft with Evidence Measurement and Substantiation Contract v1.0.0; its recorded exact head `934f7cca7ff9d145d2a187f444c9bbcc4422c0f8` had 13/13 workflow types, 1,082 full-suite passes, 7 skips, 218 subtests, and DB authority 415/415 with 14/14 technical gates. This is contract validation, not sensor/metrology/model validation. PR #196 contains a consent-deletion retry fix; exact corrected-head verification remains pending. PR #186 report work is stale/stacked and must be rebased before use. PR #187 narrows M1 acceptance. PR #194 is a source-level audit checkpoint. PR #188 is an OCI proposal only.
+- **Live repository checkpoint (27 Nov 2026):** `C2C-Connect/claim2car-connect` main is `3ee88aa022efb12a2d428ab31f91721eb41bfbcc` (PR #198 merge). PR #185 is merged at `590724597a65395ece225128b40ec48fa6ece34b`.
+- **Post-merge verification:** the combined-status query for current main returned no entries; candidate PR checks do not establish exact-main verification. The post-merge M1 verification remains open.
+- **PR #195:** open/draft at exact head `934f7cca7ff9d145d2a187f444c9bbcc4422c0f8`; all 13 distinct workflow types passed. This is contract validation, not sensor/metrology/model validation or M1 acceptance.
+- **PR #196:** open/draft at exact head `5b6560082d509c597b1cce68f99c1781a10b80dc`; all 13 workflow types passed, including the full suite and authority cutover. It adds a durable deletion outbox and receipts for registered originals; retry is owner-triggered. Derivative/report cleanup, backup/PITR, offline-device acknowledgements, legal holds, encryption and recovery remain open.
+- **Other active PRs:** #186 is open against an earlier base and needs rebase; #187 M1 registry and #194 audit remain draft proposals; #188 is an infrastructure proposal only. PR #185 is recorded merged to main as `590724597a65395ece225128b40ec48fa6ece34b`; its candidate head had 13/13 workflow types and DB-01–DB-14 14/14 technical PASS (408/408 counted DB tests). Post-merge exact-main verification is still required. PR #195 is open/draft with Evidence Measurement and Substantiation Contract v1.0.0; its recorded exact head `934f7cca7ff9d145d2a187f444c9bbcc4422c0f8` had 13/13 workflow types, 1,082 full-suite passes, 7 skips, 218 subtests, and DB authority 415/415 with 14/14 technical gates. This is contract validation, not sensor/metrology/model validation. PR #196 contains a consent-deletion retry fix; exact corrected-head verification remains pending. PR #186 report work is stale/stacked and must be rebased before use. PR #187 narrows M1 acceptance. PR #194 is a source-level audit checkpoint. PR #188 is an OCI proposal only.
 - **Release truth:** M1 is not accepted; no physical-device field qualification, persistent integrated staging deployment, real participant evidence, live payment, or dispatch activation is established. Do not claim otherwise.
 - **Device decision:** exact iPad baseline and whether LiDAR is an M1 requirement remain unresolved pending device-specific qualification. Standardized managed fleet is the intended operating model; hardware capability is not assumed from marketing specifications.
 - **Commercial planning:** dealer fee $375 on qualified close; shop fee $275 on recorded acceptance per current planning documents; operator amount $110 carried forward but payout trigger/eligibility/ledger remain unresolved; owner cash incentive is excluded. No live payment or payout logic until its release and contract gates pass.
@@ -17,7 +21,7 @@
 
 **Authoritative references**
 1. [Foundational Vision & Technical White Paper](CLAIM2CAR_FOUNDATIONAL_VISION_AND_TECHNICAL_WHITE_PAPER.md)
-2. [System-Wide Engineering Audit — 2026-11-26](audits/SYSTEM_WIDE_ENGINEERING_AUDIT_2026-11-26.md)
+2. [System-Wide Engineering Audit — 2026-11-27](audits/SYSTEM_WIDE_ENGINEERING_AUDIT_2026-11-27.md)
 3. [M1 Acceptance & Release Gate Matrix](acceptance/ACCEPTANCE_MATRIX.md)
 4. [Evidence Measurement and Substantiation Contract v1.0 — PR #195](https://github.com/C2C-Connect/claim2car-connect/pull/195) — open/draft implementation; not device or measurement validation.
 
@@ -25,21 +29,13 @@
 
 # Claim2Car Connect / FAOS — San Antonio pilot
 
-## Latest authoritative handoff — forensic substantiation (2026-11-24)
+## Current status and next work — 27 November 2026
 
-**Read first:** [complete thread handoff](docs/THREAD_HANDOFF_2026-11-23.md). PR #184 merged as `55f69790df123a4602196c3c474e143808c4b87e`; exact tested head `95692eaf30f76ca9ab8b7c0cf71c4bcf9fac5d68`; **13/13 workflows green**. Full suite: 1,064 passed, 7 skipped, 31 warnings, 218 subtests. Isolated synthetic PostgreSQL authority acceptance: 407/407 counted tests, DB-01–DB-14 14/14 PASS, 340 tenant-isolation assertions.
+The live repository state, M1 disposition and next verified actions are in the [execution status](docs/EXECUTION_STATUS.md) and [execution handoff](docs/EXECUTION_HANDOFF.md). The refreshed source/status review is the [27 November audit checkpoint](docs/audits/SYSTEM_WIDE_ENGINEERING_AUDIT_2026-11-27.md). M1 remains not accepted; exact-main verification is the next technical priority.
 
-**Active implementation:** [PR #185 — runtime manifest registration](https://github.com/C2C-Connect/claim2car-connect/pull/185), branch `cto/m1-runtime-manifest-registration`, current branch head (verify live PR #185 before acting). Migration 0030 wires root registration into the live capture seal transaction and makes review consumers verify it. Exact protocol slot sets are enforced. The latest fixes include persisted seal-actor verification across review queue, details, and original-artifact retrieval; corrected event-chain gap fixture ordering; and migration-0030 checksum/order fixtures. The exact-head rerun must include the final `retrieve_for_review` fix: reviewer access now passes the persisted seal actor into root verification, matching the queue and details paths. Fresh exact-head CI/authority verification is pending; do not merge before all 13 workflows and DB gates pass.
+## Historical implementation checkpoints (superseded)
 
-**M1 status:** database chain/context binding is merged; live runtime registration is the remaining M1 integration step. Then M2 original-artifact provenance, persisted observations, calibrated measurements, source-backed findings, and a deterministic report pipeline. The legacy in-memory four-tier dossier service is not production-ready. No deployment, external notarization, trusted timestamp, field qualification, participant evidence, live payment or dispatch is claimed.
-
-## Active engineering focus — forensic substantiation
-
-The owner has directed undivided focus on substantiating what Claim2Car claims to know: durable provenance, evidence-to-observation traceability, vehicle identity/configuration, camera calibration/alignment, geometric measurement with uncertainty, damage localization, source-backed parts/repair assessment, and reproducible forensic reports. Do not pivot to adjacent features until the initial forensic vertical slice is implemented and validated.
-
-**Program and handoff:** [Forensic Substantiation Program](docs/forensics/FORENSIC_SUBSTANTIATION_PROGRAM.md). The M1 persistent hash-chain increment is merged; the next code milestone is server-owned persisted-chain verification and seal/context binding, then registered-original/artifact verification. Then artifact binding, VIN, camera geometry, one damage region/measurement, source-backed technical assessment, report, and held-out validation. Synthetic known-answer data first.
-
-A hash or hash chain does not establish capture authenticity, identity, causation, damage classification, calibrated measurement, or independent notarization. Reports must distinguish observation, measurement, inference, causation, hidden damage, and repair advice; expose sources, methods, uncertainty and limitations. No unsupported precision or claims of forensic certification. No real participant evidence, live payments, dispatch, or public/accepted staging before independent release gates.
+The dated implementation notes that follow are retained as chronology. Their former “next task” statements are not current.
 
 ## Verified checkpoint — 2026-11-23 (PR #171 merged)
 
@@ -76,11 +72,7 @@ Current UI entry change: [PR #153](https://github.com/C2C-Connect/claim2car-conn
 - **No false completion:** distinguish implemented, integrated, automated-tested, accuracy/field-validated, deployed, and operationally accepted. Do not report placeholders, synthetic demonstrations, green CI, or a container smoke test as a deployed product.
 - **Resume without re-planning:** new sessions must read the handoff and status snapshot, inspect live GitHub state, and continue the next executable step; do not ask the founder what to do next or repeat the plan.
 
-- **Production over planning:** the product concept is settled. Do not produce another high-level plan, placeholder, mock, or disconnected scaffold as a substitute for working software. Every increment must materially improve a functional, integrated, deployable product.
-- **Sequential execution:** choose the next dependency-respecting implementation task and carry it through real logic, integrations, tests, failure fixes, exact-commit verification, merge when verified, deployment, and real end-to-end checks.
-- **Proactive autonomy:** execute within the founder's standing authorization. Make reasonable architecture and implementation decisions, resolve ordinary dependencies, edit files, run CI, and proceed without asking for routine intermediate approvals. Pause only for concrete missing credentials/access, costs not authorized, or genuine legal/privacy/security/safety decisions.
-- **No false completion:** distinguish implemented, integrated, automated-tested, accuracy/field-validated, deployed, and operationally accepted. Do not report placeholders, synthetic demonstrations, green CI, or a container smoke test as a deployed product.
-- **Resume without re-planning:** new sessions must read the handoff and status snapshot, inspect live GitHub state, and continue the next executable step; do not ask the founder what to do next or repeat the plan.
+
 
 The founder has expressly authorized high-autonomy, end-to-end execution: sequentially implement, integrate, test, commit, merge verified increments, provision/deploy the platform where access permits, and validate the deployed product. The goal is an operational Claim2Car product—not an endless plan, placeholder, mock, scaffold, or demo presented as production.
 

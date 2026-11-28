@@ -1,6 +1,6 @@
 # Claim2Car Claims, Legal Review & Publication Register
 
-**Effective:** 26 November 2026  
+**Effective:** 27 November 2026  
 **Authority:** Current product calibration and owner-approved M1 boundary.  
 **Purpose:** Track external claims and legal/commercial publication approvals. This file is not legal advice or evidence of counsel approval.
 
@@ -24,11 +24,11 @@ Use qualified language such as “designed to support,” “intended to preserv
 | Claim / feature | Current status | Publication rule |
 |---|---|---|
 | Original-byte preservation and SHA-256 verification | Software components implemented/tested; post-merge and operational storage verification remain | State exactly which bytes and verification boundary are covered. Hashes do not prove scene truth, capture time/location, identity or admissibility. |
-| Persistent event chain and manifest registration | PR #185 recorded merged; candidate CI 13/13 and DB 14/14; exact-main post-merge check pending | Describe as tamper-evident under stated threat model, not immutable or independently notarized. |
+| Persistent event chain and manifest registration | PR #185 merged; current main is `3ee88aa022efb12a2d428ab31f91721eb41bfbcc`; the combined-status query returned no entries for that exact SHA | Describe as tamper-evident under stated threat model, not immutable or independently notarized. |
 | Evidence Measurement and Substantiation Contract v1.0.0 | PR #195 open/draft; exact-head automated contract checks reported green | Contract schema only; no claim of actual camera calibration, LiDAR accuracy, physical metrology or model validation. |
 | 16-point capture protocol | Versioned software contracts exist; field/device qualification absent | Describe completeness accounting, exceptions and retakes. Never claim every view is safe or obtainable. |
 | Browser offline queue encryption | Automated browser/CI evidence exists; no WORM/secure enclave or field qualification | Do not call IndexedDB immutable or physically tamper-proof. |
-| Consent withdrawal | Retry correction in PR #196; exact corrected-head acceptance pending; durable deletion lifecycle incomplete | Do not promise global/immediate deletion across derivatives, backups and offline devices. |
+| Consent withdrawal | PR #196 is open/draft at `5b6560082d509c597b1cce68f99c1781a10b80dc`; all 13 workflow types passed. Durable outbox/receipts cover registered originals; broader lifecycle remains incomplete | Do not promise global/immediate deletion across derivatives, backups and offline devices. |
 | Human review | Controlled software workflow exists; field/operational acceptance pending | State reviewer scope and evidence available; do not imply expert certification unless actually performed. |
 
 ## 3. AI, physics, measurement and vehicle claims
