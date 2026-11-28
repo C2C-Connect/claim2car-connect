@@ -42,6 +42,7 @@ class FakeConnection:
         self.rows = [(1, "SESSION_CREATED", "operator-1", json.dumps(payload), "capture-created")]
         self.appended = []
         self.owner_bindings = {}
+        self.deletion_jobs = {}
 
     def execute(self, sql, args=()):
         if "faos.bind_claim_case_owner" in sql:
@@ -55,6 +56,42 @@ class FakeConnection:
             return Result(many=[(str(UUID(int=2)),)])
         if "SELECT sequence,kind,actor,payload_json,event_id" in sql:
             return Result(many=list(self.rows))
+        if "faos.enqueue_original_artifact_deletions" in sql:
+            _tenant, session, owner, _withdrawal_event_id = args
+            jobs = self.deletion_jobs.setdefault(session, {})
+            inserted = 0
+            for _sequence, kind, _actor, payload_json, _event_id in self.rows:
+                if kind != "ARTIFACT_REGISTERED":
+                    continue
+                artifact_id = json.loads(payload_json).get("artifact_id")
+                if artifact_id and artifact_id not in jobs:
+                    jobs[artifact_id] = {
+                        "owner": owner,
+                        "status": "PENDING",
+                        "attempt_count": 0,
+                    }
+                    inserted += 1
+            return Result(one=(inserted,))
+        if "faos.pending_original_artifact_deletions" in sql:
+            _tenant, session, owner = args
+            jobs = [
+                (UUID(artifact_id), job["attempt_count"])
+                for artifact_id, job in self.deletion_jobs.get(session, {}).items()
+                if job["owner"] == owner and job["status"] == "PENDING"
+            ]
+            return Result(many=jobs)
+        if "faos.record_original_artifact_deletion_attempt" in sql:
+            _tenant, session, artifact_id, owner, outcome, _error_code = args
+            job = self.deletion_jobs.get(session, {}).get(str(artifact_id))
+            if job is None or job["owner"] != owner:
+                raise AssertionError("artifact deletion job must be owner-bound")
+            if job["status"] == "PENDING":
+                job["attempt_count"] += 1
+                job["status"] = {
+                    "DELETED": "DELETED",
+                    "ALREADY_ABSENT": "ALREADY_ABSENT",
+                }.get(outcome, "PENDING")
+            return Result(one=(job["status"],))
         if "faos.register_manifest_root_from_capture" in sql:
             return Result(one=("REGISTERED",))
         if "faos.verify_manifest_root_binding" in sql:

@@ -15,7 +15,7 @@ from database.capture_sessions import CaptureAuthorizationError, CaptureSessionC
 from database.claim_cases import ClaimCaseConflict, ClaimCaseNotFound, ClaimCaseStore
 from database.financial_ledger import PersistentFinancialLedger
 from backend.app.anchor.ledger import PartnerAcceptanceRecord
-from app.artifact_storage import OriginalByteStore
+from app.artifact_storage import ArtifactKey, ArtifactNotFound, OriginalByteStore
 from database.capture_evidence import CaptureEvidenceService
 from app.evidence_manifest import CANONICAL_SLOTS, LEGACY_CANONICAL_SLOTS
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
@@ -161,6 +161,52 @@ class CaptureSessionIntegration(unittest.TestCase):
         persisted = self.store.get(self.auth(), case.capture_session_id)
         self.assertEqual((persisted.scope, persisted.claim_id, persisted.owner_actor_id),
                          ('persistent-claim-case', claim_id, 'claim-owner-0'))
+
+    def test_capture_consent_withdrawal_retries_original_deletion_after_transient_store_failure(self):
+        claim_id = str(uuid.uuid4())
+        case = self.claim_cases.create(self.auth(), claim_id=claim_id, request_id=str(uuid.uuid4()))
+        session_id = case.capture_session_id
+        with tempfile.TemporaryDirectory() as root:
+            byte_store = OriginalByteStore(root)
+            service = CaptureEvidenceService(self.store, byte_store, 'P'*43)
+            service.record_consent(self.owner_auth(), session_id,
+                request_id=uuid.uuid4(), accepted=True, scope='capture_review')
+            service.record_vehicle(self.auth(), session_id,
+                request_id=uuid.uuid4(), vin='1HGCM82633A004352')
+            raw = b'consent-withdrawal-retry-original'
+            expected_sha256 = hashlib.sha256(raw).hexdigest()
+            artifact_id = str(uuid.uuid4())
+            service.register_artifact(self.auth(), session_id,
+                request_id=uuid.uuid4(), artifact_id=artifact_id, slot=CANONICAL_SLOTS[0],
+                payload_base64=base64.b64encode(raw).decode('ascii'),
+                sha256_hex=expected_sha256)
+            key = ArtifactKey(uuid.UUID(str(self.f.tenants[0])), uuid.UUID(session_id), uuid.UUID(artifact_id))
+            original_delete = byte_store.delete
+            calls = {'count': 0}
+
+            def fail_first_delete(object_key):
+                if calls['count'] == 0:
+                    calls['count'] += 1
+                    raise OSError('synthetic transient object-store deletion failure')
+                return original_delete(object_key)
+
+            byte_store.delete = fail_first_delete
+            with self.assertRaisesRegex(OSError, 'synthetic transient'):
+                service.record_consent(self.owner_auth(), session_id,
+                    request_id=uuid.uuid4(), accepted=False, scope='capture_review')
+            self.assertEqual(byte_store.get(key, expected_sha256=expected_sha256), raw)
+
+            retried = service.record_consent(self.owner_auth(), session_id,
+                request_id=uuid.uuid4(), accepted=False, scope='capture_review')
+            self.assertFalse(retried['accepted'])
+            self.assertEqual(retried['deleted_original_artifacts'], 1)
+            with self.assertRaises(ArtifactNotFound):
+                byte_store.get(key, expected_sha256=expected_sha256)
+            consent_rows = self.f.seed.execute(
+                "SELECT count(*) FROM faos.events WHERE tenant_id=%s AND session_id=%s AND kind='CONSENT_RECORDED'",
+                (self.f.tenants[0], session_id),
+            ).fetchone()[0]
+            self.assertEqual(consent_rows, 3)
 
     def test_claim_case_idempotency_conflict_is_rejected(self):
         request_id = str(uuid.uuid4())

@@ -37,12 +37,13 @@ def validate_authority_migration_inventory(inventory):
     expect('0029_manifest_root_chain_context_binding.sql' in names,'MANIFEST_ROOT_CHAIN_CONTEXT_BINDING_MIGRATION_REQUIRED')
     expect('0030_runtime_manifest_registration.sql' in names,'RUNTIME_MANIFEST_REGISTRATION_MIGRATION_REQUIRED')
     expect('0031_faos_v2_manifest_root_protocol.sql' in names,'FAOS_V2_MANIFEST_ROOT_PROTOCOL_MIGRATION_REQUIRED')
+    expect('0032_original_artifact_deletion_outbox.sql' in names,'ORIGINAL_ARTIFACT_DELETION_OUTBOX_MIGRATION_REQUIRED')
     expect(names.index('0017_event_contract_parity.sql') < names.index('0018_capture_protocol_session_binding.sql') < names.index('0019_manifest_root_protocol_binding.sql') < names.index('0020_collision_lifecycle_record.sql') < names.index('0021_collision_claim_link.sql') < names.index('0022_collision_vehicle_capture_link.sql') < names.index('0023_consented_vehicle_profile.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
     expect(names.index('0024_audited_capture_exceptions_pause_resume.sql') < names.index('0025_square_sandbox_payment_intents.sql') < names.index('0026_square_sandbox_webhook_reconciliation.sql') < names.index('0027_capture_protocol_16_v2.sql'),
            'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names.index('0027_capture_protocol_16_v2.sql') < names.index('0028_persistent_event_hash_chain.sql') < names.index('0029_manifest_root_chain_context_binding.sql') < names.index('0030_runtime_manifest_registration.sql') < names.index('0031_faos_v2_manifest_root_protocol.sql'),'AUTHORITY_MIGRATION_ORDER_INVALID')
-    expect(names[-1]=='0031_faos_v2_manifest_root_protocol.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0031')
+    expect(names.index('0027_capture_protocol_16_v2.sql') < names.index('0028_persistent_event_hash_chain.sql') < names.index('0029_manifest_root_chain_context_binding.sql') < names.index('0030_runtime_manifest_registration.sql') < names.index('0031_faos_v2_manifest_root_protocol.sql') < names.index('0032_original_artifact_deletion_outbox.sql'),'AUTHORITY_MIGRATION_ORDER_INVALID')
+    expect(names[-1]=='0032_original_artifact_deletion_outbox.sql','UNEXPECTED_AUTHORITY_MIGRATION_AFTER_0032')
 
 def denied(conn,tenant,event):
     with tenant_transaction(conn,tenant):
@@ -56,7 +57,7 @@ def denied(conn,tenant,event):
     else:
         raise AssertionError('UNAUTHORIZED_APPEND_ALLOWED')
 
-TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases','claim_case_incident_intake','square_sandbox_payment_intents','square_sandbox_payment_reconciliations','square_sandbox_webhook_receipts')
+TABLES = ('organizations','users','memberships','dealer_groups','dealer_locations','location_brands','sessions','events','manifest_roots','completion_receipts','financial_ledger_entries','financial_ledger_postings','claim_cases','claim_case_incident_intake','square_sandbox_payment_intents','square_sandbox_payment_reconciliations','square_sandbox_webhook_receipts','original_artifact_deletion_outbox')
 CHECKS = ('rls_flags','own_read','cross_read','cross_insert','cross_update','cross_delete','tenant_reassignment','spoofed_context','missing_context','malformed_context')
 
 def reject_mutation(conn,tenant,statement,parameters):
@@ -102,6 +103,7 @@ def verify(report,admin,connections,fixture_connections,tenants,session):
                 ).fetchone()[0]
             expect(registration in ('REGISTERED','DUPLICATE'),'SYNTHETIC_MANIFEST_ROOT_REGISTRATION_FAILED')
             admin.execute('INSERT INTO faos.completion_receipts(tenant_id,session_id,request_id,seal_event_id,event_sequence) VALUES (%s,%s,%s,%s,%s)',(tenant,session,ids['request'],seal,sequence))
+            admin.execute('INSERT INTO faos.original_artifact_deletion_outbox(tenant_id,session_id,artifact_id,withdrawal_event_id,requested_by) VALUES (%s,%s,%s,%s,%s)',(tenant,session,uuid.uuid4(),seal,'synthetic-matrix'))
             ledger_id='matrix-ledger-'+uuid.uuid4().hex
             admin.execute('INSERT INTO faos.financial_ledger_entries(tenant_id,entry_id,sequence,idempotency_key,session_id,entry_kind,fee_type,partner_org_id,acceptance_id,amount_cents,currency,actor_id,occurred_at,reason,previous_hash,entry_hash) VALUES (%s,%s,1,%s,%s,%s,%s,%s,%s,37500,%s,%s,%s,%s,%s,%s)',
                 (tenant,ledger_id,'matrix-ledger-idem-'+uuid.uuid4().hex,session,'OBLIGATION_BOOKED','DEALER_ACQUISITION_FEE','matrix-partner','matrix-acceptance','USD_CENTS','diagnostics','2026-01-01T00:00:00Z','diagnostic storage fixture','0'*64,'1'*64))
@@ -234,6 +236,7 @@ def verify(report,admin,connections,fixture_connections,tenants,session):
         matrix['status'] = 'PASS'
     finally:
         for tenant in tenants:
+            admin.execute('DELETE FROM faos.original_artifact_deletion_outbox WHERE tenant_id=%s AND session_id=%s AND requested_by=%s',(tenant,session,'synthetic-matrix'))
             admin.execute('DELETE FROM faos.square_sandbox_webhook_receipts WHERE tenant_id=%s AND provider_event_id LIKE %s',(tenant,'matrix-webhook-%'))
             admin.execute('DELETE FROM faos.square_sandbox_payment_reconciliations WHERE tenant_id=%s AND provider_payment_id LIKE %s',(tenant,'matrix-payment-%'))
             admin.execute('DELETE FROM faos.square_sandbox_payment_order_map WHERE tenant_id=%s AND provider_order_id LIKE %s',(tenant,'matrix-order-%'))

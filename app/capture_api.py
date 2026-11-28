@@ -36,7 +36,9 @@ from app.artifact_storage import (
     ArtifactConflict, ArtifactIntegrityError, ArtifactNotFound,
     ArtifactStorageUnavailable, OriginalByteStore,
 )
-from database.capture_evidence import CaptureEvidenceService, MAX_EVIDENCE_BYTES
+from database.capture_evidence import (
+    CaptureEvidenceService, MAX_EVIDENCE_BYTES, OriginalArtifactDeletionPending,
+)
 from app.capture_protocols import DEFAULT_CAPTURE_PROTOCOL, FAOS_CAPTURE_PROTOCOL, LEGACY_CAPTURE_PROTOCOL, resolve_capture_protocol
 from app.damage_localization import zone_for_slot
 from app.vision.photo_baseline import PhotoBaselineError, analyze_photo_bytes
@@ -522,6 +524,8 @@ def create_capture_app(runtime=None, *, enable_evidence=False):
                 _fail(404, 'COLLISION_NOT_FOUND')
             except CaptureSessionNotFound:
                 _fail(404, 'CAPTURE_SESSION_NOT_FOUND')
+            except OriginalArtifactDeletionPending:
+                _fail(503, 'ORIGINAL_ARTIFACT_DELETION_PENDING')
             except (CaptureStorageUnavailable, ArtifactStorageUnavailable):
                 _fail(503, 'CAPTURE_STORAGE_UNAVAILABLE')
             except (ArtifactConflict, ArtifactIntegrityError, ArtifactNotFound):
